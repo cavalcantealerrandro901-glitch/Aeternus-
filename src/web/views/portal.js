@@ -42,7 +42,7 @@ module.exports = (guild, userGuilds, user, botUser) => {
 
         body { display: flex; flex-direction: row; }
 
-        /* Sidebar para Desktop */
+        /* Sidebar Desktop */
         .sidebar { 
             width: 80px; 
             background: #030712; 
@@ -100,13 +100,62 @@ module.exports = (guild, userGuilds, user, botUser) => {
         .stat-card span { font-size: 0.8rem; color: #94a3b8; }
         .stat-card h3 { font-size: 1.3rem; color: #38bdf8; margin-top: 4px; }
 
-        /* Cards de Configuração */
+        /* 📁 MENU DE ABAS DE CATEGORIAS */
+        .category-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab-btn {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: #94a3b8;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.08);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.25s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Forms & Cards */
         .config-card { 
             background: rgba(255,255,255,0.02); 
             border: 1px solid rgba(255,255,255,0.06); 
             border-radius: 16px; 
             padding: 20px; 
-            margin-bottom: 20px; 
             width: 100%;
             box-sizing: border-box;
         }
@@ -157,11 +206,10 @@ module.exports = (guild, userGuilds, user, botUser) => {
             text-align: center;
             font-size: 0.9rem;
             display: inline-block;
-            width: auto;
         }
         .btn-save:hover { opacity: 0.9; }
 
-        /* 📱 Ajustes Exclusivos para Celular / Mobile */
+        /* Mobile Adjustments */
         @media (max-width: 768px) {
             body { flex-direction: column; }
             
@@ -176,52 +224,24 @@ module.exports = (guild, userGuilds, user, botUser) => {
                 border-bottom: 1px solid rgba(255,255,255,0.08); 
                 overflow-x: auto; 
                 overflow-y: hidden;
-                white-space: nowrap;
                 position: sticky;
                 top: 0;
                 z-index: 100;
                 background: #030712;
-                -webkit-overflow-scrolling: touch;
             }
 
-            .sidebar-guild {
-                width: 40px;
-                height: 40px;
-                border-radius: 12px;
-            }
-
+            .sidebar-guild { width: 40px; height: 40px; border-radius: 12px; }
             .main-content { padding: 16px 12px; }
 
-            .header { 
-                flex-direction: row; 
-                align-items: center; 
-                justify-content: space-between; 
-                margin-bottom: 16px;
-            }
-            
+            .header { margin-bottom: 16px; }
             .guild-title img { width: 44px; height: 44px; }
             .guild-title h1 { font-size: 1.2rem !important; }
 
-            .form-grid { 
-                grid-template-columns: 1fr !important; 
-            }
-
-            .stats-grid { 
-                grid-template-columns: repeat(3, 1fr); 
-                gap: 8px;
-            }
-
+            .form-grid { grid-template-columns: 1fr !important; }
+            .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
             .stat-card { padding: 10px; text-align: center; }
-            .stat-card span { font-size: 0.75rem; }
-            .stat-card h3 { font-size: 1.1rem; }
-
-            .config-card { padding: 14px; border-radius: 12px; }
-
-            .btn-save { 
-                width: 100% !important; 
-                box-sizing: border-box;
-                padding: 12px;
-            }
+            .config-card { padding: 14px; }
+            .btn-save { width: 100% !important; }
         }
     </style>
 </head>
@@ -249,12 +269,47 @@ module.exports = (guild, userGuilds, user, botUser) => {
             <div class="stat-card"><span>🏷️ Cargos</span><h3>${guild.roleCount}</h3></div>
         </div>
 
-        ${renderLogsCategory(guild)}
-        ${renderWelcomeCategory(guild)}
-        ${renderUpdatesCategory(guild)}
-        ${renderCustomCommandsCategory(guild)}
-        ${renderTicketsCategory(guild)}
+        <div class="category-tabs">
+            <button class="tab-btn active" onclick="switchTab(event, 'tab-logs')">📜 Geral & Logs</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tab-welcome')">👋 Boas-vindas</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tab-updates')">📢 Atualizações</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tab-custom-commands')">⚡ Comandos</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tab-tickets')">🎫 Tickets</button>
+        </div>
+
+        <div id="tab-logs" class="tab-content active">
+            ${renderLogsCategory(guild)}
+        </div>
+
+        <div id="tab-welcome" class="tab-content">
+            ${renderWelcomeCategory(guild)}
+        </div>
+
+        <div id="tab-updates" class="tab-content">
+            ${renderUpdatesCategory(guild)}
+        </div>
+
+        <div id="tab-custom-commands" class="tab-content">
+            ${renderCustomCommandsCategory(guild)}
+        </div>
+
+        <div id="tab-tickets" class="tab-content">
+            ${renderTicketsCategory(guild)}
+        </div>
     </div>
+
+    <script>
+        function switchTab(event, tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.currentTarget.classList.add('active');
+            const targetTab = document.getElementById(tabId);
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+        }
+    </script>
 </body>
 </html>
     `;
