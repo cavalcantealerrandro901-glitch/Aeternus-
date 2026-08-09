@@ -34,7 +34,7 @@ module.exports = (client, config) => {
         res.redirect(discordAuthUrl);
     });
 
-    // Callback de Autenticação do Discord
+    // Callback de Autenticação
     app.get('/auth/discord/callback', async (req, res) => {
         const code = req.query.code;
         if (!code) return res.redirect('/');
@@ -76,15 +76,32 @@ module.exports = (client, config) => {
         }
     });
 
+    // Função para filtrar servidores gerenciáveis onde o bot também está
+    function getManageableGuilds(userGuilds) {
+        if (!Array.isArray(userGuilds)) return [];
+
+        const ADMIN_PERMISSION = 0x8n;
+        const MANAGE_GUILD_PERMISSION = 0x20n;
+
+        return userGuilds.filter(g => {
+            const perms = BigInt(g.permissions || 0);
+            const isAdmin = (perms & ADMIN_PERMISSION) === ADMIN_PERMISSION;
+            const canManage = (perms & MANAGE_GUILD_PERMISSION) === MANAGE_GUILD_PERMISSION;
+            const isOwner = Boolean(g.owner);
+
+            const hasPermission = isAdmin || canManage || isOwner;
+            const isBotInGuild = client.guilds.cache.has(g.id);
+
+            return hasPermission && isBotInGuild;
+        });
+    }
+
     // Dashboard Principal
     app.get('/dashboard', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
 
-        const manageableGuilds = Array.isArray(session.guilds)
-            ? session.guilds.filter(g => ((BigInt(g.permissions) & 0x8n) === 0x8n || g.owner) && client.guilds.cache.has(g.id))
-            : [];
-
+        const manageableGuilds = getManageableGuilds(session.guilds);
         res.send(renderDashboard(session.user, manageableGuilds));
     });
 
@@ -93,11 +110,9 @@ module.exports = (client, config) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
 
-        const manageableGuilds = Array.isArray(session.guilds)
-            ? session.guilds.filter(g => ((BigInt(g.permissions) & 0x8n) === 0x8n || g.owner) && client.guilds.cache.has(g.id))
-            : [];
-
+        const manageableGuilds = getManageableGuilds(session.guilds);
         const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+
         if (!guild) return res.redirect('/dashboard');
 
         res.send(renderPortal(guild, manageableGuilds));
