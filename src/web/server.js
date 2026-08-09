@@ -17,26 +17,21 @@ module.exports = (client, config) => {
     const CLIENT_ID = config?.clientId || process.env.CLIENT_ID;
     const CLIENT_SECRET = config?.clientSecret || process.env.CLIENT_SECRET;
     const REDIRECT_URI = process.env.REDIRECT_URI || 'https://aeternus-q7gt.onrender.com/auth/discord/callback';
-    const SUPPORT_URL = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/seu-suporte'; // Altere no Render ou aqui
+    const SUPPORT_URL = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/seu-suporte';
 
-    // Rota Principal
     app.get('/', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&scope=bot%20applications.commands&permissions=8`;
         res.send(renderHome(session?.user || null, client.user, inviteUrl, SUPPORT_URL));
     });
 
-    // Rota de Login (OAuth2)
     app.get('/login', (req, res) => {
-        if (!CLIENT_ID) {
-            return res.status(500).send('CLIENT_ID não configurado nas variáveis de ambiente.');
-        }
+        if (!CLIENT_ID) return res.status(500).send('CLIENT_ID não configurado.');
         const encodedRedirect = encodeURIComponent(REDIRECT_URI);
         const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodedRedirect}&response_type=code&scope=identify%20guilds`;
         res.redirect(discordAuthUrl);
     });
 
-    // Callback de Autenticação
     app.get('/auth/discord/callback', async (req, res) => {
         const code = req.query.code;
         if (!code) return res.redirect('/');
@@ -78,7 +73,6 @@ module.exports = (client, config) => {
         }
     });
 
-    // Função para filtrar servidores gerenciáveis onde o bot também está
     function getManageableGuilds(userGuilds) {
         if (!Array.isArray(userGuilds)) return [];
 
@@ -98,7 +92,6 @@ module.exports = (client, config) => {
         });
     }
 
-    // Dashboard Principal
     app.get('/dashboard', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
@@ -107,7 +100,7 @@ module.exports = (client, config) => {
         res.send(renderDashboard(session.user, manageableGuilds, client.user));
     });
 
-    // Portal de Servidor Específico
+    // Portal de Configuração do Servidor Selecionado
     app.get('/dashboard/:guildId', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
@@ -117,7 +110,24 @@ module.exports = (client, config) => {
 
         if (!guild) return res.redirect('/dashboard');
 
-        res.send(renderPortal(guild, manageableGuilds, session.user, client.user));
+        const botGuild = client.guilds.cache.get(guild.id);
+        
+        // Obter lista de canais de texto
+        const textChannels = botGuild ? botGuild.channels.cache
+            .filter(c => c.type === 0 || c.type === 5) // Text / Announcement
+            .map(c => ({ id: c.id, name: c.name })) : [];
+
+        const serverData = {
+            id: guild.id,
+            name: guild.name,
+            icon: guild.icon,
+            memberCount: botGuild ? botGuild.memberCount : 'N/A',
+            channelCount: botGuild ? botGuild.channels.cache.size : 'N/A',
+            roleCount: botGuild ? botGuild.roles.cache.size : 'N/A',
+            textChannels: textChannels
+        };
+
+        res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
     });
 
     app.listen(PORT, () => console.log(`🌐 Painel Web rodando na porta ${PORT}`));
