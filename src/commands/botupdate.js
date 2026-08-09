@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../database/db');
+const { version: currentVersion } = require('../../package.json');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -16,7 +17,7 @@ module.exports = {
                 .setRequired(true))
         .addStringOption(option => 
             option.setName('versao')
-                .setDescription('Versão (Ex: v2.1.0)')
+                .setDescription('Versão personalizada (Opcional - por padrão usa a versão do package.json)')
                 .setRequired(false)),
 
     async execute(interaction) {
@@ -24,7 +25,10 @@ module.exports = {
 
         const titulo = interaction.options.getString('titulo');
         const novidades = interaction.options.getString('novidades');
-        const versao = interaction.options.getString('versao') || 'v2.0.0';
+        
+        // Puxa automaticamente a versão do package.json se não for informada
+        const customVersion = interaction.options.getString('versao');
+        const versaoFinal = customVersion ? customVersion : `v${currentVersion}`;
 
         let enviados = 0;
         let falhas = 0;
@@ -49,7 +53,7 @@ module.exports = {
                 const embed = new EmbedBuilder()
                     .setTitle(`🚀 ${titulo}`)
                     .setDescription(novidades)
-                    .addFields({ name: '📌 Versão', value: `\`${versao}\``, inline: true })
+                    .addFields({ name: '📌 Versão', value: `\`${versaoFinal}\``, inline: true })
                     .setColor('#38bdf8')
                     .setThumbnail(interaction.client.user.displayAvatarURL())
                     .setTimestamp()
@@ -63,7 +67,7 @@ module.exports = {
         }
 
         await interaction.editReply({
-            content: `✅ Anúncio transmitido com sucesso!\n📢 Servidores notificados: **${enviados}**\n⚠️ Falhas: **${falhas}**`
+            content: `✅ Anúncio transmitido com sucesso!\n📢 Servidores notificados: **${enviados}**\n⚠️ Falhas: **${falhas}**\n🏷️ Versão aplicada: **${versaoFinal}**`
         });
     }
 };
