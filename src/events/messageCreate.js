@@ -6,7 +6,12 @@ module.exports = {
     async execute(message) {
         if (message.author.bot || !message.guild) return;
 
-        if (!message.content.startsWith('!') && !message.content.startsWith('/')) return;
+        // Log no terminal para verificar se o bot está lendo mensagens
+        if (message.content.startsWith('!') || message.content.startsWith('/')) {
+            console.log(`💬 Mensagem detectada no servidor [${message.guild.name}]: "${message.content}"`);
+        } else {
+            return;
+        }
 
         const args = message.content.slice(1).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
@@ -15,9 +20,13 @@ module.exports = {
         const customCommands = guildConfig.customCommands || [];
 
         const foundCmd = customCommands.find(c => c.name === commandName);
-        if (!foundCmd) return;
+        if (!foundCmd) {
+            console.log(`⚠️ Comando !${commandName} não encontrado no banco deste servidor.`);
+            return;
+        }
 
         try {
+            console.log(`✅ Executando comando customizado !${commandName}...`);
             if (foundCmd.isEmbed) {
                 await sendMessage(message.channel, {
                     embed: {
@@ -34,7 +43,7 @@ module.exports = {
                 });
             }
         } catch (err) {
-            console.error(`❌ Erro ao executar comando customizado !${commandName}:`, err);
+            console.error(`❌ Erro ao enviar resposta do comando !${commandName}:`, err);
         }
     }
 };
