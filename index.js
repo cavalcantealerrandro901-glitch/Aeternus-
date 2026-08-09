@@ -5,7 +5,6 @@ const path = require('path');
 const express = require('express');
 require('dotenv').config();
 
-// Carrega o config.json se existir (local), senão usa o Render (Variáveis de Ambiente)
 let config;
 try {
     config = require('./config.json');
@@ -37,68 +36,91 @@ if (fs.existsSync(commandsPath)) {
         const command = require(filePath);
         if ('data' in command && 'execute' in command) {
             client.commands.set(command.data.name, command);
-            console.log(`📂 Comando carregado: ${command.data.name}`);
         }
     }
 }
 
-// Conectar ao MongoDB
-mongoose.connect(config.mongoUri || process.env.MONGO_URI)
-    .then(() => console.log('📦 Conectado ao MongoDB com sucesso!'))
-    .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
+// Conectar ao MongoDB com segurança
+const mongoUri = config.mongoUri || process.env.MONGO_URI;
+if (mongoUri) {
+    mongoose.connect(mongoUri)
+        .then(() => console.log('📦 Conectado ao MongoDB com sucesso!'))
+        .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
+} else {
+    console.warn('⚠️ MONGO_URI não definida!');
+}
 
-// Painel Web com Express
+// Painel Web com Express (HTML Moderno)
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('Aeternus Web Panel is running!');
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Aeternus - Painel Web</title>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                .card { background-color: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 100%; }
+                h1 { color: #38bdf8; margin-bottom: 10px; }
+                .status { display: inline-block; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-top: 15px; }
+                .online { background-color: #22c55e; color: white; }
+                p { color: #94a3b8; font-size: 14px; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>Aeternus Bot</h1>
+                <p>Painel de Controle e Status do Web Service</p>
+                <div class="status online">● Bot Online & Ativo</div>
+            </div>
+        </body>
+        </html>
+    `);
 });
 
 app.listen(PORT, () => {
-    console.log(`🌐 Painel Web rodando em: http://localhost:${PORT}`);
+    console.log(`🌐 Painel Web rodando na porta ${PORT}`);
 });
 
-// Evento quando o bot estiver pronto
+// Evento ready do Bot
 client.once('ready', async () => {
     console.log(`🤖 Aeternus conectado com sucesso como ${client.user.tag}!`);
 
-    // Registrar Slash Commands
     const commands = [];
     client.commands.forEach(command => commands.push(command.data.toJSON()));
 
-    const rest = new REST({ version: '10' }).setToken(config.token || process.env.DISCORD_TOKEN);
+    const token = config.token || process.env.DISCORD_TOKEN;
+    const clientId = config.clientId || process.env.CLIENT_ID;
 
+    if (token && clientId) {
+        const rest = new REST({ version: '10' }).setToken(token);
+        try {
+            await rest.put(Routes.applicationCommands(clientId), { body: commands });
+            console.log('✨ Comandos de barra registrados com sucesso!');
+        } catch (error) {
+            console.error(error);
+        }
+    }
+});
+
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
     try {
-        console.log('🔄 Atualizando comandos de barra (Slash Commands)...');
-        await rest.put(
-            Routes.applicationCommands(config.clientId || process.env.CLIENT_ID),
-            { body: commands },
-        );
-        console.log('✨ Comandos de barra registrados com sucesso!');
+        await command.execute(interaction);
     } catch (error) {
         console.error(error);
     }
 });
 
-// Manipulador de Interações
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-
-    const command = client.commands.get(interaction.commandName);
-    if (!command) return;
-
-    try {
-        await command.execute(interaction);
-    } catch (error) {
-        console.error(`❌ Erro na execução do comando:`, error);
-        const errorPayload = { content: 'Houve um erro ao executar este comando!', flags: 6 };
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp(errorPayload).catch(() => {});
-        } else {
-            await interaction.reply(errorPayload).catch(() => {});
-        }
-    }
-});
-
-client.login(config.token || process.env.DISCORD_TOKEN);
+const token = config.token || process.env.DISCORD_TOKEN;
+if (token) {
+    client.login(token).catch(err => console.error('Erro ao fazer login no Discord:', err));
+} else {
+    console.error('❌ DISCORD_TOKEN não fornecido!');
+}
