@@ -1,6 +1,9 @@
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../database/db');
 
+// Emojis nativos padrão para paquerar/flertar
+const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', '🏻', '🙈', '🔥', '✨', '💐', '💘'];
+
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
@@ -9,7 +12,43 @@ module.exports = {
         const guildConfig = db.getGuildConfig(message.guild.id);
         const prefix = guildConfig.prefix || '!';
 
-        // Responde ao marcar/mencionar o bot no chat
+        // --- SISTEMA AUTOMÁTICO DE PAQUERA (REÇÕES AUTOMÁTICAS) ---
+        const flirtConfig = guildConfig.flirt || {};
+        if (flirtConfig.enabled === true) {
+            const isAllowedChannel = !flirtConfig.channels || flirtConfig.channels.length === 0 || flirtConfig.channels.includes(message.channel.id);
+
+            if (isAllowedChannel) {
+                const chance = flirtConfig.chance || 10;
+                const randomNumber = Math.floor(Math.random() * 100) + 1;
+
+                if (randomNumber <= chance) {
+                    try {
+                        // Varredura de emojis customizados e externos do bot
+                        const customGuildEmojis = message.guild.emojis.cache.filter(e => e.available).map(e => e.id);
+                        const globalClientEmojis = message.client.emojis.cache.filter(e => e.available).map(e => e.id);
+
+                        const allCustomEmojis = [...new Set([...customGuildEmojis, ...globalClientEmojis])];
+
+                        let chosenEmoji;
+                        // Seleciona um emoji customizado/externo ou cai no emoji nativo
+                        if (allCustomEmojis.length > 0 && Math.random() > 0.4) {
+                            chosenEmoji = allCustomEmojis[Math.floor(Math.random() * allCustomEmojis.length)];
+                        } else {
+                            chosenEmoji = DEFAULT_FLIRT_EMOJIS[Math.floor(Math.random() * DEFAULT_FLIRT_EMOJIS.length)];
+                        }
+
+                        await message.react(chosenEmoji).catch(() => {
+                            // Se falhar o emoji customizado, reage com um nativo
+                            message.react('❤️').catch(() => null);
+                        });
+                    } catch (err) {
+                        console.error('Erro ao reagir no modo paquera:', err);
+                    }
+                }
+            }
+        }
+
+        // --- RESPOSTA AO MENCIONAR O BOT ---
         const botMention = `<@${message.client.user.id}>`;
         const botMentionNick = `<@!${message.client.user.id}>`;
         if (message.content.trim() === botMention || message.content.trim() === botMentionNick) {
@@ -25,7 +64,7 @@ module.exports = {
 
         if (!commandName) return;
 
-        // Comando via texto tradicional para mudar o prefixo (Ex: !prefixo ?)
+        // Comando do Prefixo
         if (commandName === 'prefixo' || commandName === 'prefix') {
             if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
                 return await message.reply('❌ Você precisa da permissão de **Administrador** para alterar o prefixo.');

@@ -4,6 +4,7 @@ const renderUpdatesCategory = require('./categories/updates');
 const renderCustomCommandsCategory = require('./categories/customCommands');
 const renderTicketsCategory = require('./categories/tickets');
 const renderPrefixCategory = require('./categories/prefix');
+const renderFlirtCategory = require('./categories/flirt');
 
 module.exports = (guild, userGuilds, user, botUser) => {
     const iconUrl = guild.icon
@@ -267,6 +268,7 @@ module.exports = (guild, userGuilds, user, botUser) => {
 
         <div class="category-tabs">
             <button class="tab-btn active" onclick="switchTab(event, 'tab-prefix')">⚙️ Prefixo</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tab-flirt')">💖 Paquerar</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-logs')">📜 Geral & Logs</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-welcome')">👋 Boas-vindas</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-updates')">📢 Atualizações</button>
@@ -276,6 +278,10 @@ module.exports = (guild, userGuilds, user, botUser) => {
 
         <div id="tab-prefix" class="tab-content active">
             ${renderPrefixCategory(guild)}
+        </div>
+
+        <div id="tab-flirt" class="tab-content">
+            ${renderFlirtCategory(guild)}
         </div>
 
         <div id="tab-logs" class="tab-content">

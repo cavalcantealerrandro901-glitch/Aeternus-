@@ -137,7 +137,8 @@ module.exports = (client, config) => {
             welcomeConfig: savedConfig.welcome || {},
             updatesConfig: savedConfig.updates || {},
             customCommandsConfig: savedConfig.customCommands || [],
-            ticketsConfig: savedConfig.tickets || {}
+            ticketsConfig: savedConfig.tickets || {},
+            flirtConfig: savedConfig.flirt || {}
         };
 
         res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
@@ -154,6 +155,15 @@ module.exports = (client, config) => {
         }
 
         db.setGuildConfig(req.params.guildId, { prefix: prefix.trim() });
+        res.json({ success: true });
+    });
+
+    // API: Salvar Config de Paquera
+    app.post('/api/guilds/:guildId/flirt', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        db.setGuildConfig(req.params.guildId, { flirt: req.body });
         res.json({ success: true });
     });
 
@@ -269,7 +279,7 @@ module.exports = (client, config) => {
         }
     });
 
-    // API: Deletar Painel com Varredura no Discord
+    // API: Deletar Painel com Varredura
     app.post('/api/guilds/:guildId/tickets/delete-panel', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
@@ -293,12 +303,10 @@ module.exports = (client, config) => {
 
             let messageToDelete = null;
 
-            // 1. Tentar pela ID salva
             if (savedConfig.messageId) {
                 messageToDelete = await channel.messages.fetch(savedConfig.messageId).catch(() => null);
             }
 
-            // 2. Varredura no canal pelas últimas 50 mensagens
             if (!messageToDelete) {
                 const messages = await channel.messages.fetch({ limit: 50 });
                 messageToDelete = messages.find(m => m.author.id === client.user.id && m.components.some(row => row.components.some(c => c.customId === 'btn_open_ticket')));
@@ -310,14 +318,13 @@ module.exports = (client, config) => {
 
             await messageToDelete.delete();
 
-            // Limpa a ID da mensagem no banco
             savedConfig.messageId = null;
             db.setGuildConfig(guildId, { tickets: savedConfig });
 
             res.json({ success: true });
         } catch (err) {
             console.error('Erro ao deletar painel de tickets:', err);
-            res.status(500).json({ error: 'Erro ao apagar a mensagem. Verifique se o bot possui a permissão "Gerenciar Mensagens".' });
+            res.status(500).json({ error: 'Erro ao apagar a mensagem.' });
         }
     });
 
