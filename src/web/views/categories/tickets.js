@@ -25,7 +25,7 @@ module.exports = (guild) => {
     </div>
 
     <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 20px; line-height: 1.5;">
-        Configure e personalize o painel de suporte. Ao salvar, a mensagem do painel será enviada ou atualizada automaticamente no canal selecionado.
+        Configure e personalize o painel de suporte. Ao salvar, a mensagem do painel será enviada ou atualizada no canal selecionado.
     </p>
 
     <form id="ticketForm" onsubmit="saveAndSendTicketsConfig(event, '${guild.id}')" style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
@@ -75,7 +75,10 @@ module.exports = (guild) => {
                 💾 Salvar e Enviar Painel
             </button>
             <button type="button" onclick="editTicketPanel('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #38bdf8, #2563eb);">
-                ✏️ Editar Mensagem do Painel
+                ✏️ Editar Mensagem
+            </button>
+            <button type="button" onclick="deleteTicketPanel('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                🗑️ Deletar Painel
             </button>
             <button type="button" onclick="disableTicketSystem('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
                 🚫 Desativar Sistema
@@ -122,14 +125,11 @@ module.exports = (guild) => {
         const form = document.getElementById('ticketForm');
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
-        data.enabled = form.querySelector('[name="enabled"]').checked;
 
         if (!data.ticketChannel) {
-            alert('⚠️ Selecione um canal para localizar a mensagem do painel!');
+            alert('⚠️ Selecione o canal no formulário para localizar a mensagem!');
             return;
         }
-
-        if (!confirm('Deseja atualizar a mensagem existente do painel no Discord com as informações acima?')) return;
 
         try {
             const res = await fetch(\`/api/guilds/\${guildId}/tickets/edit-panel\`, {
@@ -140,13 +140,44 @@ module.exports = (guild) => {
 
             const result = await res.json();
             if (result.success) {
-                alert('✏️ Mensagem do painel editada com sucesso no Discord!');
+                alert('✏️ Mensagem do painel atualizada com sucesso no Discord!');
                 location.reload();
             } else {
-                alert('❌ Erro: ' + (result.error || 'Não foi possível encontrar a mensagem anterior para editar.'));
+                alert('❌ Erro: ' + (result.error || 'Não foi possível localizar o painel para editar.'));
             }
         } catch (err) {
             alert('❌ Erro de conexão ao editar o painel.');
+        }
+    }
+
+    async function deleteTicketPanel(guildId) {
+        const form = document.getElementById('ticketForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
+        if (!data.ticketChannel) {
+            alert('⚠️ Selecione o canal onde está o painel para realizar a varredura!');
+            return;
+        }
+
+        if (!confirm('Deseja fazer uma varredura no canal e apagar a mensagem do painel de tickets do Discord?')) return;
+
+        try {
+            const res = await fetch(\`/api/guilds/\${guildId}/tickets/delete-panel\`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await res.json();
+            if (result.success) {
+                alert('🗑️ Painel de tickets encontrado e deletado com sucesso do Discord!');
+                location.reload();
+            } else {
+                alert('❌ Erro: ' + (result.error || 'Painel não encontrado durante a varredura.'));
+            }
+        } catch (err) {
+            alert('❌ Erro de conexão ao deletar o painel.');
         }
     }
 

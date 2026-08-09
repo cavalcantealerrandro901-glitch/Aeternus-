@@ -157,7 +157,7 @@ module.exports = (client, config) => {
         res.json({ success: true });
     });
 
-    // API: Salvar e Enviar Painel de Tickets no Discord
+    // API: Salvar e Enviar Painel de Tickets
     app.post('/api/guilds/:guildId/tickets/save-and-send', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
@@ -196,7 +196,6 @@ module.exports = (client, config) => {
 
             const sentMessage = await channel.send({ embeds: [embed], components: [row] });
 
-            // Salva as configurações junto com a ID da mensagem enviada
             config.messageId = sentMessage.id;
             db.setGuildConfig(guildId, { tickets: config });
 
@@ -207,7 +206,7 @@ module.exports = (client, config) => {
         }
     });
 
-    // API: Editar Painel de Tickets Existente
+    // API: Editar Painel de Tickets
     app.post('/api/guilds/:guildId/tickets/edit-panel', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
@@ -234,14 +233,13 @@ module.exports = (client, config) => {
                 messageToEdit = await channel.messages.fetch(config.messageId).catch(() => null);
             }
 
-            // Se não encontrou pela ID salva, tenta procurar as últimas mensagens do bot no canal
             if (!messageToEdit) {
-                const messages = await channel.messages.fetch({ limit: 20 });
-                messageToEdit = messages.find(m => m.author.id === client.user.id && m.components.length > 0);
+                const messages = await channel.messages.fetch({ limit: 50 });
+                messageToEdit = messages.find(m => m.author.id === client.user.id && m.components.some(row => row.components.some(c => c.customId === 'btn_open_ticket')));
             }
 
             if (!messageToEdit) {
-                return res.status(404).json({ error: 'Nenhuma mensagem do painel foi encontrada neste canal para editar. Salve um novo painel.' });
+                return res.status(404).json({ error: 'Nenhuma mensagem de painel de ticket foi encontrada para editar.' });
             }
 
             const embed = new EmbedBuilder()
@@ -268,6 +266,58 @@ module.exports = (client, config) => {
         } catch (err) {
             console.error('Erro ao editar painel de tickets:', err);
             res.status(500).json({ error: 'Falha ao editar a mensagem no Discord.' });
+        }
+    });
+
+    // API: Deletar Painel com Varredura no Discord
+    app.post('/api/guilds/:guildId/tickets/delete-panel', async (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const guildId = req.params.guildId;
+        const botGuild = client.guilds.cache.get(guildId);
+        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
+
+        const savedConfig = db.getGuildConfig(guildId).tickets || {};
+        const targetChannelId = req.body.ticketChannel || savedConfig.ticketChannel;
+
+        if (!targetChannelId) {
+            return res.status(400).json({ error: 'Selecione um canal para efetuar a varredura e deleção.' });
+        }
+
+        try {
+            const channel = await botGuild.channels.fetch(targetChannelId).catch(() => null);
+            if (!channel || !channel.isTextBased()) {
+                return res.status(404).json({ error: 'Canal não encontrado ou sem acesso.' });
+            }
+
+            let messageToDelete = null;
+
+            // 1. Tentar pela ID salva
+            if (savedConfig.messageId) {
+                messageToDelete = await channel.messages.fetch(savedConfig.messageId).catch(() => null);
+            }
+
+            // 2. Varredura no canal pelas últimas 50 mensagens
+            if (!messageToDelete) {
+                const messages = await channel.messages.fetch({ limit: 50 });
+                messageToDelete = messages.find(m => m.author.id === client.user.id && m.components.some(row => row.components.some(c => c.customId === 'btn_open_ticket')));
+            }
+
+            if (!messageToDelete) {
+                return res.status(404).json({ error: 'Nenhum painel de ticket do bot foi encontrado no canal após a varredura.' });
+            }
+
+            await messageToDelete.delete();
+
+            // Limpa a ID da mensagem no banco
+            savedConfig.messageId = null;
+            db.setGuildConfig(guildId, { tickets: savedConfig });
+
+            res.json({ success: true });
+        } catch (err) {
+            console.error('Erro ao deletar painel de tickets:', err);
+            res.status(500).json({ error: 'Erro ao apagar a mensagem. Verifique se o bot possui a permissão "Gerenciar Mensagens".' });
         }
     });
 
