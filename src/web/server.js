@@ -21,7 +21,8 @@ module.exports = (client, config) => {
     // Rota Principal
     app.get('/', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
-        res.send(renderHome(session?.user || null));
+        const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&scope=bot%20applications.commands&permissions=8`;
+        res.send(renderHome(session?.user || null, client.user, inviteUrl));
     });
 
     // Rota de Login (OAuth2)
@@ -102,7 +103,7 @@ module.exports = (client, config) => {
         if (!session) return res.redirect('/login');
 
         const manageableGuilds = getManageableGuilds(session.guilds);
-        res.send(renderDashboard(session.user, manageableGuilds));
+        res.send(renderDashboard(session.user, manageableGuilds, client.user));
     });
 
     // Portal de Servidor Específico
@@ -115,7 +116,7 @@ module.exports = (client, config) => {
 
         if (!guild) return res.redirect('/dashboard');
 
-        res.send(renderPortal(guild, manageableGuilds));
+        res.send(renderPortal(guild, manageableGuilds, session.user, client.user));
     });
 
     app.listen(PORT, () => console.log(`🌐 Painel Web rodando na porta ${PORT}`));
