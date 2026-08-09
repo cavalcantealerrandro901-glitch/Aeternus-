@@ -176,7 +176,7 @@ module.exports = (client, config) => {
         if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado' });
 
         try {
-            await sendTest(botGuild, welcomeConfig.welcomeChannel, welcomeConfig);
+            await sendTest(botGuild, welcomeConfig.welcomeChannel, welcomeConfig, session.user);
             res.json({ success: true });
         } catch (err) {
             res.status(500).json({ error: err.message || 'Erro ao enviar mensagem no Discord' });

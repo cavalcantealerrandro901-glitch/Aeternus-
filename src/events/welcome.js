@@ -17,14 +17,21 @@ function buildWelcomePayload(guild, memberUser, config) {
         .replace(/{memberCount}/g, guild.memberCount.toString());
 
     title = title
+        .replace(/{user}/g, `<@${memberUser.id}>`)
         .replace(/{username}/g, memberUser.username)
         .replace(/{server}/g, guild.name);
+
+    const avatarUrl = typeof memberUser.displayAvatarURL === 'function'
+        ? memberUser.displayAvatarURL({ dynamic: true, size: 256 })
+        : memberUser.avatar
+            ? `https://cdn.discordapp.com/avatars/${memberUser.id}/${memberUser.avatar}.png`
+            : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
     const embed = new EmbedBuilder()
         .setTitle(title)
         .setDescription(message)
         .setColor(embedColor)
-        .setThumbnail(memberUser.displayAvatarURL({ dynamic: true, size: 256 }))
+        .setThumbnail(avatarUrl)
         .setTimestamp();
 
     const payload = { embeds: [embed], components: [] };
@@ -59,10 +66,12 @@ module.exports = (client) => {
     });
 };
 
-module.exports.sendTest = async (guild, channelId, config) => {
+// Teste acionado via Painel Web
+module.exports.sendTest = async (guild, channelId, config, testerUser) => {
     const channel = guild.channels.cache.get(channelId);
     if (!channel) throw new Error('Canal de boas-vindas não encontrado no bot.');
 
-    const payload = buildWelcomePayload(guild, guild.client.user, config);
+    const targetUser = testerUser || guild.client.user;
+    const payload = buildWelcomePayload(guild, targetUser, config);
     return await channel.send(payload);
 };

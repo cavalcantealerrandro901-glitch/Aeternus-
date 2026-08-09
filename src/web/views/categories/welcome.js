@@ -44,10 +44,7 @@ module.exports = (guild, textChannels) => {
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label>💬 Mensagem / Descrição</label>
                 <textarea class="form-control" name="embedMessage" rows="4" 
-                    placeholder="Escreva sua mensagem aqui... Use {user}, {server}, {memberCount}" required>${savedWelcome.embedMessage || 'Olá {user}, seja muito bem-vindo(a) ao **{server}**!\nAtualmente estamos com **{memberCount}** membros.'}</textarea>
-                <small style="color: #64748b; font-size: 0.8rem; margin-top: 4px;">
-                    Variáveis disponíveis: <code>{user}</code> (mencionador), <code>{username}</code> (nome), <code>{server}</code> (nome do servidor), <code>{memberCount}</code> (total de membros).
-                </small>
+                    placeholder="Escreva sua mensagem aqui..." required>${savedWelcome.embedMessage || 'Olá {user}, seja muito bem-vindo(a) ao **{server}**!\nAtualmente estamos com **{memberCount}** membros.'}</textarea>
             </div>
 
             <div class="form-group">
@@ -65,11 +62,26 @@ module.exports = (guild, textChannels) => {
             </div>
         </div>
 
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px;">
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;">
             <button type="submit" class="btn-save" id="saveWelcomeBtn">💾 Salvar Boas-Vindas</button>
             <button type="button" class="btn-save" id="testWelcomeBtn" onclick="testWelcome('${guild.id}')" style="background: linear-gradient(135deg, #10b981, #059669);">🧪 Testar Mensagem</button>
         </div>
     </form>
+
+    <div style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; margin-top: 20px;">
+        <h3 style="font-size: 1rem; color: #38bdf8; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            ℹ️ Variáveis Disponíveis
+        </h3>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px;">
+            Você pode utilizar as palavras-chave abaixo no <b>Título</b> e na <b>Mensagem</b> para que sejam substituídas automaticamente:
+        </p>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem; color: #cbd5e1;">
+            <li><code>{user}</code> — Menciona o novo membro que entrou no servidor (Ex: <span style="color: #38bdf8;">@NomeDoUsuario</span>)</li>
+            <li><code>{username}</code> — Exibe o nome de usuário do membro em texto puro (Ex: <span style="color: #38bdf8;">NomeDoUsuario</span>)</li>
+            <li><code>{server}</code> — Exibe o nome do seu servidor (Ex: <span style="color: #38bdf8;">${guild.name}</span>)</li>
+            <li><code>{memberCount}</code> — Exibe o número total atual de membros no servidor (Ex: <span style="color: #38bdf8;">${guild.memberCount}</span>)</li>
+        </ul>
+    </div>
 </section>
 
 <script>
@@ -116,7 +128,7 @@ module.exports = (guild, textChannels) => {
 
             const result = await res.json();
             if (result.success) {
-                alert('🧪 Teste enviado com sucesso no canal configurado!');
+                alert('🧪 Teste enviado no canal configurado mencionando seu usuário!');
             } else {
                 alert('❌ Erro no Teste: ' + (result.error || 'Verifique se selecionou um canal válido'));
             }
