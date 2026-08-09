@@ -39,7 +39,7 @@ module.exports = {
 
         let config = await GuildConfig.findOne({ guildId });
         if (!config) {
-            config = new GuildConfig({ guildId, prefix: '!' });
+            config = new GuildConfig({ guildId, prefix: '-' });
             await config.save();
         }
 
