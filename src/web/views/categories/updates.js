@@ -1,7 +1,7 @@
-module.exports = (guild, textChannels) => {
+module.exports = (guild, textChannels, roles) => {
     const savedUpdates = guild.updatesConfig || {};
 
-    const buildOptions = (selectedId) => {
+    const buildChannelOptions = (selectedId) => {
         let html = `<option value="">Desativado / Nenhum canal</option>`;
         if (textChannels && textChannels.length > 0) {
             html += textChannels.map(c => 
@@ -11,6 +11,18 @@ module.exports = (guild, textChannels) => {
         return html;
     };
 
+    const buildRoleOptions = (selectedId) => {
+        let html = `<option value="">Selecione um cargo...</option>`;
+        if (roles && roles.length > 0) {
+            html += roles.map(r => 
+                `<option value="${r.id}" ${r.id === selectedId ? 'selected' : ''}>@ ${r.name}</option>`
+            ).join('');
+        }
+        return html;
+    };
+
+    const isRoleSelected = savedUpdates.mentionType === 'role';
+
     return `
 <section class="config-card" id="updates" style="margin-top: 30px;">
     <div class="config-card-header">
@@ -19,7 +31,7 @@ module.exports = (guild, textChannels) => {
     </div>
 
     <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 20px; line-height: 1.5;">
-        Escolha o canal onde o bot irá enviar anúncios automáticos de <b>novas atualizações, novos comandos, melhorias no painel web e correções de bugs</b>.
+        Escolha o canal e a forma de menção para receber anúncios automáticos de <b>novas atualizações, comandos e correções do bot</b>.
     </p>
 
     <form onsubmit="saveUpdates(event, '${guild.id}')">
@@ -27,16 +39,24 @@ module.exports = (guild, textChannels) => {
             <div class="form-group" style="grid-column: 1 / -1;">
                 <label>📌 Canal de Notificações de Atualizações</label>
                 <select class="form-control" name="updatesChannel">
-                    ${buildOptions(savedUpdates.updatesChannel)}
+                    ${buildChannelOptions(savedUpdates.updatesChannel)}
                 </select>
             </div>
 
-            <div class="form-group" style="grid-column: 1 / -1;">
-                <label>🔔 Mencionar ao Notificar</label>
-                <select class="form-control" name="mentionType">
+            <div class="form-group">
+                <label>🔔 Tipo de Menção</label>
+                <select class="form-control" name="mentionType" id="mentionTypeSelect" onchange="toggleRoleSelect()">
                     <option value="none" ${savedUpdates.mentionType === 'none' || !savedUpdates.mentionType ? 'selected' : ''}>Nenhuma menção (Silencioso)</option>
                     <option value="here" ${savedUpdates.mentionType === 'here' ? 'selected' : ''}>@here</option>
                     <option value="everyone" ${savedUpdates.mentionType === 'everyone' ? 'selected' : ''}>@everyone</option>
+                    <option value="role" ${isRoleSelected ? 'selected' : ''}>Cargo Específico</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="roleSelectGroup" style="display: ${isRoleSelected ? 'flex' : 'none'};">
+                <label>🏷️ Selecione o Cargo</label>
+                <select class="form-control" name="mentionRoleId">
+                    ${buildRoleOptions(savedUpdates.mentionRoleId)}
                 </select>
             </div>
         </div>
@@ -52,17 +72,22 @@ module.exports = (guild, textChannels) => {
             ℹ️ Como funcionam as Notificações de Atualizações?
         </h3>
         <p style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 10px;">
-            Quando novas funcionalidades forem lançadas, um anúncio formatado será enviado neste canal com todos os detalhes:
+            Quando novas funcionalidades forem lançadas, um anúncio formatado será enviado no canal escolhido marcando o cargo selecionado ou tipo de menção configurado.
         </p>
-        <ul style="list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: #94a3b8;">
-            <li>🚀 <b>Novos Sistemas e Comandos:</b> Lançamentos de novos recursos do bot.</li>
-            <li>🌐 <b>Painel Web:</b> Atualizações e novidades na interface web.</li>
-            <li>🛠️ <b>Manutenções & Correções:</b> Informações sobre estabilidade e melhorias.</li>
-        </ul>
     </div>
 </section>
 
 <script>
+    function toggleRoleSelect() {
+        const mentionType = document.getElementById('mentionTypeSelect').value;
+        const roleGroup = document.getElementById('roleSelectGroup');
+        if (mentionType === 'role') {
+            roleGroup.style.display = 'flex';
+        } else {
+            roleGroup.style.display = 'none';
+        }
+    }
+
     async function saveUpdates(event, guildId) {
         event.preventDefault();
         const btn = document.getElementById('saveUpdatesBtn');
@@ -81,7 +106,7 @@ module.exports = (guild, textChannels) => {
 
             const result = await res.json();
             if (result.success) {
-                alert('✅ Canal de Notificações de Atualização salvo!');
+                alert('✅ Configurações de Notificações salvas!');
             } else {
                 alert('❌ Erro: ' + (result.error || 'Falha ao salvar'));
             }
@@ -108,7 +133,7 @@ module.exports = (guild, textChannels) => {
             if (result.success) {
                 alert('🧪 Anúncio de teste enviado no canal configurado!');
             } else {
-                alert('❌ Erro no Teste: ' + (result.error || 'Verifique se selecionou um canal válido'));
+                alert('❌ Erro no Teste: ' + (result.error || 'Verifique se selecionou um canal e cargo válidos'));
             }
         } catch (err) {
             alert('❌ Erro ao solicitar o teste.');

@@ -42,6 +42,9 @@ module.exports = {
                 let mentionContent = '';
                 if (updatesConfig.mentionType === 'here') mentionContent = '@here';
                 if (updatesConfig.mentionType === 'everyone') mentionContent = '@everyone';
+                if (updatesConfig.mentionType === 'role' && updatesConfig.mentionRoleId) {
+                    mentionContent = `<@&${updatesConfig.mentionRoleId}>`;
+                }
 
                 const embed = new EmbedBuilder()
                     .setTitle(`🚀 ${titulo}`)

@@ -118,6 +118,10 @@ module.exports = (client, config) => {
             .filter(c => c.type === 0 || c.type === 5)
             .map(c => ({ id: c.id, name: c.name })) : [];
 
+        const guildRoles = botGuild ? botGuild.roles.cache
+            .filter(r => r.name !== '@everyone')
+            .map(r => ({ id: r.id, name: r.name })) : [];
+
         const savedConfig = db.getGuildConfig(guild.id);
 
         const serverData = {
@@ -128,6 +132,7 @@ module.exports = (client, config) => {
             channelCount: botGuild ? botGuild.channels.cache.size : 'N/A',
             roleCount: botGuild ? botGuild.roles.cache.size : 'N/A',
             textChannels: textChannels,
+            roles: guildRoles,
             logsConfig: savedConfig.logs || {},
             welcomeConfig: savedConfig.welcome || {},
             updatesConfig: savedConfig.updates || {}
@@ -197,13 +202,16 @@ module.exports = (client, config) => {
             let mentionContent = '';
             if (updatesConfig.mentionType === 'here') mentionContent = '@here';
             if (updatesConfig.mentionType === 'everyone') mentionContent = '@everyone';
+            if (updatesConfig.mentionType === 'role' && updatesConfig.mentionRoleId) {
+                mentionContent = `<@&${updatesConfig.mentionRoleId}>`;
+            }
 
             const embed = new EmbedBuilder()
                 .setTitle('🚀 [TESTE] Nova Atualização do Bot Aeternus!')
                 .setDescription('Esta é uma mensagem de teste do sistema de Notificações de Atualizações.')
                 .addFields(
-                    { name: '✨ Novos Sistemas', value: '• Adicionada categoria de Notificações de Atualização\n• Correção e suporte a menções diretas em Boas-Vindas' },
-                    { name: '🌐 Painel Web', value: '• Sistema de abas dinâmicas sem rolamento de tela no mobile' },
+                    { name: '✨ Novos Sistemas', value: '• Suporte a marcação de cargo específico nas Notificações\n• Suporte total no Painel Web' },
+                    { name: '🌐 Painel Web', value: '• Seleção dinâmica de cargos do servidor' },
                     { name: '📌 Versão', value: '`v2.0.0-teste`', inline: true }
                 )
                 .setColor('#38bdf8')

@@ -10,7 +10,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
 
     const logsSection = renderLogsCategory(guild, guild.textChannels);
     const welcomeSection = renderWelcomeCategory(guild, guild.textChannels);
-    const updatesSection = renderUpdatesCategory(guild, guild.textChannels);
+    const updatesSection = renderUpdatesCategory(guild, guild.textChannels, guild.roles);
 
     return `
 <!DOCTYPE html>
