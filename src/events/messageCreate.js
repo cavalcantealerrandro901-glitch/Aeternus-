@@ -1,8 +1,16 @@
-const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const db = require('../database/db');
 
 const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', '🏻', '🙈', '🔥', '✨', '💐', '💘'];
 const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
+const PUNISH_CATEGORIES = ['slap', 'baka', 'poke', 'hug'];
+
+const FALLBACK_GIFS = [
+    'https://nekos.best/api/v2/slap/slap_001.gif',
+    'https://nekos.best/api/v2/baka/baka_001.gif',
+    'https://nekos.best/api/v2/poke/poke_001.gif',
+    'https://nekos.best/api/v2/hug/hug_001.gif'
+];
 
 const FLIRT_MESSAGES = [
     "Você chamou a minha atenção! 💖",
@@ -14,12 +22,18 @@ const FLIRT_MESSAGES = [
     "Você tem uma energia muito boa! 🌸"
 ];
 
+const PUNISH_TEXTS = [
+    "recebeu um castigo merecido! 💢",
+    "foi colocado(a) de castigo! 😈",
+    "levou uma bronca e tanto! 💥",
+    "precisa prestar mais atenção! ⚡"
+];
+
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
         if (message.author.bot || !message.guild) return;
 
-        // ADICIONADO AWAIT AQUI
         const guildConfig = await db.getGuildConfig(message.guild.id);
         const prefix = guildConfig.prefix || '!';
 
@@ -102,9 +116,108 @@ module.exports = {
                 return await message.reply('❌ O prefixo não pode ter mais de 5 caracteres.');
             }
 
-            // ADICIONADO AWAIT AQUI
             await db.setGuildConfig(message.guild.id, { prefix: newPrefix });
             return await message.reply(`✅ Prefixo alterado com sucesso para \`${newPrefix}\`!`);
+        }
+
+        // ⚔️ COMANDO DE PREFIXO: CASTIGAR
+        if (commandName === 'castigar') {
+            const target = message.mentions.users.first();
+            const author = message.author;
+
+            if (!target) {
+                return await message.reply(`❌ Você precisa marcar alguém para castigar! Exemplo: \`${prefix}castigar @usuario\``);
+            }
+
+            if (target.id === author.id) {
+                return await message.reply('❌ Você não pode castigar a si mesmo!');
+            }
+
+            if (target.bot) {
+                return await message.reply('🤖 Você não pode castigar um bot, eles são intocáveis!');
+            }
+
+            try {
+                let gifUrl = '';
+                try {
+                    const category = PUNISH_CATEGORIES[Math.floor(Math.random() * PUNISH_CATEGORIES.length)];
+                    const response = await fetch(`https://nekos.best/api/v2/${category}`);
+                    const contentType = response.headers.get('content-type');
+                    if (response.ok && contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        if (data && data.results && data.results.length > 0) {
+                            gifUrl = data.results[0].url;
+                        }
+                    }
+                } catch (apiErr) {}
+
+                if (!gifUrl) {
+                    gifUrl = FALLBACK_GIFS[Math.floor(Math.random() * FALLBACK_GIFS.length)];
+                }
+
+                const randomText = PUNISH_TEXTS[Math.floor(Math.random() * PUNISH_TEXTS.length)];
+
+                const embed = new EmbedBuilder()
+                    .setDescription(`⚠️ **${target}** ${randomText} *(Enviado por ${author})*`)
+                    .setImage(gifUrl)
+                    .setColor('#ec4899');
+
+                const row = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('return_punish')
+                            .setLabel('🔄 Devolver Castigo')
+                            .setStyle(ButtonStyle.Danger)
+                    );
+
+                const sentMessage = await message.reply({ embeds: [embed], components: [row] });
+
+                const collector = sentMessage.createMessageComponentCollector({ time: 60000 });
+
+                collector.on('collect', async i => {
+                    if (i.user.id !== target.id) {
+                        return await i.reply({ content: '❌ Apenas a pessoa que recebeu o castigo pode devolvê-lo!', flags: [MessageFlags.Ephemeral] });
+                    }
+
+                    const returnEmbed = new EmbedBuilder()
+                        .setDescription(`🔄 O jogo virou! **${target}** devolveu o castigo em **${author}**! 🚀`)
+                        .setImage(gifUrl)
+                        .setColor('#38bdf8');
+
+                    const disabledRow = new ActionRowBuilder()
+                        .addComponents(
+                            new ButtonBuilder()
+                                .setCustomId('return_punish')
+                                .setLabel('🔄 Castigo Devolvido')
+                                .setStyle(ButtonStyle.Secondary)
+                                .setDisabled(true)
+                        );
+
+                    await i.update({ embeds: [returnEmbed], components: [disabledRow] });
+                    collector.stop();
+                });
+
+                collector.on('end', async collected => {
+                    if (collected.size === 0) {
+                        try {
+                            const expiredRow = new ActionRowBuilder()
+                                .addComponents(
+                                    new ButtonBuilder()
+                                        .setCustomId('return_punish')
+                                        .setLabel('🔄 Tempo Esgotado')
+                                        .setStyle(ButtonStyle.Secondary)
+                                        .setDisabled(true)
+                                );
+                            await sentMessage.edit({ components: [expiredRow] });
+                        } catch (e) {}
+                    }
+                });
+
+            } catch (err) {
+                console.error('Erro no comando castigar:', err);
+                await message.reply('❌ Ocorreu um erro ao executar o comando.');
+            }
+            return;
         }
 
         // Comandos Personalizados
@@ -127,6 +240,10 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setTitle('📜 Central de Comandos')
                 .setDescription(`O prefixo atual é \`${prefix}\``)
+                .addFields(
+                    { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\`` },
+                    { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
+                )
                 .setColor('#38bdf8');
             return await message.channel.send({ embeds: [embed] });
         }
