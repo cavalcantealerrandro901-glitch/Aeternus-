@@ -1,77 +1,71 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const db = require('../database/db');
-const { sendMessage } = require('../utils/messageSender');
-
-const DASHBOARD_URL = process.env.DASHBOARD_URL || 'https://aeternus-q7gt.onrender.com';
 
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
+        // Ignora mensagens enviadas por bots ou em conversas privadas (DMs)
         if (message.author.bot || !message.guild) return;
 
-        if (!message.content.startsWith('!') && !message.content.startsWith('/')) return;
+        // Obter as configurações do servidor no banco de dados
+        const guildConfig = db.getGuildConfig(message.guild.id);
+        const prefix = guildConfig.prefix || '!';
 
-        const args = message.content.slice(1).trim().split(/ +/);
-        const commandName = args.shift()?.toLowerCase();
+        // Responde com o prefixo atual se o bot for mencionado
+        const botMention = `<@${message.client.user.id}>`;
+        const botMentionNick = `<@!${message.client.user.id}>`;
+        if (message.content.trim() === botMention || message.content.trim() === botMentionNick) {
+            return await message.reply({
+                content: `👋 Olá ${message.author}! Meu prefixo neste servidor é \`${prefix}\`.`
+            });
+        }
+
+        // Verifica se a mensagem começa com o prefixo configurado
+        if (!message.content.startsWith(prefix)) return;
+
+        // Separa o nome do comando dos argumentos
+        const args = message.content.slice(prefix.length).trim().split(/ +/);
+        const commandName = args.shift().toLowerCase();
 
         if (!commandName) return;
 
-        // 🌐 Comando Nativo de Prefixo: !painel / !dashboard
-        if (commandName === 'painel' || commandName === 'dashboard') {
-            try {
-                const guildDashboardUrl = `${DASHBOARD_URL}/dashboard/${message.guild.id}`;
+        // 1. CHECAR COMANDOS PERSONALIZADOS (Criados no Painel Web)
+        const customCommands = guildConfig.customCommands || [];
+        const customCmd = customCommands.find(c => c.name.toLowerCase() === commandName);
 
+        if (customCmd) {
+            if (customCmd.isEmbed) {
                 const embed = new EmbedBuilder()
-                    .setTitle('🌐 Painel de Controle - Aeternus')
-                    .setDescription(`Olá **${message.author.username}**! Clique no botão abaixo para gerenciar as configurações do servidor **${message.guild.name}**.`)
-                    .setColor('#38bdf8')
-                    .setThumbnail(message.client.user.displayAvatarURL())
-                    .setFooter({ text: 'Aeternus Manager', iconURL: message.client.user.displayAvatarURL() })
-                    .setTimestamp();
-
-                const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setLabel('Acessar Painel do Servidor')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(guildDashboardUrl)
-                        .setEmoji('🔗')
-                );
-
-                return await message.channel.send({
-                    embeds: [embed],
-                    components: [row]
-                });
-            } catch (err) {
-                console.error('❌ Erro ao enviar comando !painel:', err);
-                return;
+                    .setDescription(customCmd.response)
+                    .setColor('#38bdf8');
+                return await message.channel.send({ embeds: [embed] });
+            } else {
+                return await message.channel.send(customCmd.response);
             }
         }
 
-        // 🛠️ Busca comandos customizados salvos no banco
-        const guildConfig = db.getGuildConfig(message.guild.id);
-        const customCommands = guildConfig.customCommands || [];
-
-        const foundCmd = customCommands.find(c => c.name.toLowerCase() === commandName);
-        if (!foundCmd) return;
-
-        try {
-            if (foundCmd.isEmbed) {
-                await sendMessage(message.channel, {
-                    embed: {
-                        description: foundCmd.response
+        // 2. COMANDO PADRÃO DE AJUDA COM PREFIXO
+        if (commandName === 'help' || commandName === 'ajuda') {
+            const embed = new EmbedBuilder()
+                .setTitle('📜 Central de Comandos')
+                .setDescription(`O prefixo atual neste servidor é \`${prefix}\``)
+                .addFields(
+                    { 
+                        name: '⚙️ Prefixo', 
+                        value: `Use \`${prefix}prefixo\` no painel ou \`/prefixo\` para alterar.` 
                     },
-                    guild: message.guild,
-                    user: message.author
-                });
-            } else {
-                await sendMessage(message.channel, {
-                    content: foundCmd.response,
-                    guild: message.guild,
-                    user: message.author
-                });
-            }
-        } catch (err) {
-            console.error(`❌ Erro ao enviar comando !${commandName}:`, err.message);
+                    { 
+                        name: '⚡ Comandos Customizados', 
+                        value: customCommands.length > 0 
+                            ? customCommands.map(c => `\`${prefix}${c.name}\``).join(', ') 
+                            : 'Nenhum comando customizado cadastrado.' 
+                    }
+                )
+                .setColor('#38bdf8')
+                .setFooter({ text: message.guild.name, iconURL: message.guild.iconURL() })
+                .setTimestamp();
+
+            return await message.channel.send({ embeds: [embed] });
         }
     }
 };
