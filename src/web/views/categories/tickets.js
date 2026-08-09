@@ -13,7 +13,7 @@ module.exports = (guild) => {
     ).join('');
 
     return `
-<section class="config-card" id="tickets-config" style="margin-top: 20px;">
+<section class="config-card" id="tickets-config">
     <div class="config-card-header">
         <span style="font-size: 1.8rem;">🎫</span>
         <div>
@@ -28,7 +28,7 @@ module.exports = (guild) => {
         Configure ou desative o canal de chamados de suporte privados do servidor.
     </p>
 
-    <form onsubmit="saveTicketsConfig(event, '${guild.id}')" style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
+    <form id="ticketForm" onsubmit="saveTicketsConfig(event, '${guild.id}')" style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
         
         <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
             <input type="checkbox" id="ticketEnabled" name="enabled" value="true" ${isEnabled ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
@@ -40,7 +40,7 @@ module.exports = (guild) => {
         <div class="form-grid">
             <div class="form-group">
                 <label>📌 Canal do Painel de Tickets</label>
-                <select class="form-control" name="ticketChannel">
+                <select class="form-control" name="ticketChannel" required>
                     <option value="">Selecione o canal onde ficará o botão</option>
                     ${channelOptions}
                 </select>
@@ -91,9 +91,10 @@ module.exports = (guild) => {
         btn.disabled = true;
         btn.innerText = '⏳ Salvando...';
 
-        const formData = new FormData(event.target);
+        const form = document.getElementById('ticketForm');
+        const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
-        data.enabled = event.target.enabled.checked;
+        data.enabled = form.querySelector('[name="enabled"]').checked;
 
         try {
             const res = await fetch(\`/api/guilds/\${guildId}/tickets\`, {
@@ -118,21 +119,34 @@ module.exports = (guild) => {
     }
 
     async function sendTicketPanel(guildId) {
+        const form = document.getElementById('ticketForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        data.enabled = form.querySelector('[name="enabled"]').checked;
+
+        if (!data.ticketChannel) {
+            alert('⚠️ Por favor, selecione um canal no formulário antes de enviar!');
+            return;
+        }
+
         if (!confirm('Deseja enviar o painel de tickets para o canal selecionado?')) return;
 
         try {
             const res = await fetch(\`/api/guilds/\${guildId}/tickets/send-panel\`, {
-                method: 'POST'
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
             });
 
             const result = await res.json();
             if (result.success) {
-                alert('✅ Painel enviado com sucesso!');
+                alert('✅ Painel de tickets enviado com sucesso para o Discord!');
+                location.reload();
             } else {
-                alert('❌ Erro: ' + (result.error || 'Verifique as configurações do canal.'));
+                alert('❌ Erro: ' + (result.error || 'Verifique as permissões do bot no canal.'));
             }
         } catch (err) {
-            alert('❌ Erro de conexão.');
+            alert('❌ Erro de conexão ao enviar o painel.');
         }
     }
 

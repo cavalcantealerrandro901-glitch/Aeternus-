@@ -173,26 +173,27 @@ module.exports = (client, config) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
 
-        const config = db.getGuildConfig(req.params.guildId).tickets;
-        if (!config || !config.ticketChannel) {
-            return res.status(400).json({ error: 'Configure o canal de tickets primeiro.' });
-        }
+        const guildId = req.params.guildId;
+        const botGuild = client.guilds.cache.get(guildId);
+        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado no bot.' });
 
-        if (config.enabled === false) {
-            return res.status(400).json({ error: 'Ative o sistema de tickets antes de enviar o painel.' });
-        }
+        const savedConfig = db.getGuildConfig(guildId).tickets || {};
+        const config = { ...savedConfig, ...req.body, enabled: true };
 
-        const botGuild = client.guilds.cache.get(req.params.guildId);
-        const channel = botGuild?.channels.cache.get(config.ticketChannel);
-
-        if (!channel) {
-            return res.status(404).json({ error: 'Canal de tickets não encontrado no servidor.' });
+        if (!config.ticketChannel) {
+            return res.status(400).json({ error: 'Selecione um canal para o painel de tickets.' });
         }
 
         try {
+            const channel = await botGuild.channels.fetch(config.ticketChannel).catch(() => null);
+
+            if (!channel || !channel.isTextBased()) {
+                return res.status(404).json({ error: 'Canal de texto não encontrado ou inacessível.' });
+            }
+
             const embed = new EmbedBuilder()
                 .setTitle(config.embedTitle || '🎫 Central de Atendimento')
-                .setDescription(config.embedDescription || 'Clique no botão abaixo para abrir um ticket.')
+                .setDescription(config.embedDescription || 'Clique no botão abaixo para abrir um ticket privado com a nossa equipe.')
                 .setColor('#38bdf8')
                 .setFooter({ text: botGuild.name, iconURL: botGuild.iconURL() })
                 .setTimestamp();
@@ -206,10 +207,14 @@ module.exports = (client, config) => {
             );
 
             await channel.send({ embeds: [embed], components: [row] });
+            
+            // Salva no banco
+            db.setGuildConfig(guildId, { tickets: config });
+
             res.json({ success: true });
         } catch (err) {
             console.error('Erro ao enviar painel de tickets:', err);
-            res.status(500).json({ error: 'Falha ao enviar painel para o canal.' });
+            res.status(500).json({ error: 'Verifique se o bot possui permissão de Ver Canal e Enviar Mensagens no canal escolhido.' });
         }
     });
 
