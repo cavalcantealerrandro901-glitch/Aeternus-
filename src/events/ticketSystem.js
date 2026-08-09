@@ -12,10 +12,9 @@ module.exports = {
 
         // 1. ABRIR TICKET
         if (customId === 'btn_open_ticket') {
-            const existingChannel = guild.channels.cache.find(
-                c => c.name === `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`
-            );
-
+            const ticketName = `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+            
+            const existingChannel = guild.channels.cache.find(c => c.name === ticketName);
             if (existingChannel) {
                 return await interaction.reply({
                     content: `❌ Você já possui um ticket aberto em ${existingChannel}!`,
@@ -25,6 +24,22 @@ module.exports = {
 
             await interaction.deferReply({ ephemeral: true });
 
+            // Busca ou cria a categoria "🎫 TICKETS"
+            let ticketCategory = guild.channels.cache.find(
+                c => c.type === ChannelType.GuildCategory && c.name.toUpperCase().includes('TICKETS')
+            );
+
+            if (!ticketCategory) {
+                try {
+                    ticketCategory = await guild.channels.create({
+                        name: '🎫 TICKETS',
+                        type: ChannelType.GuildCategory
+                    });
+                } catch (e) {
+                    console.log('Não foi possível criar a categoria de tickets:', e.message);
+                }
+            }
+
             const supportRoleId = ticketConfig.supportRoleId;
             const permissionOverwrites = [
                 {
@@ -33,27 +48,38 @@ module.exports = {
                 },
                 {
                     id: user.id,
-                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ReadMessageHistory]
+                    allow: [
+                        PermissionFlagsBits.ViewChannel,
+                        PermissionFlagsBits.SendMessages,
+                        PermissionFlagsBits.AttachFiles,
+                        PermissionFlagsBits.ReadMessageHistory
+                    ]
                 }
             ];
 
             if (supportRoleId && guild.roles.cache.has(supportRoleId)) {
                 permissionOverwrites.push({
                     id: supportRoleId,
-                    allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ReadMessageHistory]
+                    allow: [
+                        PermissionFlagsBits.ViewChannel,
+                        PermissionFlagsBits.SendMessages,
+                        PermissionFlagsBits.AttachFiles,
+                        PermissionFlagsBits.ReadMessageHistory
+                    ]
                 });
             }
 
             try {
                 const ticketChannel = await guild.channels.create({
-                    name: `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+                    name: ticketName,
                     type: ChannelType.GuildText,
+                    parent: ticketCategory ? ticketCategory.id : null,
                     permissionOverwrites: permissionOverwrites
                 });
 
                 const welcomeEmbed = new EmbedBuilder()
                     .setTitle('🎫 Chamado de Suporte Aberto')
-                    .setDescription(`Olá ${user}, bem-vindo(a) ao seu ticket!\n\nDescreva em detalhes a sua solicitação. A equipe de atendimento <@&${supportRoleId || ''}> foi notificada.`)
+                    .setDescription(`Olá ${user}, bem-vindo(a) ao seu ticket!\n\nDescreva em detalhes a sua solicitação. A equipe de atendimento ${supportRoleId ? `<@&${supportRoleId}>` : ''} responderá em breve.`)
                     .setColor('#38bdf8')
                     .setTimestamp();
 
@@ -65,7 +91,7 @@ module.exports = {
                 );
 
                 await ticketChannel.send({
-                    content: `${user} | <@&${supportRoleId || ''}>`,
+                    content: `${user} ${supportRoleId ? `| <@&${supportRoleId}>` : ''}`,
                     embeds: [welcomeEmbed],
                     components: [closeRow]
                 });
@@ -77,7 +103,7 @@ module.exports = {
             } catch (err) {
                 console.error('Erro ao criar canal de ticket:', err);
                 await interaction.editReply({
-                    content: '❌ Falha ao criar o ticket. Verifique as permissões do bot.'
+                    content: '❌ Falha ao criar o ticket. Verifique se o bot possui permissão de **Gerenciar Canais**.'
                 });
             }
         }
@@ -86,7 +112,7 @@ module.exports = {
         if (customId === 'btn_request_close_ticket') {
             const confirmEmbed = new EmbedBuilder()
                 .setTitle('⚠️ Confirmação de Encerramento')
-                .setDescription('Tem certeza de que deseja fechar e apagar este ticket?')
+                .setDescription('Tem certeza de que deseja encerrar e apagar este ticket?')
                 .setColor('#ef4444');
 
             const confirmRow = new ActionRowBuilder().addComponents(
@@ -109,7 +135,7 @@ module.exports = {
         // 3. CONFIRMAR E APAGAR TICKET
         if (customId === 'btn_confirm_close_ticket') {
             await interaction.reply({
-                content: '🔒 Este ticket será encerrado e deletado em 5 segundos...'
+                content: '🔒 O ticket será encerrado e deletado em 5 segundos...'
             });
 
             setTimeout(async () => {
