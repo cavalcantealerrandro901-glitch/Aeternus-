@@ -55,7 +55,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
-// Simulação simples de sessão em memória para os testes
 const sessions = {};
 
 // Página Inicial com Botão de Login no Canto Superior Direito
@@ -131,13 +130,11 @@ app.get('/auth/discord/callback', async (req, res) => {
         const tokenData = await tokenResponse.json();
         if (!tokenData.access_token) return res.redirect('/');
 
-        // Buscar dados do usuário
         const userResponse = await fetch('https://discord.com/api/users/@me', {
             headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
         });
         const userData = await userResponse.json();
 
-        // Buscar servidores do usuário
         const guildsResponse = await fetch('https://discord.com/api/users/@me/guilds', {
             headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
         });
@@ -154,7 +151,7 @@ app.get('/auth/discord/callback', async (req, res) => {
     }
 });
 
-// Página do Painel / Dashboard com Seletor de Servidores e Menu (=)
+// Painel Principal / Dashboard
 app.get('/dashboard', (req, res) => {
     const sessionId = req.cookies.sessionId;
     const sessionData = sessions[sessionId];
@@ -164,7 +161,6 @@ app.get('/dashboard', (req, res) => {
     const user = sessionData.user;
     const userGuilds = sessionData.guilds;
 
-    // Filtrar servidores onde o usuário é Administrador (permissão 0x8 ou bit 3) e o bot está presente
     const botGuilds = client.guilds.cache;
     const manageableGuilds = userGuilds.filter(g => {
         const isAdmin = (BigInt(g.permissions) & 0x8n) === 0x8n || g.owner;
@@ -182,31 +178,118 @@ app.get('/dashboard', (req, res) => {
             <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
             <style>
                 body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; }
-                sidebar { width: 260px; background: #1e293b; border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; padding: 20px; }
-                .menu-toggle { font-size: 1.5rem; cursor: pointer; margin-bottom: 20px; color: #38bdf8; }
-                .server-list { list-style: none; padding: 0; margin: 0; }
+                sidebar { width: 260px; background: #1e293b; border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+                .menu-header { font-size: 1.2rem; font-weight: bold; color: #38bdf8; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+                .server-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
                 .server-item { padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-radius: 8px; cursor: pointer; transition: 0.2s; text-decoration: none; color: #cbd5e1; display: block; }
                 .server-item:hover { background: #38bdf8; color: #0f172a; font-weight: 600; }
                 main { flex: 1; padding: 40px; overflow-y: auto; }
                 h1 { font-family: 'Playfair Display', serif; font-size: 2.5rem; font-style: italic; background: linear-gradient(90deg, #38bdf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
                 .welcome-card { background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); margin-top: 20px; }
                 p { color: #94a3b8; line-height: 1.6; }
+                .back-home { display: inline-block; margin-top: 20px; color: #38bdf8; text-decoration: none; font-size: 0.9rem; }
+                .back-home:hover { text-decoration: underline; }
             </style>
         </head>
         <body>
             <sidebar>
-                <div class="menu-toggle">☰ Menu</div>
-                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 10px;">SELECIONE UM SERVIDOR</p>
+                <div class="menu-header">☰ Menu de Servidores</div>
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 10px;">SELECIONE UM PARA GERENCIAR</p>
                 <ul class="server-list">
                     ${manageableGuilds.length > 0 ? manageableGuilds.map(g => `
                         <a href="/dashboard/${g.id}" class="server-item">🛡️ ${g.name}</a>
-                    `).join('') : '<p style="font-size: 0.9rem; color: #f87171;">Nenhum servidor comum encontrado onde você seja administrador e o bot esteja.</p>'}
+                    `).join('') : '<p style="font-size: 0.9rem; color: #f87171;">Nenhum servidor encontrado onde você seja administrador e o bot esteja.</p>'}
                 </ul>
             </sidebar>
             <main>
                 <h1>Bem-vindo, ${user.username}!</h1>
                 <div class="welcome-card">
-                    <p>Este é o seu painel de controle centralizado no Aeternus. Utilize o menu lateral esquerdo (☰) para selecionar o servidor que deseja gerenciar, configurar comandos, visualizar registros e ajustar permissões da sua comunidade com total autonomia.</p>
+                    <p>Este é o seu painel de controle centralizado no Aeternus. Utilize o menu lateral esquerdo com o ícone <strong>☰</strong> para selecionar o servidor que deseja gerenciar, configurar comandos, visualizar registros e ajustar permissões da sua comunidade com total autonomia e elegância.</p>
+                </div>
+                <a href="/" class="back-home">← Voltar à Página Inicial</a>
+            </main>
+        </body>
+        </html>
+    `);
+});
+
+// Portal de Gerenciamento do Servidor Específico (/dashboard/:guildId)
+app.get('/dashboard/:guildId', (req, res) => {
+    const sessionId = req.cookies.sessionId;
+    const sessionData = sessions[sessionId];
+
+    if (!sessionData) return res.redirect('/');
+
+    const guildId = req.params.guildId;
+    const userGuilds = sessionData.guilds;
+
+    const guild = userGuilds.find(g => g.id === guildId);
+    if (!guild) return res.redirect('/dashboard');
+
+    const isAdmin = (BigInt(guild.permissions) & 0x8n) === 0x8n || guild.owner;
+    const botGuild = client.guilds.cache.get(guildId);
+
+    if (!isAdmin || !botGuild) {
+        return res.redirect('/dashboard');
+    }
+
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Gerenciar ${guild.name} - Aeternus</title>
+            <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+            <style>
+                body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; }
+                sidebar { width: 260px; background: #1e293b; border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+                .menu-header { font-size: 1.2rem; font-weight: bold; color: #38bdf8; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+                .server-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+                .server-item { padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-radius: 8px; cursor: pointer; transition: 0.2s; text-decoration: none; color: #cbd5e1; display: block; }
+                .server-item:hover, .server-item.active { background: #38bdf8; color: #0f172a; font-weight: 600; }
+                main { flex: 1; padding: 40px; overflow-y: auto; }
+                h1 { font-family: 'Playfair Display', serif; font-size: 2.2rem; font-style: italic; background: linear-gradient(90deg, #38bdf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+                .portal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+                .card { background: #1e293b; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); }
+                .card h3 { color: #38bdf8; margin-top: 0; }
+                p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
+                .btn-action { display: inline-block; background: #38bdf8; color: #0f172a; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 15px; transition: 0.2s; }
+                .btn-action:hover { background: #7dd3fc; }
+                .back-link { display: inline-block; margin-bottom: 20px; color: #94a3b8; text-decoration: none; }
+                .back-link:hover { color: #f8fafc; }
+            </style>
+        </head>
+        <body>
+            <sidebar>
+                <div class="menu-header">☰ Servidores</div>
+                <ul class="server-list">
+                    ${userGuilds.filter(g => (BigInt(g.permissions) & 0x8n) === 0x8n || g.owner).filter(g => client.guilds.cache.has(g.id)).map(g => `
+                        <a href="/dashboard/${g.id}" class="server-item ${g.id === guildId ? 'active' : ''}">🛡️ ${g.name}</a>
+                    `).join('')}
+                </ul>
+            </sidebar>
+            <main>
+                <a href="/dashboard" class="back-link">← Voltar à Visão Geral</a>
+                <h1>Portal de Gerenciamento: ${guild.name}</h1>
+                <p>Configure as opções avançadas do bot para este servidor em tempo real.</p>
+                
+                <div class="portal-grid">
+                    <div class="card">
+                        <h3>💬 Comandos & Integrações</h3>
+                        <p>Ative ou desative módulos de comandos personalizados e configure canais permitidos.</p>
+                        <a href="#" class="btn-action">Configurar</a>
+                    </div>
+                    <div class="card">
+                        <h3>👋 Mensagem de Boas-Vindas</h3>
+                        <p>Personalize o texto, imagem e canal onde o bot dará boas-vindas aos novos membros.</p>
+                        <a href="#" class="btn-action">Configurar</a>
+                    </div>
+                    <div class="card">
+                        <h3>🔒 Permissões & Cargos</h3>
+                        <p>Defina quais cargos administrativos do Discord terão acesso a este painel web.</p>
+                        <a href="#" class="btn-action">Configurar</a>
+                    </div>
                 </div>
             </main>
         </body>
