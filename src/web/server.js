@@ -157,43 +157,16 @@ module.exports = (client, config) => {
         res.json({ success: true });
     });
 
-    // API: Salvar Config de Tickets
-    app.post('/api/guilds/:guildId/tickets', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const current = db.getGuildConfig(req.params.guildId).tickets || {};
-        const updated = {
-            ...current,
-            ...req.body,
-            enabled: req.body.enabled === true || req.body.enabled === 'true'
-        };
-
-        db.setGuildConfig(req.params.guildId, { tickets: updated });
-        res.json({ success: true });
-    });
-
-    // API: Desativar Sistema de Tickets
-    app.post('/api/guilds/:guildId/tickets/disable', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const current = db.getGuildConfig(req.params.guildId).tickets || {};
-        db.setGuildConfig(req.params.guildId, { tickets: { ...current, enabled: false } });
-        res.json({ success: true });
-    });
-
-    // API: Enviar Painel de Tickets no Discord
-    app.post('/api/guilds/:guildId/tickets/send-panel', async (req, res) => {
+    // API: Salvar e Enviar Painel de Tickets no Discord
+    app.post('/api/guilds/:guildId/tickets/save-and-send', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
 
         const guildId = req.params.guildId;
         const botGuild = client.guilds.cache.get(guildId);
-        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado no bot.' });
+        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
 
-        const savedConfig = db.getGuildConfig(guildId).tickets || {};
-        const config = { ...savedConfig, ...req.body, enabled: true };
+        const config = { ...req.body, enabled: req.body.enabled === true || req.body.enabled === 'true' };
 
         if (!config.ticketChannel) {
             return res.status(400).json({ error: 'Selecione um canal para o painel de tickets.' });
@@ -221,15 +194,91 @@ module.exports = (client, config) => {
                     .setEmoji('🎫')
             );
 
-            await channel.send({ embeds: [embed], components: [row] });
-            
+            const sentMessage = await channel.send({ embeds: [embed], components: [row] });
+
+            // Salva as configurações junto com a ID da mensagem enviada
+            config.messageId = sentMessage.id;
             db.setGuildConfig(guildId, { tickets: config });
 
             res.json({ success: true });
         } catch (err) {
             console.error('Erro ao enviar painel de tickets:', err);
-            res.status(500).json({ error: 'Verifique as permissões do bot no canal escolhido.' });
+            res.status(500).json({ error: 'Verifique se o bot possui permissão de Ver Canal e Enviar Mensagens.' });
         }
+    });
+
+    // API: Editar Painel de Tickets Existente
+    app.post('/api/guilds/:guildId/tickets/edit-panel', async (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const guildId = req.params.guildId;
+        const botGuild = client.guilds.cache.get(guildId);
+        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
+
+        const savedConfig = db.getGuildConfig(guildId).tickets || {};
+        const config = { ...savedConfig, ...req.body, enabled: true };
+
+        if (!config.ticketChannel) {
+            return res.status(400).json({ error: 'Selecione o canal do painel.' });
+        }
+
+        try {
+            const channel = await botGuild.channels.fetch(config.ticketChannel).catch(() => null);
+            if (!channel || !channel.isTextBased()) {
+                return res.status(404).json({ error: 'Canal não encontrado.' });
+            }
+
+            let messageToEdit = null;
+            if (config.messageId) {
+                messageToEdit = await channel.messages.fetch(config.messageId).catch(() => null);
+            }
+
+            // Se não encontrou pela ID salva, tenta procurar as últimas mensagens do bot no canal
+            if (!messageToEdit) {
+                const messages = await channel.messages.fetch({ limit: 20 });
+                messageToEdit = messages.find(m => m.author.id === client.user.id && m.components.length > 0);
+            }
+
+            if (!messageToEdit) {
+                return res.status(404).json({ error: 'Nenhuma mensagem do painel foi encontrada neste canal para editar. Salve um novo painel.' });
+            }
+
+            const embed = new EmbedBuilder()
+                .setTitle(config.embedTitle || '🎫 Central de Atendimento')
+                .setDescription(config.embedDescription || 'Clique no botão abaixo para abrir um ticket privado com a nossa equipe.')
+                .setColor('#38bdf8')
+                .setFooter({ text: botGuild.name, iconURL: botGuild.iconURL() })
+                .setTimestamp();
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('btn_open_ticket')
+                    .setLabel(config.buttonText || 'Abrir Ticket')
+                    .setStyle(ButtonStyle.Primary)
+                    .setEmoji('🎫')
+            );
+
+            await messageToEdit.edit({ embeds: [embed], components: [row] });
+
+            config.messageId = messageToEdit.id;
+            db.setGuildConfig(guildId, { tickets: config });
+
+            res.json({ success: true });
+        } catch (err) {
+            console.error('Erro ao editar painel de tickets:', err);
+            res.status(500).json({ error: 'Falha ao editar a mensagem no Discord.' });
+        }
+    });
+
+    // API: Desativar Sistema de Tickets
+    app.post('/api/guilds/:guildId/tickets/disable', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const current = db.getGuildConfig(req.params.guildId).tickets || {};
+        db.setGuildConfig(req.params.guildId, { tickets: { ...current, enabled: false } });
+        res.json({ success: true });
     });
 
     // Outras rotas da API

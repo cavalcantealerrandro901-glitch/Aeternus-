@@ -25,10 +25,10 @@ module.exports = (guild) => {
     </div>
 
     <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 20px; line-height: 1.5;">
-        Configure ou desative o canal de chamados de suporte privados do servidor.
+        Configure e personalize o painel de suporte. Ao salvar, a mensagem do painel será enviada ou atualizada automaticamente no canal selecionado.
     </p>
 
-    <form id="ticketForm" onsubmit="saveTicketsConfig(event, '${guild.id}')" style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
+    <form id="ticketForm" onsubmit="saveAndSendTicketsConfig(event, '${guild.id}')" style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
         
         <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
             <input type="checkbox" id="ticketEnabled" name="enabled" value="true" ${isEnabled ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
@@ -72,10 +72,10 @@ module.exports = (guild) => {
 
         <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 15px;">
             <button type="submit" class="btn-save" id="saveTicketsBtn" style="background: linear-gradient(135deg, #10b981, #059669);">
-                💾 Salvar Configurações
+                💾 Salvar e Enviar Painel
             </button>
-            <button type="button" onclick="sendTicketPanel('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #38bdf8, #2563eb);">
-                📩 Enviar Painel ao Discord
+            <button type="button" onclick="editTicketPanel('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #38bdf8, #2563eb);">
+                ✏️ Editar Mensagem do Painel
             </button>
             <button type="button" onclick="disableTicketSystem('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
                 🚫 Desativar Sistema
@@ -85,11 +85,11 @@ module.exports = (guild) => {
 </section>
 
 <script>
-    async function saveTicketsConfig(event, guildId) {
+    async function saveAndSendTicketsConfig(event, guildId) {
         event.preventDefault();
         const btn = document.getElementById('saveTicketsBtn');
         btn.disabled = true;
-        btn.innerText = '⏳ Salvando...';
+        btn.innerText = '⏳ Salvando e Enviando...';
 
         const form = document.getElementById('ticketForm');
         const formData = new FormData(form);
@@ -97,7 +97,7 @@ module.exports = (guild) => {
         data.enabled = form.querySelector('[name="enabled"]').checked;
 
         try {
-            const res = await fetch(\`/api/guilds/\${guildId}/tickets\`, {
+            const res = await fetch(\`/api/guilds/\${guildId}/tickets/save-and-send\`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -105,34 +105,34 @@ module.exports = (guild) => {
 
             const result = await res.json();
             if (result.success) {
-                alert('✅ Configurações salvas!');
+                alert('✅ Configurações salvas e painel enviado ao Discord!');
                 location.reload();
             } else {
-                alert('❌ Erro: ' + (result.error || 'Falha ao salvar.'));
+                alert('❌ Erro: ' + (result.error || 'Falha ao processar.'));
             }
         } catch (err) {
             alert('❌ Erro de conexão com o servidor.');
         } finally {
             btn.disabled = false;
-            btn.innerText = '💾 Salvar Configurações';
+            btn.innerText = '💾 Salvar e Enviar Painel';
         }
     }
 
-    async function sendTicketPanel(guildId) {
+    async function editTicketPanel(guildId) {
         const form = document.getElementById('ticketForm');
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
         data.enabled = form.querySelector('[name="enabled"]').checked;
 
         if (!data.ticketChannel) {
-            alert('⚠️ Por favor, selecione um canal no formulário antes de enviar!');
+            alert('⚠️ Selecione um canal para localizar a mensagem do painel!');
             return;
         }
 
-        if (!confirm('Deseja enviar o painel de tickets para o canal selecionado?')) return;
+        if (!confirm('Deseja atualizar a mensagem existente do painel no Discord com as informações acima?')) return;
 
         try {
-            const res = await fetch(\`/api/guilds/\${guildId}/tickets/send-panel\`, {
+            const res = await fetch(\`/api/guilds/\${guildId}/tickets/edit-panel\`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -140,13 +140,13 @@ module.exports = (guild) => {
 
             const result = await res.json();
             if (result.success) {
-                alert('✅ Painel de tickets enviado com sucesso para o Discord!');
+                alert('✏️ Mensagem do painel editada com sucesso no Discord!');
                 location.reload();
             } else {
-                alert('❌ Erro: ' + (result.error || 'Verifique as permissões do bot no canal.'));
+                alert('❌ Erro: ' + (result.error || 'Não foi possível encontrar a mensagem anterior para editar.'));
             }
         } catch (err) {
-            alert('❌ Erro de conexão ao enviar o painel.');
+            alert('❌ Erro de conexão ao editar o painel.');
         }
     }
 
