@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 let config;
@@ -40,56 +41,181 @@ if (fs.existsSync(commandsPath)) {
     }
 }
 
-// Conectar ao MongoDB com segurança
+// Conectar ao MongoDB
 const mongoUri = config.mongoUri || process.env.MONGO_URI;
 if (mongoUri) {
     mongoose.connect(mongoUri)
         .then(() => console.log('📦 Conectado ao MongoDB com sucesso!'))
         .catch(err => console.error('Erro ao conectar ao MongoDB:', err));
-} else {
-    console.warn('⚠️ MONGO_URI não definida!');
 }
 
-// Painel Web com Express (HTML Moderno)
+// Configurar Servidor Web Express
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
 
+// Simulação simples de sessão em memória para os testes
+const sessions = {};
+
+// Página Inicial com Botão de Login no Canto Superior Direito
 app.get('/', (req, res) => {
+    const sessionId = req.cookies.sessionId;
+    const user = sessions[sessionId];
+
     res.send(`
         <!DOCTYPE html>
         <html lang="pt-BR">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Aeternus - Painel Web</title>
+            <title>Aeternus - Início</title>
+            <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
             <style>
-                body { font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                .card { background-color: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 100%; }
-                h1 { color: #38bdf8; margin-bottom: 10px; }
-                .status { display: inline-block; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-top: 15px; }
-                .online { background-color: #22c55e; color: white; }
-                p { color: #94a3b8; font-size: 14px; }
+                body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; }
+                header { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; background: rgba(30, 41, 59, 0.5); border-bottom: 1px solid rgba(255,255,255,0.1); }
+                .logo { font-size: 1.5rem; font-weight: bold; color: #38bdf8; }
+                .login-btn { background: #5865F2; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: 0.3s; }
+                .login-btn:hover { background: #4752c4; }
+                .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; }
+                h1 { font-family: 'Playfair Display', serif; font-size: 3rem; font-style: italic; background: linear-gradient(90deg, #38bdf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
+                p { color: #94a3b8; font-size: 1.1rem; max-width: 600px; line-height: 1.6; }
             </style>
         </head>
         <body>
-            <div class="card">
-                <h1>Aeternus Bot</h1>
-                <p>Painel de Controle e Status do Web Service</p>
-                <div class="status online">● Bot Online & Ativo</div>
+            <header>
+                <div class="logo">Aeternus</div>
+                <div>
+                    ${user ? `<a href="/dashboard" class="login-btn">Painel</a>` : `<a href="/login" class="login-btn">Login 🔚</a>`}
+                </div>
+            </header>
+            <div class="hero">
+                <h1>Gerencie seu Bot com Elegância</h1>
+                <p>O painel de controle definitivo para acompanhar estatísticas, gerenciar servidores e configurar seu ecossistema no Discord com facilidade.</p>
             </div>
         </body>
         </html>
     `);
 });
 
-app.listen(PORT, () => {
-    console.log(`🌐 Painel Web rodando na porta ${PORT}`);
+// Redirecionamento para o Discord OAuth2
+app.get('/login', (req, res) => {
+    const clientId = config.clientId || process.env.CLIENT_ID;
+    const redirectUri = `${req.protocol}://${req.get('host')}/auth/discord/callback`;
+    const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify%20guilds`;
+    res.redirect(discordAuthUrl);
 });
 
-// Evento ready do Bot
+// Callback do Discord OAuth2
+app.get('/auth/discord/callback', async (req, res) => {
+    const code = req.query.code;
+    if (!code) return res.redirect('/');
+
+    const clientId = config.clientId || process.env.CLIENT_ID;
+    const clientSecret = config.clientSecret || process.env.CLIENT_SECRET;
+    const redirectUri = `${req.protocol}://${req.get('host')}/auth/discord/callback`;
+
+    try {
+        const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+            method: 'POST',
+            body: new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: redirectUri,
+            }),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+
+        const tokenData = await tokenResponse.json();
+        if (!tokenData.access_token) return res.redirect('/');
+
+        // Buscar dados do usuário
+        const userResponse = await fetch('https://discord.com/api/users/@me', {
+            headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
+        });
+        const userData = await userResponse.json();
+
+        // Buscar servidores do usuário
+        const guildsResponse = await fetch('https://discord.com/api/users/@me/guilds', {
+            headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
+        });
+        const guildsData = await guildsResponse.json();
+
+        const sessionId = Math.random().toString(36).substring(2);
+        sessions[sessionId] = { user: userData, guilds: guildsData };
+
+        res.cookie('sessionId', sessionId, { httpOnly: true });
+        res.redirect('/dashboard');
+    } catch (error) {
+        console.error('Erro no OAuth2:', error);
+        res.redirect('/');
+    }
+});
+
+// Página do Painel / Dashboard com Seletor de Servidores e Menu (=)
+app.get('/dashboard', (req, res) => {
+    const sessionId = req.cookies.sessionId;
+    const sessionData = sessions[sessionId];
+
+    if (!sessionData) return res.redirect('/');
+
+    const user = sessionData.user;
+    const userGuilds = sessionData.guilds;
+
+    // Filtrar servidores onde o usuário é Administrador (permissão 0x8 ou bit 3) e o bot está presente
+    const botGuilds = client.guilds.cache;
+    const manageableGuilds = userGuilds.filter(g => {
+        const isAdmin = (BigInt(g.permissions) & 0x8n) === 0x8n || g.owner;
+        const botIsInGuild = botGuilds.has(g.id);
+        return isAdmin && botIsInGuild;
+    });
+
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Dashboard - Aeternus</title>
+            <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+            <style>
+                body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; }
+                sidebar { width: 260px; background: #1e293b; border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; padding: 20px; }
+                .menu-toggle { font-size: 1.5rem; cursor: pointer; margin-bottom: 20px; color: #38bdf8; }
+                .server-list { list-style: none; padding: 0; margin: 0; }
+                .server-item { padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border-radius: 8px; cursor: pointer; transition: 0.2s; text-decoration: none; color: #cbd5e1; display: block; }
+                .server-item:hover { background: #38bdf8; color: #0f172a; font-weight: 600; }
+                main { flex: 1; padding: 40px; overflow-y: auto; }
+                h1 { font-family: 'Playfair Display', serif; font-size: 2.5rem; font-style: italic; background: linear-gradient(90deg, #38bdf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+                .welcome-card { background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); margin-top: 20px; }
+                p { color: #94a3b8; line-height: 1.6; }
+            </style>
+        </head>
+        <body>
+            <sidebar>
+                <div class="menu-toggle">☰ Menu</div>
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 10px;">SELECIONE UM SERVIDOR</p>
+                <ul class="server-list">
+                    ${manageableGuilds.length > 0 ? manageableGuilds.map(g => `
+                        <a href="/dashboard/${g.id}" class="server-item">🛡️ ${g.name}</a>
+                    `).join('') : '<p style="font-size: 0.9rem; color: #f87171;">Nenhum servidor comum encontrado onde você seja administrador e o bot esteja.</p>'}
+                </ul>
+            </sidebar>
+            <main>
+                <h1>Bem-vindo, ${user.username}!</h1>
+                <div class="welcome-card">
+                    <p>Este é o seu painel de controle centralizado no Aeternus. Utilize o menu lateral esquerdo (☰) para selecionar o servidor que deseja gerenciar, configurar comandos, visualizar registros e ajustar permissões da sua comunidade com total autonomia.</p>
+                </div>
+            </main>
+        </body>
+        </html>
+    `);
+});
+
 client.once('ready', async () => {
     console.log(`🤖 Aeternus conectado com sucesso como ${client.user.tag}!`);
-
     const commands = [];
     client.commands.forEach(command => commands.push(command.data.toJSON()));
 
@@ -117,95 +243,8 @@ client.on('interactionCreate', async interaction => {
         console.error(error);
     }
 });
-// Importe a fonte do Google Fonts no HTML para letras charmosas e modernas
-app.get('/welcome', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Bem-vindo ao Aeternus</title>
-            <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-            <style>
-                body {
-                    margin: 0;
-                    padding: 0;
-                    font-family: 'Inter', sans-serif;
-                    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-                    color: #f8fafc;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    height: 100vh;
-                    overflow: hidden;
-                }
-                .welcome-card {
-                    background: rgba(30, 41, 59, 0.7);
-                    backdrop-filter: blur(12px);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    padding: 40px;
-                    border-radius: 20px;
-                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-                    text-align: center;
-                    max-width: 500px;
-                    width: 90%;
-                }
-                h1 {
-                    font-family: 'Playfair Display', serif;
-                    font-size: 2.8rem;
-                    font-style: italic;
-                    background: linear-gradient(90deg, #38bdf8, #c084fc);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    margin-bottom: 20px;
-                }
-                p {
-                    color: #cbd5e1;
-                    font-size: 1rem;
-                    line-height: 1.6;
-                    margin-bottom: 30px;
-                }
-                .btn {
-                    display: inline-block;
-                    background: #5865F2;
-                    color: white;
-                    padding: 12px 25px;
-                    border-radius: 8px;
-                    text-decoration: none;
-                    font-weight: 600;
-                    transition: background 0.3s ease;
-                }
-                .btn:hover {
-                    background: #4752c4;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="welcome-card">
-                <h1>Bem-vindo ao Aeternus</h1>
-                <p>
-                    Este é o seu painel de controle centralizado. Aqui você gerencia comandos, 
-                    monitora o status do bot em tempo real, acompanha o sistema de economia 
-                    e configura todas as preferências da sua aplicação com facilidade e segurança.
-                </p>
-                <a href="/" class="btn">Voltar ao Início</a>
-            </div>
-        </body>
-        </html>
-    `);
-});
-
-// Rota de login simulada ou redirecionamento do Discord OAuth2
-app.get('/login', (req, res) => {
-    // Aqui você redirecionaria para o Discord OAuth2 se configurado, 
-    // ou redireciona direto para a página de boas-vindas após o login bem-sucedido:
-    res.redirect('/welcome');
-});
 
 const token = config.token || process.env.DISCORD_TOKEN;
 if (token) {
     client.login(token).catch(err => console.error('Erro ao fazer login no Discord:', err));
-} else {
-    console.error('❌ DISCORD_TOKEN não fornecido!');
 }
