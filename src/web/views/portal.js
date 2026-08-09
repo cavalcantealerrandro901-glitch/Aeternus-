@@ -1,4 +1,5 @@
 const renderLogsCategory = require('./categories/logs');
+const renderWelcomeCategory = require('./categories/welcome');
 
 module.exports = (guild, manageableGuilds, user, botUser) => {
     const botAvatarUrl = botUser ? botUser.displayAvatarURL({ extension: 'png', size: 128 }) : 'https://cdn.discordapp.com/embed/avatars/0.png';
@@ -7,6 +8,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
     const botName = botUser ? botUser.username : 'Aeternus';
 
     const logsSection = renderLogsCategory(guild, guild.textChannels);
+    const welcomeSection = renderWelcomeCategory(guild, guild.textChannels);
 
     return `
 <!DOCTYPE html>
@@ -55,10 +57,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             justify-content: center;
             transition: all 0.2s;
         }
-        .menu-toggle-btn:hover {
-            background: rgba(56, 189, 248, 0.2);
-            border-color: #38bdf8;
-        }
+        .menu-toggle-btn:hover { background: rgba(56, 189, 248, 0.2); border-color: #38bdf8; }
         .brand {
             display: flex;
             align-items: center;
@@ -207,20 +206,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         .pill { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; color: #cbd5e1; font-weight: 600; }
         .pill span { color: #38bdf8; font-weight: 700; }
 
-        .info-box {
-            background: rgba(56, 189, 248, 0.08);
-            border: 1px solid rgba(56, 189, 248, 0.25);
-            border-radius: 16px;
-            padding: 20px 24px;
-            margin-bottom: 30px;
-            display: flex;
-            gap: 16px;
-            align-items: flex-start;
-        }
-        .info-icon { font-size: 1.6rem; line-height: 1; }
-        .info-content h3 { font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px; }
-        .info-content p { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; }
-
         .config-card {
             background: rgba(15, 23, 42, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -314,8 +299,11 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
 
         <div class="nav-category-title">Categorias de Módulos</div>
         <ul class="nav-menu-list">
-            <li class="nav-menu-item active">
+            <li class="nav-menu-item">
                 <a href="#logs" onclick="closeSidebar()">📜 Sistema de Logs</a>
+            </li>
+            <li class="nav-menu-item">
+                <a href="#welcome" onclick="closeSidebar()">👋 Boas-Vindas</a>
             </li>
         </ul>
 
@@ -359,18 +347,8 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             </div>
         </div>
 
-        <div class="info-box">
-            <div class="info-icon">💡</div>
-            <div class="info-content">
-                <h3>Como Funciona a Configuração?</h3>
-                <p>
-                    Escolha abaixo os canais onde o bot enviará as notificações automáticas do seu servidor.
-                    Clique no botão de menu <strong>☰ (no canto superior esquerdo)</strong> ou <strong>deslize a tela para a direita</strong> no celular para navegar pelas diferentes categorias do painel!
-                </p>
-            </div>
-        </div>
-
         ${logsSection}
+        ${welcomeSection}
     </main>
 
     <script>
@@ -385,27 +363,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         function closeSidebar() {
             sidebar.classList.remove('active');
             overlay.classList.remove('active');
-        }
-
-        let touchStartX = 0;
-        let touchEndX = 0;
-
-        document.addEventListener('touchstart', e => {
-            touchStartX = e.changedTouches[0].screenX;
-        }, false);
-
-        document.addEventListener('touchend', e => {
-            touchEndX = e.changedTouches[0].screenX;
-            handleSwipe();
-        }, false);
-
-        function handleSwipe() {
-            if (touchEndX - touchStartX > 70 && touchStartX < 60) {
-                openSidebar();
-            }
-            if (touchStartX - touchEndX > 70 && sidebar.classList.contains('active')) {
-                closeSidebar();
-            }
         }
     </script>
 </body>

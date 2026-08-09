@@ -6,8 +6,8 @@ const path = require('path');
 
 const startWebServer = require('./src/web/server');
 const registerLogs = require('./src/events/logs');
+const registerWelcome = require('./src/events/welcome');
 
-// Carregar configurações do JSON ou variáveis de ambiente
 let config;
 try { 
     config = require('./config.json'); 
@@ -20,14 +20,13 @@ try {
     };
 }
 
-// Instância do Client com Intents e Partials essenciais para os Logs
 const client = new Client({
     intents: [ 
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent,   // Para ler conteúdo de mensagens editadas/apagadas
-        GatewayIntentBits.GuildMembers,     // Para logs de entrada/saída de membros
-        GatewayIntentBits.GuildVoiceStates  // Para logs de canais de voz
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,    // Essencial para detectar novos membros
+        GatewayIntentBits.GuildVoiceStates 
     ],
     partials: [
         Partials.Message,
@@ -40,7 +39,6 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Carregar Comandos Slash
 const commandsPath = path.join(__dirname, 'src', 'commands');
 if (fs.existsSync(commandsPath)) {
     const files = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'));
@@ -50,20 +48,19 @@ if (fs.existsSync(commandsPath)) {
     }
 }
 
-// Conectar ao MongoDB
 if (config.mongoUri) {
     mongoose.connect(config.mongoUri)
         .then(() => console.log('📦 Conectado ao MongoDB com sucesso!'))
         .catch(err => console.error('❌ Erro no MongoDB:', err));
 }
 
-// Registrar os ouvinte de logs (AGORA NO LUGAR CORRETO, após a criação do client)
+// Registrar eventos
 registerLogs(client);
+registerWelcome(client);
 
-// Iniciar Painel Web e injetar dependências
+// Iniciar Painel Web
 startWebServer(client, config);
 
-// Eventos do Bot
 client.once('ready', async () => {
     console.log(`🤖 Aeternus online como ${client.user.tag}!`);
     const cmds = []; 
@@ -74,12 +71,11 @@ client.once('ready', async () => {
             await new REST({ version: '10' }).setToken(config.token).put(Routes.applicationCommands(config.clientId), { body: cmds });
             console.log('✨ Comandos barra registrados!');
         } catch (error) { 
-            console.error('❌ Erro ao registrar comandos slash:', error); 
+            console.error('❌ Erro ao registrar comandos:', error); 
         }
     }
 });
 
-// Execução de Comandos
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
     const cmd = client.commands.get(interaction.commandName);
@@ -92,9 +88,6 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// Login do Bot
 if (config.token) {
     client.login(config.token);
-} else {
-    console.error('❌ ERRO: Token não foi fornecido no .env ou config.json!');
 }

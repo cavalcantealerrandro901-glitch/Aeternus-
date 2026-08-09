@@ -4,6 +4,7 @@ const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderPortal = require('./views/portal');
 const db = require('../database/db');
+const { sendTest } = require('../events/welcome');
 
 module.exports = (client, config) => {
     const app = express();
@@ -116,7 +117,6 @@ module.exports = (client, config) => {
             .filter(c => c.type === 0 || c.type === 5)
             .map(c => ({ id: c.id, name: c.name })) : [];
 
-        // Carregar logs já configurados para este servidor
         const savedConfig = db.getGuildConfig(guild.id);
 
         const serverData = {
@@ -127,26 +127,60 @@ module.exports = (client, config) => {
             channelCount: botGuild ? botGuild.channels.cache.size : 'N/A',
             roleCount: botGuild ? botGuild.roles.cache.size : 'N/A',
             textChannels: textChannels,
-            logsConfig: savedConfig.logs || {}
+            logsConfig: savedConfig.logs || {},
+            welcomeConfig: savedConfig.welcome || {}
         };
 
         res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
     });
 
-    // Rota API para salvar configurações de Logs
+    // Salvar Logs
     app.post('/api/guilds/:guildId/logs', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
 
         const manageableGuilds = getManageableGuilds(session.guilds);
         const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
 
-        if (!guild) return res.status(403).json({ error: 'Sem permissão neste servidor' });
+        db.setGuildConfig(req.params.guildId, { logs: req.body });
+        res.json({ success: true });
+    });
 
-        const logsConfig = req.body;
-        db.setGuildConfig(req.params.guildId, { logs: logsConfig });
+    // Salvar Boas-Vindas
+    app.post('/api/guilds/:guildId/welcome', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
 
-        res.json({ success: true, message: 'Configurações salvas com sucesso!' });
+        const manageableGuilds = getManageableGuilds(session.guilds);
+        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
+
+        db.setGuildConfig(req.params.guildId, { welcome: req.body });
+        res.json({ success: true });
+    });
+
+    // Rota para Testar Boas-Vindas
+    app.post('/api/guilds/:guildId/welcome/test', async (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const guildConfig = db.getGuildConfig(req.params.guildId);
+        const welcomeConfig = guildConfig.welcome;
+
+        if (!welcomeConfig || !welcomeConfig.welcomeChannel) {
+            return res.status(400).json({ error: 'Selecione e salve um canal de boas-vindas antes de testar!' });
+        }
+
+        const botGuild = client.guilds.cache.get(req.params.guildId);
+        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado' });
+
+        try {
+            await sendTest(botGuild, welcomeConfig.welcomeChannel, welcomeConfig);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(500).json({ error: err.message || 'Erro ao enviar mensagem no Discord' });
+        }
     });
 
     app.listen(PORT, () => console.log(`🌐 Painel Web rodando na porta ${PORT}`));

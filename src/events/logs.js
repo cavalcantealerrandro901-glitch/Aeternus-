@@ -4,6 +4,11 @@ const db = require('../database/db');
 module.exports = (client) => {
     // Log de Mensagem Deletada
     client.on('messageDelete', async (message) => {
+        // Tenta buscar a mensagem se for parcial
+        if (message.partial) {
+            try { await message.fetch(); } catch (e) { return; }
+        }
+        
         if (!message.guild || message.author?.bot) return;
 
         const config = db.getGuildConfig(message.guild.id);
@@ -28,6 +33,14 @@ module.exports = (client) => {
 
     // Log de Mensagem Editada
     client.on('messageUpdate', async (oldMessage, newMessage) => {
+        // Tenta buscar mensagens parciais caso não estejam em cache
+        if (oldMessage.partial) {
+            try { await oldMessage.fetch(); } catch (e) { return; }
+        }
+        if (newMessage.partial) {
+            try { await newMessage.fetch(); } catch (e) { return; }
+        }
+
         if (!oldMessage.guild || oldMessage.author?.bot) return;
         if (oldMessage.content === newMessage.content) return;
 
@@ -44,7 +57,7 @@ module.exports = (client) => {
             .addFields(
                 { name: 'Autor', value: `${oldMessage.author} (\`${oldMessage.author.id}\`)`, inline: true },
                 { name: 'Canal', value: `${oldMessage.channel}`, inline: true },
-                { name: 'Antes', value: oldMessage.content ? `\`\`\`${oldMessage.content.slice(0, 500)}\`\`\`` : '*[Sem conteúdo]*' },
+                { name: 'Antes', value: oldMessage.content ? `\`\`\`${oldMessage.content.slice(0, 500)}\`\`\`` : '*[Conteúdo antigo não estava em cache]*' },
                 { name: 'Depois', value: newMessage.content ? `\`\`\`${newMessage.content.slice(0, 500)}\`\`\`` : '*[Sem conteúdo]*' }
             )
             .setTimestamp();
@@ -52,7 +65,7 @@ module.exports = (client) => {
         logChannel.send({ embeds: [embed] }).catch(() => {});
     });
 
-    // Log de Entradas de Membros
+    // Log de Entradas
     client.on('guildMemberAdd', async (member) => {
         const config = db.getGuildConfig(member.guild.id);
         const channelId = config.logs?.logMembers;
@@ -74,7 +87,7 @@ module.exports = (client) => {
         logChannel.send({ embeds: [embed] }).catch(() => {});
     });
 
-    // Log de Saídas de Membros
+    // Log de Saídas
     client.on('guildMemberRemove', async (member) => {
         const config = db.getGuildConfig(member.guild.id);
         const channelId = config.logs?.logMembers;
