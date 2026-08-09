@@ -17,12 +17,13 @@ module.exports = (client, config) => {
     const CLIENT_ID = config?.clientId || process.env.CLIENT_ID;
     const CLIENT_SECRET = config?.clientSecret || process.env.CLIENT_SECRET;
     const REDIRECT_URI = process.env.REDIRECT_URI || 'https://aeternus-q7gt.onrender.com/auth/discord/callback';
+    const SUPPORT_URL = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/seu-suporte'; // Altere no Render ou aqui
 
     // Rota Principal
     app.get('/', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&scope=bot%20applications.commands&permissions=8`;
-        res.send(renderHome(session?.user || null, client.user, inviteUrl));
+        res.send(renderHome(session?.user || null, client.user, inviteUrl, SUPPORT_URL));
     });
 
     // Rota de Login (OAuth2)

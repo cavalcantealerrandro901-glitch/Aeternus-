@@ -1,4 +1,4 @@
-module.exports = (user, botUser, inviteUrl) => {
+module.exports = (user, botUser, inviteUrl, supportUrl) => {
     const avatarUrl = botUser ? botUser.displayAvatarURL({ extension: 'png', size: 256 }) : 'https://cdn.discordapp.com/embed/avatars/0.png';
     const botName = botUser ? botUser.username : 'Aeternus';
 
@@ -150,6 +150,19 @@ module.exports = (user, botUser, inviteUrl) => {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(56, 189, 248, 0.5);
         }
+        .btn-support {
+            background: rgba(88, 101, 242, 0.15);
+            color: #818cf8;
+            border: 1px solid rgba(88, 101, 242, 0.4);
+            padding: 14px 28px;
+            font-size: 1.05rem;
+        }
+        .btn-support:hover {
+            background: rgba(88, 101, 242, 0.3);
+            color: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(88, 101, 242, 0.25);
+        }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.06);
             color: #f1f5f9;
@@ -232,6 +245,7 @@ module.exports = (user, botUser, inviteUrl) => {
 
         <div class="cta-group">
             <a href="${inviteUrl}" target="_blank" class="btn btn-add">🤖 Adicionar ao Seu Servidor</a>
+            <a href="${supportUrl}" target="_blank" class="btn btn-support">💬 Servidor de Suporte</a>
             ${user ? `<a href="/dashboard" class="btn btn-secondary">⚡ Ir para o Painel</a>` : `<a href="/login" class="btn btn-secondary">🌐 Fazer Login com Discord</a>`}
         </div>
 
