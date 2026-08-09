@@ -1,8 +1,9 @@
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../database/db');
 
-// Emojis nativos padrão para paquerar/flertar
 const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', '🏻', '🙈', '🔥', '✨', '💐', '💘'];
+// Categorias de gifs fofos da API
+const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
 
 module.exports = {
     name: 'messageCreate',
@@ -12,7 +13,7 @@ module.exports = {
         const guildConfig = db.getGuildConfig(message.guild.id);
         const prefix = guildConfig.prefix || '!';
 
-        // --- SISTEMA AUTOMÁTICO DE PAQUERA (REÇÕES AUTOMÁTICAS) ---
+        // --- SISTEMA AUTOMÁTICO DE PAQUERA (EMOJIS E FIGURINHAS) ---
         const flirtConfig = guildConfig.flirt || {};
         if (flirtConfig.enabled === true) {
             const isAllowedChannel = !flirtConfig.channels || flirtConfig.channels.length === 0 || flirtConfig.channels.includes(message.channel.id);
@@ -23,26 +24,37 @@ module.exports = {
 
                 if (randomNumber <= chance) {
                     try {
-                        // Varredura de emojis customizados e externos do bot
-                        const customGuildEmojis = message.guild.emojis.cache.filter(e => e.available).map(e => e.id);
-                        const globalClientEmojis = message.client.emojis.cache.filter(e => e.available).map(e => e.id);
+                        const mode = flirtConfig.mode || 'emoji';
+                        // Se for "both", sorteia 50/50 entre emoji e gif
+                        const useGif = mode === 'gif' || (mode === 'both' && Math.random() > 0.5);
 
-                        const allCustomEmojis = [...new Set([...customGuildEmojis, ...globalClientEmojis])];
-
-                        let chosenEmoji;
-                        // Seleciona um emoji customizado/externo ou cai no emoji nativo
-                        if (allCustomEmojis.length > 0 && Math.random() > 0.4) {
-                            chosenEmoji = allCustomEmojis[Math.floor(Math.random() * allCustomEmojis.length)];
+                        if (useGif) {
+                            // 📸 BUSCA UMA FIGURINHA ANIMADA (GIF) AUTOMATICAMENTE
+                            const randomCategory = GIF_CATEGORIES[Math.floor(Math.random() * GIF_CATEGORIES.length)];
+                            const response = await fetch(`https://nekos.best/api/v2/${randomCategory}`);
+                            const data = await response.json();
+                            
+                            if (data && data.results && data.results.length > 0) {
+                                const gifUrl = data.results[0].url;
+                                await message.reply({ content: gifUrl });
+                            }
                         } else {
-                            chosenEmoji = DEFAULT_FLIRT_EMOJIS[Math.floor(Math.random() * DEFAULT_FLIRT_EMOJIS.length)];
-                        }
+                            // 💖 REAÇÃO COM EMOJIS
+                            const customGuildEmojis = message.guild.emojis.cache.filter(e => e.available).map(e => e.id);
+                            const globalClientEmojis = message.client.emojis.cache.filter(e => e.available).map(e => e.id);
+                            const allCustomEmojis = [...new Set([...customGuildEmojis, ...globalClientEmojis])];
 
-                        await message.react(chosenEmoji).catch(() => {
-                            // Se falhar o emoji customizado, reage com um nativo
-                            message.react('❤️').catch(() => null);
-                        });
+                            let chosenEmoji;
+                            if (allCustomEmojis.length > 0 && Math.random() > 0.4) {
+                                chosenEmoji = allCustomEmojis[Math.floor(Math.random() * allCustomEmojis.length)];
+                            } else {
+                                chosenEmoji = DEFAULT_FLIRT_EMOJIS[Math.floor(Math.random() * DEFAULT_FLIRT_EMOJIS.length)];
+                            }
+
+                            await message.react(chosenEmoji).catch(() => message.react('❤️').catch(() => null));
+                        }
                     } catch (err) {
-                        console.error('Erro ao reagir no modo paquera:', err);
+                        console.error('Erro ao processar paquera automática:', err);
                     }
                 }
             }

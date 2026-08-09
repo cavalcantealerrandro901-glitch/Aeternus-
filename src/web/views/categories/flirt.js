@@ -21,7 +21,7 @@ module.exports = (guild) => {
     </div>
 
     <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 20px; line-height: 1.5;">
-        Quando os membros conversarem nos canais selecionados, o bot reagirá de forma surpresa com emojis/figurinhas divertidas de paquera!
+        Quando os membros conversarem, o bot interagirá de forma surpresa! Agora ele pode buscar figurinhas animadas (GIFs) automaticamente.
     </p>
 
     <form id="flirtForm" onsubmit="saveFlirtConfig(event, '${guild.id}')" style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
@@ -35,17 +35,26 @@ module.exports = (guild) => {
 
         <div class="form-grid">
             <div class="form-group">
-                <label>📌 Canais Permitidos (Mantenha CTRL/Cmd pressionado para selecionar vários)</label>
+                <label>📌 Canais Permitidos (CTRL/Cmd para vários)</label>
                 <select class="form-control" name="channels" multiple style="height: 120px;">
                     ${channelOptions}
                 </select>
-                <span style="font-size: 0.75rem; color: #64748b;">Se nenhum for selecionado, funcionará em todos os canais de texto.</span>
+                <span style="font-size: 0.75rem; color: #64748b;">Se vazio, funcionará em todos os canais.</span>
             </div>
 
             <div class="form-group">
-                <label>🎲 Chance de Reagir em cada mensagem (%)</label>
-                <input type="number" class="form-control" name="chance" value="${config.chance || 10}" min="1" max="100" placeholder="Ex: 10 para 10% de chance">
-                <span style="font-size: 0.75rem; color: #64748b;">Recomendado: entre 5% e 15% para não poluir o chat.</span>
+                <label>🎭 Modo de Interação</label>
+                <select class="form-control" name="mode">
+                    <option value="emoji" ${config.mode === 'emoji' ? 'selected' : ''}>Apenas Reagir com Emojis</option>
+                    <option value="gif" ${config.mode === 'gif' ? 'selected' : ''}>Enviar Figurinhas Animadas (Automático)</option>
+                    <option value="both" ${config.mode === 'both' ? 'selected' : ''}>Ambos (Sorteio entre Emoji e Figurinha)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>🎲 Chance de Interagir (%)</label>
+                <input type="number" class="form-control" name="chance" value="${config.chance || 10}" min="1" max="100">
+                <span style="font-size: 0.75rem; color: #64748b;">Recomendado: 5% a 15%.</span>
             </div>
         </div>
 
@@ -71,6 +80,7 @@ module.exports = (guild) => {
         const data = {
             enabled: form.querySelector('[name="enabled"]').checked,
             chance: parseInt(formData.get('chance')) || 10,
+            mode: formData.get('mode') || 'emoji',
             channels: channels
         };
 
@@ -83,7 +93,7 @@ module.exports = (guild) => {
 
             const result = await res.json();
             if (result.success) {
-                alert('✅ Configurações de paquera salvas!');
+                alert('✅ Sistema de paquera animado salvo!');
                 location.reload();
             } else {
                 alert('❌ Erro ao salvar.');
