@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { broadcastUpdate } = require('../utils/broadcaster');
-const { version: currentVersion } = require('../../package.json');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,7 +18,7 @@ module.exports = {
                 .setRequired(true))
         .addStringOption(option => 
             option.setName('versao')
-                .setDescription('Versão personalizada (Opcional - usa a versão do package.json por padrão)')
+                .setDescription('Versão específica (Deixe em branco para auto-incrementar a versão atual)')
                 .setRequired(false)),
 
     async execute(interaction) {
@@ -25,8 +26,43 @@ module.exports = {
 
         const titulo = interaction.options.getString('titulo');
         const novidades = interaction.options.getString('novidades');
-        const customVersion = interaction.options.getString('versao');
-        const versaoFinal = customVersion ? customVersion : `v${currentVersion}`;
+        let customVersion = interaction.options.getString('versao');
+
+        const packagePath = path.join(__dirname, '../../package.json');
+        
+        let packageData;
+        try {
+            packageData = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+        } catch (err) {
+            packageData = { version: '1.0.0' };
+        }
+
+        let currentVersion = packageData.version || '1.0.0';
+        let newVersion = '';
+
+        if (customVersion) {
+            // Se o usuário passou uma versão customizada (ex: 1.2.0 ou v1.2.0)
+            newVersion = customVersion.replace(/^v/i, '').trim();
+        } else {
+            // Auto-incrementa a versão Patch (ex: 1.0.0 -> 1.0.1)
+            const parts = currentVersion.replace(/^v/i, '').split('.').map(Number);
+            if (parts.length === 3 && !parts.some(isNaN)) {
+                parts[2] += 1;
+                newVersion = parts.join('.');
+            } else {
+                newVersion = currentVersion;
+            }
+        }
+
+        // Atualiza o arquivo package.json localmente
+        try {
+            packageData.version = newVersion;
+            fs.writeFileSync(packagePath, JSON.stringify(packageData, null, 2), 'utf8');
+        } catch (err) {
+            console.error('❌ Erro ao atualizar o package.json:', err);
+        }
+
+        const versaoFinal = `v${newVersion}`;
 
         const result = await broadcastUpdate(interaction.client, {
             title: titulo,
@@ -35,7 +71,7 @@ module.exports = {
         });
 
         await interaction.editReply({
-            content: `✅ Transmissão concluída!\n📢 Servidores notificados: **${result.successCount}**\n⚠️ Falhas: **${result.failCount}**\n🏷️ Versão aplicada: **${versaoFinal}**`
+            content: `✅ Transmissão concluída!\n📢 Servidores notificados: **${result.successCount}**\n⚠️ Falhas: **${result.failCount}**\n🏷️ Versão salva no package.json: **${versaoFinal}**`
         });
     }
 };
