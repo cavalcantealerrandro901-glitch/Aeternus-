@@ -1,3 +1,5 @@
+const renderLogsCategory = require('./categories/logs');
+
 module.exports = (guild, manageableGuilds, user, botUser) => {
     const botAvatarUrl = botUser ? botUser.displayAvatarURL({ extension: 'png', size: 128 }) : 'https://cdn.discordapp.com/embed/avatars/0.png';
     const userAvatarUrl = user?.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png';
@@ -7,6 +9,9 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
     const channelOptionsHtml = guild.textChannels && guild.textChannels.length > 0
         ? guild.textChannels.map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')
         : `<option value="">Nenhum canal encontrado</option>`;
+
+    // Renderizando o componente isolado da categoria de Logs
+    const logsSection = renderLogsCategory(guild, channelOptionsHtml);
 
     return `
 <!DOCTYPE html>
@@ -41,11 +46,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             top: 0;
             z-index: 90;
         }
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
         .menu-toggle-btn {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -91,7 +92,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         }
         .user-profile img { width: 26px; height: 26px; border-radius: 50%; }
 
-        /* Drawer Sidebar Off-Canvas */
+        /* Drawer Sidebar */
         .drawer-overlay {
             position: fixed;
             top: 0;
@@ -105,10 +106,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             visibility: hidden;
             transition: all 0.3s ease;
         }
-        .drawer-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
+        .drawer-overlay.active { opacity: 1; visibility: visible; }
         .sidebar-drawer {
             position: fixed;
             top: 0;
@@ -126,9 +124,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             padding: 24px 18px;
             overflow-y: auto;
         }
-        .sidebar-drawer.active {
-            transform: translateX(0);
-        }
+        .sidebar-drawer.active { transform: translateX(0); }
         .drawer-header {
             display: flex;
             justify-content: space-between;
@@ -153,7 +149,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         }
         .close-drawer-btn:hover { color: #fff; }
 
-        /* Server Box Inside Drawer */
         .drawer-server-card {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -201,7 +196,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         .stat-val { font-weight: 800; font-size: 0.95rem; color: #38bdf8; }
         .stat-lbl { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
 
-        /* Menu Categories */
         .nav-category-title {
             font-size: 0.75rem;
             font-weight: 700;
@@ -233,7 +227,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             color: #38bdf8;
         }
 
-        /* Main Content Container */
         main {
             flex: 1;
             max-width: 1100px;
@@ -242,7 +235,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             padding: 30px 20px;
         }
 
-        /* Top Hero Server Info Card */
         .server-hero-card {
             background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.7));
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -293,7 +285,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         }
         .pill span { color: #38bdf8; font-weight: 700; }
 
-        /* How it works Banner */
         .info-box {
             background: rgba(56, 189, 248, 0.08);
             border: 1px solid rgba(56, 189, 248, 0.25);
@@ -308,7 +299,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         .info-content h3 { font-size: 1.1rem; color: #38bdf8; margin-bottom: 6px; }
         .info-content p { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; }
 
-        /* Config Category Section */
         .config-card {
             background: rgba(15, 23, 42, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -369,10 +359,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3);
             transition: all 0.2s;
         }
-        .btn-save:hover {
-            opacity: 0.92;
-            transform: translateY(-2px);
-        }
+        .btn-save:hover { opacity: 0.92; transform: translateY(-2px); }
 
         @media (max-width: 640px) {
             main { padding: 20px 14px; }
@@ -430,7 +417,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
 
     <header>
         <div class="header-left">
-            <button class="menu-toggle-btn" id="openMenuBtn" onclick="openSidebar()" title="Abrir Menu (=)">
+            <button class="menu-toggle-btn" id="openMenuBtn" onclick="openSidebar()" title="Abrir Menu (☰)">
                 ☰
             </button>
             <a href="/" class="brand">
@@ -472,58 +459,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             </div>
         </div>
 
-        <section class="config-card" id="logs">
-            <div class="config-card-header">
-                <span style="font-size: 1.8rem;">📜</span>
-                <h2>Sistema de Logs e Registros</h2>
-            </div>
-
-            <form onsubmit="saveLogs(event)">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>🗑️ Mensagens Apagadas</label>
-                        <select class="form-control" name="logDeleted">
-                            <option value="">Selecione um canal...</option>
-                            ${channelOptionsHtml}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>✏️ Mensagens Editadas</label>
-                        <select class="form-control" name="logEdited">
-                            <option value="">Selecione um canal...</option>
-                            ${channelOptionsHtml}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>📥 Entradas e Saídas de Membros</label>
-                        <select class="form-control" name="logMembers">
-                            <option value="">Selecione um canal...</option>
-                            ${channelOptionsHtml}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>🎙️ Alterações e Atividades de Voz</label>
-                        <select class="form-control" name="logVoice">
-                            <option value="">Selecione um canal...</option>
-                            ${channelOptionsHtml}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>🛡️ Punições e Moderação (Bans / Mutes)</label>
-                        <select class="form-control" name="logMod">
-                            <option value="">Selecione um canal...</option>
-                            ${channelOptionsHtml}
-                        </select>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-save">💾 Salvar Configurações de Logs</button>
-            </form>
-        </section>
+        ${logsSection}
     </main>
 
     <script>
@@ -540,7 +476,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             overlay.classList.remove('active');
         }
 
-        // Suporte para Deslizar para a Direita (Swipe Right) no Celular
         let touchStartX = 0;
         let touchEndX = 0;
 
@@ -554,11 +489,9 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         }, false);
 
         function handleSwipe() {
-            // Se o gesto for da esquerda para a direita (abrir)
             if (touchEndX - touchStartX > 70 && touchStartX < 60) {
                 openSidebar();
             }
-            // Se o gesto for da direita para a esquerda (fechar)
             if (touchStartX - touchEndX > 70 && sidebar.classList.contains('active')) {
                 closeSidebar();
             }
