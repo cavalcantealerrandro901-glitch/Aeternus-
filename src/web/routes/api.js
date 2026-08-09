@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../../database/db');
 
-// 📌 Rota para salvar o Prefixo
-router.post('/guilds/:guildId/prefix', (req, res) => {
+// Rota para salvar o Prefixo via Painel Web
+router.post('/guilds/:guildId/prefix', async (req, res) => {
     try {
         const { guildId } = req.params;
         const { prefix } = req.body;
@@ -16,7 +16,8 @@ router.post('/guilds/:guildId/prefix', (req, res) => {
             return res.status(400).json({ success: false, message: 'O prefixo deve ter no máximo 5 caracteres.' });
         }
 
-        const updated = db.setGuildConfig(guildId, { prefix: prefix.trim() });
+        // ADICIONADO AWAIT AQUI
+        const updated = await db.setGuildConfig(guildId, { prefix: prefix.trim() });
         return res.json({ success: true, prefix: updated.prefix });
     } catch (err) {
         console.error('Erro ao salvar prefixo via API:', err);
@@ -24,20 +25,22 @@ router.post('/guilds/:guildId/prefix', (req, res) => {
     }
 });
 
-// 💖 Rota para salvar o Modo Paquerar
-router.post('/guilds/:guildId/flirt', (req, res) => {
+// Rota para salvar o Modo Paquerar via Painel Web
+router.post('/guilds/:guildId/flirt', async (req, res) => {
     try {
         const { guildId } = req.params;
         const { chance, mode } = req.body;
 
-        const currentConfig = db.getGuildConfig(guildId);
+        // ADICIONADO AWAIT AQUI
+        const currentConfig = await db.getGuildConfig(guildId);
         const flirtConfig = {
             ...(currentConfig.flirt || {}),
             chance: parseInt(chance) || 10,
             mode: mode || 'emoji'
         };
 
-        db.setGuildConfig(guildId, { flirt: flirtConfig });
+        // ADICIONADO AWAIT AQUI
+        await db.setGuildConfig(guildId, { flirt: flirtConfig });
         return res.json({ success: true, flirt: flirtConfig });
     } catch (err) {
         console.error('Erro ao salvar paquera via API:', err);
