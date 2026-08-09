@@ -2,7 +2,6 @@ const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../database/db');
 
 const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', '🏻', '🙈', '🔥', '✨', '💐', '💘'];
-// Categorias de gifs fofos da API
 const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
 
 module.exports = {
@@ -13,49 +12,46 @@ module.exports = {
         const guildConfig = db.getGuildConfig(message.guild.id);
         const prefix = guildConfig.prefix || '!';
 
-        // --- SISTEMA AUTOMÁTICO DE PAQUERA (EMOJIS E FIGURINHAS) ---
+        // --- SISTEMA AUTOMÁTICO DE PAQUERA (GLOBAL) ---
         const flirtConfig = guildConfig.flirt || {};
-        if (flirtConfig.enabled === true) {
-            const isAllowedChannel = !flirtConfig.channels || flirtConfig.channels.length === 0 || flirtConfig.channels.includes(message.channel.id);
+        
+        // Se já houver uma chance salva maior que zero, o sistema funciona
+        if (flirtConfig.chance && flirtConfig.chance > 0) {
+            const chance = flirtConfig.chance;
+            const randomNumber = Math.floor(Math.random() * 100) + 1;
 
-            if (isAllowedChannel) {
-                const chance = flirtConfig.chance || 10;
-                const randomNumber = Math.floor(Math.random() * 100) + 1;
+            if (randomNumber <= chance) {
+                try {
+                    const mode = flirtConfig.mode || 'emoji';
+                    const useGif = mode === 'gif' || (mode === 'both' && Math.random() > 0.5);
 
-                if (randomNumber <= chance) {
-                    try {
-                        const mode = flirtConfig.mode || 'emoji';
-                        // Se for "both", sorteia 50/50 entre emoji e gif
-                        const useGif = mode === 'gif' || (mode === 'both' && Math.random() > 0.5);
-
-                        if (useGif) {
-                            // 📸 BUSCA UMA FIGURINHA ANIMADA (GIF) AUTOMATICAMENTE
-                            const randomCategory = GIF_CATEGORIES[Math.floor(Math.random() * GIF_CATEGORIES.length)];
-                            const response = await fetch(`https://nekos.best/api/v2/${randomCategory}`);
-                            const data = await response.json();
-                            
-                            if (data && data.results && data.results.length > 0) {
-                                const gifUrl = data.results[0].url;
-                                await message.reply({ content: gifUrl });
-                            }
-                        } else {
-                            // 💖 REAÇÃO COM EMOJIS
-                            const customGuildEmojis = message.guild.emojis.cache.filter(e => e.available).map(e => e.id);
-                            const globalClientEmojis = message.client.emojis.cache.filter(e => e.available).map(e => e.id);
-                            const allCustomEmojis = [...new Set([...customGuildEmojis, ...globalClientEmojis])];
-
-                            let chosenEmoji;
-                            if (allCustomEmojis.length > 0 && Math.random() > 0.4) {
-                                chosenEmoji = allCustomEmojis[Math.floor(Math.random() * allCustomEmojis.length)];
-                            } else {
-                                chosenEmoji = DEFAULT_FLIRT_EMOJIS[Math.floor(Math.random() * DEFAULT_FLIRT_EMOJIS.length)];
-                            }
-
-                            await message.react(chosenEmoji).catch(() => message.react('❤️').catch(() => null));
+                    if (useGif) {
+                        // Busca uma figurinha animada (GIF)
+                        const randomCategory = GIF_CATEGORIES[Math.floor(Math.random() * GIF_CATEGORIES.length)];
+                        const response = await fetch(`https://nekos.best/api/v2/${randomCategory}`);
+                        const data = await response.json();
+                        
+                        if (data && data.results && data.results.length > 0) {
+                            const gifUrl = data.results[0].url;
+                            await message.reply({ content: gifUrl });
                         }
-                    } catch (err) {
-                        console.error('Erro ao processar paquera automática:', err);
+                    } else {
+                        // Reage com Emoji
+                        const customGuildEmojis = message.guild.emojis.cache.filter(e => e.available).map(e => e.id);
+                        const globalClientEmojis = message.client.emojis.cache.filter(e => e.available).map(e => e.id);
+                        const allCustomEmojis = [...new Set([...customGuildEmojis, ...globalClientEmojis])];
+
+                        let chosenEmoji;
+                        if (allCustomEmojis.length > 0 && Math.random() > 0.4) {
+                            chosenEmoji = allCustomEmojis[Math.floor(Math.random() * allCustomEmojis.length)];
+                        } else {
+                            chosenEmoji = DEFAULT_FLIRT_EMOJIS[Math.floor(Math.random() * DEFAULT_FLIRT_EMOJIS.length)];
+                        }
+
+                        await message.react(chosenEmoji).catch(() => message.react('❤️').catch(() => null));
                     }
+                } catch (err) {
+                    console.error('Erro ao processar paquera automática:', err);
                 }
             }
         }
@@ -95,7 +91,7 @@ module.exports = {
             return await message.reply(`✅ Prefixo alterado com sucesso para \`${newPrefix}\`!`);
         }
 
-        // Comandos Personalizados do Painel Web
+        // Comandos Personalizados
         const customCommands = guildConfig.customCommands || [];
         const customCmd = customCommands.find(c => c.name.toLowerCase() === commandName);
 

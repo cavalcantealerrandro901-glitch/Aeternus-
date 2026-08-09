@@ -1,12 +1,5 @@
 module.exports = (guild) => {
     const config = guild.flirtConfig || {};
-    const textChannels = guild.textChannels || [];
-    const isEnabled = config.enabled === true;
-
-    const channelOptions = textChannels.map(c => {
-        const isSelected = Array.isArray(config.channels) && config.channels.includes(c.id);
-        return `<option value="${c.id}" ${isSelected ? 'selected' : ''}>#${c.name}</option>`;
-    }).join('');
 
     return `
 <section class="config-card" id="flirt-config">
@@ -14,39 +7,24 @@ module.exports = (guild) => {
         <span style="font-size: 1.8rem;">💖</span>
         <div>
             <h2>Modo Paquerar (Interação Automática)</h2>
-            <span style="font-size: 0.8rem; color: ${isEnabled ? '#10b981' : '#ef4444'}; font-weight: 700;">
-                ● Status: ${isEnabled ? 'Ativo' : 'Desativado'}
+            <span style="font-size: 0.8rem; color: #10b981; font-weight: 700;">
+                ● Sempre Ativo em Todos os Canais
             </span>
         </div>
     </div>
 
     <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 20px; line-height: 1.5;">
-        Quando os membros conversarem, o bot interagirá de forma surpresa! Agora ele pode buscar figurinhas animadas (GIFs) automaticamente.
+        O bot interagirá de forma surpresa em <b>todos os canais</b> de texto! Basta escolher como ele deve reagir e definir a chance.
     </p>
 
     <form id="flirtForm" onsubmit="saveFlirtConfig(event, '${guild.id}')" style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
         
-        <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
-            <input type="checkbox" id="flirtEnabled" name="enabled" value="true" ${isEnabled ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
-            <label for="flirtEnabled" style="font-weight: 700; color: #f8fafc; cursor: pointer;">
-                Ativar Reações Automáticas de Paquera
-            </label>
-        </div>
-
         <div class="form-grid">
-            <div class="form-group">
-                <label>📌 Canais Permitidos (CTRL/Cmd para vários)</label>
-                <select class="form-control" name="channels" multiple style="height: 120px;">
-                    ${channelOptions}
-                </select>
-                <span style="font-size: 0.75rem; color: #64748b;">Se vazio, funcionará em todos os canais.</span>
-            </div>
-
             <div class="form-group">
                 <label>🎭 Modo de Interação</label>
                 <select class="form-control" name="mode">
                     <option value="emoji" ${config.mode === 'emoji' ? 'selected' : ''}>Apenas Reagir com Emojis</option>
-                    <option value="gif" ${config.mode === 'gif' ? 'selected' : ''}>Enviar Figurinhas Animadas (Automático)</option>
+                    <option value="gif" ${config.mode === 'gif' ? 'selected' : ''}>Enviar Figurinhas Animadas (GIFs)</option>
                     <option value="both" ${config.mode === 'both' ? 'selected' : ''}>Ambos (Sorteio entre Emoji e Figurinha)</option>
                 </select>
             </div>
@@ -54,7 +32,7 @@ module.exports = (guild) => {
             <div class="form-group">
                 <label>🎲 Chance de Interagir (%)</label>
                 <input type="number" class="form-control" name="chance" value="${config.chance || 10}" min="1" max="100">
-                <span style="font-size: 0.75rem; color: #64748b;">Recomendado: 5% a 15%.</span>
+                <span style="font-size: 0.75rem; color: #64748b;">Coloque 100% para testar e depois diminua (Ex: 10).</span>
             </div>
         </div>
 
@@ -75,13 +53,11 @@ module.exports = (guild) => {
 
         const form = document.getElementById('flirtForm');
         const formData = new FormData(form);
-        const channels = Array.from(form.querySelector('[name="channels"]').selectedOptions).map(opt => opt.value);
         
+        // Salvamos apenas os dados essenciais (sem checar checkbox ou canal)
         const data = {
-            enabled: form.querySelector('[name="enabled"]').checked,
             chance: parseInt(formData.get('chance')) || 10,
-            mode: formData.get('mode') || 'emoji',
-            channels: channels
+            mode: formData.get('mode') || 'emoji'
         };
 
         try {
@@ -93,7 +69,7 @@ module.exports = (guild) => {
 
             const result = await res.json();
             if (result.success) {
-                alert('✅ Sistema de paquera animado salvo!');
+                alert('✅ Sistema de paquera global salvo!');
                 location.reload();
             } else {
                 alert('❌ Erro ao salvar.');
