@@ -142,7 +142,7 @@ module.exports = (client, config) => {
         res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
     });
 
-    // API: Criar Comando Personalizado
+    // API: Criar / Editar Comando Personalizado
     app.post('/api/guilds/:guildId/custom-commands', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
@@ -151,7 +151,7 @@ module.exports = (client, config) => {
         const guild = manageableGuilds.find(g => g.id === req.params.guildId);
         if (!guild) return res.status(403).json({ error: 'Sem permissão' });
 
-        const { cmdName, cmdResponse, isEmbed } = req.body;
+        const { cmdName, cmdResponse, isEmbed, oldCmdName } = req.body;
         if (!cmdName || !cmdResponse) {
             return res.status(400).json({ error: 'Nome e resposta do comando são obrigatórios' });
         }
@@ -160,18 +160,22 @@ module.exports = (client, config) => {
         const currentConfig = db.getGuildConfig(req.params.guildId);
         let commands = currentConfig.customCommands || [];
 
-        // Verifica se o comando já existe e atualiza, senão adiciona
+        // Se estiver editando e alterou o nome antigo, remove o nome antigo primeiro
+        if (oldCmdName && oldCmdName !== cleanName) {
+            commands = commands.filter(c => c.name !== oldCmdName.toLowerCase());
+        }
+
         const existingIndex = commands.findIndex(c => c.name === cleanName);
-        const newCmd = {
+        const updatedCmd = {
             name: cleanName,
             response: cmdResponse,
             isEmbed: isEmbed === 'true'
         };
 
         if (existingIndex >= 0) {
-            commands[existingIndex] = newCmd;
+            commands[existingIndex] = updatedCmd;
         } else {
-            commands.push(newCmd);
+            commands.push(updatedCmd);
         }
 
         db.setGuildConfig(req.params.guildId, { customCommands: commands });
@@ -234,74 +238,6 @@ module.exports = (client, config) => {
 
         db.setGuildConfig(req.params.guildId, { updates: req.body });
         res.json({ success: true });
-    });
-
-    // Testar Notificação de Atualização
-    app.post('/api/guilds/:guildId/updates/test', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const guildConfig = db.getGuildConfig(req.params.guildId);
-        const updatesConfig = guildConfig.updates;
-
-        if (!updatesConfig || !updatesConfig.updatesChannel) {
-            return res.status(400).json({ error: 'Selecione e salve um canal de atualizações antes de testar!' });
-        }
-
-        const botGuild = client.guilds.cache.get(req.params.guildId);
-        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado' });
-
-        const channel = botGuild.channels.cache.get(updatesConfig.updatesChannel);
-        if (!channel) return res.status(404).json({ error: 'Canal de atualizações não encontrado' });
-
-        try {
-            let mentionContent = '';
-            if (updatesConfig.mentionType === 'here') mentionContent = '@here';
-            if (updatesConfig.mentionType === 'everyone') mentionContent = '@everyone';
-            if (updatesConfig.mentionType === 'role' && updatesConfig.mentionRoleId) {
-                mentionContent = `<@&${updatesConfig.mentionRoleId}>`;
-            }
-
-            const embed = new EmbedBuilder()
-                .setTitle('🚀 [TESTE] Nova Atualização do Bot Aeternus!')
-                .setDescription('Esta é uma mensagem de teste do sistema de Notificações de Atualizações.')
-                .addFields(
-                    { name: '✨ Novos Sistemas', value: '• Categoria de Comandos Personalizados no Painel Web' },
-                    { name: '🌐 Painel Web', value: '• Criação e gerenciamento de comandos customizados' }
-                )
-                .setColor('#38bdf8')
-                .setThumbnail(client.user.displayAvatarURL())
-                .setTimestamp()
-                .setFooter({ text: 'Aeternus Updates', iconURL: client.user.displayAvatarURL() });
-
-            await channel.send({ content: mentionContent || undefined, embeds: [embed] });
-            res.json({ success: true });
-        } catch (err) {
-            res.status(500).json({ error: err.message || 'Erro ao enviar anúncio no Discord' });
-        }
-    });
-
-    // Rota para Testar Boas-Vindas
-    app.post('/api/guilds/:guildId/welcome/test', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const guildConfig = db.getGuildConfig(req.params.guildId);
-        const welcomeConfig = guildConfig.welcome;
-
-        if (!welcomeConfig || !welcomeConfig.welcomeChannel) {
-            return res.status(400).json({ error: 'Selecione e salve um canal de boas-vindas antes de testar!' });
-        }
-
-        const botGuild = client.guilds.cache.get(req.params.guildId);
-        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado' });
-
-        try {
-            await sendTest(botGuild, welcomeConfig.welcomeChannel, welcomeConfig, session.user);
-            res.json({ success: true });
-        } catch (err) {
-            res.status(500).json({ error: err.message || 'Erro ao enviar mensagem no Discord' });
-        }
     });
 
     app.listen(PORT, () => console.log(`🌐 Painel Web rodando na porta ${PORT}`));
