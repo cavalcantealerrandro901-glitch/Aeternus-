@@ -3,6 +3,7 @@ const cookieParser = require('cookie-parser');
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderPortal = require('./views/portal');
+const db = require('../database/db');
 
 module.exports = (client, config) => {
     const app = express();
@@ -100,7 +101,6 @@ module.exports = (client, config) => {
         res.send(renderDashboard(session.user, manageableGuilds, client.user));
     });
 
-    // Portal de Configuração do Servidor Selecionado
     app.get('/dashboard/:guildId', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
@@ -112,10 +112,12 @@ module.exports = (client, config) => {
 
         const botGuild = client.guilds.cache.get(guild.id);
         
-        // Obter lista de canais de texto
         const textChannels = botGuild ? botGuild.channels.cache
-            .filter(c => c.type === 0 || c.type === 5) // Text / Announcement
+            .filter(c => c.type === 0 || c.type === 5)
             .map(c => ({ id: c.id, name: c.name })) : [];
+
+        // Carregar logs já configurados para este servidor
+        const savedConfig = db.getGuildConfig(guild.id);
 
         const serverData = {
             id: guild.id,
@@ -124,10 +126,27 @@ module.exports = (client, config) => {
             memberCount: botGuild ? botGuild.memberCount : 'N/A',
             channelCount: botGuild ? botGuild.channels.cache.size : 'N/A',
             roleCount: botGuild ? botGuild.roles.cache.size : 'N/A',
-            textChannels: textChannels
+            textChannels: textChannels,
+            logsConfig: savedConfig.logs || {}
         };
 
         res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
+    });
+
+    // Rota API para salvar configurações de Logs
+    app.post('/api/guilds/:guildId/logs', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const manageableGuilds = getManageableGuilds(session.guilds);
+        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+
+        if (!guild) return res.status(403).json({ error: 'Sem permissão neste servidor' });
+
+        const logsConfig = req.body;
+        db.setGuildConfig(req.params.guildId, { logs: logsConfig });
+
+        res.json({ success: true, message: 'Configurações salvas com sucesso!' });
     });
 
     app.listen(PORT, () => console.log(`🌐 Painel Web rodando na porta ${PORT}`));

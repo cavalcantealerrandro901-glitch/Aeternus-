@@ -6,12 +6,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
     const guildIconUrl = guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png` : null;
     const botName = botUser ? botUser.username : 'Aeternus';
 
-    const channelOptionsHtml = guild.textChannels && guild.textChannels.length > 0
-        ? guild.textChannels.map(c => `<option value="${c.id}"># ${c.name}</option>`).join('')
-        : `<option value="">Nenhum canal encontrado</option>`;
-
-    // Renderizando o componente isolado da categoria de Logs
-    const logsSection = renderLogsCategory(guild, channelOptionsHtml);
+    const logsSection = renderLogsCategory(guild, guild.textChannels);
 
     return `
 <!DOCTYPE html>
@@ -33,7 +28,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             overflow-x: hidden;
         }
 
-        /* Top Bar */
         header {
             display: flex;
             justify-content: space-between;
@@ -74,12 +68,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             font-weight: 800;
             font-size: 1.1rem;
         }
-        .brand img {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: 2px solid #38bdf8;
-        }
+        .brand img { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #38bdf8; }
         .user-profile {
             display: flex;
             align-items: center;
@@ -92,7 +81,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         }
         .user-profile img { width: 26px; height: 26px; border-radius: 50%; }
 
-        /* Drawer Sidebar */
         .drawer-overlay {
             position: fixed;
             top: 0;
@@ -133,21 +121,8 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             padding-bottom: 12px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .drawer-title {
-            font-weight: 800;
-            font-size: 1rem;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .close-drawer-btn {
-            background: transparent;
-            border: none;
-            color: #94a3b8;
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
-        .close-drawer-btn:hover { color: #fff; }
+        .drawer-title { font-weight: 800; font-size: 1rem; color: #94a3b8; text-transform: uppercase; }
+        .close-drawer-btn { background: transparent; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
 
         .drawer-server-card {
             background: rgba(255, 255, 255, 0.03);
@@ -175,41 +150,14 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             border: 2px solid #38bdf8;
             object-fit: cover;
         }
-        .drawer-server-name {
-            font-weight: 700;
-            font-size: 1.1rem;
-            margin-bottom: 12px;
-            word-break: break-word;
-        }
-        .drawer-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            width: 100%;
-        }
-        .stat-item {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px 4px;
-            border-radius: 8px;
-            text-align: center;
-        }
+        .drawer-server-name { font-weight: 700; font-size: 1.1rem; margin-bottom: 12px; word-break: break-word; }
+        .drawer-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+        .stat-item { background: rgba(0, 0, 0, 0.3); padding: 8px 4px; border-radius: 8px; text-align: center; }
         .stat-val { font-weight: 800; font-size: 0.95rem; color: #38bdf8; }
         .stat-lbl { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
 
-        .nav-category-title {
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #64748b;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-            padding-left: 8px;
-        }
-        .nav-menu-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
+        .nav-category-title { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 10px; padding-left: 8px; }
+        .nav-menu-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
         .nav-menu-item a {
             display: flex;
             align-items: center;
@@ -222,18 +170,9 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             font-size: 0.95rem;
             transition: all 0.2s;
         }
-        .nav-menu-item a:hover, .nav-menu-item.active a {
-            background: rgba(56, 189, 248, 0.15);
-            color: #38bdf8;
-        }
+        .nav-menu-item a:hover, .nav-menu-item.active a { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
 
-        main {
-            flex: 1;
-            max-width: 1100px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 30px 20px;
-        }
+        main { flex: 1; max-width: 1100px; width: 100%; margin: 0 auto; padding: 30px 20px; }
 
         .server-hero-card {
             background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.7));
@@ -263,26 +202,9 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
             flex-shrink: 0;
         }
-        .hero-server-details h1 {
-            font-size: 1.8rem;
-            font-weight: 800;
-            margin-bottom: 8px;
-            color: #fff;
-        }
-        .hero-stats-pills {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .pill {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            color: #cbd5e1;
-            font-weight: 600;
-        }
+        .hero-server-details h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; color: #fff; }
+        .hero-stats-pills { display: flex; flex-wrap: wrap; gap: 10px; }
+        .pill { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; color: #cbd5e1; font-weight: 600; }
         .pill span { color: #38bdf8; font-weight: 700; }
 
         .info-box {
@@ -322,16 +244,8 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             gap: 20px;
             margin-bottom: 28px;
         }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .form-group label {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #cbd5e1;
-        }
+        .form-group { display: flex; flex-direction: column; gap: 8px; }
+        .form-group label { font-size: 0.9rem; font-weight: 600; color: #cbd5e1; }
         .form-control {
             background: rgba(0, 0, 0, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.12);
@@ -342,10 +256,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             outline: none;
             transition: border-color 0.2s;
         }
-        .form-control:focus {
-            border-color: #38bdf8;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
-        }
+        .form-control:focus { border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2); }
 
         .btn-save {
             background: linear-gradient(135deg, #38bdf8, #2563eb);
@@ -495,11 +406,6 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             if (touchStartX - touchEndX > 70 && sidebar.classList.contains('active')) {
                 closeSidebar();
             }
-        }
-
-        function saveLogs(e) {
-            e.preventDefault();
-            alert('Configurações salvas com sucesso!');
         }
     </script>
 </body>
