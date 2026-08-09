@@ -2,6 +2,7 @@ const renderLogsCategory = require('./categories/logs');
 const renderWelcomeCategory = require('./categories/welcome');
 const renderUpdatesCategory = require('./categories/updates');
 const renderCustomCommandsCategory = require('./categories/customCommands');
+const renderTicketsCategory = require('./categories/tickets');
 
 module.exports = (guild, userGuilds, user, botUser) => {
     const iconUrl = guild.icon
@@ -56,28 +57,18 @@ module.exports = (guild, userGuilds, user, botUser) => {
         .form-control { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 12px 16px; border-radius: 10px; color: #fff; font-size: 0.95rem; outline: none; width: 100%; box-sizing: border-box; }
         .form-control:focus { border-color: #38bdf8; }
 
-        .btn-save { background: linear-gradient(135deg, #38bdf8, #2563eb); color: #fff; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: 100%; max-width: 300px; text-align: center; }
+        .btn-save { background: linear-gradient(135deg, #38bdf8, #2563eb); color: #fff; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; text-align: center; }
         .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
 
-        /* 📱 Adaptabilidade Responsiva para Celulares */
         @media (max-width: 768px) {
             body { flex-direction: column; }
-            .sidebar { 
-                width: 100%; 
-                height: auto; 
-                flex-direction: row; 
-                padding: 12px 16px; 
-                justify-content: flex-start; 
-                border-right: none; 
-                border-bottom: 1px solid rgba(255,255,255,0.05); 
-                overflow-x: auto; 
-            }
+            .sidebar { width: 100%; height: auto; flex-direction: row; padding: 12px 16px; justify-content: flex-start; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); overflow-x: auto; }
             .main-content { padding: 16px; }
             .header { flex-direction: column; align-items: flex-start; }
             .form-grid { grid-template-columns: 1fr !important; }
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .config-card { padding: 18px; }
-            .btn-save { max-width: 100%; }
+            .btn-save { width: 100%; }
         }
     </style>
 </head>
@@ -109,6 +100,7 @@ module.exports = (guild, userGuilds, user, botUser) => {
         ${renderWelcomeCategory(guild)}
         ${renderUpdatesCategory(guild)}
         ${renderCustomCommandsCategory(guild)}
+        ${renderTicketsCategory(guild)}
     </div>
 </body>
 </html>

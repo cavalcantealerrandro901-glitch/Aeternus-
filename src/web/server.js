@@ -1,11 +1,10 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderPortal = require('./views/portal');
 const db = require('../database/db');
-const { sendTest } = require('../events/welcome');
 
 module.exports = (client, config) => {
     const app = express();
@@ -136,106 +135,104 @@ module.exports = (client, config) => {
             logsConfig: savedConfig.logs || {},
             welcomeConfig: savedConfig.welcome || {},
             updatesConfig: savedConfig.updates || {},
-            customCommandsConfig: savedConfig.customCommands || []
+            customCommandsConfig: savedConfig.customCommands || [],
+            ticketsConfig: savedConfig.tickets || {}
         };
 
         res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
     });
 
-    // API: Criar / Editar Comando Personalizado
-    app.post('/api/guilds/:guildId/custom-commands', (req, res) => {
+    // API: Salvar Config de Tickets
+    app.post('/api/guilds/:guildId/tickets', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
 
-        const manageableGuilds = getManageableGuilds(session.guilds);
-        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
-        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
+        db.setGuildConfig(req.params.guildId, { tickets: req.body });
+        res.json({ success: true });
+    });
 
-        const { cmdName, cmdResponse, isEmbed, oldCmdName } = req.body;
-        if (!cmdName || !cmdResponse) {
-            return res.status(400).json({ error: 'Nome e resposta do comando são obrigatórios' });
+    // API: Enviar Painel de Tickets no Discord
+    app.post('/api/guilds/:guildId/tickets/send-panel', async (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const config = db.getGuildConfig(req.params.guildId).tickets;
+        if (!config || !config.ticketChannel) {
+            return res.status(400).json({ error: 'Configure o canal de tickets primeiro.' });
         }
 
+        const botGuild = client.guilds.cache.get(req.params.guildId);
+        const channel = botGuild?.channels.cache.get(config.ticketChannel);
+
+        if (!channel) {
+            return res.status(404).json({ error: 'Canal de tickets não encontrado no servidor.' });
+        }
+
+        try {
+            const embed = new EmbedBuilder()
+                .setTitle(config.embedTitle || '🎫 Central de Atendimento')
+                .setDescription(config.embedDescription || 'Clique no botão abaixo para abrir um ticket.')
+                .setColor('#38bdf8')
+                .setFooter({ text: botGuild.name, iconURL: botGuild.iconURL() })
+                .setTimestamp();
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('btn_open_ticket')
+                    .setLabel(config.buttonText || 'Abrir Ticket')
+                    .setStyle(ButtonStyle.Primary)
+                    .setEmoji('🎫')
+            );
+
+            await channel.send({ embeds: [embed], components: [row] });
+            res.json({ success: true });
+        } catch (err) {
+            console.error('Erro ao enviar painel de tickets:', err);
+            res.status(500).json({ error: 'Falha ao enviar painel para o canal.' });
+        }
+    });
+
+    // API: Outras rotas
+    app.post('/api/guilds/:guildId/custom-commands', (req, res) => {
+        const { cmdName, cmdResponse, isEmbed, oldCmdName } = req.body;
         const cleanName = cmdName.toLowerCase().replace(/[^a-z0-9_-]/g, '');
         const currentConfig = db.getGuildConfig(req.params.guildId);
         let commands = currentConfig.customCommands || [];
 
-        // Se estiver editando e alterou o nome antigo, remove o nome antigo primeiro
         if (oldCmdName && oldCmdName !== cleanName) {
             commands = commands.filter(c => c.name !== oldCmdName.toLowerCase());
         }
 
         const existingIndex = commands.findIndex(c => c.name === cleanName);
-        const updatedCmd = {
-            name: cleanName,
-            response: cmdResponse,
-            isEmbed: isEmbed === 'true'
-        };
+        const updatedCmd = { name: cleanName, response: cmdResponse, isEmbed: isEmbed === 'true' };
 
-        if (existingIndex >= 0) {
-            commands[existingIndex] = updatedCmd;
-        } else {
-            commands.push(updatedCmd);
-        }
+        if (existingIndex >= 0) commands[existingIndex] = updatedCmd;
+        else commands.push(updatedCmd);
 
         db.setGuildConfig(req.params.guildId, { customCommands: commands });
         res.json({ success: true });
     });
 
-    // API: Excluir Comando Personalizado
     app.delete('/api/guilds/:guildId/custom-commands/:cmdName', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const manageableGuilds = getManageableGuilds(session.guilds);
-        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
-        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
-
         const cmdName = req.params.cmdName.toLowerCase();
         const currentConfig = db.getGuildConfig(req.params.guildId);
-        let commands = currentConfig.customCommands || [];
-
-        commands = commands.filter(c => c.name !== cmdName);
+        let commands = (currentConfig.customCommands || []).filter(c => c.name !== cmdName);
 
         db.setGuildConfig(req.params.guildId, { customCommands: commands });
         res.json({ success: true });
     });
 
-    // Salvar Logs
     app.post('/api/guilds/:guildId/logs', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const manageableGuilds = getManageableGuilds(session.guilds);
-        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
-        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
-
         db.setGuildConfig(req.params.guildId, { logs: req.body });
         res.json({ success: true });
     });
 
-    // Salvar Boas-Vindas
     app.post('/api/guilds/:guildId/welcome', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const manageableGuilds = getManageableGuilds(session.guilds);
-        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
-        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
-
         db.setGuildConfig(req.params.guildId, { welcome: req.body });
         res.json({ success: true });
     });
 
-    // Salvar Atualizações do Bot
     app.post('/api/guilds/:guildId/updates', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const manageableGuilds = getManageableGuilds(session.guilds);
-        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
-        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
-
         db.setGuildConfig(req.params.guildId, { updates: req.body });
         res.json({ success: true });
     });
