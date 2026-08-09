@@ -1,6 +1,7 @@
 const renderLogsCategory = require('./categories/logs');
 const renderWelcomeCategory = require('./categories/welcome');
 const renderUpdatesCategory = require('./categories/updates');
+const renderCustomCommandsCategory = require('./categories/customCommands');
 
 module.exports = (guild, manageableGuilds, user, botUser) => {
     const botAvatarUrl = botUser ? botUser.displayAvatarURL({ extension: 'png', size: 128 }) : 'https://cdn.discordapp.com/embed/avatars/0.png';
@@ -11,6 +12,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
     const logsSection = renderLogsCategory(guild, guild.textChannels);
     const welcomeSection = renderWelcomeCategory(guild, guild.textChannels);
     const updatesSection = renderUpdatesCategory(guild, guild.textChannels, guild.roles);
+    const customCommandsSection = renderCustomCommandsCategory(guild);
 
     return `
 <!DOCTYPE html>
@@ -325,6 +327,9 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             <li class="nav-menu-item" id="nav-updates">
                 <button onclick="switchCategory('updates')">📢 Notificações do Bot</button>
             </li>
+            <li class="nav-menu-item" id="nav-custom-commands">
+                <button onclick="switchCategory('custom-commands')">🛠️ Comandos Customizados</button>
+            </li>
         </ul>
 
         <div style="margin-top: auto; padding-top: 20px;">
@@ -377,6 +382,10 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
 
         <div id="sec-updates" class="category-section">
             ${updatesSection}
+        </div>
+
+        <div id="sec-custom-commands" class="category-section">
+            ${customCommandsSection}
         </div>
     </main>
 

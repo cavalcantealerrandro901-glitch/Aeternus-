@@ -4,7 +4,8 @@ const guildConfigSchema = new mongoose.Schema({
     guildId: { type: String, required: true, unique: true },
     logs: { type: Object, default: {} },
     welcome: { type: Object, default: {} },
-    updates: { type: Object, default: {} }
+    updates: { type: Object, default: {} },
+    customCommands: { type: Array, default: [] }
 }, { timestamps: true });
 
 module.exports = mongoose.model('GuildConfig', guildConfigSchema);

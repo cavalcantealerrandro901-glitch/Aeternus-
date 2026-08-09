@@ -135,10 +135,66 @@ module.exports = (client, config) => {
             roles: guildRoles,
             logsConfig: savedConfig.logs || {},
             welcomeConfig: savedConfig.welcome || {},
-            updatesConfig: savedConfig.updates || {}
+            updatesConfig: savedConfig.updates || {},
+            customCommandsConfig: savedConfig.customCommands || []
         };
 
         res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
+    });
+
+    // API: Criar Comando Personalizado
+    app.post('/api/guilds/:guildId/custom-commands', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const manageableGuilds = getManageableGuilds(session.guilds);
+        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
+
+        const { cmdName, cmdResponse, isEmbed } = req.body;
+        if (!cmdName || !cmdResponse) {
+            return res.status(400).json({ error: 'Nome e resposta do comando são obrigatórios' });
+        }
+
+        const cleanName = cmdName.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        const currentConfig = db.getGuildConfig(req.params.guildId);
+        let commands = currentConfig.customCommands || [];
+
+        // Verifica se o comando já existe e atualiza, senão adiciona
+        const existingIndex = commands.findIndex(c => c.name === cleanName);
+        const newCmd = {
+            name: cleanName,
+            response: cmdResponse,
+            isEmbed: isEmbed === 'true'
+        };
+
+        if (existingIndex >= 0) {
+            commands[existingIndex] = newCmd;
+        } else {
+            commands.push(newCmd);
+        }
+
+        db.setGuildConfig(req.params.guildId, { customCommands: commands });
+        res.json({ success: true });
+    });
+
+    // API: Excluir Comando Personalizado
+    app.delete('/api/guilds/:guildId/custom-commands/:cmdName', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const manageableGuilds = getManageableGuilds(session.guilds);
+        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
+
+        const cmdName = req.params.cmdName.toLowerCase();
+        const currentConfig = db.getGuildConfig(req.params.guildId);
+        let commands = currentConfig.customCommands || [];
+
+        commands = commands.filter(c => c.name !== cmdName);
+
+        db.setGuildConfig(req.params.guildId, { customCommands: commands });
+        res.json({ success: true });
     });
 
     // Salvar Logs
@@ -210,9 +266,8 @@ module.exports = (client, config) => {
                 .setTitle('🚀 [TESTE] Nova Atualização do Bot Aeternus!')
                 .setDescription('Esta é uma mensagem de teste do sistema de Notificações de Atualizações.')
                 .addFields(
-                    { name: '✨ Novos Sistemas', value: '• Suporte a marcação de cargo específico nas Notificações\n• Suporte total no Painel Web' },
-                    { name: '🌐 Painel Web', value: '• Seleção dinâmica de cargos do servidor' },
-                    { name: '📌 Versão', value: '`v2.0.0-teste`', inline: true }
+                    { name: '✨ Novos Sistemas', value: '• Categoria de Comandos Personalizados no Painel Web' },
+                    { name: '🌐 Painel Web', value: '• Criação e gerenciamento de comandos customizados' }
                 )
                 .setColor('#38bdf8')
                 .setThumbnail(client.user.displayAvatarURL())

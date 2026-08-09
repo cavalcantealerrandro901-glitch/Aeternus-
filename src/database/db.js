@@ -10,7 +10,8 @@ module.exports = {
                 cache.set(cfg.guildId, {
                     logs: cfg.logs || {},
                     welcome: cfg.welcome || {},
-                    updates: cfg.updates || {}
+                    updates: cfg.updates || {},
+                    customCommands: cfg.customCommands || []
                 });
             });
             console.log(`📦 ${configs.length} configurações de servidores carregadas do MongoDB!`);
@@ -20,7 +21,7 @@ module.exports = {
     },
 
     getGuildConfig(guildId) {
-        return cache.get(guildId) || { logs: {}, welcome: {}, updates: {} };
+        return cache.get(guildId) || { logs: {}, welcome: {}, updates: {}, customCommands: [] };
     },
 
     async setGuildConfig(guildId, partialConfig) {
@@ -29,7 +30,8 @@ module.exports = {
         const updated = {
             logs: partialConfig.logs !== undefined ? partialConfig.logs : current.logs,
             welcome: partialConfig.welcome !== undefined ? partialConfig.welcome : current.welcome,
-            updates: partialConfig.updates !== undefined ? partialConfig.updates : current.updates
+            updates: partialConfig.updates !== undefined ? partialConfig.updates : current.updates,
+            customCommands: partialConfig.customCommands !== undefined ? partialConfig.customCommands : current.customCommands
         };
 
         cache.set(guildId, updated);
@@ -37,7 +39,7 @@ module.exports = {
         try {
             await GuildConfig.findOneAndUpdate(
                 { guildId },
-                { guildId, logs: updated.logs, welcome: updated.welcome, updates: updated.updates },
+                { guildId, ...updated },
                 { upsert: true, new: true }
             );
         } catch (err) {
