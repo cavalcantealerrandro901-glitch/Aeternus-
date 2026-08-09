@@ -133,9 +133,7 @@ module.exports = {
                 return await message.reply('❌ Você não pode castigar a si mesmo!');
             }
 
-            if (target.bot) {
-                return await message.reply('🤖 Você não pode castigar um bot, eles são intocáveis!');
-            }
+            const isBotTarget = target.id === message.client.user.id;
 
             try {
                 let gifUrl = '';
@@ -166,11 +164,29 @@ module.exports = {
                     .addComponents(
                         new ButtonBuilder()
                             .setCustomId('return_punish')
-                            .setLabel('🔄 Devolver Castigo')
+                            .setLabel(isBotTarget ? '🔄 Bot Revidando...' : '🔄 Devolver Castigo')
                             .setStyle(ButtonStyle.Danger)
+                            .setDisabled(isBotTarget)
                     );
 
                 const sentMessage = await message.reply({ embeds: [embed], components: [row] });
+
+                // Se o bot for o alvo, ele revida automaticamente respondendo à mensagem original
+                if (isBotTarget) {
+                    setTimeout(async () => {
+                        try {
+                            const returnEmbed = new EmbedBuilder()
+                                .setDescription(`🔄 O jogo virou! **${target}** (Aeternus) devolveu o castigo em **${author}**! 🚀`)
+                                .setImage(gifUrl)
+                                .setColor('#38bdf8');
+
+                            await sentMessage.reply({ embeds: [returnEmbed] });
+                        } catch (e) {
+                            console.error('Erro ao revidar automaticamente:', e);
+                        }
+                    }, 1500);
+                    return;
+                }
 
                 const collector = sentMessage.createMessageComponentCollector({ time: 60000 });
 
@@ -241,7 +257,7 @@ module.exports = {
                 .setTitle('📜 Central de Comandos')
                 .setDescription(`O prefixo atual é \`${prefix}\``)
                 .addFields(
-                    { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\`` },
+                    { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Pode castigar membros ou o próprio bot!)` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
                 .setColor('#38bdf8');
