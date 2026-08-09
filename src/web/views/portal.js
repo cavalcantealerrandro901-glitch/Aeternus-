@@ -3,6 +3,7 @@ const renderWelcomeCategory = require('./categories/welcome');
 const renderUpdatesCategory = require('./categories/updates');
 const renderCustomCommandsCategory = require('./categories/customCommands');
 const renderTicketsCategory = require('./categories/tickets');
+const renderPrefixCategory = require('./categories/prefix');
 
 module.exports = (guild, userGuilds, user, botUser) => {
     const iconUrl = guild.icon
@@ -42,7 +43,6 @@ module.exports = (guild, userGuilds, user, botUser) => {
 
         body { display: flex; flex-direction: row; }
 
-        /* Sidebar Desktop */
         .sidebar { 
             width: 80px; 
             background: #030712; 
@@ -69,7 +69,6 @@ module.exports = (guild, userGuilds, user, botUser) => {
         .sidebar-guild:hover, .sidebar-guild.active { opacity: 1; border-color: #38bdf8; border-radius: 12px; }
         .sidebar-guild img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* Conteúdo Principal */
         .main-content { 
             flex: 1; 
             padding: 30px; 
@@ -100,7 +99,6 @@ module.exports = (guild, userGuilds, user, botUser) => {
         .stat-card span { font-size: 0.8rem; color: #94a3b8; }
         .stat-card h3 { font-size: 1.3rem; color: #38bdf8; margin-top: 4px; }
 
-        /* 📁 MENU DE ABAS DE CATEGORIAS */
         .category-tabs {
             display: flex;
             gap: 8px;
@@ -150,7 +148,6 @@ module.exports = (guild, userGuilds, user, botUser) => {
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Forms & Cards */
         .config-card { 
             background: rgba(255,255,255,0.02); 
             border: 1px solid rgba(255,255,255,0.06); 
@@ -209,7 +206,6 @@ module.exports = (guild, userGuilds, user, botUser) => {
         }
         .btn-save:hover { opacity: 0.9; }
 
-        /* Mobile Adjustments */
         @media (max-width: 768px) {
             body { flex-direction: column; }
             
@@ -270,14 +266,19 @@ module.exports = (guild, userGuilds, user, botUser) => {
         </div>
 
         <div class="category-tabs">
-            <button class="tab-btn active" onclick="switchTab(event, 'tab-logs')">📜 Geral & Logs</button>
+            <button class="tab-btn active" onclick="switchTab(event, 'tab-prefix')">⚙️ Prefixo</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tab-logs')">📜 Geral & Logs</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-welcome')">👋 Boas-vindas</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-updates')">📢 Atualizações</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-custom-commands')">⚡ Comandos</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-tickets')">🎫 Tickets</button>
         </div>
 
-        <div id="tab-logs" class="tab-content active">
+        <div id="tab-prefix" class="tab-content active">
+            ${renderPrefixCategory(guild)}
+        </div>
+
+        <div id="tab-logs" class="tab-content">
             ${renderLogsCategory(guild)}
         </div>
 

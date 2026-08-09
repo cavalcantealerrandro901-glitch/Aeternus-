@@ -132,6 +132,7 @@ module.exports = (client, config) => {
             roleCount: botGuild ? botGuild.roles.cache.size : 'N/A',
             textChannels: textChannels,
             roles: guildRoles,
+            prefix: savedConfig.prefix || '!',
             logsConfig: savedConfig.logs || {},
             welcomeConfig: savedConfig.welcome || {},
             updatesConfig: savedConfig.updates || {},
@@ -140,6 +141,20 @@ module.exports = (client, config) => {
         };
 
         res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
+    });
+
+    // API: Alterar Prefixo
+    app.post('/api/guilds/:guildId/prefix', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const { prefix } = req.body;
+        if (!prefix || prefix.trim().length === 0) {
+            return res.status(400).json({ error: 'O prefixo não pode ser vazio.' });
+        }
+
+        db.setGuildConfig(req.params.guildId, { prefix: prefix.trim() });
+        res.json({ success: true });
     });
 
     // API: Salvar Config de Tickets
@@ -208,13 +223,12 @@ module.exports = (client, config) => {
 
             await channel.send({ embeds: [embed], components: [row] });
             
-            // Salva no banco
             db.setGuildConfig(guildId, { tickets: config });
 
             res.json({ success: true });
         } catch (err) {
             console.error('Erro ao enviar painel de tickets:', err);
-            res.status(500).json({ error: 'Verifique se o bot possui permissão de Ver Canal e Enviar Mensagens no canal escolhido.' });
+            res.status(500).json({ error: 'Verifique as permissões do bot no canal escolhido.' });
         }
     });
 
