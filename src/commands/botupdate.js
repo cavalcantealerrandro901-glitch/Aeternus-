@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const db = require('../database/db');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { broadcastUpdate } = require('../utils/broadcaster');
 const { version: currentVersion } = require('../../package.json');
 
 module.exports = {
@@ -17,7 +17,7 @@ module.exports = {
                 .setRequired(true))
         .addStringOption(option => 
             option.setName('versao')
-                .setDescription('Versão personalizada (Opcional - por padrão usa a versão do package.json)')
+                .setDescription('Versão personalizada (Opcional - usa a versão do package.json por padrão)')
                 .setRequired(false)),
 
     async execute(interaction) {
@@ -25,49 +25,17 @@ module.exports = {
 
         const titulo = interaction.options.getString('titulo');
         const novidades = interaction.options.getString('novidades');
-        
-        // Puxa automaticamente a versão do package.json se não for informada
         const customVersion = interaction.options.getString('versao');
         const versaoFinal = customVersion ? customVersion : `v${currentVersion}`;
 
-        let enviados = 0;
-        let falhas = 0;
-
-        for (const guild of interaction.client.guilds.cache.values()) {
-            const guildConfig = db.getGuildConfig(guild.id);
-            const updatesConfig = guildConfig.updates;
-
-            if (!updatesConfig || !updatesConfig.updatesChannel) continue;
-
-            const channel = guild.channels.cache.get(updatesConfig.updatesChannel);
-            if (!channel) continue;
-
-            try {
-                let mentionContent = '';
-                if (updatesConfig.mentionType === 'here') mentionContent = '@here';
-                if (updatesConfig.mentionType === 'everyone') mentionContent = '@everyone';
-                if (updatesConfig.mentionType === 'role' && updatesConfig.mentionRoleId) {
-                    mentionContent = `<@&${updatesConfig.mentionRoleId}>`;
-                }
-
-                const embed = new EmbedBuilder()
-                    .setTitle(`🚀 ${titulo}`)
-                    .setDescription(novidades)
-                    .addFields({ name: '📌 Versão', value: `\`${versaoFinal}\``, inline: true })
-                    .setColor('#38bdf8')
-                    .setThumbnail(interaction.client.user.displayAvatarURL())
-                    .setTimestamp()
-                    .setFooter({ text: `${interaction.client.user.username} Updates`, iconURL: interaction.client.user.displayAvatarURL() });
-
-                await channel.send({ content: mentionContent || undefined, embeds: [embed] });
-                enviados++;
-            } catch (err) {
-                falhas++;
-            }
-        }
+        const result = await broadcastUpdate(interaction.client, {
+            title: titulo,
+            description: novidades,
+            version: versaoFinal
+        });
 
         await interaction.editReply({
-            content: `✅ Anúncio transmitido com sucesso!\n📢 Servidores notificados: **${enviados}**\n⚠️ Falhas: **${falhas}**\n🏷️ Versão aplicada: **${versaoFinal}**`
+            content: `✅ Transmissão concluída!\n📢 Servidores notificados: **${result.successCount}**\n⚠️ Falhas: **${result.failCount}**\n🏷️ Versão aplicada: **${versaoFinal}**`
         });
     }
 };
