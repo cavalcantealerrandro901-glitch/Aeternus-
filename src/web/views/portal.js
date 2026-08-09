@@ -1,5 +1,6 @@
 const renderLogsCategory = require('./categories/logs');
 const renderWelcomeCategory = require('./categories/welcome');
+const renderUpdatesCategory = require('./categories/updates');
 
 module.exports = (guild, manageableGuilds, user, botUser) => {
     const botAvatarUrl = botUser ? botUser.displayAvatarURL({ extension: 'png', size: 128 }) : 'https://cdn.discordapp.com/embed/avatars/0.png';
@@ -9,6 +10,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
 
     const logsSection = renderLogsCategory(guild, guild.textChannels);
     const welcomeSection = renderWelcomeCategory(guild, guild.textChannels);
+    const updatesSection = renderUpdatesCategory(guild, guild.textChannels);
 
     return `
 <!DOCTYPE html>
@@ -320,6 +322,9 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             <li class="nav-menu-item" id="nav-welcome">
                 <button onclick="switchCategory('welcome')">👋 Boas-Vindas</button>
             </li>
+            <li class="nav-menu-item" id="nav-updates">
+                <button onclick="switchCategory('updates')">📢 Notificações do Bot</button>
+            </li>
         </ul>
 
         <div style="margin-top: auto; padding-top: 20px;">
@@ -369,6 +374,10 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         <div id="sec-welcome" class="category-section">
             ${welcomeSection}
         </div>
+
+        <div id="sec-updates" class="category-section">
+            ${updatesSection}
+        </div>
     </main>
 
     <script>
@@ -386,11 +395,9 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         }
 
         function switchCategory(catId) {
-            // Esconde todas as categorias
             document.querySelectorAll('.category-section').forEach(sec => sec.classList.remove('active'));
             document.querySelectorAll('.nav-menu-item').forEach(item => item.classList.remove('active'));
 
-            // Exibe apenas a selecionada
             const selectedSec = document.getElementById('sec-' + catId);
             const selectedNav = document.getElementById('nav-' + catId);
 

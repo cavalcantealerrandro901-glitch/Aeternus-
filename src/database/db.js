@@ -1,17 +1,16 @@
 const GuildConfig = require('./models/GuildConfig');
 
-// Cache em memória para leitura rápida e síncrona nos eventos do bot
 const cache = new Map();
 
 module.exports = {
-    // Carrega todas as configurações do MongoDB para o cache quando o bot liga
     async init() {
         try {
             const configs = await GuildConfig.find({});
             configs.forEach(cfg => {
                 cache.set(cfg.guildId, {
                     logs: cfg.logs || {},
-                    welcome: cfg.welcome || {}
+                    welcome: cfg.welcome || {},
+                    updates: cfg.updates || {}
                 });
             });
             console.log(`📦 ${configs.length} configurações de servidores carregadas do MongoDB!`);
@@ -20,28 +19,25 @@ module.exports = {
         }
     },
 
-    // Obtém as configurações diretamente do cache
     getGuildConfig(guildId) {
-        return cache.get(guildId) || { logs: {}, welcome: {} };
+        return cache.get(guildId) || { logs: {}, welcome: {}, updates: {} };
     },
 
-    // Atualiza o cache e salva permanentemente no MongoDB
     async setGuildConfig(guildId, partialConfig) {
         const current = this.getGuildConfig(guildId);
         
         const updated = {
             logs: partialConfig.logs !== undefined ? partialConfig.logs : current.logs,
-            welcome: partialConfig.welcome !== undefined ? partialConfig.welcome : current.welcome
+            welcome: partialConfig.welcome !== undefined ? partialConfig.welcome : current.welcome,
+            updates: partialConfig.updates !== undefined ? partialConfig.updates : current.updates
         };
 
-        // Atualiza no cache instantaneamente
         cache.set(guildId, updated);
 
-        // Salva/Atualiza no MongoDB em segundo plano
         try {
             await GuildConfig.findOneAndUpdate(
                 { guildId },
-                { guildId, logs: updated.logs, welcome: updated.welcome },
+                { guildId, logs: updated.logs, welcome: updated.welcome, updates: updated.updates },
                 { upsert: true, new: true }
             );
         } catch (err) {

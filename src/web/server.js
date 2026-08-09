@@ -1,5 +1,6 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
+const { EmbedBuilder } = require('discord.js');
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderPortal = require('./views/portal');
@@ -128,7 +129,8 @@ module.exports = (client, config) => {
             roleCount: botGuild ? botGuild.roles.cache.size : 'N/A',
             textChannels: textChannels,
             logsConfig: savedConfig.logs || {},
-            welcomeConfig: savedConfig.welcome || {}
+            welcomeConfig: savedConfig.welcome || {},
+            updatesConfig: savedConfig.updates || {}
         };
 
         res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
@@ -158,6 +160,62 @@ module.exports = (client, config) => {
 
         db.setGuildConfig(req.params.guildId, { welcome: req.body });
         res.json({ success: true });
+    });
+
+    // Salvar Atualizações do Bot
+    app.post('/api/guilds/:guildId/updates', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const manageableGuilds = getManageableGuilds(session.guilds);
+        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+        if (!guild) return res.status(403).json({ error: 'Sem permissão' });
+
+        db.setGuildConfig(req.params.guildId, { updates: req.body });
+        res.json({ success: true });
+    });
+
+    // Testar Notificação de Atualização
+    app.post('/api/guilds/:guildId/updates/test', async (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const guildConfig = db.getGuildConfig(req.params.guildId);
+        const updatesConfig = guildConfig.updates;
+
+        if (!updatesConfig || !updatesConfig.updatesChannel) {
+            return res.status(400).json({ error: 'Selecione e salve um canal de atualizações antes de testar!' });
+        }
+
+        const botGuild = client.guilds.cache.get(req.params.guildId);
+        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado' });
+
+        const channel = botGuild.channels.cache.get(updatesConfig.updatesChannel);
+        if (!channel) return res.status(404).json({ error: 'Canal de atualizações não encontrado' });
+
+        try {
+            let mentionContent = '';
+            if (updatesConfig.mentionType === 'here') mentionContent = '@here';
+            if (updatesConfig.mentionType === 'everyone') mentionContent = '@everyone';
+
+            const embed = new EmbedBuilder()
+                .setTitle('🚀 [TESTE] Nova Atualização do Bot Aeternus!')
+                .setDescription('Esta é uma mensagem de teste do sistema de Notificações de Atualizações.')
+                .addFields(
+                    { name: '✨ Novos Sistemas', value: '• Adicionada categoria de Notificações de Atualização\n• Correção e suporte a menções diretas em Boas-Vindas' },
+                    { name: '🌐 Painel Web', value: '• Sistema de abas dinâmicas sem rolamento de tela no mobile' },
+                    { name: '📌 Versão', value: '`v2.0.0-teste`', inline: true }
+                )
+                .setColor('#38bdf8')
+                .setThumbnail(client.user.displayAvatarURL())
+                .setTimestamp()
+                .setFooter({ text: 'Aeternus Updates', iconURL: client.user.displayAvatarURL() });
+
+            await channel.send({ content: mentionContent || undefined, embeds: [embed] });
+            res.json({ success: true });
+        } catch (err) {
+            res.status(500).json({ error: err.message || 'Erro ao enviar anúncio no Discord' });
+        }
     });
 
     // Rota para Testar Boas-Vindas
