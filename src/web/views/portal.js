@@ -15,19 +15,20 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Configurar ${guild.name} - ${botName}</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
+        html, body {
+            max-width: 100vw;
+            overflow-x: hidden;
             font-family: 'Plus Jakarta Sans', sans-serif;
             background: #090d16;
             color: #f1f5f9;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
         }
 
         header {
@@ -35,19 +36,20 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             justify-content: space-between;
             align-items: center;
             padding: 14px 20px;
-            background: rgba(15, 23, 42, 0.85);
+            background: rgba(15, 23, 42, 0.95);
             backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             position: sticky;
             top: 0;
             z-index: 90;
+            width: 100%;
         }
-        .header-left { display: flex; align-items: center; gap: 16px; }
+        .header-left { display: flex; align-items: center; gap: 14px; }
         .menu-toggle-btn {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.15);
             color: #38bdf8;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             width: 42px;
             height: 42px;
             border-radius: 10px;
@@ -86,7 +88,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(4px);
             z-index: 100;
             opacity: 0;
@@ -98,7 +100,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             position: fixed;
             top: 0;
             left: 0;
-            width: 320px;
+            width: 300px;
             max-width: 85vw;
             height: 100vh;
             background: #0f172a;
@@ -108,7 +110,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
-            padding: 24px 18px;
+            padding: 20px 16px;
             overflow-y: auto;
         }
         .sidebar-drawer.active { transform: translateX(0); }
@@ -116,11 +118,11 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             padding-bottom: 12px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .drawer-title { font-weight: 800; font-size: 1rem; color: #94a3b8; text-transform: uppercase; }
+        .drawer-title { font-weight: 800; font-size: 0.9rem; color: #94a3b8; text-transform: uppercase; }
         .close-drawer-btn { background: transparent; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; }
 
         .drawer-server-card {
@@ -128,72 +130,76 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 14px;
             padding: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             text-align: center;
         }
         .drawer-server-icon {
-            width: 60px;
-            height: 60px;
+            width: 54px;
+            height: 54px;
             border-radius: 50%;
             background: #1e293b;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: 800;
             color: #38bdf8;
             margin-bottom: 10px;
             border: 2px solid #38bdf8;
             object-fit: cover;
         }
-        .drawer-server-name { font-weight: 700; font-size: 1.1rem; margin-bottom: 12px; word-break: break-word; }
-        .drawer-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
+        .drawer-server-name { font-weight: 700; font-size: 1rem; margin-bottom: 12px; word-break: break-word; }
+        .drawer-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
         .stat-item { background: rgba(0, 0, 0, 0.3); padding: 8px 4px; border-radius: 8px; text-align: center; }
-        .stat-val { font-weight: 800; font-size: 0.95rem; color: #38bdf8; }
-        .stat-lbl { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
+        .stat-val { font-weight: 800; font-size: 0.9rem; color: #38bdf8; }
+        .stat-lbl { font-size: 0.65rem; color: #64748b; margin-top: 2px; }
 
         .nav-category-title { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 10px; padding-left: 8px; }
         .nav-menu-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-        .nav-menu-item a {
+        .nav-menu-item button {
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: none;
             display: flex;
             align-items: center;
             gap: 12px;
             padding: 12px 14px;
             border-radius: 10px;
             color: #94a3b8;
-            text-decoration: none;
             font-weight: 600;
             font-size: 0.95rem;
+            cursor: pointer;
             transition: all 0.2s;
         }
-        .nav-menu-item a:hover, .nav-menu-item.active a { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+        .nav-menu-item button:hover, .nav-menu-item.active button { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
 
-        main { flex: 1; max-width: 1100px; width: 100%; margin: 0 auto; padding: 30px 20px; }
+        main { flex: 1; max-width: 1000px; width: 100%; margin: 0 auto; padding: 24px 16px; box-sizing: border-box; }
 
         .server-hero-card {
             background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.7));
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 20px;
-            padding: 28px;
+            padding: 24px;
             display: flex;
             align-items: center;
-            gap: 24px;
-            margin-bottom: 30px;
+            gap: 20px;
+            margin-bottom: 24px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(10px);
         }
         .hero-server-icon {
-            width: 90px;
-            height: 90px;
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
             background: #1e293b;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.2rem;
+            font-size: 2rem;
             font-weight: 800;
             color: #38bdf8;
             border: 3px solid #38bdf8;
@@ -201,43 +207,48 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
             flex-shrink: 0;
         }
-        .hero-server-details h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 8px; color: #fff; }
-        .hero-stats-pills { display: flex; flex-wrap: wrap; gap: 10px; }
-        .pill { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; color: #cbd5e1; font-weight: 600; }
+        .hero-server-details h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 8px; color: #fff; word-break: break-word; }
+        .hero-stats-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+        .pill { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; color: #cbd5e1; font-weight: 600; }
         .pill span { color: #38bdf8; font-weight: 700; }
 
         .config-card {
             background: rgba(15, 23, 42, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 18px;
-            padding: 28px;
+            padding: 24px;
             backdrop-filter: blur(8px);
+            width: 100%;
+            box-sizing: border-box;
         }
         .config-card-header {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .config-card-header h2 { font-size: 1.4rem; color: #fff; }
+        .config-card-header h2 { font-size: 1.3rem; color: #fff; }
 
         .form-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 28px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+            width: 100%;
         }
-        .form-group { display: flex; flex-direction: column; gap: 8px; }
-        .form-group label { font-size: 0.9rem; font-weight: 600; color: #cbd5e1; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+        .form-group label { font-size: 0.85rem; font-weight: 600; color: #cbd5e1; }
         .form-control {
+            width: 100%;
+            box-sizing: border-box;
             background: rgba(0, 0, 0, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.12);
             color: #f1f5f9;
             padding: 12px 14px;
             border-radius: 10px;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             outline: none;
             transition: border-color 0.2s;
         }
@@ -247,21 +258,25 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             background: linear-gradient(135deg, #38bdf8, #2563eb);
             color: #fff;
             border: none;
-            padding: 14px 28px;
+            padding: 12px 24px;
             border-radius: 12px;
             font-weight: 700;
-            font-size: 1rem;
+            font-size: 0.95rem;
             cursor: pointer;
             box-shadow: 0 4px 14px rgba(56, 189, 248, 0.3);
             transition: all 0.2s;
         }
         .btn-save:hover { opacity: 0.92; transform: translateY(-2px); }
 
+        .category-section { display: none; }
+        .category-section.active { display: block; }
+
         @media (max-width: 640px) {
-            main { padding: 20px 14px; }
-            .server-hero-card { flex-direction: column; text-align: center; }
-            .hero-server-icon { width: 75px; height: 75px; font-size: 1.8rem; }
+            main { padding: 16px 12px; }
+            .server-hero-card { flex-direction: column; text-align: center; padding: 18px; }
+            .hero-server-icon { width: 70px; height: 70px; font-size: 1.6rem; }
             .hero-stats-pills { justify-content: center; }
+            .form-grid { grid-template-columns: 1fr !important; }
         }
     </style>
 </head>
@@ -299,11 +314,11 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
 
         <div class="nav-category-title">Categorias de Módulos</div>
         <ul class="nav-menu-list">
-            <li class="nav-menu-item">
-                <a href="#logs" onclick="closeSidebar()">📜 Sistema de Logs</a>
+            <li class="nav-menu-item active" id="nav-logs">
+                <button onclick="switchCategory('logs')">📜 Sistema de Logs</button>
             </li>
-            <li class="nav-menu-item">
-                <a href="#welcome" onclick="closeSidebar()">👋 Boas-Vindas</a>
+            <li class="nav-menu-item" id="nav-welcome">
+                <button onclick="switchCategory('welcome')">👋 Boas-Vindas</button>
             </li>
         </ul>
 
@@ -316,7 +331,7 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
 
     <header>
         <div class="header-left">
-            <button class="menu-toggle-btn" id="openMenuBtn" onclick="openSidebar()" title="Abrir Menu (☰)">
+            <button class="menu-toggle-btn" id="openMenuBtn" onclick="openSidebar()" title="Abrir Menu">
                 ☰
             </button>
             <a href="/" class="brand">
@@ -347,8 +362,13 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
             </div>
         </div>
 
-        ${logsSection}
-        ${welcomeSection}
+        <div id="sec-logs" class="category-section active">
+            ${logsSection}
+        </div>
+
+        <div id="sec-welcome" class="category-section">
+            ${welcomeSection}
+        </div>
     </main>
 
     <script>
@@ -363,6 +383,21 @@ module.exports = (guild, manageableGuilds, user, botUser) => {
         function closeSidebar() {
             sidebar.classList.remove('active');
             overlay.classList.remove('active');
+        }
+
+        function switchCategory(catId) {
+            // Esconde todas as categorias
+            document.querySelectorAll('.category-section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('.nav-menu-item').forEach(item => item.classList.remove('active'));
+
+            // Exibe apenas a selecionada
+            const selectedSec = document.getElementById('sec-' + catId);
+            const selectedNav = document.getElementById('nav-' + catId);
+
+            if (selectedSec) selectedSec.classList.add('active');
+            if (selectedNav) selectedNav.classList.add('active');
+
+            closeSidebar();
         }
     </script>
 </body>
