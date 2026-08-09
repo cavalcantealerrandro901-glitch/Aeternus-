@@ -1,55 +1,72 @@
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 
-const DB_PATH = path.join(__dirname, '../../database.json');
+// Definindo o Schema para as configurações da Guilda no MongoDB
+const guildConfigSchema = new mongoose.Schema({
+    guildId: { type: String, required: true, unique: true },
+    prefix: { type: String, default: '!' },
+    flirt: {
+        chance: { type: Number, default: 10 },
+        mode: { type: String, default: 'emoji' }
+    },
+    customCommands: { type: Array, default: [] }
+});
 
-// Garante que o arquivo JSON existe
-function ensureDbExists() {
-    if (!fs.existsSync(DB_PATH)) {
-        fs.writeFileSync(DB_PATH, JSON.stringify({ guilds: {} }, null, 2));
-    }
-}
+const GuildConfig = mongoose.model('GuildConfig', guildConfigSchema);
 
-function readDb() {
-    ensureDbExists();
-    try {
-        const data = fs.readFileSync(DB_PATH, 'utf8');
-        return JSON.parse(data) || { guilds: {} };
-    } catch (err) {
-        console.error('Erro ao ler database.json:', err);
-        return { guilds: {} };
-    }
-}
-
-function writeDb(data) {
-    try {
-        fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
-    } catch (err) {
-        console.error('Erro ao salvar database.json:', err);
-    }
-}
+// Cache em memória para acesso rápido
+const cache = new Map();
 
 module.exports = {
-    getGuildConfig(guildId) {
-        const db = readDb();
-        const config = db.guilds[guildId] || {};
-        return {
-            prefix: '!',
-            ...config
-        };
+    // 📌 Função init exigida pelo index.js
+    async init() {
+        try {
+            console.log('📦 Inicializando banco de dados e carregando cache...');
+            const allConfigs = await GuildConfig.find({});
+            cache.clear();
+            for (const cfg of allConfigs) {
+                cache.set(cfg.guildId, cfg.toObject());
+            }
+            console.log(`✅ Cache carregado com ${cache.size} servidores.`);
+        } catch (err) {
+            console.error('❌ Erro ao inicializar o banco de dados:', err);
+        }
     },
 
-    setGuildConfig(guildId, newConfig) {
-        const db = readDb();
-        const currentConfig = db.guilds[guildId] || {};
-        
-        // Mescla as configurações antigas mantendo tudo que já existia
-        db.guilds[guildId] = {
-            ...currentConfig,
-            ...newConfig
-        };
+    async getGuildConfig(guildId) {
+        if (cache.has(guildId)) {
+            return cache.get(guildId);
+        }
 
-        writeDb(db);
-        return db.guilds[guildId];
+        let config = await GuildConfig.findOne({ guildId });
+        if (!config) {
+            config = new GuildConfig({ guildId, prefix: '!' });
+            await config.save();
+        }
+
+        const configObj = config.toObject();
+        cache.set(guildId, configObj);
+        return configObj;
+    },
+
+    async setGuildConfig(guildId, newConfig) {
+        try {
+            let config = await GuildConfig.findOne({ guildId });
+            
+            if (!config) {
+                config = new GuildConfig({ guildId, ...newConfig });
+            } else {
+                if (newConfig.prefix !== undefined) config.prefix = newConfig.prefix;
+                if (newConfig.flirt !== undefined) config.flirt = { ...config.flirt, ...newConfig.flirt };
+                if (newConfig.customCommands !== undefined) config.customCommands = newConfig.customCommands;
+            }
+
+            await config.save();
+            const configObj = config.toObject();
+            cache.set(guildId, configObj);
+            return configObj;
+        } catch (err) {
+            console.error('Erro ao salvar configuração no MongoDB:', err);
+            throw err;
+        }
     }
 };
