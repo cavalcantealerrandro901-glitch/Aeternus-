@@ -34,7 +34,12 @@ function buildWelcomePayload(guild, memberUser, config) {
         .setThumbnail(avatarUrl)
         .setTimestamp();
 
-    const payload = { embeds: [embed], components: [] };
+    // Adicionamos a menção no 'content' para marcar/notificar o usuário de verdade no Discord
+    const payload = { 
+        content: `<@${memberUser.id}>`, 
+        embeds: [embed], 
+        components: [] 
+    };
 
     // Adicionar botão com link caso configurado
     if (config.buttonText && config.buttonUrl && /^https?:\/\//i.test(config.buttonUrl)) {
