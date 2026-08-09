@@ -112,7 +112,7 @@ module.exports = (client, config) => {
         if (!guild) return res.redirect('/dashboard');
 
         const botGuild = client.guilds.cache.get(guild.id);
-        
+
         const textChannels = botGuild ? botGuild.channels.cache
             .filter(c => c.type === 0 || c.type === 5)
             .map(c => ({ id: c.id, name: c.name })) : [];
@@ -147,7 +147,24 @@ module.exports = (client, config) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
 
-        db.setGuildConfig(req.params.guildId, { tickets: req.body });
+        const current = db.getGuildConfig(req.params.guildId).tickets || {};
+        const updated = {
+            ...current,
+            ...req.body,
+            enabled: req.body.enabled === true || req.body.enabled === 'true'
+        };
+
+        db.setGuildConfig(req.params.guildId, { tickets: updated });
+        res.json({ success: true });
+    });
+
+    // API: Desativar Sistema de Tickets
+    app.post('/api/guilds/:guildId/tickets/disable', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const current = db.getGuildConfig(req.params.guildId).tickets || {};
+        db.setGuildConfig(req.params.guildId, { tickets: { ...current, enabled: false } });
         res.json({ success: true });
     });
 
@@ -159,6 +176,10 @@ module.exports = (client, config) => {
         const config = db.getGuildConfig(req.params.guildId).tickets;
         if (!config || !config.ticketChannel) {
             return res.status(400).json({ error: 'Configure o canal de tickets primeiro.' });
+        }
+
+        if (config.enabled === false) {
+            return res.status(400).json({ error: 'Ative o sistema de tickets antes de enviar o painel.' });
         }
 
         const botGuild = client.guilds.cache.get(req.params.guildId);
@@ -192,7 +213,7 @@ module.exports = (client, config) => {
         }
     });
 
-    // API: Outras rotas
+    // Outras rotas da API
     app.post('/api/guilds/:guildId/custom-commands', (req, res) => {
         const { cmdName, cmdResponse, isEmbed, oldCmdName } = req.body;
         const cleanName = cmdName.toLowerCase().replace(/[^a-z0-9_-]/g, '');

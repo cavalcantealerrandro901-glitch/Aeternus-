@@ -12,6 +12,13 @@ module.exports = {
 
         // 1. ABRIR TICKET
         if (customId === 'btn_open_ticket') {
+            if (ticketConfig.enabled === false) {
+                return await interaction.reply({
+                    content: '🚫 O sistema de atendimento de tickets está **desativado** temporariamente neste servidor.',
+                    ephemeral: true
+                });
+            }
+
             const ticketName = `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
             
             const existingChannel = guild.channels.cache.find(c => c.name === ticketName);
@@ -24,7 +31,6 @@ module.exports = {
 
             await interaction.deferReply({ ephemeral: true });
 
-            // Busca ou cria a categoria "🎫 TICKETS"
             let ticketCategory = guild.channels.cache.find(
                 c => c.type === ChannelType.GuildCategory && c.name.toUpperCase().includes('TICKETS')
             );
@@ -36,7 +42,7 @@ module.exports = {
                         type: ChannelType.GuildCategory
                     });
                 } catch (e) {
-                    console.log('Não foi possível criar a categoria de tickets:', e.message);
+                    console.log('Erro ao criar categoria de tickets:', e.message);
                 }
             }
 
@@ -108,7 +114,7 @@ module.exports = {
             }
         }
 
-        // 2. SOLICITAR FECHAMENTO (Confirmação)
+        // 2. SOLICITAR FECHAMENTO
         if (customId === 'btn_request_close_ticket') {
             const confirmEmbed = new EmbedBuilder()
                 .setTitle('⚠️ Confirmação de Encerramento')
@@ -132,7 +138,7 @@ module.exports = {
             });
         }
 
-        // 3. CONFIRMAR E APAGAR TICKET
+        // 3. CONFIRMAR E APAGAR
         if (customId === 'btn_confirm_close_ticket') {
             await interaction.reply({
                 content: '🔒 O ticket será encerrado e deletado em 5 segundos...'
