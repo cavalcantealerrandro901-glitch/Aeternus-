@@ -5,11 +5,12 @@ const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', 
 const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
 const PUNISH_CATEGORIES = ['slap', 'baka', 'poke', 'hug'];
 
+// GIFs diretos e seguros garantidos para o embed
 const FALLBACK_GIFS = [
-    'https://nekos.best/api/v2/slap/slap_001.gif',
-    'https://nekos.best/api/v2/baka/baka_001.gif',
-    'https://nekos.best/api/v2/poke/poke_001.gif',
-    'https://nekos.best/api/v2/hug/hug_001.gif'
+    'https://media.giphy.com/media/3oKIPnmiqNhZIleLPW/giphy.gif',
+    'https://media.giphy.com/media/l0HlHFRbmaZtBRhXG/giphy.gif',
+    'https://media.giphy.com/media/26u6dTP6p4y0iyBIQ/giphy.gif',
+    'https://media.giphy.com/media/3ohzdIuqJoo8QdKlnW/giphy.gif'
 ];
 
 const FLIRT_MESSAGES = [
