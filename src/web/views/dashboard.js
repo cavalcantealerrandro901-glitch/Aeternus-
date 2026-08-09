@@ -26,11 +26,11 @@ module.exports = (user, manageableGuilds) => `
         <div class="menu-header">☰ Menu de Servidores</div>
         <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 10px;">SELECIONE UM PARA GERENCIAR</p>
         <ul class="server-list">
-            ${manageableGuilds.length > 0 ? manageableGuilds.map(g => \`<a href="/dashboard/\${g.id}" class="server-item">🛡️ \${g.name}</a>\`).join('') : '<p style="font-size: 0.9rem; color: #f87171;">Nenhum servidor encontrado.</p>'}
+            ${manageableGuilds.length > 0 ? manageableGuilds.map(g => '<a href="/dashboard/' + g.id + '" class="server-item">🛡️ ' + g.name + '</a>').join('') : '<p style="font-size: 0.9rem; color: #f87171;">Nenhum servidor encontrado.</p>'}
         </ul>
     </sidebar>
     <main>
-        <h1>Bem-vindo, \${user.username}!</h1>
+        <h1>Bem-vindo, ${user.username}!</h1>
         <div class="welcome-card">
             <p>Este é o seu painel de controle centralizado no Aeternus. Utilize o menu lateral esquerdo para selecionar o servidor que deseja gerenciar, configurar comandos, visualizar registros e ajustar permissões da sua comunidade.</p>
         </div>

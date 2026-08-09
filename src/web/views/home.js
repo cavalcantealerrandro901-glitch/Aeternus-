@@ -20,7 +20,7 @@ module.exports = (user) => `
 <body>
     <header>
         <div class="logo">Aeternus</div>
-        <div>${user ? \`<a href="/dashboard" class="login-btn">Painel</a>\` : \`<a href="/login" class="login-btn">Login 🔚</a>\`}</div>
+        <div>${user ? '<a href="/dashboard" class="login-btn">Painel</a>' : '<a href="/login" class="login-btn">Login 🔚</a>'}</div>
     </header>
     <div class="hero">
         <h1>Gerencie seu Bot com Elegância</h1>

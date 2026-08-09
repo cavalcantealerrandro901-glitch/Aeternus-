@@ -4,7 +4,7 @@ module.exports = (guild, manageableGuilds) => `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciar \${guild.name} - Aeternus</title>
+    <title>Gerenciar ${guild.name} - Aeternus</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; }
@@ -29,12 +29,12 @@ module.exports = (guild, manageableGuilds) => `
     <sidebar>
         <div class="menu-header">☰ Servidores</div>
         <ul class="server-list">
-            ${manageableGuilds.map(g => \`<a href="/dashboard/\${g.id}" class="server-item \${g.id === guild.id ? 'active' : ''}">🛡️ \${g.name}</a>\`).join('')}
+            ${manageableGuilds.map(g => '<a href="/dashboard/' + g.id + '" class="server-item ' + (g.id === guild.id ? 'active' : '') + '">🛡️ ' + g.name + '</a>').join('')}
         </ul>
     </sidebar>
     <main>
         <a href="/dashboard" class="back-link">← Voltar à Visão Geral</a>
-        <h1>Portal: \${guild.name}</h1>
+        <h1>Portal: ${guild.name}</h1>
         <p>Configure as opções avançadas do bot para este servidor em tempo real.</p>
         <div class="portal-grid">
             <div class="card"><h3>💬 Comandos & Integrações</h3><p>Ative ou desative módulos personalizados.</p><a href="#" class="btn-action">Configurar</a></div>
