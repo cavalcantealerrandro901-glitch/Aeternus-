@@ -1,35 +1,50 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const db = require('../database/db');
 
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
-        // Ignora mensagens enviadas por bots ou em conversas privadas (DMs)
         if (message.author.bot || !message.guild) return;
 
-        // Obter as configurações do servidor no banco de dados
         const guildConfig = db.getGuildConfig(message.guild.id);
         const prefix = guildConfig.prefix || '!';
 
-        // Responde com o prefixo atual se o bot for mencionado
+        // Responde ao marcar/mencionar o bot no chat
         const botMention = `<@${message.client.user.id}>`;
         const botMentionNick = `<@!${message.client.user.id}>`;
         if (message.content.trim() === botMention || message.content.trim() === botMentionNick) {
             return await message.reply({
-                content: `👋 Olá ${message.author}! Meu prefixo neste servidor é \`${prefix}\`.`
+                content: `👋 Olá ${message.author}! Meu prefixo neste servidor é \`${prefix}\`. Use \`${prefix}help\` para ver a lista de comandos.`
             });
         }
 
-        // Verifica se a mensagem começa com o prefixo configurado
         if (!message.content.startsWith(prefix)) return;
 
-        // Separa o nome do comando dos argumentos
         const args = message.content.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
 
         if (!commandName) return;
 
-        // 1. CHECAR COMANDOS PERSONALIZADOS (Criados no Painel Web)
+        // Comando via texto tradicional para mudar o prefixo (Ex: !prefixo ?)
+        if (commandName === 'prefixo' || commandName === 'prefix') {
+            if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return await message.reply('❌ Você precisa da permissão de **Administrador** para alterar o prefixo.');
+            }
+
+            const newPrefix = args[0];
+            if (!newPrefix) {
+                return await message.reply(`📌 O prefixo atual é \`${prefix}\`. Para alterar use: \`${prefix}prefixo <novo_prefixo>\``);
+            }
+
+            if (newPrefix.length > 5) {
+                return await message.reply('❌ O prefixo não pode ter mais de 5 caracteres.');
+            }
+
+            db.setGuildConfig(message.guild.id, { prefix: newPrefix });
+            return await message.reply(`✅ Prefixo alterado com sucesso para \`${newPrefix}\`!`);
+        }
+
+        // Comandos Personalizados do Painel Web
         const customCommands = guildConfig.customCommands || [];
         const customCmd = customCommands.find(c => c.name.toLowerCase() === commandName);
 
@@ -44,7 +59,7 @@ module.exports = {
             }
         }
 
-        // 2. COMANDO PADRÃO DE AJUDA COM PREFIXO
+        // Comando de Ajuda
         if (commandName === 'help' || commandName === 'ajuda') {
             const embed = new EmbedBuilder()
                 .setTitle('📜 Central de Comandos')
@@ -52,7 +67,7 @@ module.exports = {
                 .addFields(
                     { 
                         name: '⚙️ Prefixo', 
-                        value: `Use \`${prefix}prefixo\` no painel ou \`/prefixo\` para alterar.` 
+                        value: `Use \`${prefix}prefixo <novo>\`, o comando \`/prefixo\` ou o Painel Web para alterar.` 
                     },
                     { 
                         name: '⚡ Comandos Customizados', 
