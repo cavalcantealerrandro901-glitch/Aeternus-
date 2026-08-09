@@ -4,6 +4,17 @@ const db = require('../database/db');
 const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', '🏻', '🙈', '🔥', '✨', '💐', '💘'];
 const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
 
+// Mensagens fofas para acompanhar o GIF
+const FLIRT_MESSAGES = [
+    "Você chamou a minha atenção! 💖",
+    "Alguém está esbanjando charme por aqui... ✨",
+    "Piscou, eu notei! 😏",
+    "Muito fofo(a)! Toma aqui uma figurinha. 🥰",
+    "Passando só para deixar isso aqui pra você... 💘",
+    "Não resisti e tive que mandar isso! 😳",
+    "Você tem uma energia muito boa! 🌸"
+];
+
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
@@ -15,7 +26,6 @@ module.exports = {
         // --- SISTEMA AUTOMÁTICO DE PAQUERA (GLOBAL) ---
         const flirtConfig = guildConfig.flirt || {};
         
-        // Se já houver uma chance salva maior que zero, o sistema funciona
         if (flirtConfig.chance && flirtConfig.chance > 0) {
             const chance = flirtConfig.chance;
             const randomNumber = Math.floor(Math.random() * 100) + 1;
@@ -33,7 +43,15 @@ module.exports = {
                         
                         if (data && data.results && data.results.length > 0) {
                             const gifUrl = data.results[0].url;
-                            await message.reply({ content: gifUrl });
+                            const randomMessage = FLIRT_MESSAGES[Math.floor(Math.random() * FLIRT_MESSAGES.length)];
+                            
+                            // Cria um Embed limpo e bonito para a figurinha animada
+                            const flirtEmbed = new EmbedBuilder()
+                                .setDescription(`Oi **${message.author.username}**! ${randomMessage}`)
+                                .setImage(gifUrl)
+                                .setColor('#ec4899'); // Cor rosa choque
+
+                            await message.reply({ embeds: [flirtEmbed] });
                         }
                     } else {
                         // Reage com Emoji
