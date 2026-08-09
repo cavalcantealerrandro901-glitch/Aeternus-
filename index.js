@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 
+const db = require('./src/database/db');
 const startWebServer = require('./src/web/server');
 const registerLogs = require('./src/events/logs');
 const registerWelcome = require('./src/events/welcome');
@@ -25,7 +26,7 @@ const client = new Client({
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildMessages, 
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,    // Essencial para detectar novos membros
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildVoiceStates 
     ],
     partials: [
@@ -48,10 +49,16 @@ if (fs.existsSync(commandsPath)) {
     }
 }
 
+// Conexão e carregamento das configurações salvas no MongoDB
 if (config.mongoUri) {
     mongoose.connect(config.mongoUri)
-        .then(() => console.log('📦 Conectado ao MongoDB com sucesso!'))
+        .then(async () => {
+            console.log('📦 Conectado ao MongoDB com sucesso!');
+            await db.init(); // Inicializa o cache com os dados salvos
+        })
         .catch(err => console.error('❌ Erro no MongoDB:', err));
+} else {
+    console.warn('⚠️ MONGO_URI não definida! As configurações não serão salvas permanentemente.');
 }
 
 // Registrar eventos
