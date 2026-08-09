@@ -117,6 +117,91 @@ client.on('interactionCreate', async interaction => {
         console.error(error);
     }
 });
+// Importe a fonte do Google Fonts no HTML para letras charmosas e modernas
+app.get('/welcome', (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Bem-vindo ao Aeternus</title>
+            <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+            <style>
+                body {
+                    margin: 0;
+                    padding: 0;
+                    font-family: 'Inter', sans-serif;
+                    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+                    color: #f8fafc;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    overflow: hidden;
+                }
+                .welcome-card {
+                    background: rgba(30, 41, 59, 0.7);
+                    backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    padding: 40px;
+                    border-radius: 20px;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                    text-align: center;
+                    max-width: 500px;
+                    width: 90%;
+                }
+                h1 {
+                    font-family: 'Playfair Display', serif;
+                    font-size: 2.8rem;
+                    font-style: italic;
+                    background: linear-gradient(90deg, #38bdf8, #c084fc);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    margin-bottom: 20px;
+                }
+                p {
+                    color: #cbd5e1;
+                    font-size: 1rem;
+                    line-height: 1.6;
+                    margin-bottom: 30px;
+                }
+                .btn {
+                    display: inline-block;
+                    background: #5865F2;
+                    color: white;
+                    padding: 12px 25px;
+                    border-radius: 8px;
+                    text-decoration: none;
+                    font-weight: 600;
+                    transition: background 0.3s ease;
+                }
+                .btn:hover {
+                    background: #4752c4;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="welcome-card">
+                <h1>Bem-vindo ao Aeternus</h1>
+                <p>
+                    Este é o seu painel de controle centralizado. Aqui você gerencia comandos, 
+                    monitora o status do bot em tempo real, acompanha o sistema de economia 
+                    e configura todas as preferências da sua aplicação com facilidade e segurança.
+                </p>
+                <a href="/" class="btn">Voltar ao Início</a>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+// Rota de login simulada ou redirecionamento do Discord OAuth2
+app.get('/login', (req, res) => {
+    // Aqui você redirecionaria para o Discord OAuth2 se configurado, 
+    // ou redireciona direto para a página de boas-vindas após o login bem-sucedido:
+    res.redirect('/welcome');
+});
 
 const token = config.token || process.env.DISCORD_TOKEN;
 if (token) {
