@@ -5,11 +5,13 @@ const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', 
 const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
 const PUNISH_CATEGORIES = ['slap', 'baka', 'poke', 'hug'];
 
+// 🎌 Novos GIFs de anime puros e otimizados para carregar rápido
 const FALLBACK_GIFS = [
-    'https://media.giphy.com/media/3oKIPnmiqNhZIleLPW/giphy.gif',
-    'https://media.giphy.com/media/l0HlHFRbmaZtBRhXG/giphy.gif',
-    'https://media.giphy.com/media/26u6dTP6p4y0iyBIQ/giphy.gif',
-    'https://media.giphy.com/media/3ohzdIuqJoo8QdKlnW/giphy.gif'
+    'https://media1.giphy.com/media/12xwMUaxUETLgc/giphy.gif',
+    'https://media1.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif',
+    'https://media1.giphy.com/media/8dYmJ6Buo3lYY/giphy.gif',
+    'https://media1.giphy.com/media/l4FGpPki5v2Bcd6Ss/giphy.gif',
+    'https://media1.giphy.com/media/26u6dTP6p4y0iyBIQ/giphy.gif'
 ];
 
 const FLIRT_MESSAGES = [
@@ -34,7 +36,7 @@ async function sendPunishMessage(client, channel, sender, recipient, messageToRe
     let gifUrl = '';
     try {
         const category = PUNISH_CATEGORIES[Math.floor(Math.random() * PUNISH_CATEGORIES.length)];
-        const response = await fetch(`https://nekos.best/api/v2/${category}`);
+        const response = await fetch(`https://nekos.best/api/v2/${category}`, { timeout: 3000 });
         const contentType = response.headers.get('content-type');
         if (response.ok && contentType && contentType.includes('application/json')) {
             const data = await response.json();
@@ -72,7 +74,6 @@ async function sendPunishMessage(client, channel, sender, recipient, messageToRe
         sentMessage = await channel.send({ embeds: [embed], components: [row] });
     }
 
-    // Se o destinatário for o Aeternus (bot), ele revida automaticamente após 1.5s
     if (isBotRecipient) {
         setTimeout(async () => {
             try {
@@ -86,7 +87,6 @@ async function sendPunishMessage(client, channel, sender, recipient, messageToRe
                     );
                 await sentMessage.edit({ components: [disabledRow] }).catch(() => {});
 
-                // Revida automaticamente criando um novo elo no ciclo
                 await sendPunishMessage(client, channel, recipient, sender, sentMessage);
             } catch (e) {
                 console.error('Erro no revide automático do bot:', e);
@@ -95,8 +95,7 @@ async function sendPunishMessage(client, channel, sender, recipient, messageToRe
         return;
     }
 
-    // Coletor para usuários reais continuarem o ciclo
-    const collector = sentMessage.createMessageComponentCollector({ time: 300000 }); // 5 minutos
+    const collector = sentMessage.createMessageComponentCollector({ time: 300000 });
 
     collector.on('collect', async i => {
         if (i.user.id !== recipient.id) {
@@ -115,7 +114,6 @@ async function sendPunishMessage(client, channel, sender, recipient, messageToRe
             );
         await i.update({ components: [disabledRow] }).catch(() => {});
 
-        // Continua o ciclo enviando o revide de volta
         await sendPunishMessage(client, channel, recipient, sender, sentMessage);
     });
 
@@ -277,7 +275,6 @@ module.exports = {
 
                 const sentMessage = await message.reply({ embeds: [embed], components: [row] });
 
-                // Se o alvo for o bot, ele desativa o primeiro botão e inicia o ciclo automático de revide
                 if (isBotTarget) {
                     setTimeout(async () => {
                         try {
@@ -291,7 +288,6 @@ module.exports = {
                                 );
                             await sentMessage.edit({ components: [disabledRow] }).catch(() => {});
 
-                            // Inicia a primeira resposta automática do bot criando o ciclo infinito
                             await sendPunishMessage(message.client, message.channel, target, author, sentMessage);
                         } catch (e) {
                             console.error('Erro no revide inicial do bot:', e);
@@ -319,7 +315,6 @@ module.exports = {
                         );
                     await i.update({ components: [disabledRow] }).catch(() => {});
 
-                    // Começa o ciclo infinito enviando a resposta de volta para o autor original
                     await sendPunishMessage(message.client, message.channel, target, author, sentMessage);
                 });
 
@@ -367,7 +362,7 @@ module.exports = {
                 .setTitle('📜 Central de Comandos')
                 .setDescription(`O prefixo atual é \`${prefix}\``)
                 .addFields(
-                    { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Cria um ciclo infinito interativo ou automático com o bot!)` },
+                    { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito com GIFs de anime!)` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
                 .setColor('#38bdf8');
