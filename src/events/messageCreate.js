@@ -172,15 +172,15 @@ module.exports = {
         // --- SISTEMA DE AFK: VERIFICAÇÕES DE MENSAGEM ---
         const authorId = message.author.id;
 
-        // 1. Se o autor estava AFK, remove o status ao falar
+        // 1. Se o autor estava AFK, remove o status ao falar e deleta após 7 segundos
         if (afkMap.has(authorId)) {
             afkMap.delete(authorId);
             await message.reply({ content: `👋 Bem-vindo(a) de volta, ${message.author}! Retirei seu status de AFK.` }).then(msg => {
-                setTimeout(() => msg.delete().catch(() => {}), 5000);
+                setTimeout(() => msg.delete().catch(() => {}), 7000);
             }).catch(() => {});
         }
 
-        // 2. Se alguém mencionou um usuário que está AFK
+        // 2. Se alguém mencionou um usuário que está AFK (a mensagem somome após 7 segundos)
         if (message.mentions.users.size > 0) {
             message.mentions.users.forEach(async (mentionedUser) => {
                 if (afkMap.has(mentionedUser.id)) {
@@ -197,7 +197,9 @@ module.exports = {
                         .setColor('#facc15')
                         .setTimestamp();
 
-                    await message.reply({ embeds: [afkEmbed] }).catch(() => {});
+                    await message.reply({ embeds: [afkEmbed] }).then(msg => {
+                        setTimeout(() => msg.delete().catch(() => {}), 7000);
+                    }).catch(() => {});
                 }
             });
         }
@@ -440,7 +442,7 @@ module.exports = {
                 .setTitle('📜 Central de Comandos')
                 .setDescription(`O prefixo atual é \`${prefix}\``)
                 .addFields(
-                    { name: '💤 Sistema', value: `\`${prefix}afk [motivo]\` (Fica ausente e avisa quem te marcar)` },
+                    { name: '💤 Sistema', value: `\`${prefix}afk [motivo]\` (Fica ausente e avisa quem te marcar - mensagens somem em 7s)` },
                     { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito marcando ambos os envolvidos!)` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
