@@ -1,24 +1,8 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const db = require('../database/db');
+const gifs = require('../data/gifs');
 
 const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', '🏻', '🙈', '🔥', '✨', '💐', '💘'];
-const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
-const PUNISH_CATEGORIES = ['slap', 'baka', 'poke', 'hug'];
-const CARINHO_CATEGORIES = ['hug', 'kiss', 'pat', 'cuddle'];
-
-// 🎌 Lista de GIFs de anime otimizados
-const FALLBACK_GIFS = [
-    'https://media1.giphy.com/media/Gf3AUz3eBNbTW/giphy.gif',
-    'https://media1.giphy.com/media/10rsLtGrOGx0sE/giphy.gif',
-    'https://media1.giphy.com/media/3oKIPnmiqNhZIleLPW/giphy.gif',
-    'https://media1.giphy.com/media/l0HlHFRbmaZtBRhXG/giphy.gif',
-    'https://media1.giphy.com/media/26u6dTP6p4y0iyBIQ/giphy.gif',
-    'https://media1.giphy.com/media/3ohzdIuqJoo8QdKlnW/giphy.gif',
-    'https://media1.giphy.com/media/12xwMUaxUETLgc/giphy.gif',
-    'https://media1.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif',
-    'https://media1.giphy.com/media/8dYmJ6Buo3lYY/giphy.gif',
-    'https://media1.giphy.com/media/l4FGpPki5v2Bcd6Ss/giphy.gif'
-];
 
 const FLIRT_MESSAGES = [
     "Você chamou a minha atenção! 💖",
@@ -105,37 +89,21 @@ function formatTimeAgo(timestamp) {
     return `há ${hours} hora(s)`;
 }
 
-// Função genérica e otimizada para interações dinâmicas (rápida)
+// Função genérica para interações puxando GIFs locais
 async function sendInteractionMessage(client, channel, sender, recipient, type, messageToReply = null) {
-    let categories = [];
+    let gifList = gifs[type] || gifs.carinho;
     let texts = [];
     let color = '#ec4899';
     let label = '🔄 Retribuir';
 
-    if (type === 'punish') { categories = PUNISH_CATEGORIES; texts = PUNISH_TEXTS; color = '#38bdf8'; label = '🔄 Devolver Castigo'; }
-    else if (type === 'carinho') { categories = CARINHO_CATEGORIES; texts = CARINHO_TEXTS; color = '#ec4899'; label = '💖 Retribuir Carinho'; }
-    else if (type === 'beijo') { categories = ['kiss']; texts = BEIJO_TEXTS; color = '#f43f5e'; label = '💋 Retribuir Beijo'; }
-    else if (type === 'tapa') { categories = ['slap']; texts = TAPA_TEXTS; color = '#ef4444'; label = '👋 Retribuir Tapa'; }
-    else if (type === 'chute') { categories = ['kick']; texts = CHUTE_TEXTS; color = '#f97316'; label = '🚀 Retribuir Chute'; }
-    else if (type === 'cosquinha') { categories = ['tickle']; texts = COSQUINHA_TEXTS; color = '#10b981'; label = '🤭 Retribuir Cosquinha'; }
+    if (type === 'punish') { texts = PUNISH_TEXTS; color = '#38bdf8'; label = '🔄 Devolver Castigo'; }
+    else if (type === 'carinho') { texts = CARINHO_TEXTS; color = '#ec4899'; label = '💖 Retribuir Carinho'; }
+    else if (type === 'beijo') { texts = BEIJO_TEXTS; color = '#f43f5e'; label = '💋 Retribuir Beijo'; }
+    else if (type === 'tapa') { texts = TAPA_TEXTS; color = '#ef4444'; label = '👋 Retribuir Tapa'; }
+    else if (type === 'chute') { texts = CHUTE_TEXTS; color = '#f97316'; label = '🚀 Retribuir Chute'; }
+    else if (type === 'cosquinha') { texts = COSQUINHA_TEXTS; color = '#10b981'; label = '🤭 Retribuir Cosquinha'; }
 
-    let gifUrl = '';
-    try {
-        const category = categories[Math.floor(Math.random() * categories.length)];
-        const response = await fetch(`https://nekos.best/api/v2/${category}`, { timeout: 2000 });
-        const contentType = response.headers.get('content-type');
-        if (response.ok && contentType && contentType.includes('application/json')) {
-            const data = await response.json();
-            if (data && data.results && data.results.length > 0) {
-                gifUrl = data.results[0].url;
-            }
-        }
-    } catch (apiErr) {}
-
-    if (!gifUrl) {
-        gifUrl = FALLBACK_GIFS[Math.floor(Math.random() * FALLBACK_GIFS.length)];
-    }
-
+    const gifUrl = gifList[Math.floor(Math.random() * gifList.length)];
     const randomText = texts[Math.floor(Math.random() * texts.length)];
     const isBotRecipient = recipient.id === client.user.id;
 
@@ -223,7 +191,6 @@ module.exports = {
     async execute(message) {
         if (message.author.bot || !message.guild) return;
 
-        // --- SISTEMA DE AFK: VERIFICAÇÕES DE MENSAGEM ---
         const authorId = message.author.id;
 
         if (afkMap.has(authorId)) {
@@ -271,21 +238,16 @@ module.exports = {
                     const useGif = mode === 'gif' || (mode === 'both' && Math.random() > 0.5);
 
                     if (useGif) {
-                        const randomCategory = GIF_CATEGORIES[Math.floor(Math.random() * GIF_CATEGORIES.length)];
-                        const response = await fetch(`https://nekos.best/api/v2/${randomCategory}`);
-                        const data = await response.json();
+                        const flirtGifList = gifs.flirt || gifs.carinho;
+                        const gifUrl = flirtGifList[Math.floor(Math.random() * flirtGifList.length)];
+                        const randomMessage = FLIRT_MESSAGES[Math.floor(Math.random() * FLIRT_MESSAGES.length)];
                         
-                        if (data && data.results && data.results.length > 0) {
-                            const gifUrl = data.results[0].url;
-                            const randomMessage = FLIRT_MESSAGES[Math.floor(Math.random() * FLIRT_MESSAGES.length)];
-                            
-                            const flirtEmbed = new EmbedBuilder()
-                                .setDescription(`Oi **${message.author.username}**! ${randomMessage}`)
-                                .setImage(gifUrl)
-                                .setColor('#ec4899');
+                        const flirtEmbed = new EmbedBuilder()
+                            .setDescription(`Oi **${message.author.username}**! ${randomMessage}`)
+                            .setImage(gifUrl)
+                            .setColor('#ec4899');
 
-                            await message.reply({ embeds: [flirtEmbed] });
-                        }
+                        await message.reply({ embeds: [flirtEmbed] });
                     } else {
                         const customGuildEmojis = message.guild.emojis.cache.filter(e => e.available).map(e => e.id);
                         const globalClientEmojis = message.client.emojis.cache.filter(e => e.available).map(e => e.id);
@@ -304,7 +266,6 @@ module.exports = {
             }
         }
 
-        // --- RESPOSTA AO MENCIONAR O BOT ---
         const botMention = `<@${message.client.user.id}>`;
         const botMentionNick = `<@!${message.client.user.id}>`;
         if (message.content.trim() === botMention || message.content.trim() === botMentionNick) {
@@ -320,7 +281,6 @@ module.exports = {
 
         if (!commandName) return;
 
-        // Comando do Prefixo
         if (commandName === 'prefixo' || commandName === 'prefix') {
             if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
                 return await message.reply('❌ Você precisa da permissão de **Administrador**.');
@@ -339,7 +299,6 @@ module.exports = {
             return await message.reply(`✅ Prefixo alterado com sucesso para \`${newPrefix}\`!`);
         }
 
-        // --- COMANDO AFK ---
         if (commandName === 'afk') {
             const reason = args.join(' ') || 'Ausente';
             afkMap.set(authorId, {
@@ -354,7 +313,6 @@ module.exports = {
             return await message.reply({ embeds: [afkSuccessEmbed] });
         }
 
-        // --- COMANDO AVATAR / AV ---
         if (commandName === 'avatar' || commandName === 'av') {
             const target = message.mentions.users.first() || message.author;
             const avatarUrl = target.displayAvatarURL({ dynamic: true, size: 4096 });
@@ -376,7 +334,6 @@ module.exports = {
             return await message.reply({ embeds: [embed], components: [row] });
         }
 
-        // --- COMANDO USERINFO / USUARIO ---
         if (commandName === 'userinfo' || commandName === 'usuario' || commandName === 'user') {
             const member = message.mentions.members.first() || message.member;
             const targetUser = member.user;
@@ -406,7 +363,6 @@ module.exports = {
             return await message.reply({ embeds: [embed] });
         }
 
-        // --- COMANDO SERVERINFO / SERVIDOR ---
         if (commandName === 'serverinfo' || commandName === 'servidor' || commandName === 'server') {
             const guild = message.guild;
             const owner = await guild.fetchOwner();
@@ -432,7 +388,6 @@ module.exports = {
             return await message.reply({ embeds: [embed] });
         }
 
-        // --- COMANDOS DE INTERAÇÃO (CARINHO, BEIJO, TAPA, CHUTE, COSQUINHA, CASTIGAR) ---
         if (['carinho', 'abraco', 'hug'].includes(commandName)) {
             const target = message.mentions.users.first();
             if (!target) return await message.reply(`❌ Marque alguém! Exemplo: \`${prefix}carinho @usuario\``);
@@ -475,7 +430,6 @@ module.exports = {
             return await sendInteractionMessage(message.client, message.channel, message.author, target, 'punish');
         }
 
-        // Comandos Personalizados
         const customCommands = guildConfig.customCommands || [];
         const customCmd = customCommands.find(c => c.name.toLowerCase() === commandName);
 
@@ -490,7 +444,6 @@ module.exports = {
             }
         }
 
-        // Ajuda
         if (commandName === 'help' || commandName === 'ajuda') {
             const embed = new EmbedBuilder()
                 .setTitle('📜 Central de Comandos')
