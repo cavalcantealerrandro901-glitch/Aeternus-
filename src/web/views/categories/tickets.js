@@ -1,106 +1,181 @@
 module.exports = (guild) => {
-    const config = guild.ticketsConfig || {};
-    const textChannels = guild.textChannels || [];
-    const roles = guild.roles || [];
-    const isEnabled = config.enabled !== false;
-
-    const channelOptions = textChannels.map(c => 
-        `<option value="${c.id}" ${config.ticketChannel === c.id ? 'selected' : ''}>#${c.name}</option>`
-    ).join('');
-
-    const roleOptions = roles.map(r => 
-        `<option value="${r.id}" ${config.supportRoleId === r.id ? 'selected' : ''}>@${r.name}</option>`
-    ).join('');
+    const config = guild.ticketConfig || {};
 
     return `
-<section class="config-card" id="tickets-config">
-    <div class="config-card-header">
-        <span style="font-size: 1.8rem;">🎫</span>
-        <div>
-            <h2>Sistema de Tickets e Suporte</h2>
-            <span style="font-size: 0.8rem; color: ${isEnabled ? '#10b981' : '#ef4444'}; font-weight: 700;">
-                ● Status: ${isEnabled ? 'Ativo' : 'Desativado'}
-            </span>
+<section class="config-card" id="ticket-panel">
+    <div class="config-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.8rem;">🎫</span>
+            <div>
+                <h2>Sistema de Tickets & Atendimento</h2>
+                <span style="font-size: 0.8rem; color: #38bdf8; font-weight: 700;">
+                    ● Central de Suporte Profissional
+                </span>
+            </div>
         </div>
+        <button type="button" class="btn-action-save" onclick="openTicketEditor()" style="padding: 8px 16px; font-size: 0.85rem;">
+            ✏️ Editar Configurações
+        </button>
     </div>
 
-    <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 20px; line-height: 1.5;">
-        Configure e personalize o painel de suporte. Ao salvar, a mensagem do painel será enviada ou atualizada no canal selecionado.
+    <p style="font-size: 0.85rem; color: #94a3b8; margin: 15px 0; line-height: 1.5;">
+        Gerencie canais de atendimento automatizados. Permite que membros abram tickets privados com suporte a botões interativos, menus de seleção e tópicos dedicados.
     </p>
 
-    <form id="ticketForm" onsubmit="saveAndSendTicketsConfig(event, '${guild.id}')" style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);">
-        
-        <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
-            <input type="checkbox" id="ticketEnabled" name="enabled" value="true" ${isEnabled ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
-            <label for="ticketEnabled" style="font-weight: 700; color: #f8fafc; cursor: pointer;">
-                Ativar Sistema de Tickets
-            </label>
+    <div style="width: 100%; max-height: 200px; overflow: hidden; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.06);">
+        <img src="https://media.giphy.com/media/3oKIPnmiqNhZIleLPW/giphy.gif" alt="Tickets Preview" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.85;">
+    </div>
+
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 14px; padding: 20px; position: relative;">
+        <div style="position: absolute; top: 15px; right: 15px; background: rgba(56,189,248,0.1); color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">
+            Prévia ao Vivo
         </div>
-
-        <div class="form-grid">
-            <div class="form-group">
-                <label>📌 Canal do Painel de Tickets</label>
-                <select class="form-control" name="ticketChannel" required>
-                    <option value="">Selecione o canal onde ficará o botão</option>
-                    ${channelOptions}
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>🛠️ Cargo de Suporte (Atendentes)</label>
-                <select class="form-control" name="supportRoleId">
-                    <option value="">Selecione quem atende os tickets</option>
-                    ${roleOptions}
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>🎨 Título da Embed</label>
-                <input type="text" class="form-control" name="embedTitle" value="${config.embedTitle || '🎫 Central de Atendimento'}" placeholder="Ex: Suporte e Dúvidas">
-            </div>
-
-            <div class="form-group">
-                <label>💬 Descrição da Embed</label>
-                <input type="text" class="form-control" name="embedDescription" value="${config.embedDescription || 'Clique no botão abaixo para abrir um ticket privado com a nossa equipe.'}" placeholder="Mensagem de instrução...">
-            </div>
-
-            <div class="form-group">
-                <label>🔘 Texto do Botão de Abrir</label>
-                <input type="text" class="form-control" name="buttonText" value="${config.buttonText || 'Abrir Ticket'}" placeholder="Ex: Criar Chamado">
-            </div>
+        <h4 style="color: #fff; margin-bottom: 10px; font-size: 1rem;">📢 Painel Exemplo no Discord</h4>
+        <div style="background: #1e293b; padding: 15px; border-radius: 10px; border-left: 4px solid #38bdf8; font-size: 0.9rem; color: #cbd5e1;">
+            <strong>[Painel de Atendimento]</strong><br>
+            Clique no botão abaixo para abrir um ticket de suporte com nossa equipe.
         </div>
-
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 15px;">
-            <button type="submit" class="btn-save" id="saveTicketsBtn" style="background: linear-gradient(135deg, #10b981, #059669);">
-                💾 Salvar e Enviar Painel
-            </button>
-            <button type="button" onclick="editTicketPanel('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #38bdf8, #2563eb);">
-                ✏️ Editar Mensagem
-            </button>
-            <button type="button" onclick="deleteTicketPanel('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-                🗑️ Deletar Painel
-            </button>
-            <button type="button" onclick="disableTicketSystem('${guild.id}')" class="btn-save" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
-                🚫 Desativar Sistema
-            </button>
+        <div style="display: flex; gap: 10px; margin-top: 12px;">
+            <button disabled style="background: #38bdf8; color: #0f172a; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 0.8rem;">🎫 Abrir Ticket</button>
         </div>
-    </form>
+    </div>
 </section>
 
-<script>
-    async function saveAndSendTicketsConfig(event, guildId) {
-        event.preventDefault();
-        const btn = document.getElementById('saveTicketsBtn');
-        btn.disabled = true;
-        btn.innerText = '⏳ Salvando e Enviando...';
+<div id="ticketEditorModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15,23,42,0.85); backdrop-filter: blur(6px); z-index: 1500; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); width: 100%; max-width: 800px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+        
+        <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="color: #fff; font-size: 1.2rem;">🛠️ Editor do Sistema de Tickets</h3>
+            <button onclick="closeTicketEditor()" style="background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
 
-        const form = document.getElementById('ticketForm');
+        <div style="display: flex; background: #0f172a; padding: 0 20px; border-bottom: 1px solid rgba(255,255,255,0.06); gap: 10px;">
+            <button type="button" class="ticket-tab-btn active" onclick="switchTicketTab(event, 'tab-interface')" style="padding: 12px 16px; background: none; border: none; color: #38bdf8; font-weight: 700; border-bottom: 2px solid #38bdf8; cursor: pointer;">1. Interface do Painel</button>
+            <button type="button" class="ticket-tab-btn" onclick="switchTicketTab(event, 'tab-message')" style="padding: 12px 16px; background: none; border: none; color: #94a3b8; font-weight: 600; cursor: pointer;">2. Mensagem de Abertura</button>
+            <button type="button" class="ticket-tab-btn" onclick="switchTicketTab(event, 'tab-destination')" style="padding: 12px 16px; background: none; border: none; color: #94a3b8; font-weight: 600; cursor: pointer;">3. Destino & Comportamento</button>
+        </div>
+
+        <form id="ticketConfigForm" onsubmit="saveTicketConfig(event, '${guild.id}')" style="padding: 24px; overflow-y: auto; flex: 1;">
+            
+            <div id="tab-interface" class="ticket-tab-content">
+                <h4 style="color: #38bdf8; margin-bottom: 10px; font-size: 1rem;">📢 Configuração da Mensagem Principal</h4>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 15px;">Edite o texto que aparecerá no embed fixado onde os membros irão interagir.</p>
+                
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; color: #cbd5e1; display: block; margin-bottom: 6px;">Texto / Embed do Painel</label>
+                    <textarea class="form-control" name="panelMessage" rows="4" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 10px; border-radius: 8px;">${config.panelMessage || 'Clique no botão abaixo para abrir um atendimento com nossa equipe.'}</textarea>
+                </div>
+
+                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; color: #cbd5e1; display: block; margin-bottom: 6px;">Estilo de Exibição</label>
+                        <select class="form-control" name="panelStyle" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 10px; border-radius: 8px;">
+                            <option value="buttons" ${config.panelStyle === 'buttons' ? 'selected' : ''}>Botões Individuais</option>
+                            <option value="dropdown" ${config.panelStyle === 'dropdown' ? 'selected' : ''}>Menu de Seleção (Dropdown)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; color: #cbd5e1; display: block; margin-bottom: 6px;">Nome do Botão / Opção</label>
+                        <input type="text" class="form-control" name="buttonName" value="${config.buttonName || 'Abrir Ticket'}" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 10px; border-radius: 8px;">
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-message" class="ticket-tab-content" style="display: none;">
+                <h4 style="color: #38bdf8; margin-bottom: 10px; font-size: 1rem;">💬 Mensagem Enviada ao Abrir o Ticket</h4>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 15px;">Escolha como o bot recepcionará o usuário dentro do canal privado criado.</p>
+                
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; color: #cbd5e1; display: block; margin-bottom: 6px;">Formato da Mensagem</label>
+                    <select class="form-control" name="openFormat" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 10px; border-radius: 8px;">
+                        <option value="embed" ${config.openFormat === 'embed' ? 'selected' : ''}>Embed Estilizado</option>
+                        <option value="text" ${config.openFormat === 'text' ? 'selected' : ''}>Texto Simples</option>
+                        <option value="both" ${config.openFormat === 'both' ? 'selected' : ''}>Ambos (Texto + Embed)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-size: 0.85rem; color: #cbd5e1; display: block; margin-bottom: 6px;">Conteúdo Inicial</label>
+                    <textarea class="form-control" name="openMessage" rows="3" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 10px; border-radius: 8px;">Olá {user}, a equipe de suporte atenderá você em breve. Descreva seu problema.</textarea>
+                    <span style="font-size: 0.75rem; color: #64748b;">Variáveis disponíveis: <code>{user}</code> (Nome), <code>{userId}</code> (ID), <code>{guild}</code> (Servidor)</span>
+                </div>
+            </div>
+
+            <div id="tab-destination" class="ticket-tab-content" style="display: none;">
+                <h4 style="color: #38bdf8; margin-bottom: 10px; font-size: 1rem;">⚙️ Comportamento de Criação</h4>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 15px;">Defina onde e de que forma o canal de ticket será gerado na estrutura do servidor.</p>
+
+                <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; color: #cbd5e1; display: block; margin-bottom: 6px;">Tipo de Canal</label>
+                        <select class="form-control" name="channelType" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 10px; border-radius: 8px;">
+                            <option value="text" ${config.channelType === 'text' ? 'selected' : ''}>Canal de Texto Privado</option>
+                            <option value="thread" ${config.channelType === 'thread' ? 'selected' : ''}>Tópico Privado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size: 0.85rem; color: #cbd5e1; display: block; margin-bottom: 6px;">Posicionamento</label>
+                        <select class="form-control" name="position" style="width: 100%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 10px; border-radius: 8px;">
+                            <option value="top" ${config.position === 'top' ? 'selected' : ''}>No Topo da Lista</option>
+                            <option value="bottom" ${config.position === 'bottom' ? 'selected' : ''}>No Final do Servidor</option>
+                            <option value="category" ${config.position === 'category' ? 'selected' : ''}>Em Categoria Específica</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px;">
+                <button type="button" onclick="closeTicketEditor()" style="background: rgba(239,68,68,0.2); color: #ef4444; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;">Cancelar</button>
+                <button type="submit" class="btn-action-save" id="saveTicketBtn" style="padding: 10px 24px;">🚀 Criar / Salvar Configuração</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openTicketEditor() {
+        document.getElementById('ticketEditorModal').style.display = 'flex';
+    }
+
+    function closeTicketEditor() {
+        document.getElementById('ticketEditorModal').style.display = 'none';
+    }
+
+    function switchTicketTab(event, tabId) {
+        document.querySelectorAll('.ticket-tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.ticket-tab-btn').forEach(btn => {
+            btn.style.color = '#94a3b8';
+            btn.style.fontWeight = '600';
+            btn.style.borderBottom = 'none';
+        });
+
+        document.getElementById(tabId).style.display = 'block';
+        event.currentTarget.style.color = '#38bdf8';
+        event.currentTarget.style.fontWeight = '700';
+        event.currentTarget.style.borderBottom = '2px solid #38bdf8';
+    }
+
+    async function saveTicketConfig(event, guildId) {
+        event.preventDefault();
+        const btn = document.getElementById('saveTicketBtn');
+        btn.disabled = true;
+        btn.innerText = '⏳ Salvando...';
+
+        const form = document.getElementById('ticketConfigForm');
         const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
-        data.enabled = form.querySelector('[name="enabled"]').checked;
+
+        const data = {
+            panelMessage: formData.get('panelMessage'),
+            panelStyle: formData.get('panelStyle'),
+            buttonName: formData.get('buttonName'),
+            openFormat: formData.get('openFormat'),
+            openMessage: formData.get('openMessage'),
+            channelType: formData.get('channelType'),
+            position: formData.get('position')
+        };
 
         try {
-            const res = await fetch(\`/api/guilds/\${guildId}/tickets/save-and-send\`, {
+            const res = await fetch(\`/api/guilds/\${guildId}/tickets\`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -108,96 +183,16 @@ module.exports = (guild) => {
 
             const result = await res.json();
             if (result.success) {
-                alert('✅ Configurações salvas e painel enviado ao Discord!');
+                closeTicketEditor();
                 location.reload();
             } else {
-                alert('❌ Erro: ' + (result.error || 'Falha ao processar.'));
+                alert('❌ Erro ao salvar sistema de tickets.');
             }
         } catch (err) {
             alert('❌ Erro de conexão com o servidor.');
         } finally {
             btn.disabled = false;
-            btn.innerText = '💾 Salvar e Enviar Painel';
-        }
-    }
-
-    async function editTicketPanel(guildId) {
-        const form = document.getElementById('ticketForm');
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
-
-        if (!data.ticketChannel) {
-            alert('⚠️ Selecione o canal no formulário para localizar a mensagem!');
-            return;
-        }
-
-        try {
-            const res = await fetch(\`/api/guilds/\${guildId}/tickets/edit-panel\`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-
-            const result = await res.json();
-            if (result.success) {
-                alert('✏️ Mensagem do painel atualizada com sucesso no Discord!');
-                location.reload();
-            } else {
-                alert('❌ Erro: ' + (result.error || 'Não foi possível localizar o painel para editar.'));
-            }
-        } catch (err) {
-            alert('❌ Erro de conexão ao editar o painel.');
-        }
-    }
-
-    async function deleteTicketPanel(guildId) {
-        const form = document.getElementById('ticketForm');
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
-
-        if (!data.ticketChannel) {
-            alert('⚠️ Selecione o canal onde está o painel para realizar a varredura!');
-            return;
-        }
-
-        if (!confirm('Deseja fazer uma varredura no canal e apagar a mensagem do painel de tickets do Discord?')) return;
-
-        try {
-            const res = await fetch(\`/api/guilds/\${guildId}/tickets/delete-panel\`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-
-            const result = await res.json();
-            if (result.success) {
-                alert('🗑️ Painel de tickets encontrado e deletado com sucesso do Discord!');
-                location.reload();
-            } else {
-                alert('❌ Erro: ' + (result.error || 'Painel não encontrado durante a varredura.'));
-            }
-        } catch (err) {
-            alert('❌ Erro de conexão ao deletar o painel.');
-        }
-    }
-
-    async function disableTicketSystem(guildId) {
-        if (!confirm('Tem certeza de que deseja desativar o sistema de tickets neste servidor?')) return;
-
-        try {
-            const res = await fetch(\`/api/guilds/\${guildId}/tickets/disable\`, {
-                method: 'POST'
-            });
-
-            const result = await res.json();
-            if (result.success) {
-                alert('🚫 Sistema de tickets desativado!');
-                location.reload();
-            } else {
-                alert('❌ Erro ao desativar.');
-            }
-        } catch (err) {
-            alert('❌ Erro de conexão.');
+            btn.innerText = '🚀 Criar / Salvar Configuração';
         }
     }
 </script>

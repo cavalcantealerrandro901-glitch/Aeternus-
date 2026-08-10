@@ -1,71 +1,28 @@
-module.exports = (user, manageableGuilds, botUser) => {
-    const botAvatarUrl = botUser ? botUser.displayAvatarURL({ extension: 'png', size: 128 }) : 'https://cdn.discordapp.com/embed/avatars/0.png';
-    const userAvatarUrl = user?.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png';
-    const botName = botUser ? botUser.username : 'Aeternus';
-
-    return `
-<!DOCTYPE html>
+module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl }) => {
+    return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Selecione um Servidor - ${botName}</title>
+    <title>Selecionar Servidor | ${botName}</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background: #090d16;
-            color: #f1f5f9;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; }
         header {
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 16px 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 5%;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            backdrop-filter: blur(10px);
         }
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-            color: #fff;
-            font-weight: 800;
-            font-size: 1.2rem;
-        }
-        .brand img {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: 2px solid #38bdf8;
-        }
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 6px 14px;
-            border-radius: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .user-profile img {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-        }
-        .user-profile span {
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
+        .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: #fff; font-weight: 700; font-size: 1.1rem; }
+        .brand img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+        .user-profile { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); }
+        .user-profile img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+        .user-profile span { font-size: 0.9rem; font-weight: 600; color: #cbd5e1; }
         main {
             flex: 1;
             max-width: 1100px;
@@ -186,15 +143,6 @@ module.exports = (user, manageableGuilds, botUser) => {
             margin: 0 auto 24px auto;
             line-height: 1.6;
         }
-        .back-home {
-            display: inline-block;
-            margin-top: 36px;
-            color: #64748b;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .back-home:hover { color: #38bdf8; }
         @media (max-width: 640px) {
             main { padding: 24px 16px; }
             .page-header h1 { font-size: 1.75rem; }
@@ -205,48 +153,41 @@ module.exports = (user, manageableGuilds, botUser) => {
 <body>
     <header>
         <a href="/" class="brand">
-            <img src="${botAvatarUrl}" alt="${botName}">
-            <span>${botName}</span>
+            <img src="\${botAvatarUrl}" alt="\${botName}">
+            <span>\${botName}</span>
         </a>
         <div class="user-profile">
-            <img src="${userAvatarUrl}" alt="${user.username}">
-            <span>${user.username}</span>
+            <img src="\${userAvatarUrl}" alt="\${user.username}">
+            <span>\${user.username}</span>
         </div>
     </header>
 
     <main>
         <div class="page-header">
             <h1>Selecione um Servidor</h1>
-            <p>Escolha o servidor que deseja configurar agora no painel do ${botName}</p>
+            <p>Escolha o servidor que deseja configurar agora no painel do \${botName}</p>
         </div>
 
         <div class="servers-grid">
-            ${manageableGuilds.length > 0 ? manageableGuilds.map(g => {
-                const iconUrl = g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : null;
-                return `
+            \${manageableGuilds.length > 0 ? manageableGuilds.map(g => {
+                const iconUrl = g.icon ? \`https://cdn.discordapp.com/icons/\${g.id}/\${g.icon}.png\` : null;
+                const initials = g.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                return \`
                     <div class="card-server">
-                        ${iconUrl 
-                            ? `<img src="${iconUrl}" class="server-icon-large" alt="${g.name}">` 
-                            : `<div class="server-icon-large">${g.name.charAt(0)}</div>`}
-                        <div class="server-name">${g.name}</div>
-                        <div class="server-badge">🟢 Bot Online & Presente</div>
-                        <a href="/dashboard/${g.id}" class="btn-select">⚙️ Configurar Servidor</a>
+                        \${iconUrl ? \`<img src="\${iconUrl}" class="server-icon-large" alt="\${g.name}">\` : \`<div class="server-icon-large">\${initials}</div>\`}
+                        <h3 class="server-name">\${g.name}</h3>
+                        <div class="server-badge">✨ Administrador</div>
+                        <a href="/dashboard/\${g.id}" class="btn-select">Configurar Servidor</a>
                     </div>
-                `;
-            }).join('') : `
+                \`;
+            }).join('') : \`
                 <div class="no-servers">
                     <h3>Nenhum servidor encontrado</h3>
-                    <p>Não encontramos nenhum servidor onde você seja <strong>Administrador</strong> e que o bot <strong>${botName}</strong> já esteja adicionado.</p>
-                    <a href="/" class="btn-select" style="max-width: 250px; display: inline-block;">➕ Adicionar Bot a um Servidor</a>
+                    <p>Você precisa ter permissão de Administrador em algum servidor onde o \${botName} esteja instalado para poder configurá-lo.</p>
                 </div>
-            `}
-        </div>
-
-        <div style="text-align: center;">
-            <a href="/" class="back-home">← Voltar para a Página Inicial</a>
+            \`}
         </div>
     </main>
 </body>
-</html>
-    `;
+</html>\`;
 };
