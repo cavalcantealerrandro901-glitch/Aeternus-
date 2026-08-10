@@ -26,7 +26,7 @@ const FLIRT_MESSAGES = [
     "Muito fofo(a)! Toma aqui uma figurinha. 🥰",
     "Passando só para deixar isso aqui pra você... 💘",
     "Não resisti e tive que mandar isso! 😳",
-    "Você tem uma energia muito boa! 🌸",
+    "Você tiene uma energia muito boa! 🌸",
     "Você é o tipo de pessoa que ilumina o chat! ✨",
     "Cuidado para não roubar todos os corações daqui! 💖",
     "Tem espaço para mais alguém incrível por perto? 🥰",
@@ -327,6 +327,62 @@ module.exports = {
             return await message.reply({ embeds: [embed], components: [row] });
         }
 
+        // --- COMANDO USERINFO / USUARIO ---
+        if (commandName === 'userinfo' || commandName === 'usuario' || commandName === 'user') {
+            const member = message.mentions.members.first() || message.member;
+            const targetUser = member.user;
+
+            const roles = member.roles.cache
+                .filter(r => r.id !== message.guild.id)
+                .sort((a, b) => b.position - a.position)
+                .map(r => r)
+                .slice(0, 10);
+
+            const rolesDisplay = roles.length > 0 ? roles.join(', ') : 'Nenhum cargo';
+
+            const embed = new EmbedBuilder()
+                .setTitle(`👤 Informações de ${targetUser.username}`)
+                .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 1024 }))
+                .setColor('#38bdf8')
+                .addFields(
+                    { name: '🏷️ Tag / Nome', value: `${targetUser.tag}`, inline: true },
+                    { name: '🆔 ID do Usuário', value: `\`${targetUser.id}\``, inline: true },
+                    { name: '🤖 É Bot?', value: targetUser.bot ? 'Sim 🤖' : 'Não 👤', inline: true },
+                    { name: '📅 Conta Criada', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:R>`, inline: true },
+                    { name: '📥 Entrou no Servidor', value: member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Desconhecido', inline: true },
+                    { name: `🛡️ Cargos [${member.roles.cache.size - 1}]`, value: rolesDisplay, inline: false }
+                )
+                .setTimestamp();
+
+            return await message.reply({ embeds: [embed] });
+        }
+
+        // --- COMANDO SERVERINFO / SERVIDOR ---
+        if (commandName === 'serverinfo' || commandName === 'servidor' || commandName === 'server') {
+            const guild = message.guild;
+            const owner = await guild.fetchOwner();
+
+            const embed = new EmbedBuilder()
+                .setTitle(`🏠 Informações do Servidor: ${guild.name}`)
+                .setThumbnail(guild.iconURL({ dynamic: true, size: 1024 }))
+                .setColor('#ec4899')
+                .addFields(
+                    { name: '👑 Dono(a)', value: `${owner.user.tag}`, inline: true },
+                    { name: '🆔 ID do Servidor', value: `\`${guild.id}\``, inline: true },
+                    { name: '📅 Criação', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: true },
+                    { name: '👥 Membros', value: `${guild.memberCount} membros`, inline: true },
+                    { name: '💬 Canais', value: `${guild.channels.cache.size} canais`, inline: true },
+                    { name: '🚀 Nível de Boost', value: `Nível ${guild.premiumTier} (${guild.premiumSubscriptionCount} boosts)`, inline: true }
+                )
+                .setTimestamp();
+
+            if (guild.bannerURL()) {
+                embed.setImage(guild.bannerURL({ size: 1024 }));
+            }
+
+            return await message.reply({ embeds: [embed] });
+        }
+
         // ⚔️ COMANDO DE PREFIXO: CASTIGAR (CICLO INFINITO & MARCAÇÃO DUPLA)
         if (commandName === 'castigar') {
             const target = message.mentions.users.first();
@@ -465,7 +521,7 @@ module.exports = {
                 .setDescription(`O prefixo atual é \`${prefix}\``)
                 .addFields(
                     { name: '💤 Sistema', value: `\`${prefix}afk [motivo]\` (Fica ausente e avisa quem te marcar - mensagens somem em 7s)` },
-                    { name: '🖼️ Utilidades', value: `\`${prefix}avatar\` ou \`${prefix}av [@usuario]\` (Mostra a foto de perfil)` },
+                    { name: '🖼️ Utilidades', value: `\`${prefix}avatar\` / \`${prefix}av\` [@usuario]\n\`${prefix}usuario\` / \`${prefix}userinfo\` [@usuario]\n\`${prefix}servidor\` / \`${prefix}serverinfo\`` },
                     { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito marcando ambos os envolvidos!)` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
