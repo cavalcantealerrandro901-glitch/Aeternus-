@@ -1,8 +1,9 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const startWebPanel = require('./src/web/server');
 const db = require('./src/database/db');
-// O webServer será criado no próximo passo
-const webServer = require('./src/web/server'); 
 
 const client = new Client({
     intents: [
@@ -11,27 +12,48 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+    partials: [Partials.Channel, Partials.Message, Partials.User]
 });
 
 client.commands = new Collection();
 
-async function init() {
-    try {
-        await db.connect(); 
-        
-        if (webServer && typeof webServer === 'function') {
-            webServer(client, {
-                clientId: process.env.CLIENT_ID,
-                clientSecret: process.env.CLIENT_SECRET
-            });
+// Carregar comandos (quando existirem)
+const commandsPath = path.join(__dirname, 'src/bot/commands');
+if (fs.existsSync(commandsPath)) {
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const command = require(`./src/bot/commands/${file}`);
+        if ('data' in command && 'execute' in command) {
+            client.commands.set(command.data.name, command);
+            console.log(`✅ Comando carregado: ${command.data.name}`);
         }
-
-        await client.login(process.env.DISCORD_TOKEN);
-        console.log(`🤖 Aeternus online como ${client.user.tag}!`);
-    } catch (error) {
-        console.error('❌ Erro fatal ao iniciar:', error);
     }
 }
 
-init();
+// Carregar eventos (quando existirem)
+const eventsPath = path.join(__dirname, 'src/bot/events');
+if (fs.existsSync(eventsPath)) {
+    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+    for (const file of eventFiles) {
+        const event = require(`./src/bot/events/${file}`);
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args, client));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args, client));
+        }
+        console.log(`✅ Evento carregado: ${event.name}`);
+    }
+}
+
+client.once('ready', async () => {
+    console.log(`\n🎰 ${client.user.tag} está online!`);
+    console.log(`📡 Servidores: ${client.guilds.cache.size}`);
+
+    // Conectar MongoDB
+    await db.connect();
+
+    // Iniciar Painel Web
+    startWebPanel(client);
+});
+
+client.login(process.env.TOKEN);

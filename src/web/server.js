@@ -1,27 +1,28 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const path = require('path');
 const db = require('../database/db');
 
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
-const renderPortal = require('./views/portal');
-const renderServerGuide = require('./views/serverGuide'); // Nova página de guia do servidor
 
-module.exports = (client, config) => {
+module.exports = (client) => {
     const app = express();
     const PORT = process.env.PORT || 10000;
 
     app.use(cookieParser());
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
+    app.use(express.static(path.join(__dirname, 'public')));
 
     const sessions = {};
 
-    const CLIENT_ID = config?.clientId || process.env.CLIENT_ID;
-    const CLIENT_SECRET = config?.clientSecret || process.env.CLIENT_SECRET;
+    const CLIENT_ID = process.env.CLIENT_ID;
+    const CLIENT_SECRET = process.env.CLIENT_SECRET;
     const REDIRECT_URI = process.env.REDIRECT_URI || 'https://aeternus-q7gt.onrender.com/auth/discord/callback';
     const SUPPORT_URL = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/seu-suporte';
+
+    // ========== ROTAS ==========
 
     app.get('/', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
@@ -32,8 +33,8 @@ module.exports = (client, config) => {
     app.get('/login', (req, res) => {
         if (!CLIENT_ID) return res.status(500).send('CLIENT_ID não configurado.');
         const encodedRedirect = encodeURIComponent(REDIRECT_URI);
-        const discordAuthUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodedRedirect}&response_type=code&scope=identify%20guilds`;
-        res.redirect(discordAuthUrl);
+        const url = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodedRedirect}&response_type=code&scope=identify%20guilds`;
+        res.redirect(url);
     });
 
     app.get('/auth/discord/callback', async (req, res) => {
@@ -47,7 +48,7 @@ module.exports = (client, config) => {
                     client_id: CLIENT_ID,
                     client_secret: CLIENT_SECRET,
                     grant_type: 'authorization_code',
-                    code: code,
+                    code,
                     redirect_uri: REDIRECT_URI,
                 }),
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -69,28 +70,31 @@ module.exports = (client, config) => {
             const sessionId = Math.random().toString(36).substring(2);
             sessions[sessionId] = { user, guilds };
 
-            res.cookie('sessionId', sessionId, { httpOnly: true });
+            res.cookie('sessionId', sessionId, { httpOnly: true, maxAge: 1000 * 60 * 60 * 24 * 7 });
             res.redirect('/dashboard');
-        } catch (error) {
-            console.error('Erro no OAuth2:', error);
+        } catch (err) {
+            console.error('Erro OAuth2:', err);
             res.redirect('/');
         }
     });
 
+    app.get('/logout', (req, res) => {
+        const sessionId = req.cookies?.sessionId;
+        if (sessionId) delete sessions[sessionId];
+        res.clearCookie('sessionId');
+        res.redirect('/');
+    });
+
     function getManageableGuilds(userGuilds) {
         if (!Array.isArray(userGuilds)) return [];
-        const ADMIN_PERMISSION = 0x8n;
-        const MANAGE_GUILD_PERMISSION = 0x20n;
+        const ADMIN = 0x8n;
+        const MANAGE_GUILD = 0x20n;
 
         return userGuilds.filter(g => {
             const perms = BigInt(g.permissions || 0);
-            const isAdmin = (perms & ADMIN_PERMISSION) === ADMIN_PERMISSION;
-            const canManage = (perms & MANAGE_GUILD_PERMISSION) === MANAGE_GUILD_PERMISSION;
-            const isOwner = Boolean(g.owner);
-            const hasPermission = isAdmin || canManage || isOwner;
-            const isBotInGuild = client.guilds.cache.has(g.id);
-
-            return hasPermission && isBotInGuild;
+            const hasPerm = (perms & ADMIN) === ADMIN || (perms & MANAGE_GUILD) === MANAGE_GUILD || g.owner;
+            const botInGuild = client.guilds.cache.has(g.id);
+            return hasPerm && botInGuild;
         });
     }
 
@@ -99,107 +103,55 @@ module.exports = (client, config) => {
         if (!session) return res.redirect('/login');
 
         const manageableGuilds = getManageableGuilds(session.guilds);
+
         res.send(renderDashboard({
             user: session.user,
-            manageableGuilds: manageableGuilds,
+            manageableGuilds,
             botName: client.user.username,
             botAvatarUrl: client.user.displayAvatarURL(),
-            userAvatarUrl: session.user.avatar ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png'
+            userAvatarUrl: session.user.avatar
+                ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png`
+                : 'https://cdn.discordapp.com/embed/avatars/0.png'
         }));
     });
 
-    // Rota que mostra o Guia / Explicação antes de ir para o painel de configurações
+    // Rota temporária de servidor (depois expandimos)
     app.get('/dashboard/:guildId', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
 
-        const manageableGuilds = getManageableGuilds(session.guilds);
-        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+        const guild = getManageableGuilds(session.guilds).find(g => g.id === req.params.guildId);
         if (!guild) return res.redirect('/dashboard');
 
-        const botGuild = client.guilds.cache.get(guild.id);
-        const serverData = {
-            id: guild.id,
-            name: guild.name,
-            icon: guild.icon,
-            memberCount: botGuild ? botGuild.memberCount : 'N/A'
-        };
-
-        res.send(renderServerGuide(serverData, session.user));
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head>
+                <meta charset="UTF-8">
+                <title>${guild.name} — Aeternus</title>
+                <link rel="stylesheet" href="/style.css">
+            </head>
+            <body>
+                <nav class="navbar">
+                    <div class="container">
+                        <div class="logo">Aeternus</div>
+                        <div class="nav-links">
+                            <a href="/dashboard" class="btn btn-outline">Voltar</a>
+                        </div>
+                    </div>
+                </nav>
+                <div class="container" style="padding-top:60px;text-align:center;">
+                    <h1 style="margin-bottom:12px;">${guild.name}</h1>
+                    <p style="color:var(--text-muted);">Painel de configurações em construção...</p>
+                    <br>
+                    <a href="/dashboard" class="btn btn-primary">Voltar ao Dashboard</a>
+                </div>
+            </body>
+            </html>
+        `);
     });
 
-    // Rota real de configurações (Painel Completo)
-    app.get('/dashboard/:guildId/settings', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.redirect('/login');
-
-        const manageableGuilds = getManageableGuilds(session.guilds);
-        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
-        if (!guild) return res.redirect('/dashboard');
-
-        const botGuild = client.guilds.cache.get(guild.id);
-        const textChannels = botGuild ? botGuild.channels.cache.filter(c => c.type === 0 || c.type === 5).map(c => ({ id: c.id, name: c.name })) : [];
-        const guildRoles = botGuild ? botGuild.roles.cache.filter(r => r.name !== '@everyone').map(r => ({ id: r.id, name: r.name })) : [];
-        
-        const savedConfig = db.getGuildConfig(guild.id);
-
-        const serverData = {
-            id: guild.id,
-            name: guild.name,
-            icon: guild.icon,
-            memberCount: botGuild ? botGuild.memberCount : 'N/A',
-            textChannels: textChannels,
-            roles: guildRoles,
-            prefix: savedConfig.prefix || '!',
-            ticketsConfig: savedConfig.tickets || {},
-            flirtConfig: savedConfig.flirt || {}
-        };
-
-        res.send(renderPortal(serverData, manageableGuilds, session.user, client.user));
+    app.listen(PORT, () => {
+        console.log(`🌐 Painel Web rodando na porta ${PORT}`);
     });
-
-    // API: Alterar Prefixo
-    app.post('/api/guilds/:guildId/prefix', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-        db.setGuildConfig(req.params.guildId, { prefix: req.body.prefix.trim() });
-        res.json({ success: true });
-    });
-
-    // API: Salvar e Enviar Painel de Tickets
-    app.post('/api/guilds/:guildId/tickets/save-and-send', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-        
-        const guildId = req.params.guildId;
-        const botGuild = client.guilds.cache.get(guildId);
-        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
-
-        const config = { ...req.body, enabled: true };
-
-        try {
-            const channel = await botGuild.channels.fetch(config.ticketChannel).catch(() => null);
-            if (!channel || !channel.isTextBased()) return res.status(404).json({ error: 'Canal inválido.' });
-
-            const embed = new EmbedBuilder()
-                .setTitle(config.embedTitle || '🎫 Central de Atendimento')
-                .setDescription(config.embedDescription || 'Clique abaixo para abrir um ticket.')
-                .setColor('#38bdf8');
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('btn_open_ticket').setLabel(config.buttonText || 'Abrir Ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫')
-            );
-
-            const sentMessage = await channel.send({ embeds: [embed], components: [row] });
-            config.messageId = sentMessage.id;
-            
-            db.setGuildConfig(guildId, { tickets: config });
-            res.json({ success: true });
-        } catch (err) {
-            console.error('Erro tickets:', err);
-            res.status(500).json({ error: 'Erro ao enviar painel.' });
-        }
-    });
-
-    app.listen(PORT, () => console.log(`🌐 Painel Web rodando na porta ${PORT}`));
 };
