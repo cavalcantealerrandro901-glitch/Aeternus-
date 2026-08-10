@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 
 /**
- * Substitui marcadores dinâmicos pelo valor real do contexto
+ * Substitui marcadores dinâmicos no texto pelo valor do contexto
  */
 function parseVariables(text, { guild, user, channel } = {}) {
     if (!text) return '';
@@ -15,10 +15,12 @@ function parseVariables(text, { guild, user, channel } = {}) {
 }
 
 /**
- * Envia uma mensagem (Texto puro ou Embed) para um canal específico
+ * Envia mensagens (Texto ou Embed) tratando erros e permissões do canal
  */
 async function sendMessage(channel, options = {}) {
-    if (!channel) throw new Error('Canal inválido fornecido ao sendMessage.');
+    if (!channel || typeof channel.send !== 'function') {
+        throw new Error('Canal de envio inválido ou sem permissão para enviar mensagens.');
+    }
 
     const {
         content = '',
@@ -31,23 +33,24 @@ async function sendMessage(channel, options = {}) {
     const parsedContent = parseVariables(content, { guild, user, channel });
     const payload = {};
 
-    // Adiciona menção (@here, @everyone, <@&roleId>) se fornecida
     let finalContent = mention ? `${mention}\n${parsedContent}`.trim() : parsedContent;
     if (finalContent) payload.content = finalContent;
 
-    // Constrói o Embed caso seja solicitado
     if (embed) {
         const embedBuilder = new EmbedBuilder();
 
         if (embed.title) embedBuilder.setTitle(parseVariables(embed.title, { guild, user, channel }));
         if (embed.description) embedBuilder.setDescription(parseVariables(embed.description, { guild, user, channel }));
-        if (embed.color) embedBuilder.setColor(embed.color); else embedBuilder.setColor('#38bdf8');
+        embedBuilder.setColor(embed.color || '#38bdf8');
         
         if (embed.thumbnail) {
-            embedBuilder.setThumbnail(embed.thumbnail === 'user' && user?.displayAvatarURL ? user.displayAvatarURL() : embed.thumbnail);
+            const thumbUrl = (embed.thumbnail === 'user' && user?.displayAvatarURL) 
+                ? user.displayAvatarURL() 
+                : embed.thumbnail;
+            embedBuilder.setThumbnail(thumbUrl);
         }
 
-        if (embed.fields && Array.isArray(embed.fields)) {
+        if (Array.isArray(embed.fields) && embed.fields.length > 0) {
             embedBuilder.addFields(embed.fields.map(f => ({
                 name: parseVariables(f.name, { guild, user, channel }),
                 value: parseVariables(f.value, { guild, user, channel }),
@@ -57,6 +60,11 @@ async function sendMessage(channel, options = {}) {
 
         embedBuilder.setTimestamp();
         payload.embeds = [embedBuilder];
+    }
+
+    // Se não tiver conteúdo nem embed, não faz nada
+    if (!payload.content && (!payload.embeds || payload.embeds.length === 0)) {
+        return;
     }
 
     return await channel.send(payload);
