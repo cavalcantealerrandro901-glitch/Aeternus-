@@ -3,10 +3,10 @@ const cookieParser = require('cookie-parser');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../database/db');
 
-// Vamos criar estes ficheiros visuais no próximo passo
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderPortal = require('./views/portal');
+const renderServerGuide = require('./views/serverGuide'); // Nova página de guia do servidor
 
 module.exports = (client, config) => {
     const app = express();
@@ -108,7 +108,28 @@ module.exports = (client, config) => {
         }));
     });
 
+    // Rota que mostra o Guia / Explicação antes de ir para o painel de configurações
     app.get('/dashboard/:guildId', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.redirect('/login');
+
+        const manageableGuilds = getManageableGuilds(session.guilds);
+        const guild = manageableGuilds.find(g => g.id === req.params.guildId);
+        if (!guild) return res.redirect('/dashboard');
+
+        const botGuild = client.guilds.cache.get(guild.id);
+        const serverData = {
+            id: guild.id,
+            name: guild.name,
+            icon: guild.icon,
+            memberCount: botGuild ? botGuild.memberCount : 'N/A'
+        };
+
+        res.send(renderServerGuide(serverData, session.user));
+    });
+
+    // Rota real de configurações (Painel Completo)
+    app.get('/dashboard/:guildId/settings', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
 
