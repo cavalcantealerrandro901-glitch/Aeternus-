@@ -27,8 +27,8 @@ module.exports = (user, botUser, inviteUrl, supportUrl) => {
                 <span class="text-xl font-bold text-sky-400 tracking-wide">${botName}</span>
             </div>
             ${user 
-                ? `<a href="/dashboard" class="bg-sky-500 hover:bg-sky-400 px-5 py-2 rounded-lg font-semibold transition-all shadow-[0_0_15px_rgba(56,189,248,0.2)]">Dashboard</a>` 
-                : `<a href="/login" class="bg-sky-500 hover:bg-sky-400 px-5 py-2 rounded-lg font-semibold transition-all shadow-[0_0_15px_rgba(56,189,248,0.2)]">Login com Discord</a>`
+                ? `<a href="/dashboard" class="bg-sky-500 hover:bg-sky-400 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-[0_0_10px_rgba(56,189,248,0.2)]">Dashboard</a>` 
+                : `<a href="/login" class="bg-sky-500 hover:bg-sky-400 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-[0_0_10px_rgba(56,189,248,0.2)]">Login</a>`
             }
         </header>
 
