@@ -4,6 +4,7 @@ const db = require('../database/db');
 const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', '🏻', '🙈', '🔥', '✨', '💐', '💘'];
 const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
 const PUNISH_CATEGORIES = ['slap', 'baka', 'poke', 'hug'];
+const CARINHO_CATEGORIES = ['hug', 'kiss', 'pat', 'cuddle'];
 
 // 🎌 Lista de GIFs de anime otimizados
 const FALLBACK_GIFS = [
@@ -26,7 +27,7 @@ const FLIRT_MESSAGES = [
     "Muito fofo(a)! Toma aqui uma figurinha. 🥰",
     "Passando só para deixar isso aqui pra você... 💘",
     "Não resisti e tive que mandar isso! 😳",
-    "Você tiene uma energia muito boa! 🌸",
+    "Você tem uma energia muito boa! 🌸",
     "Você é o tipo de pessoa que ilumina o chat! ✨",
     "Cuidado para não roubar todos os corações daqui! 💖",
     "Tem espaço para mais alguém incrível por perto? 🥰",
@@ -48,6 +49,17 @@ const PUNISH_TEXTS = [
     "merece ficar sem doces por uma semana! 🍬"
 ];
 
+const CARINHO_TEXTS = [
+    "envolveu em um abraço super aconchegante! 💖",
+    "deu um abraço bem forte e carinhoso! 🥰",
+    "espalhou muito amor e carinho por aqui! ✨",
+    "compartilhou um momento super fofo! 🌸",
+    "encheu de mimos e carinho! 💝",
+    "recebeu um abraço quentinho e acolhedor! 🧸",
+    "ganhou um carinho muito especial! 💕",
+    "teve o dia iluminado por tanto carinho! 🌟"
+];
+
 // 💤 Armazenamento temporário de usuários AFK (userId -> { reason, timestamp })
 const afkMap = new Map();
 
@@ -61,7 +73,7 @@ function formatTimeAgo(timestamp) {
     return `há ${hours} hora(s)`;
 }
 
-// Função recursiva para gerenciar o ciclo infinito de castigos
+// Função recursiva para gerenciar o ciclo de castigos
 async function sendPunishMessage(client, channel, sender, recipient, messageToReply = null) {
     let gifUrl = '';
     try {
@@ -155,6 +167,109 @@ async function sendPunishMessage(client, channel, sender, recipient, messageToRe
                         new ButtonBuilder()
                             .setCustomId(uniqueId)
                             .setLabel('🔄 Tempo Esgotado')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true)
+                    );
+                await sentMessage.edit({ components: [expiredRow] }).catch(() => {});
+            } catch (e) {}
+        }
+    });
+}
+
+// Função recursiva rápida para o sistema de Carinho
+async function sendCarinhoMessage(client, channel, sender, recipient, messageToReply = null) {
+    let gifUrl = '';
+    try {
+        const category = CARINHO_CATEGORIES[Math.floor(Math.random() * CARINHO_CATEGORIES.length)];
+        const response = await fetch(`https://nekos.best/api/v2/${category}`, { timeout: 2000 });
+        const contentType = response.headers.get('content-type');
+        if (response.ok && contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            if (data && data.results && data.results.length > 0) {
+                gifUrl = data.results[0].url;
+            }
+        }
+    } catch (apiErr) {}
+
+    if (!gifUrl) {
+        gifUrl = FALLBACK_GIFS[Math.floor(Math.random() * FALLBACK_GIFS.length)];
+    }
+
+    const randomText = CARINHO_TEXTS[Math.floor(Math.random() * CARINHO_TEXTS.length)];
+    const isBotRecipient = recipient.id === client.user.id;
+
+    const embed = new EmbedBuilder()
+        .setDescription(`💖 **${recipient}** ${randomText}\n\n*(Carinho retribuído por ${sender})*`)
+        .setImage(gifUrl)
+        .setColor('#ec4899');
+
+    const uniqueId = `carinho_${Date.now()}_${Math.random()}`;
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId(uniqueId)
+                .setLabel('💖 Retribuir Carinho')
+                .setStyle(ButtonStyle.Success)
+        );
+
+    let sentMessage;
+    if (messageToReply) {
+        sentMessage = await messageToReply.reply({ content: `${recipient} ${sender}`, embeds: [embed], components: [row] });
+    } else {
+        sentMessage = await channel.send({ content: `${recipient} ${sender}`, embeds: [embed], components: [row] });
+    }
+
+    if (isBotRecipient) {
+        setTimeout(async () => {
+            try {
+                const disabledRow = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(uniqueId)
+                            .setLabel('💖 Carinho Retribuído pelo Aeternus')
+                            .setStyle(ButtonStyle.Secondary)
+                            .setDisabled(true)
+                    );
+                await sentMessage.edit({ components: [disabledRow] }).catch(() => {});
+
+                await sendCarinhoMessage(client, channel, recipient, sender, sentMessage);
+            } catch (e) {
+                console.error('Erro no revide rápido de carinho do bot:', e);
+            }
+        }, 1000);
+        return;
+    }
+
+    const collector = sentMessage.createMessageComponentCollector({ time: 300000 });
+
+    collector.on('collect', async i => {
+        if (i.user.id !== recipient.id) {
+            return await i.reply({ content: '❌ Apenas quem recebeu o carinho pode retribuí-lo!', flags: [MessageFlags.Ephemeral] });
+        }
+
+        collector.stop();
+
+        const disabledRow = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId(uniqueId)
+                    .setLabel('💖 Carinho Retribuído')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(true)
+            );
+        await i.update({ components: [disabledRow] }).catch(() => {});
+
+        await sendCarinhoMessage(client, channel, recipient, sender, sentMessage);
+    });
+
+    collector.on('end', async collected => {
+        if (collected.size === 0) {
+            try {
+                const expiredRow = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(uniqueId)
+                            .setLabel('💖 Tempo Esgotado')
                             .setStyle(ButtonStyle.Secondary)
                             .setDisabled(true)
                     );
@@ -383,6 +498,122 @@ module.exports = {
             return await message.reply({ embeds: [embed] });
         }
 
+        // 💕 COMANDO DE PREFIXO: CARINHO (RESPOSTA RÁPIDA & CICLO DE AFETO)
+        if (commandName === 'carinho' || commandName === 'abraco' || commandName === 'hug') {
+            const target = message.mentions.users.first();
+            const author = message.author;
+
+            if (!target) {
+                return await message.reply(`❌ Você precisa marcar alguém para dar carinho! Exemplo: \`${prefix}carinho @usuario\``);
+            }
+
+            if (target.id === author.id) {
+                return await message.reply('❌ Você não pode dar carinho em si mesmo, mas tome um abraço virtual! 🫂');
+            }
+
+            try {
+                let gifUrl = '';
+                try {
+                    const category = CARINHO_CATEGORIES[Math.floor(Math.random() * CARINHO_CATEGORIES.length)];
+                    const response = await fetch(`https://nekos.best/api/v2/${category}`);
+                    const contentType = response.headers.get('content-type');
+                    if (response.ok && contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        if (data && data.results && data.results.length > 0) {
+                            gifUrl = data.results[0].url;
+                        }
+                    }
+                } catch (apiErr) {}
+
+                if (!gifUrl) {
+                    gifUrl = FALLBACK_GIFS[Math.floor(Math.random() * FALLBACK_GIFS.length)];
+                }
+
+                const randomText = CARINHO_TEXTS[Math.floor(Math.random() * CARINHO_TEXTS.length)];
+                const isBotTarget = target.id === message.client.user.id;
+
+                const embed = new EmbedBuilder()
+                    .setDescription(`💖 **${target}** ${randomText}\n\n*(Carinho enviado por ${author})*`)
+                    .setImage(gifUrl)
+                    .setColor('#ec4899');
+
+                const uniqueId = `carinho_initial_${Date.now()}`;
+                const row = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(uniqueId)
+                            .setLabel('💖 Retribuir Carinho')
+                            .setStyle(ButtonStyle.Success)
+                    );
+
+                const sentMessage = await message.reply({ content: `${target} ${author}`, embeds: [embed], components: [row] });
+
+                if (isBotTarget) {
+                    setTimeout(async () => {
+                        try {
+                            const disabledRow = new ActionRowBuilder()
+                                .addComponents(
+                                    new ButtonBuilder()
+                                        .setCustomId(uniqueId)
+                                        .setLabel('💖 Carinho Retribuído pelo Aeternus')
+                                        .setStyle(ButtonStyle.Secondary)
+                                        .setDisabled(true)
+                                );
+                            await sentMessage.edit({ components: [disabledRow] }).catch(() => {});
+
+                            await sendCarinhoMessage(message.client, message.channel, target, author, sentMessage);
+                        } catch (e) {
+                            console.error('Erro no revide rápido de carinho do bot:', e);
+                        }
+                    }, 1000);
+                    return;
+                }
+
+                const collector = sentMessage.createMessageComponentCollector({ time: 300000 });
+
+                collector.on('collect', async i => {
+                    if (i.user.id !== target.id) {
+                        return await i.reply({ content: '❌ Apenas quem recebeu o carinho pode retribuí-lo!', flags: [MessageFlags.Ephemeral] });
+                    }
+
+                    collector.stop();
+
+                    const disabledRow = new ActionRowBuilder()
+                        .addComponents(
+                            new ButtonBuilder()
+                                .setCustomId(uniqueId)
+                                .setLabel('💖 Carinho Retribuído')
+                                .setStyle(ButtonStyle.Secondary)
+                                .setDisabled(true)
+                        );
+                    await i.update({ components: [disabledRow] }).catch(() => {});
+
+                    await sendCarinhoMessage(message.client, message.channel, target, author, sentMessage);
+                });
+
+                collector.on('end', async collected => {
+                    if (collected.size === 0) {
+                        try {
+                            const expiredRow = new ActionRowBuilder()
+                                .addComponents(
+                                    new ButtonBuilder()
+                                        .setCustomId(uniqueId)
+                                        .setLabel('💖 Tempo Esgotado')
+                                        .setStyle(ButtonStyle.Secondary)
+                                        .setDisabled(true)
+                                );
+                            await sentMessage.edit({ components: [expiredRow] }).catch(() => {});
+                        } catch (e) {}
+                    }
+                });
+
+            } catch (err) {
+                console.error('Erro no comando carinho:', err);
+                await message.reply('❌ Ocorreu um erro ao executar o comando.');
+            }
+            return;
+        }
+
         // ⚔️ COMANDO DE PREFIXO: CASTIGAR (CICLO INFINITO & MARCAÇÃO DUPLA)
         if (commandName === 'castigar') {
             const target = message.mentions.users.first();
@@ -522,6 +753,7 @@ module.exports = {
                 .addFields(
                     { name: '💤 Sistema', value: `\`${prefix}afk [motivo]\` (Fica ausente e avisa quem te marcar - mensagens somem em 7s)` },
                     { name: '🖼️ Utilidades', value: `\`${prefix}avatar\` / \`${prefix}av\` [@usuario]\n\`${prefix}usuario\` / \`${prefix}userinfo\` [@usuario]\n\`${prefix}servidor\` / \`${prefix}serverinfo\`` },
+                    { name: '💖 Interações', value: `\`${prefix}carinho @usuario\` (Ciclo rápido e fofo de carinho mutuo!)` },
                     { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito marcando ambos os envolvidos!)` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
