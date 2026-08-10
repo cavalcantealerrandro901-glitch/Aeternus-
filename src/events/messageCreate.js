@@ -5,33 +5,50 @@ const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', 
 const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
 const PUNISH_CATEGORIES = ['slap', 'baka', 'poke', 'hug'];
 
-// 🎌 Novos GIFs de anime puros e otimizados para carregar rápido
+// 🎌 Lista expandida de GIFs de anime otimizados
 const FALLBACK_GIFS = [
+    'https://media1.giphy.com/media/Gf3AUz3eBNbTW/giphy.gif',
+    'https://media1.giphy.com/media/10rsLtGrOGx0sE/giphy.gif',
+    'https://media1.giphy.com/media/3oKIPnmiqNhZIleLPW/giphy.gif',
+    'https://media1.giphy.com/media/l0HlHFRbmaZtBRhXG/giphy.gif',
+    'https://media1.giphy.com/media/26u6dTP6p4y0iyBIQ/giphy.gif',
+    'https://media1.giphy.com/media/3ohzdIuqJoo8QdKlnW/giphy.gif',
     'https://media1.giphy.com/media/12xwMUaxUETLgc/giphy.gif',
     'https://media1.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif',
     'https://media1.giphy.com/media/8dYmJ6Buo3lYY/giphy.gif',
-    'https://media1.giphy.com/media/l4FGpPki5v2Bcd6Ss/giphy.gif',
-    'https://media1.giphy.com/media/26u6dTP6p4y0iyBIQ/giphy.gif'
+    'https://media1.giphy.com/media/l4FGpPki5v2Bcd6Ss/giphy.gif'
 ];
 
 const FLIRT_MESSAGES = [
     "Você chamou a minha atenção! 💖",
     "Alguém está esbanjando charme por aqui... ✨",
-    "Piscou, eu notei! 😏",
+    "Piscou, i notei! 😏",
     "Muito fofo(a)! Toma aqui uma figurinha. 🥰",
     "Passando só para deixar isso aqui pra você... 💘",
     "Não resisti e tive que mandar isso! 😳",
-    "Você tem uma energia muito boa! 🌸"
+    "Você tem uma energia muito boa! 🌸",
+    "Você é o tipo de pessoa que ilumina o chat! ✨",
+    "Cuidado para não roubar todos os corações daqui! 💖",
+    "Tem espaço para mais alguém incrível por perto? 🥰",
+    "Sua presença deixa o servidor muito mais legal! 🌟",
+    "Achei alguém especial por aqui... 👀",
+    "Um toque de carinho para alegrar o seu dia! 🌸"
 ];
 
 const PUNISH_TEXTS = [
     "recebeu um castigo merecido! 💢",
     "foi colocado(a) de castigo! 😈",
     "levou uma bronca e tanto! 💥",
-    "precisa prestar mais atenção! ⚡"
+    "precisa prestar mais atenção! ⚡",
+    "foi pego(a) no flagra e levou castigo! 🚨",
+    "recebeu uma chuva de cosquinhas! 🤭",
+    "levou um puxão de orelha virtual! 🐾",
+    "precisa ficar de castigo no cantinho da disciplina! 🛑",
+    "foi atingido(a) por uma onda de fofura e confusão! 🌀",
+    "merece ficar sem doces por uma semana! 🍬"
 ];
 
-// Função recursiva para gerenciar o ciclo infinito de castigos
+// Função recursiva para gerenciar o ciclo infinito marcando ambos os usuários
 async function sendPunishMessage(client, channel, sender, recipient, messageToReply = null) {
     let gifUrl = '';
     try {
@@ -54,7 +71,7 @@ async function sendPunishMessage(client, channel, sender, recipient, messageToRe
     const isBotRecipient = recipient.id === client.user.id;
 
     const embed = new EmbedBuilder()
-        .setDescription(`🔄 O jogo virou! **${recipient}** ${randomText} *(Enviado por ${sender})*`)
+        .setDescription(`🔄 O jogo virou entre ${recipient} e ${sender}!\n\n**${recipient}** ${randomText}`)
         .setImage(gifUrl)
         .setColor('#38bdf8');
 
@@ -69,9 +86,9 @@ async function sendPunishMessage(client, channel, sender, recipient, messageToRe
 
     let sentMessage;
     if (messageToReply) {
-        sentMessage = await messageToReply.reply({ embeds: [embed], components: [row] });
+        sentMessage = await messageToReply.reply({ content: `${recipient} ${sender}`, embeds: [embed], components: [row] });
     } else {
-        sentMessage = await channel.send({ embeds: [embed], components: [row] });
+        sentMessage = await channel.send({ content: `${recipient} ${sender}`, embeds: [embed], components: [row] });
     }
 
     if (isBotRecipient) {
@@ -225,7 +242,7 @@ module.exports = {
             return await message.reply(`✅ Prefixo alterado com sucesso para \`${newPrefix}\`!`);
         }
 
-        // ⚔️ COMANDO DE PREFIXO: CASTIGAR (CICLO INFINITO)
+        // ⚔️ COMANDO DE PREFIXO: CASTIGAR (CICLO INFINITO & MARCAÇÃO DUPLA)
         if (commandName === 'castigar') {
             const target = message.mentions.users.first();
             const author = message.author;
@@ -260,7 +277,7 @@ module.exports = {
                 const isBotTarget = target.id === message.client.user.id;
 
                 const embed = new EmbedBuilder()
-                    .setDescription(`⚠️ **${target}** ${randomText} *(Enviado por ${author})*`)
+                    .setDescription(`⚠️ **${target}** ${randomText}\n\n*(Castigo enviado por ${author})*`)
                     .setImage(gifUrl)
                     .setColor('#ec4899');
 
@@ -273,7 +290,8 @@ module.exports = {
                             .setStyle(ButtonStyle.Danger)
                     );
 
-                const sentMessage = await message.reply({ embeds: [embed], components: [row] });
+                // Marca ambos os usuários no conteúdo da mensagem para garantir notificação mútua
+                const sentMessage = await message.reply({ content: `${target} ${author}`, embeds: [embed], components: [row] });
 
                 if (isBotTarget) {
                     setTimeout(async () => {
@@ -362,7 +380,7 @@ module.exports = {
                 .setTitle('📜 Central de Comandos')
                 .setDescription(`O prefixo atual é \`${prefix}\``)
                 .addFields(
-                    { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito com GIFs de anime!)` },
+                    { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito marcando ambos os envolvidos!)` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
                 .setColor('#38bdf8');
