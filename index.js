@@ -89,7 +89,7 @@ registerWelcome(client);
 // Iniciar Painel Web
 startWebServer(client, config);
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
     console.log(`🤖 Aeternus online como ${client.user.tag}!`);
     const cmds = [];
     client.commands.forEach(c => cmds.push(c.data.toJSON()));
