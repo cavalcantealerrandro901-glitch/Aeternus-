@@ -180,7 +180,7 @@ module.exports = {
             }).catch(() => {});
         }
 
-        // 2. Se alguém mencionou um usuário que está AFK (a mensagem somome após 7 segundos)
+        // 2. Se alguém mencionou um usuário que está AFK (a mensagem some após 7 segundos)
         if (message.mentions.users.size > 0) {
             message.mentions.users.forEach(async (mentionedUser) => {
                 if (afkMap.has(mentionedUser.id)) {
@@ -303,6 +303,28 @@ module.exports = {
                 .setColor('#facc15');
 
             return await message.reply({ embeds: [afkSuccessEmbed] });
+        }
+
+        // --- COMANDO AVATAR / AV ---
+        if (commandName === 'avatar' || commandName === 'av') {
+            const target = message.mentions.users.first() || message.author;
+            const avatarUrl = target.displayAvatarURL({ dynamic: true, size: 4096 });
+
+            const embed = new EmbedBuilder()
+                .setTitle(`🖼️ Avatar de ${target.username}`)
+                .setImage(avatarUrl)
+                .setColor('#38bdf8')
+                .setTimestamp();
+
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setLabel('🔗 Link Direto')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(avatarUrl)
+                );
+
+            return await message.reply({ embeds: [embed], components: [row] });
         }
 
         // ⚔️ COMANDO DE PREFIXO: CASTIGAR (CICLO INFINITO & MARCAÇÃO DUPLA)
@@ -443,6 +465,7 @@ module.exports = {
                 .setDescription(`O prefixo atual é \`${prefix}\``)
                 .addFields(
                     { name: '💤 Sistema', value: `\`${prefix}afk [motivo]\` (Fica ausente e avisa quem te marcar - mensagens somem em 7s)` },
+                    { name: '🖼️ Utilidades', value: `\`${prefix}avatar\` ou \`${prefix}av [@usuario]\` (Mostra a foto de perfil)` },
                     { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito marcando ambos os envolvidos!)` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
