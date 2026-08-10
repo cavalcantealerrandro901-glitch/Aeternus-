@@ -60,6 +60,38 @@ const CARINHO_TEXTS = [
     "teve o dia iluminado por tanto carinho! 🌟"
 ];
 
+const BEIJO_TEXTS = [
+    "recebeu um beijinho super fofo! 😘",
+    "ganhou um beijo apaixonado e carinhoso! 💋",
+    "ficou com vergonha após um beijo surpresa! 😳",
+    "recebeu um selinho cheio de carinho! ✨",
+    "foi surpreendido(a) com um beijo romântico! 💖"
+];
+
+const TAPA_TEXTS = [
+    "levou um tapa bem estalado na bochecha! 👋",
+    "recebeu um tapinha corretivo! 💥",
+    "apanhou de leve por vacilar! 💢",
+    "recebeu um tapa que ecoou pelo servidor inteiro! ⚡",
+    "tomou um bofetão e acordou pra vida! 🛑"
+];
+
+const CHUTE_TEXTS = [
+    "levou um chute voador digno de anime! 🚀",
+    "recebeu um chutão e voou para longe! 🌪️",
+    "foi atingido(a) por um belo chute ninja! 👟",
+    "apanhou com um chute épico! 💥",
+    "foi lançado(a) para fora do mapa com um chute! ☄️"
+];
+
+const COSQUINHA_TEXTS = [
+    "morreu de rir com uma sessão de cosquinhas! 🤭",
+    "recebeu um ataque surpresa de cosquinhas! ✨",
+    "não aguentou de tanto rir com as cosquinhas! 😂",
+    "foi alvo de cócegas incontroláveis! 🌸",
+    "ganhou cócegas até pedir paz! 🤍"
+];
+
 // 💤 Armazenamento temporário de usuários AFK (userId -> { reason, timestamp })
 const afkMap = new Map();
 
@@ -73,114 +105,23 @@ function formatTimeAgo(timestamp) {
     return `há ${hours} hora(s)`;
 }
 
-// Função recursiva para gerenciar o ciclo de castigos
-async function sendPunishMessage(client, channel, sender, recipient, messageToReply = null) {
+// Função genérica e otimizada para interações dinâmicas (rápida)
+async function sendInteractionMessage(client, channel, sender, recipient, type, messageToReply = null) {
+    let categories = [];
+    let texts = [];
+    let color = '#ec4899';
+    let label = '🔄 Retribuir';
+
+    if (type === 'punish') { categories = PUNISH_CATEGORIES; texts = PUNISH_TEXTS; color = '#38bdf8'; label = '🔄 Devolver Castigo'; }
+    else if (type === 'carinho') { categories = CARINHO_CATEGORIES; texts = CARINHO_TEXTS; color = '#ec4899'; label = '💖 Retribuir Carinho'; }
+    else if (type === 'beijo') { categories = ['kiss']; texts = BEIJO_TEXTS; color = '#f43f5e'; label = '💋 Retribuir Beijo'; }
+    else if (type === 'tapa') { categories = ['slap']; texts = TAPA_TEXTS; color = '#ef4444'; label = '👋 Retribuir Tapa'; }
+    else if (type === 'chute') { categories = ['kick']; texts = CHUTE_TEXTS; color = '#f97316'; label = '🚀 Retribuir Chute'; }
+    else if (type === 'cosquinha') { categories = ['tickle']; texts = COSQUINHA_TEXTS; color = '#10b981'; label = '🤭 Retribuir Cosquinha'; }
+
     let gifUrl = '';
     try {
-        const category = PUNISH_CATEGORIES[Math.floor(Math.random() * PUNISH_CATEGORIES.length)];
-        const response = await fetch(`https://nekos.best/api/v2/${category}`, { timeout: 3000 });
-        const contentType = response.headers.get('content-type');
-        if (response.ok && contentType && contentType.includes('application/json')) {
-            const data = await response.json();
-            if (data && data.results && data.results.length > 0) {
-                gifUrl = data.results[0].url;
-            }
-        }
-    } catch (apiErr) {}
-
-    if (!gifUrl) {
-        gifUrl = FALLBACK_GIFS[Math.floor(Math.random() * FALLBACK_GIFS.length)];
-    }
-
-    const randomText = PUNISH_TEXTS[Math.floor(Math.random() * PUNISH_TEXTS.length)];
-    const isBotRecipient = recipient.id === client.user.id;
-
-    const embed = new EmbedBuilder()
-        .setDescription(`🔄 O jogo virou entre ${recipient} e ${sender}!\n\n**${recipient}** ${randomText}`)
-        .setImage(gifUrl)
-        .setColor('#38bdf8');
-
-    const uniqueId = `punish_${Date.now()}_${Math.random()}`;
-    const row = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId(uniqueId)
-                .setLabel('🔄 Devolver Castigo')
-                .setStyle(ButtonStyle.Danger)
-        );
-
-    let sentMessage;
-    if (messageToReply) {
-        sentMessage = await messageToReply.reply({ content: `${recipient} ${sender}`, embeds: [embed], components: [row] });
-    } else {
-        sentMessage = await channel.send({ content: `${recipient} ${sender}`, embeds: [embed], components: [row] });
-    }
-
-    if (isBotRecipient) {
-        setTimeout(async () => {
-            try {
-                const disabledRow = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(uniqueId)
-                            .setLabel('🔄 Castigo Devolvido pelo Aeternus')
-                            .setStyle(ButtonStyle.Secondary)
-                            .setDisabled(true)
-                    );
-                await sentMessage.edit({ components: [disabledRow] }).catch(() => {});
-
-                await sendPunishMessage(client, channel, recipient, sender, sentMessage);
-            } catch (e) {
-                console.error('Erro no revide automático do bot:', e);
-            }
-        }, 1500);
-        return;
-    }
-
-    const collector = sentMessage.createMessageComponentCollector({ time: 300000 });
-
-    collector.on('collect', async i => {
-        if (i.user.id !== recipient.id) {
-            return await i.reply({ content: '❌ Apenas a pessoa que recebeu o castigo pode devolvê-lo!', flags: [MessageFlags.Ephemeral] });
-        }
-
-        collector.stop();
-
-        const disabledRow = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId(uniqueId)
-                    .setLabel('🔄 Castigo Devolvido')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setDisabled(true)
-            );
-        await i.update({ components: [disabledRow] }).catch(() => {});
-
-        await sendPunishMessage(client, channel, recipient, sender, sentMessage);
-    });
-
-    collector.on('end', async collected => {
-        if (collected.size === 0) {
-            try {
-                const expiredRow = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(uniqueId)
-                            .setLabel('🔄 Tempo Esgotado')
-                            .setStyle(ButtonStyle.Secondary)
-                            .setDisabled(true)
-                    );
-                await sentMessage.edit({ components: [expiredRow] }).catch(() => {});
-            } catch (e) {}
-        }
-    });
-}
-
-// Função recursiva rápida para o sistema de Carinho
-async function sendCarinhoMessage(client, channel, sender, recipient, messageToReply = null) {
-    let gifUrl = '';
-    try {
-        const category = CARINHO_CATEGORIES[Math.floor(Math.random() * CARINHO_CATEGORIES.length)];
+        const category = categories[Math.floor(Math.random() * categories.length)];
         const response = await fetch(`https://nekos.best/api/v2/${category}`, { timeout: 2000 });
         const contentType = response.headers.get('content-type');
         if (response.ok && contentType && contentType.includes('application/json')) {
@@ -195,21 +136,21 @@ async function sendCarinhoMessage(client, channel, sender, recipient, messageToR
         gifUrl = FALLBACK_GIFS[Math.floor(Math.random() * FALLBACK_GIFS.length)];
     }
 
-    const randomText = CARINHO_TEXTS[Math.floor(Math.random() * CARINHO_TEXTS.length)];
+    const randomText = texts[Math.floor(Math.random() * texts.length)];
     const isBotRecipient = recipient.id === client.user.id;
 
     const embed = new EmbedBuilder()
-        .setDescription(`💖 **${recipient}** ${randomText}\n\n*(Carinho retribuído por ${sender})*`)
+        .setDescription(`✨ **${recipient}** ${randomText}\n\n*(Ação enviada por ${sender})*`)
         .setImage(gifUrl)
-        .setColor('#ec4899');
+        .setColor(color);
 
-    const uniqueId = `carinho_${Date.now()}_${Math.random()}`;
+    const uniqueId = `${type}_${Date.now()}_${Math.random()}`;
     const row = new ActionRowBuilder()
         .addComponents(
             new ButtonBuilder()
                 .setCustomId(uniqueId)
-                .setLabel('💖 Retribuir Carinho')
-                .setStyle(ButtonStyle.Success)
+                .setLabel(label)
+                .setStyle(ButtonStyle.Primary)
         );
 
     let sentMessage;
@@ -226,16 +167,14 @@ async function sendCarinhoMessage(client, channel, sender, recipient, messageToR
                     .addComponents(
                         new ButtonBuilder()
                             .setCustomId(uniqueId)
-                            .setLabel('💖 Carinho Retribuído pelo Aeternus')
+                            .setLabel(`${label} (Respondido)`)
                             .setStyle(ButtonStyle.Secondary)
                             .setDisabled(true)
                     );
                 await sentMessage.edit({ components: [disabledRow] }).catch(() => {});
 
-                await sendCarinhoMessage(client, channel, recipient, sender, sentMessage);
-            } catch (e) {
-                console.error('Erro no revide rápido de carinho do bot:', e);
-            }
+                await sendInteractionMessage(client, channel, recipient, sender, type, sentMessage);
+            } catch (e) {}
         }, 1000);
         return;
     }
@@ -244,7 +183,7 @@ async function sendCarinhoMessage(client, channel, sender, recipient, messageToR
 
     collector.on('collect', async i => {
         if (i.user.id !== recipient.id) {
-            return await i.reply({ content: '❌ Apenas quem recebeu o carinho pode retribuí-lo!', flags: [MessageFlags.Ephemeral] });
+            return await i.reply({ content: '❌ Apenas quem recebeu a interação pode retribuí-la!', flags: [MessageFlags.Ephemeral] });
         }
 
         collector.stop();
@@ -253,13 +192,13 @@ async function sendCarinhoMessage(client, channel, sender, recipient, messageToR
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId(uniqueId)
-                    .setLabel('💖 Carinho Retribuído')
+                    .setLabel(`${label} (Feito)`)
                     .setStyle(ButtonStyle.Secondary)
                     .setDisabled(true)
             );
         await i.update({ components: [disabledRow] }).catch(() => {});
 
-        await sendCarinhoMessage(client, channel, recipient, sender, sentMessage);
+        await sendInteractionMessage(client, channel, recipient, sender, type, sentMessage);
     });
 
     collector.on('end', async collected => {
@@ -269,7 +208,7 @@ async function sendCarinhoMessage(client, channel, sender, recipient, messageToR
                     .addComponents(
                         new ButtonBuilder()
                             .setCustomId(uniqueId)
-                            .setLabel('💖 Tempo Esgotado')
+                            .setLabel('⏳ Tempo Esgotado')
                             .setStyle(ButtonStyle.Secondary)
                             .setDisabled(true)
                     );
@@ -287,7 +226,6 @@ module.exports = {
         // --- SISTEMA DE AFK: VERIFICAÇÕES DE MENSAGEM ---
         const authorId = message.author.id;
 
-        // 1. Se o autor estava AFK, remove o status ao falar e deleta após 7 segundos
         if (afkMap.has(authorId)) {
             afkMap.delete(authorId);
             await message.reply({ content: `👋 Bem-vindo(a) de volta, ${message.author}! Retirei seu status de AFK.` }).then(msg => {
@@ -295,7 +233,6 @@ module.exports = {
             }).catch(() => {});
         }
 
-        // 2. Se alguém mencionou um usuário que está AFK (a mensagem some após 7 segundos)
         if (message.mentions.users.size > 0) {
             message.mentions.users.forEach(async (mentionedUser) => {
                 if (afkMap.has(mentionedUser.id)) {
@@ -324,7 +261,6 @@ module.exports = {
 
         // --- SISTEMA AUTOMÁTICO DE PAQUERA (GLOBAL) ---
         const flirtConfig = guildConfig.flirt || {};
-        
         if (flirtConfig.chance && flirtConfig.chance > 0) {
             const chance = flirtConfig.chance;
             const randomNumber = Math.floor(Math.random() * 100) + 1;
@@ -364,9 +300,7 @@ module.exports = {
 
                         await message.react(chosenEmoji).catch(() => message.react('❤️').catch(() => null));
                     }
-                } catch (err) {
-                    console.error('Erro ao processar paquera automática:', err);
-                }
+                } catch (err) {}
             }
         }
 
@@ -498,236 +432,47 @@ module.exports = {
             return await message.reply({ embeds: [embed] });
         }
 
-        // 💕 COMANDO DE PREFIXO: CARINHO (RESPOSTA RÁPIDA & CICLO DE AFETO)
-        if (commandName === 'carinho' || commandName === 'abraco' || commandName === 'hug') {
+        // --- COMANDOS DE INTERAÇÃO (CARINHO, BEIJO, TAPA, CHUTE, COSQUINHA, CASTIGAR) ---
+        if (['carinho', 'abraco', 'hug'].includes(commandName)) {
             const target = message.mentions.users.first();
-            const author = message.author;
-
-            if (!target) {
-                return await message.reply(`❌ Você precisa marcar alguém para dar carinho! Exemplo: \`${prefix}carinho @usuario\``);
-            }
-
-            if (target.id === author.id) {
-                return await message.reply('❌ Você não pode dar carinho em si mesmo, mas tome um abraço virtual! 🫂');
-            }
-
-            try {
-                let gifUrl = '';
-                try {
-                    const category = CARINHO_CATEGORIES[Math.floor(Math.random() * CARINHO_CATEGORIES.length)];
-                    const response = await fetch(`https://nekos.best/api/v2/${category}`);
-                    const contentType = response.headers.get('content-type');
-                    if (response.ok && contentType && contentType.includes('application/json')) {
-                        const data = await response.json();
-                        if (data && data.results && data.results.length > 0) {
-                            gifUrl = data.results[0].url;
-                        }
-                    }
-                } catch (apiErr) {}
-
-                if (!gifUrl) {
-                    gifUrl = FALLBACK_GIFS[Math.floor(Math.random() * FALLBACK_GIFS.length)];
-                }
-
-                const randomText = CARINHO_TEXTS[Math.floor(Math.random() * CARINHO_TEXTS.length)];
-                const isBotTarget = target.id === message.client.user.id;
-
-                const embed = new EmbedBuilder()
-                    .setDescription(`💖 **${target}** ${randomText}\n\n*(Carinho enviado por ${author})*`)
-                    .setImage(gifUrl)
-                    .setColor('#ec4899');
-
-                const uniqueId = `carinho_initial_${Date.now()}`;
-                const row = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(uniqueId)
-                            .setLabel('💖 Retribuir Carinho')
-                            .setStyle(ButtonStyle.Success)
-                    );
-
-                const sentMessage = await message.reply({ content: `${target} ${author}`, embeds: [embed], components: [row] });
-
-                if (isBotTarget) {
-                    setTimeout(async () => {
-                        try {
-                            const disabledRow = new ActionRowBuilder()
-                                .addComponents(
-                                    new ButtonBuilder()
-                                        .setCustomId(uniqueId)
-                                        .setLabel('💖 Carinho Retribuído pelo Aeternus')
-                                        .setStyle(ButtonStyle.Secondary)
-                                        .setDisabled(true)
-                                );
-                            await sentMessage.edit({ components: [disabledRow] }).catch(() => {});
-
-                            await sendCarinhoMessage(message.client, message.channel, target, author, sentMessage);
-                        } catch (e) {
-                            console.error('Erro no revide rápido de carinho do bot:', e);
-                        }
-                    }, 1000);
-                    return;
-                }
-
-                const collector = sentMessage.createMessageComponentCollector({ time: 300000 });
-
-                collector.on('collect', async i => {
-                    if (i.user.id !== target.id) {
-                        return await i.reply({ content: '❌ Apenas quem recebeu o carinho pode retribuí-lo!', flags: [MessageFlags.Ephemeral] });
-                    }
-
-                    collector.stop();
-
-                    const disabledRow = new ActionRowBuilder()
-                        .addComponents(
-                            new ButtonBuilder()
-                                .setCustomId(uniqueId)
-                                .setLabel('💖 Carinho Retribuído')
-                                .setStyle(ButtonStyle.Secondary)
-                                .setDisabled(true)
-                        );
-                    await i.update({ components: [disabledRow] }).catch(() => {});
-
-                    await sendCarinhoMessage(message.client, message.channel, target, author, sentMessage);
-                });
-
-                collector.on('end', async collected => {
-                    if (collected.size === 0) {
-                        try {
-                            const expiredRow = new ActionRowBuilder()
-                                .addComponents(
-                                    new ButtonBuilder()
-                                        .setCustomId(uniqueId)
-                                        .setLabel('💖 Tempo Esgotado')
-                                        .setStyle(ButtonStyle.Secondary)
-                                        .setDisabled(true)
-                                );
-                            await sentMessage.edit({ components: [expiredRow] }).catch(() => {});
-                        } catch (e) {}
-                    }
-                });
-
-            } catch (err) {
-                console.error('Erro no comando carinho:', err);
-                await message.reply('❌ Ocorreu um erro ao executar o comando.');
-            }
-            return;
+            if (!target) return await message.reply(`❌ Marque alguém! Exemplo: \`${prefix}carinho @usuario\``);
+            if (target.id === message.author.id) return await message.reply('❌ Você não pode dar carinho em si mesmo!');
+            return await sendInteractionMessage(message.client, message.channel, message.author, target, 'carinho');
         }
 
-        // ⚔️ COMANDO DE PREFIXO: CASTIGAR (CICLO INFINITO & MARCAÇÃO DUPLA)
-        if (commandName === 'castigar') {
+        if (['beijo', 'kiss'].includes(commandName)) {
             const target = message.mentions.users.first();
-            const author = message.author;
+            if (!target) return await message.reply(`❌ Marque alguém! Exemplo: \`${prefix}beijo @usuario\``);
+            if (target.id === message.author.id) return await message.reply('❌ Você não pode beijar a si mesmo!');
+            return await sendInteractionMessage(message.client, message.channel, message.author, target, 'beijo');
+        }
 
-            if (!target) {
-                return await message.reply(`❌ Você precisa marcar alguém para castigar! Exemplo: \`${prefix}castigar @usuario\``);
-            }
+        if (['tapa', 'slap'].includes(commandName)) {
+            const target = message.mentions.users.first();
+            if (!target) return await message.reply(`❌ Marque alguém! Exemplo: \`${prefix}tapa @usuario\``);
+            if (target.id === message.author.id) return await message.reply('❌ Você não pode se estapear!');
+            return await sendInteractionMessage(message.client, message.channel, message.author, target, 'tapa');
+        }
 
-            if (target.id === author.id) {
-                return await message.reply('❌ Você não pode castigar a si mesmo!');
-            }
+        if (['chute', 'kick'].includes(commandName)) {
+            const target = message.mentions.users.first();
+            if (!target) return await message.reply(`❌ Marque alguém! Exemplo: \`${prefix}chute @usuario\``);
+            if (target.id === message.author.id) return await message.reply('❌ Você não pode se chutar!');
+            return await sendInteractionMessage(message.client, message.channel, message.author, target, 'chute');
+        }
 
-            try {
-                let gifUrl = '';
-                try {
-                    const category = PUNISH_CATEGORIES[Math.floor(Math.random() * PUNISH_CATEGORIES.length)];
-                    const response = await fetch(`https://nekos.best/api/v2/${category}`);
-                    const contentType = response.headers.get('content-type');
-                    if (response.ok && contentType && contentType.includes('application/json')) {
-                        const data = await response.json();
-                        if (data && data.results && data.results.length > 0) {
-                            gifUrl = data.results[0].url;
-                        }
-                    }
-                } catch (apiErr) {}
+        if (['cosquinha', 'tickle'].includes(commandName)) {
+            const target = message.mentions.users.first();
+            if (!target) return await message.reply(`❌ Marque alguém! Exemplo: \`${prefix}cosquinha @usuario\``);
+            if (target.id === message.author.id) return await message.reply('❌ Você não pode fazer cosquinha em si mesmo!');
+            return await sendInteractionMessage(message.client, message.channel, message.author, target, 'cosquinha');
+        }
 
-                if (!gifUrl) {
-                    gifUrl = FALLBACK_GIFS[Math.floor(Math.random() * FALLBACK_GIFS.length)];
-                }
-
-                const randomText = PUNISH_TEXTS[Math.floor(Math.random() * PUNISH_TEXTS.length)];
-                const isBotTarget = target.id === message.client.user.id;
-
-                const embed = new EmbedBuilder()
-                    .setDescription(`⚠️ **${target}** ${randomText}\n\n*(Castigo enviado por ${author})*`)
-                    .setImage(gifUrl)
-                    .setColor('#ec4899');
-
-                const uniqueId = `punish_initial_${Date.now()}`;
-                const row = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(uniqueId)
-                            .setLabel('🔄 Devolver Castigo')
-                            .setStyle(ButtonStyle.Danger)
-                    );
-
-                const sentMessage = await message.reply({ content: `${target} ${author}`, embeds: [embed], components: [row] });
-
-                if (isBotTarget) {
-                    setTimeout(async () => {
-                        try {
-                            const disabledRow = new ActionRowBuilder()
-                                .addComponents(
-                                    new ButtonBuilder()
-                                        .setCustomId(uniqueId)
-                                        .setLabel('🔄 Castigo Devolvido pelo Aeternus')
-                                        .setStyle(ButtonStyle.Secondary)
-                                        .setDisabled(true)
-                                );
-                            await sentMessage.edit({ components: [disabledRow] }).catch(() => {});
-
-                            await sendPunishMessage(message.client, message.channel, target, author, sentMessage);
-                        } catch (e) {
-                            console.error('Erro no revide inicial do bot:', e);
-                        }
-                    }, 1500);
-                    return;
-                }
-
-                const collector = sentMessage.createMessageComponentCollector({ time: 300000 });
-
-                collector.on('collect', async i => {
-                    if (i.user.id !== target.id) {
-                        return await i.reply({ content: '❌ Apenas a pessoa que recebeu o castigo pode devolvê-lo!', flags: [MessageFlags.Ephemeral] });
-                    }
-
-                    collector.stop();
-
-                    const disabledRow = new ActionRowBuilder()
-                        .addComponents(
-                            new ButtonBuilder()
-                                .setCustomId(uniqueId)
-                                .setLabel('🔄 Castigo Devolvido')
-                                .setStyle(ButtonStyle.Secondary)
-                                .setDisabled(true)
-                        );
-                    await i.update({ components: [disabledRow] }).catch(() => {});
-
-                    await sendPunishMessage(message.client, message.channel, target, author, sentMessage);
-                });
-
-                collector.on('end', async collected => {
-                    if (collected.size === 0) {
-                        try {
-                            const expiredRow = new ActionRowBuilder()
-                                .addComponents(
-                                    new ButtonBuilder()
-                                        .setCustomId(uniqueId)
-                                        .setLabel('🔄 Tempo Esgotado')
-                                        .setStyle(ButtonStyle.Secondary)
-                                        .setDisabled(true)
-                                );
-                            await sentMessage.edit({ components: [expiredRow] }).catch(() => {});
-                        } catch (e) {}
-                    }
-                });
-
-            } catch (err) {
-                console.error('Erro no comando castigar:', err);
-                await message.reply('❌ Ocorreu um erro ao executar o comando.');
-            }
-            return;
+        if (['castigar', 'punish'].includes(commandName)) {
+            const target = message.mentions.users.first();
+            if (!target) return await message.reply(`❌ Marque alguém! Exemplo: \`${prefix}castigar @usuario\``);
+            if (target.id === message.author.id) return await message.reply('❌ Você não pode se castigar!');
+            return await sendInteractionMessage(message.client, message.channel, message.author, target, 'punish');
         }
 
         // Comandos Personalizados
@@ -753,8 +498,7 @@ module.exports = {
                 .addFields(
                     { name: '💤 Sistema', value: `\`${prefix}afk [motivo]\` (Fica ausente e avisa quem te marcar - mensagens somem em 7s)` },
                     { name: '🖼️ Utilidades', value: `\`${prefix}avatar\` / \`${prefix}av\` [@usuario]\n\`${prefix}usuario\` / \`${prefix}userinfo\` [@usuario]\n\`${prefix}servidor\` / \`${prefix}serverinfo\`` },
-                    { name: '💖 Interações', value: `\`${prefix}carinho @usuario\` (Ciclo rápido e fofo de carinho mutuo!)` },
-                    { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito marcando ambos os envolvidos!)` },
+                    { name: '💖 Interações & Ações', value: `\`${prefix}carinho @usuario\`\n\`${prefix}beijo @usuario\`\n\`${prefix}tapa @usuario\`\n\`${prefix}chute @usuario\`\n\`${prefix}cosquinha @usuario\`\n\`${prefix}castigar @usuario\`` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
                 .setColor('#38bdf8');
