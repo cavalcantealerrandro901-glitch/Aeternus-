@@ -1,14 +1,16 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const db = require('../database/db');
+
+// Vamos criar estes ficheiros visuais no próximo passo
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderPortal = require('./views/portal');
-const db = require('../database/db');
 
 module.exports = (client, config) => {
     const app = express();
-    const PORT = process.env.PORT || 3000;
+    const PORT = process.env.PORT || 10000;
 
     app.use(cookieParser());
     app.use(express.json());
@@ -77,7 +79,6 @@ module.exports = (client, config) => {
 
     function getManageableGuilds(userGuilds) {
         if (!Array.isArray(userGuilds)) return [];
-
         const ADMIN_PERMISSION = 0x8n;
         const MANAGE_GUILD_PERMISSION = 0x20n;
 
@@ -86,7 +87,6 @@ module.exports = (client, config) => {
             const isAdmin = (perms & ADMIN_PERMISSION) === ADMIN_PERMISSION;
             const canManage = (perms & MANAGE_GUILD_PERMISSION) === MANAGE_GUILD_PERMISSION;
             const isOwner = Boolean(g.owner);
-
             const hasPermission = isAdmin || canManage || isOwner;
             const isBotInGuild = client.guilds.cache.has(g.id);
 
@@ -114,19 +114,12 @@ module.exports = (client, config) => {
 
         const manageableGuilds = getManageableGuilds(session.guilds);
         const guild = manageableGuilds.find(g => g.id === req.params.guildId);
-
         if (!guild) return res.redirect('/dashboard');
 
         const botGuild = client.guilds.cache.get(guild.id);
-
-        const textChannels = botGuild ? botGuild.channels.cache
-            .filter(c => c.type === 0 || c.type === 5)
-            .map(c => ({ id: c.id, name: c.name })) : [];
-
-        const guildRoles = botGuild ? botGuild.roles.cache
-            .filter(r => r.name !== '@everyone')
-            .map(r => ({ id: r.id, name: r.name })) : [];
-
+        const textChannels = botGuild ? botGuild.channels.cache.filter(c => c.type === 0 || c.type === 5).map(c => ({ id: c.id, name: c.name })) : [];
+        const guildRoles = botGuild ? botGuild.roles.cache.filter(r => r.name !== '@everyone').map(r => ({ id: r.id, name: r.name })) : [];
+        
         const savedConfig = db.getGuildConfig(guild.id);
 
         const serverData = {
@@ -134,15 +127,9 @@ module.exports = (client, config) => {
             name: guild.name,
             icon: guild.icon,
             memberCount: botGuild ? botGuild.memberCount : 'N/A',
-            channelCount: botGuild ? botGuild.channels.cache.size : 'N/A',
-            roleCount: botGuild ? botGuild.roles.cache.size : 'N/A',
             textChannels: textChannels,
             roles: guildRoles,
             prefix: savedConfig.prefix || '!',
-            logsConfig: savedConfig.logs || {},
-            welcomeConfig: savedConfig.welcome || {},
-            updatesConfig: savedConfig.updates || {},
-            customCommandsConfig: savedConfig.customCommands || [],
             ticketsConfig: savedConfig.tickets || {},
             flirtConfig: savedConfig.flirt || {}
         };
@@ -154,22 +141,7 @@ module.exports = (client, config) => {
     app.post('/api/guilds/:guildId/prefix', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const { prefix } = req.body;
-        if (!prefix || prefix.trim().length === 0) {
-            return res.status(400).json({ error: 'O prefixo não pode ser vazio.' });
-        }
-
-        db.setGuildConfig(req.params.guildId, { prefix: prefix.trim() });
-        res.json({ success: true });
-    });
-
-    // API: Salvar Config de Paquera
-    app.post('/api/guilds/:guildId/flirt', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        db.setGuildConfig(req.params.guildId, { flirt: req.body });
+        db.setGuildConfig(req.params.guildId, { prefix: req.body.prefix.trim() });
         res.json({ success: true });
     });
 
@@ -177,209 +149,35 @@ module.exports = (client, config) => {
     app.post('/api/guilds/:guildId/tickets/save-and-send', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
+        
         const guildId = req.params.guildId;
         const botGuild = client.guilds.cache.get(guildId);
         if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
 
-        const config = { ...req.body, enabled: req.body.enabled === true || req.body.enabled === 'true' };
-
-        if (!config.ticketChannel) {
-            return res.status(400).json({ error: 'Selecione um canal para o painel de tickets.' });
-        }
+        const config = { ...req.body, enabled: true };
 
         try {
             const channel = await botGuild.channels.fetch(config.ticketChannel).catch(() => null);
-
-            if (!channel || !channel.isTextBased()) {
-                return res.status(404).json({ error: 'Canal de texto não encontrado ou inacessível.' });
-            }
+            if (!channel || !channel.isTextBased()) return res.status(404).json({ error: 'Canal inválido.' });
 
             const embed = new EmbedBuilder()
                 .setTitle(config.embedTitle || '🎫 Central de Atendimento')
-                .setDescription(config.embedDescription || 'Clique no botão abaixo para abrir um ticket privado com a nossa equipe.')
-                .setColor('#38bdf8')
-                .setFooter({ text: botGuild.name, iconURL: botGuild.iconURL() })
-                .setTimestamp();
+                .setDescription(config.embedDescription || 'Clique abaixo para abrir um ticket.')
+                .setColor('#38bdf8');
 
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('btn_open_ticket')
-                    .setLabel(config.buttonText || 'Abrir Ticket')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🎫')
+                new ButtonBuilder().setCustomId('btn_open_ticket').setLabel(config.buttonText || 'Abrir Ticket').setStyle(ButtonStyle.Primary).setEmoji('🎫')
             );
 
             const sentMessage = await channel.send({ embeds: [embed], components: [row] });
-
             config.messageId = sentMessage.id;
+            
             db.setGuildConfig(guildId, { tickets: config });
-
             res.json({ success: true });
         } catch (err) {
-            console.error('Erro ao enviar painel de tickets:', err);
-            res.status(500).json({ error: 'Verifique se o bot possui permissão de Ver Canal e Enviar Mensagens.' });
+            console.error('Erro tickets:', err);
+            res.status(500).json({ error: 'Erro ao enviar painel.' });
         }
-    });
-
-    // API: Editar Painel de Tickets
-    app.post('/api/guilds/:guildId/tickets/edit', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const guildId = req.params.guildId;
-        const botGuild = client.guilds.cache.get(guildId);
-        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
-
-        const config = { ...req.body, enabled: req.body.enabled === true || req.body.enabled === 'true' };
-
-        try {
-            const channel = await botGuild.channels.fetch(config.ticketChannel).catch(() => null);
-            if (!channel || !channel.isTextBased()) {
-                return res.status(404).json({ error: 'Canal não encontrado.' });
-            }
-
-            let messageToEdit = null;
-            if (config.messageId) {
-                messageToEdit = await channel.messages.fetch(config.messageId).catch(() => null);
-            }
-
-            if (!messageToEdit) {
-                const messages = await channel.messages.fetch({ limit: 50 });
-                messageToEdit = messages.find(m => m.author.id === client.user.id && m.components.some(row => row.components.some(c => c.customId === 'btn_open_ticket')));
-            }
-
-            if (!messageToEdit) {
-                return res.status(404).json({ error: 'Nenhuma mensagem de painel de ticket foi encontrada para editar.' });
-            }
-
-            const embed = new EmbedBuilder()
-                .setTitle(config.embedTitle || '🎫 Central de Atendimento')
-                .setDescription(config.embedDescription || 'Clique no botão abaixo para abrir um ticket privado com a nossa equipe.')
-                .setColor('#38bdf8')
-                .setFooter({ text: botGuild.name, iconURL: botGuild.iconURL() })
-                .setTimestamp();
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('btn_open_ticket')
-                    .setLabel(config.buttonText || 'Abrir Ticket')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🎫')
-            );
-
-            await messageToEdit.edit({ embeds: [embed], components: [row] });
-
-            config.messageId = messageToEdit.id;
-            db.setGuildConfig(guildId, { tickets: config });
-
-            res.json({ success: true });
-        } catch (err) {
-            console.error('Erro ao editar painel de tickets:', err);
-            res.status(500).json({ error: 'Falha ao editar a mensagem no Discord.' });
-        }
-    });
-
-    // API: Deletar Painel com Varredura
-    app.post('/api/guilds/:guildId/tickets/delete-panel', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const guildId = req.params.guildId;
-        const botGuild = client.guilds.cache.get(guildId);
-        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
-
-        const savedConfig = db.getGuildConfig(guildId).tickets || {};
-        const targetChannelId = req.body.ticketChannel || savedConfig.ticketChannel;
-
-        if (!targetChannelId) {
-            return res.status(400).json({ error: 'Selecione um canal para efetuar a varredura e deleção.' });
-        }
-
-        try {
-            const channel = await botGuild.channels.fetch(targetChannelId).catch(() => null);
-            if (!channel || !channel.isTextBased()) {
-                return res.status(404).json({ error: 'Canal não encontrado ou sem acesso.' });
-            }
-
-            let messageToDelete = null;
-
-            if (savedConfig.messageId) {
-                messageToDelete = await channel.messages.fetch(savedConfig.messageId).catch(() => null);
-            }
-
-            if (!messageToDelete) {
-                const messages = await channel.messages.fetch({ limit: 50 });
-                messageToDelete = messages.find(m => m.author.id === client.user.id && m.components.some(row => row.components.some(c => c.customId === 'btn_open_ticket')));
-            }
-
-            if (!messageToDelete) {
-                return res.status(404).json({ error: 'Nenhum painel de ticket do bot foi encontrado no canal após a varredura.' });
-            }
-
-            await messageToDelete.delete();
-
-            savedConfig.messageId = null;
-            db.setGuildConfig(guildId, { tickets: savedConfig });
-            res.json({ success: true });
-        } catch (err) {
-            console.error('Erro ao deletar painel de tickets:', err);
-            res.status(500).json({ error: 'Erro ao apagar a mensagem.' });
-        }
-    });
-
-    // API: Desativar Sistema de Tickets
-    app.post('/api/guilds/:guildId/tickets/disable', (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const current = db.getGuildConfig(req.params.guildId).tickets || {};
-        db.setGuildConfig(req.params.guildId, { tickets: { ...current, enabled: false } });
-        res.json({ success: true });
-    });
-
-    // Outras rotas da API
-    app.post('/api/guilds/:guildId/custom-commands', (req, res) => {
-        const { cmdName, cmdResponse, isEmbed, oldCmdName } = req.body;
-        const cleanName = cmdName.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        const currentConfig = db.getGuildConfig(req.params.guildId);
-        let commands = currentConfig.customCommands || [];
-
-        if (oldCmdName && oldCmdName !== cleanName) {
-            commands = commands.filter(c => c.name !== oldCmdName.toLowerCase());
-        }
-
-        const existingIndex = commands.findIndex(c => c.name === cleanName);
-        const updatedCmd = { name: cleanName, response: cmdResponse, isEmbed: isEmbed === 'true' };
-
-        if (existingIndex >= 0) commands[existingIndex] = updatedCmd;
-        else commands.push(updatedCmd);
-
-        db.setGuildConfig(req.params.guildId, { customCommands: commands });
-        res.json({ success: true });
-    });
-
-    app.delete('/api/guilds/:guildId/custom-commands/:cmdName', (req, res) => {
-        const cmdName = req.params.cmdName.toLowerCase();
-        const currentConfig = db.getGuildConfig(req.params.guildId);
-        let commands = (currentConfig.customCommands || []).filter(c => c.name !== cmdName);
-
-        db.setGuildConfig(req.params.guildId, { customCommands: commands });
-        res.json({ success: true });
-    });
-
-    app.post('/api/guilds/:guildId/logs', (req, res) => {
-        db.setGuildConfig(req.params.guildId, { logs: req.body });
-        res.json({ success: true });
-    });
-
-    app.post('/api/guilds/:guildId/welcome', (req, res) => {
-        db.setGuildConfig(req.params.guildId, { welcome: req.body });
-        res.json({ success: true });
-    });
-
-    app.post('/api/guilds/:guildId/updates', (req, res) => {
-        db.setGuildConfig(req.params.guildId, { updates: req.body });
-        res.json({ success: true });
     });
 
     app.listen(PORT, () => console.log(`🌐 Painel Web rodando na porta ${PORT}`));
