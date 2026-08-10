@@ -153,41 +153,41 @@ module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl
 <body>
     <header>
         <a href="/" class="brand">
-            <img src="\${botAvatarUrl}" alt="\${botName}">
-            <span>\${botName}</span>
+            <img src="${botAvatarUrl}" alt="${botName}">
+            <span>${botName}</span>
         </a>
         <div class="user-profile">
-            <img src="\${userAvatarUrl}" alt="\${user.username}">
-            <span>\${user.username}</span>
+            <img src="${userAvatarUrl}" alt="${user.username}">
+            <span>${user.username}</span>
         </div>
     </header>
 
     <main>
         <div class="page-header">
             <h1>Selecione um Servidor</h1>
-            <p>Escolha o servidor que deseja configurar agora no painel do \${botName}</p>
+            <p>Escolha o servidor que deseja configurar agora no painel do ${botName}</p>
         </div>
 
         <div class="servers-grid">
-            \${manageableGuilds.length > 0 ? manageableGuilds.map(g => {
-                const iconUrl = g.icon ? \`https://cdn.discordapp.com/icons/\${g.id}/\${g.icon}.png\` : null;
+            ${manageableGuilds.length > 0 ? manageableGuilds.map(g => {
+                const iconUrl = g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : null;
                 const initials = g.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-                return \`
+                return `
                     <div class="card-server">
-                        \${iconUrl ? \`<img src="\${iconUrl}" class="server-icon-large" alt="\${g.name}">\` : \`<div class="server-icon-large">\${initials}</div>\`}
-                        <h3 class="server-name">\${g.name}</h3>
+                        ${iconUrl ? `<img src="${iconUrl}" class="server-icon-large" alt="${g.name}">` : `<div class="server-icon-large">${initials}</div>`}
+                        <h3 class="server-name">${g.name}</h3>
                         <div class="server-badge">✨ Administrador</div>
-                        <a href="/dashboard/\${g.id}" class="btn-select">Configurar Servidor</a>
+                        <a href="/dashboard/${g.id}" class="btn-select">Configurar Servidor</a>
                     </div>
-                \`;
-            }).join('') : \`
+                `;
+            }).join('') : `
                 <div class="no-servers">
                     <h3>Nenhum servidor encontrado</h3>
-                    <p>Você precisa ter permissão de Administrador em algum servidor onde o \${botName} esteja instalado para poder configurá-lo.</p>
+                    <p>Você precisa ter permissão de Administrador em algum servidor onde o ${botName} esteja instalado para poder configurá-lo.</p>
                 </div>
-            \`}
+            `}
         </div>
     </main>
 </body>
-</html>\`;
+</html>`;
 };
