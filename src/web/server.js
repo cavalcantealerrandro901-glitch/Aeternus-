@@ -99,7 +99,13 @@ module.exports = (client, config) => {
         if (!session) return res.redirect('/login');
 
         const manageableGuilds = getManageableGuilds(session.guilds);
-        res.send(renderDashboard(session.user, manageableGuilds, client.user));
+        res.send(renderDashboard({
+            user: session.user,
+            manageableGuilds: manageableGuilds,
+            botName: client.user.username,
+            botAvatarUrl: client.user.displayAvatarURL(),
+            userAvatarUrl: session.user.avatar ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png'
+        }));
     });
 
     app.get('/dashboard/:guildId', (req, res) => {
@@ -171,7 +177,6 @@ module.exports = (client, config) => {
     app.post('/api/guilds/:guildId/tickets/save-and-send', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
         const guildId = req.params.guildId;
         const botGuild = client.guilds.cache.get(guildId);
         if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
@@ -217,7 +222,7 @@ module.exports = (client, config) => {
     });
 
     // API: Editar Painel de Tickets
-    app.post('/api/guilds/:guildId/tickets/edit-panel', async (req, res) => {
+    app.post('/api/guilds/:guildId/tickets/edit', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
 
@@ -225,12 +230,7 @@ module.exports = (client, config) => {
         const botGuild = client.guilds.cache.get(guildId);
         if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado.' });
 
-        const savedConfig = db.getGuildConfig(guildId).tickets || {};
-        const config = { ...savedConfig, ...req.body, enabled: true };
-
-        if (!config.ticketChannel) {
-            return res.status(400).json({ error: 'Selecione o canal do painel.' });
-        }
+        const config = { ...req.body, enabled: req.body.enabled === true || req.body.enabled === 'true' };
 
         try {
             const channel = await botGuild.channels.fetch(config.ticketChannel).catch(() => null);
@@ -320,7 +320,6 @@ module.exports = (client, config) => {
 
             savedConfig.messageId = null;
             db.setGuildConfig(guildId, { tickets: savedConfig });
-
             res.json({ success: true });
         } catch (err) {
             console.error('Erro ao deletar painel de tickets:', err);
