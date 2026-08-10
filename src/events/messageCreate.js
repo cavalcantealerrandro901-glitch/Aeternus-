@@ -5,7 +5,7 @@ const DEFAULT_FLIRT_EMOJIS = ['💖', '❤️', '😍', '🥰', '😘', '😏', 
 const GIF_CATEGORIES = ['hug', 'kiss', 'blush', 'wink', 'pat', 'smile']; 
 const PUNISH_CATEGORIES = ['slap', 'baka', 'poke', 'hug'];
 
-// 🎌 Lista expandida de GIFs de anime otimizados
+// 🎌 Lista de GIFs de anime otimizados
 const FALLBACK_GIFS = [
     'https://media1.giphy.com/media/Gf3AUz3eBNbTW/giphy.gif',
     'https://media1.giphy.com/media/10rsLtGrOGx0sE/giphy.gif',
@@ -22,7 +22,7 @@ const FALLBACK_GIFS = [
 const FLIRT_MESSAGES = [
     "Você chamou a minha atenção! 💖",
     "Alguém está esbanjando charme por aqui... ✨",
-    "Piscou, i notei! 😏",
+    "Piscou, eu notei! 😏",
     "Muito fofo(a)! Toma aqui uma figurinha. 🥰",
     "Passando só para deixar isso aqui pra você... 💘",
     "Não resisti e tive que mandar isso! 😳",
@@ -48,7 +48,20 @@ const PUNISH_TEXTS = [
     "merece ficar sem doces por uma semana! 🍬"
 ];
 
-// Função recursiva para gerenciar o ciclo infinito marcando ambos os usuários
+// 💤 Armazenamento temporário de usuários AFK (userId -> { reason, timestamp })
+const afkMap = new Map();
+
+// Função auxiliar para formatar tempo decorrido
+function formatTimeAgo(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return `há ${seconds} segundo(s)`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `há ${minutes} minuto(s)`;
+    const hours = Math.floor(minutes / 60);
+    return `há ${hours} hora(s)`;
+}
+
+// Função recursiva para gerenciar o ciclo infinito de castigos
 async function sendPunishMessage(client, channel, sender, recipient, messageToReply = null) {
     let gifUrl = '';
     try {
@@ -156,6 +169,39 @@ module.exports = {
     async execute(message) {
         if (message.author.bot || !message.guild) return;
 
+        // --- SISTEMA DE AFK: VERIFICAÇÕES DE MENSAGEM ---
+        const authorId = message.author.id;
+
+        // 1. Se o autor estava AFK, remove o status ao falar
+        if (afkMap.has(authorId)) {
+            afkMap.delete(authorId);
+            await message.reply({ content: `👋 Bem-vindo(a) de volta, ${message.author}! Retirei seu status de AFK.` }).then(msg => {
+                setTimeout(() => msg.delete().catch(() => {}), 5000);
+            }).catch(() => {});
+        }
+
+        // 2. Se alguém mencionou um usuário que está AFK
+        if (message.mentions.users.size > 0) {
+            message.mentions.users.forEach(async (mentionedUser) => {
+                if (afkMap.has(mentionedUser.id)) {
+                    const afkData = afkMap.get(mentionedUser.id);
+                    const timeAgo = formatTimeAgo(afkData.timestamp);
+
+                    const afkEmbed = new EmbedBuilder()
+                        .setTitle('💤 Usuário Ausente (AFK)')
+                        .setDescription(`**${mentionedUser.tag}** está AFK no momento.`)
+                        .addFields(
+                            { name: '📝 Motivo', value: `\`${afkData.reason}\``, inline: false },
+                            { name: '⏰ Ausente', value: `${timeAgo}`, inline: false }
+                        )
+                        .setColor('#facc15')
+                        .setTimestamp();
+
+                    await message.reply({ embeds: [afkEmbed] }).catch(() => {});
+                }
+            });
+        }
+
         const guildConfig = await db.getGuildConfig(message.guild.id);
         const prefix = guildConfig.prefix || '!';
 
@@ -242,6 +288,21 @@ module.exports = {
             return await message.reply(`✅ Prefixo alterado com sucesso para \`${newPrefix}\`!`);
         }
 
+        // --- COMANDO AFK ---
+        if (commandName === 'afk') {
+            const reason = args.join(' ') || 'Ausente';
+            afkMap.set(authorId, {
+                reason: reason,
+                timestamp: Date.now()
+            });
+
+            const afkSuccessEmbed = new EmbedBuilder()
+                .setDescription(`💤 ${message.author}, você agora está **AFK**!\n📝 **Motivo:** \`${reason}\``)
+                .setColor('#facc15');
+
+            return await message.reply({ embeds: [afkSuccessEmbed] });
+        }
+
         // ⚔️ COMANDO DE PREFIXO: CASTIGAR (CICLO INFINITO & MARCAÇÃO DUPLA)
         if (commandName === 'castigar') {
             const target = message.mentions.users.first();
@@ -290,7 +351,6 @@ module.exports = {
                             .setStyle(ButtonStyle.Danger)
                     );
 
-                // Marca ambos os usuários no conteúdo da mensagem para garantir notificação mútua
                 const sentMessage = await message.reply({ content: `${target} ${author}`, embeds: [embed], components: [row] });
 
                 if (isBotTarget) {
@@ -380,6 +440,7 @@ module.exports = {
                 .setTitle('📜 Central de Comandos')
                 .setDescription(`O prefixo atual é \`${prefix}\``)
                 .addFields(
+                    { name: '💤 Sistema', value: `\`${prefix}afk [motivo]\` (Fica ausente e avisa quem te marcar)` },
                     { name: '⚔️ Divertidos', value: `\`${prefix}castigar @usuario\` (Ciclo infinito marcando ambos os envolvidos!)` },
                     { name: '⚙️ Prefixo', value: `\`${prefix}prefixo <novo>\`` }
                 )
