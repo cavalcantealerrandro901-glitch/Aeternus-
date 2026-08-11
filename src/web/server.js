@@ -125,7 +125,23 @@ module.exports = (client) => {
             ? \`https://cdn.discordapp.com/avatars/\${session.user.id}/\${session.user.avatar}.png\`
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
-        res.send(renderGuild(guild, session.user, userAvatarUrl));
+        const config = db.getGuildConfig(guild.id);
+
+        res.send(renderGuild(guild, session.user, userAvatarUrl, config));
+    });
+
+    // API: Salvar Prefixo
+    app.post('/api/guilds/:guildId/prefix', async (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const prefix = (req.body.prefix || '').trim();
+        if (!prefix || prefix.length > 5) {
+            return res.status(400).json({ error: 'Prefixo inválido' });
+        }
+
+        await db.setGuildConfig(req.params.guildId, { prefix });
+        res.json({ success: true });
     });
 
     app.listen(PORT, () => {

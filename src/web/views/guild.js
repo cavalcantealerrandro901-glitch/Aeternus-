@@ -1,4 +1,4 @@
-module.exports = (guild, user, userAvatarUrl) => `
+module.exports = (guild, user, userAvatarUrl, config) => `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -14,7 +14,6 @@ module.exports = (guild, user, userAvatarUrl) => `
             overflow-x: hidden;
         }
 
-        /* Sidebar */
         .sidebar {
             width: 280px;
             background: var(--card);
@@ -88,6 +87,11 @@ module.exports = (guild, user, userAvatarUrl) => `
             margin-bottom: 4px;
             transition: all 0.2s;
             cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-size: 0.95rem;
         }
 
         .menu-item:hover,
@@ -96,7 +100,6 @@ module.exports = (guild, user, userAvatarUrl) => `
             color: #a78bfa;
         }
 
-        /* Conteúdo principal */
         .main-content {
             flex: 1;
             padding: 30px 20px;
@@ -157,9 +160,102 @@ module.exports = (guild, user, userAvatarUrl) => `
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 28px;
+            margin-bottom: 20px;
         }
 
-        /* Desktop: sidebar sempre visível */
+        .content-card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 6px;
+        }
+
+        .content-card .desc {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            max-width: 280px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--primary);
+        }
+
+        .form-group .hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .save-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .save-btn:hover {
+            background: var(--primary-hover);
+        }
+
+        .save-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--success);
+            color: white;
+            padding: 14px 22px;
+            border-radius: 12px;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            z-index: 200;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
         @media (min-width: 900px) {
             .sidebar {
                 position: relative;
@@ -174,9 +270,6 @@ module.exports = (guild, user, userAvatarUrl) => `
             }
             .close-btn {
                 display: none;
-            }
-            .layout {
-                padding-left: 0;
             }
         }
     </style>
@@ -193,34 +286,31 @@ module.exports = (guild, user, userAvatarUrl) => `
     </nav>
 
     <div class="layout">
-        <!-- Overlay -->
         <div class="sidebar-overlay" id="overlay"></div>
 
-        <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h3>Menu</h3>
                 <button class="close-btn" id="closeSidebar">✕</button>
             </div>
 
-            <div class="menu-item active" data-section="geral">
+            <button class="menu-item active" data-section="geral">
                 <span>⚙️</span> Geral
-            </div>
-            <div class="menu-item" data-section="moderacao">
+            </button>
+            <button class="menu-item" data-section="moderacao">
                 <span>🛡️</span> Moderação
-            </div>
-            <div class="menu-item" data-section="economia">
+            </button>
+            <button class="menu-item" data-section="economia">
                 <span>💰</span> Economia
-            </div>
-            <div class="menu-item" data-section="utilidades">
+            </button>
+            <button class="menu-item" data-section="utilidades">
                 <span>🔧</span> Utilidades
-            </div>
-            <div class="menu-item" data-section="logs">
+            </button>
+            <button class="menu-item" data-section="logs">
                 <span>📋</span> Logs
-            </div>
+            </button>
         </aside>
 
-        <!-- Conteúdo -->
         <main class="main-content">
             <div class="page-header">
                 <div class="guild-title">
@@ -236,20 +326,64 @@ module.exports = (guild, user, userAvatarUrl) => `
                 <button class="menu-toggle" id="openSidebar">☰</button>
             </div>
 
-            <div class="content-card" id="content">
-                <h2 style="margin-bottom:10px;">Configurações Gerais</h2>
-                <p style="color:var(--text-muted);">
-                    Em breve você poderá alterar o prefixo, canais de log, mensagens de boas-vindas e muito mais por aqui.
-                </p>
+            <!-- SEÇÃO GERAL -->
+            <div class="section active" id="section-geral">
+                <div class="content-card">
+                    <h2>Prefixo do Bot</h2>
+                    <p class="desc">Altere o prefixo usado nos comandos de texto deste servidor.</p>
+
+                    <div class="form-group">
+                        <label for="prefix">Prefixo atual</label>
+                        <input type="text" id="prefix" value="${config.prefix || '!'}" maxlength="5">
+                        <div class="hint">Máximo 5 caracteres. Exemplo: !, ., >, a!</div>
+                    </div>
+
+                    <button class="save-btn" id="savePrefix">Salvar Prefixo</button>
+                </div>
+            </div>
+
+            <!-- SEÇÃO MODERAÇÃO -->
+            <div class="section" id="section-moderacao">
+                <div class="content-card">
+                    <h2>Moderação</h2>
+                    <p class="desc">Em breve você poderá configurar punições automáticas, avisos e mais.</p>
+                </div>
+            </div>
+
+            <!-- SEÇÃO ECONOMIA -->
+            <div class="section" id="section-economia">
+                <div class="content-card">
+                    <h2>Economia</h2>
+                    <p class="desc">Configurações de economia e apostas chegarão em breve.</p>
+                </div>
+            </div>
+
+            <!-- SEÇÃO UTILIDADES -->
+            <div class="section" id="section-utilidades">
+                <div class="content-card">
+                    <h2>Utilidades</h2>
+                    <p class="desc">Comandos utilitários e personalizações.</p>
+                </div>
+            </div>
+
+            <!-- SEÇÃO LOGS -->
+            <div class="section" id="section-logs">
+                <div class="content-card">
+                    <h2>Logs</h2>
+                    <p class="desc">Em breve você poderá definir canais de logs de moderação, entradas e saídas.</p>
+                </div>
             </div>
         </main>
     </div>
+
+    <div class="toast" id="toast">Salvo com sucesso!</div>
 
     <script>
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
         const openBtn = document.getElementById('openSidebar');
         const closeBtn = document.getElementById('closeSidebar');
+        const guildId = "${guild.id}";
 
         function openSidebar() {
             sidebar.classList.add('open');
@@ -265,30 +399,68 @@ module.exports = (guild, user, userAvatarUrl) => `
         closeBtn.addEventListener('click', closeSidebar);
         overlay.addEventListener('click', closeSidebar);
 
-        // Swipe para abrir/fechar
-        let touchStartX = 0;
-        let touchEndX = 0;
+        // Menu sections
+        document.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
 
+                item.classList.add('active');
+                document.getElementById('section-' + item.dataset.section).classList.add('active');
+                closeSidebar();
+            });
+        });
+
+        // Swipe
+        let touchStartX = 0;
         document.addEventListener('touchstart', e => {
             touchStartX = e.changedTouches[0].screenX;
         }, { passive: true });
 
         document.addEventListener('touchend', e => {
-            touchEndX = e.changedTouches[0].screenX;
-            handleSwipe();
+            const diff = e.changedTouches[0].screenX - touchStartX;
+            if (diff > 80 && touchStartX < 40) openSidebar();
+            if (diff < -80 && sidebar.classList.contains('open')) closeSidebar();
         }, { passive: true });
 
-        function handleSwipe() {
-            const diff = touchEndX - touchStartX;
+        // Salvar prefixo
+        document.getElementById('savePrefix').addEventListener('click', async () => {
+            const btn = document.getElementById('savePrefix');
+            const prefix = document.getElementById('prefix').value.trim();
 
-            // Arrastar da esquerda para a direita → abrir
-            if (diff > 80 && touchStartX < 40) {
-                openSidebar();
+            if (!prefix || prefix.length > 5) {
+                alert('Prefixo inválido (máximo 5 caracteres)');
+                return;
             }
-            // Arrastar da direita para a esquerda → fechar
-            if (diff < -80 && sidebar.classList.contains('open')) {
-                closeSidebar();
+
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+
+            try {
+                const res = await fetch('/api/guilds/' + guildId + '/prefix', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prefix })
+                });
+
+                if (res.ok) {
+                    showToast('Prefixo salvo com sucesso!');
+                } else {
+                    alert('Erro ao salvar');
+                }
+            } catch (err) {
+                alert('Erro de conexão');
             }
+
+            btn.disabled = false;
+            btn.textContent = 'Salvar Prefixo';
+        });
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
         }
     </script>
 </body>
