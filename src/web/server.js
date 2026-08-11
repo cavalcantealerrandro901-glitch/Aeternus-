@@ -121,16 +121,24 @@ module.exports = (client) => {
         const guild = getManageableGuilds(session.guilds).find(g => g.id === req.params.guildId);
         if (!guild) return res.redirect('/dashboard');
 
+        const botGuild = client.guilds.cache.get(guild.id);
+        const channels = botGuild
+            ? botGuild.channels.cache
+                .filter(c => c.type === 0 || c.type === 5)
+                .map(c => ({ id: c.id, name: c.name }))
+                .sort((a, b) => a.name.localeCompare(b.name))
+            : [];
+
         const userAvatarUrl = session.user.avatar
             ? \`https://cdn.discordapp.com/avatars/\${session.user.id}/\${session.user.avatar}.png\`
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
         const config = db.getGuildConfig(guild.id);
 
-        res.send(renderGuild(guild, session.user, userAvatarUrl, config));
+        res.send(renderGuild(guild, session.user, userAvatarUrl, config, channels));
     });
 
-    // API: Salvar Prefixo
+    // API: Prefixo
     app.post('/api/guilds/:guildId/prefix', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.status(401).json({ error: 'Não autorizado' });
@@ -141,6 +149,16 @@ module.exports = (client) => {
         }
 
         await db.setGuildConfig(req.params.guildId, { prefix });
+        res.json({ success: true });
+    });
+
+    // API: Logs
+    app.post('/api/guilds/:guildId/logs', async (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const logs = req.body.logs || {};
+        await db.setGuildConfig(req.params.guildId, { logs });
         res.json({ success: true });
     });
 

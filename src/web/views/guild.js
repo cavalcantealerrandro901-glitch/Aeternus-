@@ -1,4 +1,4 @@
-module.exports = (guild, user, userAvatarUrl, config) => `
+module.exports = (guild, user, userAvatarUrl, config, channels) => `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -29,9 +29,7 @@ module.exports = (guild, user, userAvatarUrl, config) => `
             overflow-y: auto;
         }
 
-        .sidebar.open {
-            transform: translateX(0);
-        }
+        .sidebar.open { transform: translateX(0); }
 
         .sidebar-overlay {
             position: fixed;
@@ -56,10 +54,7 @@ module.exports = (guild, user, userAvatarUrl, config) => `
             padding: 0 8px;
         }
 
-        .sidebar-header h3 {
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
+        .sidebar-header h3 { font-size: 1.1rem; font-weight: 600; }
 
         .close-btn {
             background: none;
@@ -175,7 +170,7 @@ module.exports = (guild, user, userAvatarUrl, config) => `
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 22px;
         }
 
         .form-group label {
@@ -185,9 +180,10 @@ module.exports = (guild, user, userAvatarUrl, config) => `
             font-size: 0.95rem;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group select {
             width: 100%;
-            max-width: 280px;
+            max-width: 320px;
             background: var(--bg);
             border: 1px solid var(--border);
             color: var(--text);
@@ -198,7 +194,8 @@ module.exports = (guild, user, userAvatarUrl, config) => `
             transition: border-color 0.2s;
         }
 
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group select:focus {
             border-color: var(--primary);
         }
 
@@ -206,6 +203,26 @@ module.exports = (guild, user, userAvatarUrl, config) => `
             font-size: 0.8rem;
             color: var(--text-muted);
             margin-top: 6px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .checkbox-item input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
         }
 
         .save-btn {
@@ -219,14 +236,8 @@ module.exports = (guild, user, userAvatarUrl, config) => `
             transition: background 0.2s;
         }
 
-        .save-btn:hover {
-            background: var(--primary-hover);
-        }
-
-        .save-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
+        .save-btn:hover { background: var(--primary-hover); }
+        .save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .toast {
             position: fixed;
@@ -248,13 +259,8 @@ module.exports = (guild, user, userAvatarUrl, config) => `
             transform: translateY(0);
         }
 
-        .section {
-            display: none;
-        }
-
-        .section.active {
-            display: block;
-        }
+        .section { display: none; }
+        .section.active { display: block; }
 
         @media (min-width: 900px) {
             .sidebar {
@@ -262,15 +268,9 @@ module.exports = (guild, user, userAvatarUrl, config) => `
                 top: 0;
                 transform: translateX(0);
             }
-            .sidebar-overlay {
-                display: none !important;
-            }
-            .menu-toggle {
-                display: none;
-            }
-            .close-btn {
-                display: none;
-            }
+            .sidebar-overlay { display: none !important; }
+            .menu-toggle { display: none; }
+            .close-btn { display: none; }
         }
     </style>
 </head>
@@ -294,21 +294,11 @@ module.exports = (guild, user, userAvatarUrl, config) => `
                 <button class="close-btn" id="closeSidebar">✕</button>
             </div>
 
-            <button class="menu-item active" data-section="geral">
-                <span>⚙️</span> Geral
-            </button>
-            <button class="menu-item" data-section="moderacao">
-                <span>🛡️</span> Moderação
-            </button>
-            <button class="menu-item" data-section="economia">
-                <span>💰</span> Economia
-            </button>
-            <button class="menu-item" data-section="utilidades">
-                <span>🔧</span> Utilidades
-            </button>
-            <button class="menu-item" data-section="logs">
-                <span>📋</span> Logs
-            </button>
+            <button class="menu-item active" data-section="geral"><span>⚙️</span> Geral</button>
+            <button class="menu-item" data-section="moderacao"><span>🛡️</span> Moderação</button>
+            <button class="menu-item" data-section="economia"><span>💰</span> Economia</button>
+            <button class="menu-item" data-section="utilidades"><span>🔧</span> Utilidades</button>
+            <button class="menu-item" data-section="logs"><span>📋</span> Logs</button>
         </aside>
 
         <main class="main-content">
@@ -326,7 +316,7 @@ module.exports = (guild, user, userAvatarUrl, config) => `
                 <button class="menu-toggle" id="openSidebar">☰</button>
             </div>
 
-            <!-- SEÇÃO GERAL -->
+            <!-- GERAL -->
             <div class="section active" id="section-geral">
                 <div class="content-card">
                     <h2>Prefixo do Bot</h2>
@@ -342,7 +332,7 @@ module.exports = (guild, user, userAvatarUrl, config) => `
                 </div>
             </div>
 
-            <!-- SEÇÃO MODERAÇÃO -->
+            <!-- MODERAÇÃO -->
             <div class="section" id="section-moderacao">
                 <div class="content-card">
                     <h2>Moderação</h2>
@@ -350,7 +340,7 @@ module.exports = (guild, user, userAvatarUrl, config) => `
                 </div>
             </div>
 
-            <!-- SEÇÃO ECONOMIA -->
+            <!-- ECONOMIA -->
             <div class="section" id="section-economia">
                 <div class="content-card">
                     <h2>Economia</h2>
@@ -358,7 +348,7 @@ module.exports = (guild, user, userAvatarUrl, config) => `
                 </div>
             </div>
 
-            <!-- SEÇÃO UTILIDADES -->
+            <!-- UTILIDADES -->
             <div class="section" id="section-utilidades">
                 <div class="content-card">
                     <h2>Utilidades</h2>
@@ -366,11 +356,52 @@ module.exports = (guild, user, userAvatarUrl, config) => `
                 </div>
             </div>
 
-            <!-- SEÇÃO LOGS -->
+            <!-- LOGS -->
             <div class="section" id="section-logs">
                 <div class="content-card">
-                    <h2>Logs</h2>
-                    <p class="desc">Em breve você poderá definir canais de logs de moderação, entradas e saídas.</p>
+                    <h2>Logs de Auditoria</h2>
+                    <p class="desc">Escolha o canal onde o bot enviará os registros de ações do servidor.</p>
+
+                    <div class="form-group">
+                        <label for="logChannel">Canal de Logs</label>
+                        <select id="logChannel">
+                            <option value="">Nenhum (desativado)</option>
+                            ${channels.map(c => `
+                                <option value="${c.id}" ${config.logs?.channel === c.id ? 'selected' : ''}>
+                                    #${c.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                        <div class="hint">O bot precisa ter permissão de Enviar Mensagens e Incorporar Links neste canal.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Eventos que serão registrados</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="logBan" ${config.logs?.ban !== false ? 'checked' : ''}>
+                                Banimentos e desbanimentos
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="logKick" ${config.logs?.kick !== false ? 'checked' : ''}>
+                                Expulsões
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="logTimeout" ${config.logs?.timeout !== false ? 'checked' : ''}>
+                                Castigos (timeout)
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="logMessage" ${config.logs?.message !== false ? 'checked' : ''}>
+                                Mensagens apagadas / editadas
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" id="logMember" ${config.logs?.member !== false ? 'checked' : ''}>
+                                Entrada e saída de membros
+                            </label>
+                        </div>
+                    </div>
+
+                    <button class="save-btn" id="saveLogs">Salvar Configurações de Logs</button>
                 </div>
             </div>
         </main>
@@ -399,19 +430,16 @@ module.exports = (guild, user, userAvatarUrl, config) => `
         closeBtn.addEventListener('click', closeSidebar);
         overlay.addEventListener('click', closeSidebar);
 
-        // Menu sections
         document.querySelectorAll('.menu-item').forEach(item => {
             item.addEventListener('click', () => {
                 document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
                 document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-
                 item.classList.add('active');
                 document.getElementById('section-' + item.dataset.section).classList.add('active');
                 closeSidebar();
             });
         });
 
-        // Swipe
         let touchStartX = 0;
         document.addEventListener('touchstart', e => {
             touchStartX = e.changedTouches[0].screenX;
@@ -423,15 +451,11 @@ module.exports = (guild, user, userAvatarUrl, config) => `
             if (diff < -80 && sidebar.classList.contains('open')) closeSidebar();
         }, { passive: true });
 
-        // Salvar prefixo
+        // Salvar Prefixo
         document.getElementById('savePrefix').addEventListener('click', async () => {
             const btn = document.getElementById('savePrefix');
             const prefix = document.getElementById('prefix').value.trim();
-
-            if (!prefix || prefix.length > 5) {
-                alert('Prefixo inválido (máximo 5 caracteres)');
-                return;
-            }
+            if (!prefix || prefix.length > 5) return alert('Prefixo inválido');
 
             btn.disabled = true;
             btn.textContent = 'Salvando...';
@@ -442,18 +466,45 @@ module.exports = (guild, user, userAvatarUrl, config) => `
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prefix })
                 });
-
-                if (res.ok) {
-                    showToast('Prefixo salvo com sucesso!');
-                } else {
-                    alert('Erro ao salvar');
-                }
-            } catch (err) {
+                if (res.ok) showToast('Prefixo salvo com sucesso!');
+                else alert('Erro ao salvar');
+            } catch {
                 alert('Erro de conexão');
             }
 
             btn.disabled = false;
             btn.textContent = 'Salvar Prefixo';
+        });
+
+        // Salvar Logs
+        document.getElementById('saveLogs').addEventListener('click', async () => {
+            const btn = document.getElementById('saveLogs');
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+
+            const logs = {
+                channel: document.getElementById('logChannel').value || null,
+                ban: document.getElementById('logBan').checked,
+                kick: document.getElementById('logKick').checked,
+                timeout: document.getElementById('logTimeout').checked,
+                message: document.getElementById('logMessage').checked,
+                member: document.getElementById('logMember').checked
+            };
+
+            try {
+                const res = await fetch('/api/guilds/' + guildId + '/logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ logs })
+                });
+                if (res.ok) showToast('Configurações de logs salvas!');
+                else alert('Erro ao salvar');
+            } catch {
+                alert('Erro de conexão');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Salvar Configurações de Logs';
         });
 
         function showToast(msg) {
