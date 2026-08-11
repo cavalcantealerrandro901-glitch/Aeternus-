@@ -5,6 +5,7 @@ const guildSchema = new mongoose.Schema({
     prefix: { type: String, default: '!' },
     logs: { type: Object, default: {} },
     welcome: { type: Object, default: {} },
+    automod: { type: Object, default: {} },
     updates: { type: Object, default: {} },
     customCommands: { type: Array, default: [] },
     tickets: { type: Object, default: {} },
@@ -22,7 +23,7 @@ module.exports = {
         }
         await mongoose.connect(process.env.MONGO_URI);
         console.log("📦 Conectado ao MongoDB com sucesso!");
-        
+
         const configs = await GuildConfig.find();
         configs.forEach(c => cache.set(c.guildId, c.toObject()));
         console.log(`✅ Cache carregado com ${cache.size} servidores.`);
@@ -30,7 +31,16 @@ module.exports = {
 
     getGuildConfig: (guildId) => {
         if (!cache.has(guildId)) {
-            return { prefix: '!', logs: {}, welcome: {}, updates: {}, customCommands: [], tickets: {}, flirt: {} };
+            return {
+                prefix: '!',
+                logs: {},
+                welcome: {},
+                automod: {},
+                updates: {},
+                customCommands: [],
+                tickets: {},
+                flirt: {}
+            };
         }
         return cache.get(guildId);
     },
