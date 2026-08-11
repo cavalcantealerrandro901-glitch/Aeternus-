@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Partials, Events } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const startWebPanel = require('./src/web/server');
@@ -45,7 +45,7 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
     console.log(`\n🎰 ${client.user.tag} está online!`);
     console.log(`📡 Servidores: ${client.guilds.cache.size}`);
 
