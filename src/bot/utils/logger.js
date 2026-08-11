@@ -4,10 +4,25 @@ const db = require('../../database/db');
 async function sendLog(guild, type, embed) {
     try {
         const config = db.getGuildConfig(guild.id);
-        if (!config.logs || !config.logs.channel) return;
-        if (config.logs[type] === false) return;
+        const logs = config.logs || {};
 
-        const channel = guild.channels.cache.get(config.logs.channel);
+        // Novo formato: logs.ban = { enabled, channel }
+        // Compatibilidade com formato antigo
+        let enabled = false;
+        let channelId = null;
+
+        if (logs[type] && typeof logs[type] === 'object') {
+            enabled = !!logs[type].enabled;
+            channelId = logs[type].channel || null;
+        } else if (logs[type] === true || logs[type] === undefined) {
+            // Formato antigo
+            enabled = logs[type] !== false;
+            channelId = logs.channel || null;
+        }
+
+        if (!enabled || !channelId) return;
+
+        const channel = guild.channels.cache.get(channelId);
         if (!channel || !channel.isTextBased()) return;
 
         await channel.send({ embeds: [embed] });

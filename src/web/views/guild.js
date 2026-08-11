@@ -1,4 +1,32 @@
-module.exports = (guild, user, userAvatarUrl, config, channels) => `
+module.exports = (guild, user, userAvatarUrl, config, channels) => {
+    const logs = config.logs || {};
+
+    // Helper para ler config de cada tipo (novo + antigo formato)
+    function getLogConfig(type) {
+        if (logs[type] && typeof logs[type] === 'object') {
+            return {
+                enabled: !!logs[type].enabled,
+                channel: logs[type].channel || ''
+            };
+        }
+        // Formato antigo
+        return {
+            enabled: logs[type] !== false && !!logs.channel,
+            channel: logs.channel || ''
+        };
+    }
+
+    const banCfg = getLogConfig('ban');
+    const kickCfg = getLogConfig('kick');
+    const timeoutCfg = getLogConfig('timeout');
+    const messageCfg = getLogConfig('message');
+    const memberCfg = getLogConfig('member');
+
+    const channelOptions = (selected) => channels.map(c =>
+        `<option value="${c.id}" ${selected === c.id ? 'selected' : ''}>#${c.name}</option>`
+    ).join('');
+
+    return `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -205,26 +233,6 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => `
             margin-top: 6px;
         }
 
-        .checkbox-group {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 8px;
-        }
-
-        .checkbox-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-        }
-
-        .checkbox-item input {
-            width: 18px;
-            height: 18px;
-            accent-color: var(--primary);
-        }
-
         .save-btn {
             background: var(--primary);
             color: white;
@@ -261,6 +269,120 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => `
 
         .section { display: none; }
         .section.active { display: block; }
+
+        /* Toggle Switch */
+        .log-item {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin-bottom: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .log-item.active-item {
+            border-color: rgba(124, 58, 237, 0.4);
+        }
+
+        .log-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .log-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .log-item-info strong {
+            font-size: 0.98rem;
+            font-weight: 600;
+        }
+
+        .log-item-info span {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .toggle {
+            position: relative;
+            width: 52px;
+            height: 30px;
+            flex-shrink: 0;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #333;
+            border-radius: 30px;
+            transition: 0.25s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 24px;
+            width: 24px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.25s;
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background: #3b82f6;
+        }
+
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        .log-channel-box {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+            display: none;
+        }
+
+        .log-channel-box.show {
+            display: block;
+        }
+
+        .log-channel-box label {
+            display: block;
+            font-size: 0.88rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+        }
+
+        .log-channel-box select {
+            width: 100%;
+            max-width: 100%;
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 11px 14px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .log-channel-box select:focus {
+            border-color: var(--primary);
+        }
 
         @media (min-width: 900px) {
             .sidebar {
@@ -360,48 +482,114 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => `
             <div class="section" id="section-logs">
                 <div class="content-card">
                     <h2>Logs de Auditoria</h2>
-                    <p class="desc">Escolha o canal onde o bot enviará os registros de ações do servidor.</p>
+                    <p class="desc">Ative cada tipo de log e escolha o canal onde ele será enviado.</p>
 
-                    <div class="form-group">
-                        <label for="logChannel">Canal de Logs</label>
-                        <select id="logChannel">
-                            <option value="">Nenhum (desativado)</option>
-                            ${channels.map(c => `
-                                <option value="${c.id}" ${config.logs?.channel === c.id ? 'selected' : ''}>
-                                    #${c.name}
-                                </option>
-                            `).join('')}
-                        </select>
-                        <div class="hint">O bot precisa ter permissão de Enviar Mensagens e Incorporar Links neste canal.</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Eventos que serão registrados</label>
-                        <div class="checkbox-group">
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="logBan" ${config.logs?.ban !== false ? 'checked' : ''}>
-                                Banimentos e desbanimentos
+                    <!-- BAN -->
+                    <div class="log-item ${banCfg.enabled ? 'active-item' : ''}" id="item-ban">
+                        <div class="log-item-header">
+                            <div class="log-item-info">
+                                <strong>🔨 Banimentos</strong>
+                                <span>Banimentos e desbanimentos</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="toggle-ban" ${banCfg.enabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
                             </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="logKick" ${config.logs?.kick !== false ? 'checked' : ''}>
-                                Expulsões
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="logTimeout" ${config.logs?.timeout !== false ? 'checked' : ''}>
-                                Castigos (timeout)
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="logMessage" ${config.logs?.message !== false ? 'checked' : ''}>
-                                Mensagens apagadas / editadas
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" id="logMember" ${config.logs?.member !== false ? 'checked' : ''}>
-                                Entrada e saída de membros
-                            </label>
+                        </div>
+                        <div class="log-channel-box ${banCfg.enabled ? 'show' : ''}" id="channel-box-ban">
+                            <label>Canal de destino</label>
+                            <select id="channel-ban">
+                                <option value="">Selecione um canal</option>
+                                ${channelOptions(banCfg.channel)}
+                            </select>
                         </div>
                     </div>
 
-                    <button class="save-btn" id="saveLogs">Salvar Configurações de Logs</button>
+                    <!-- KICK -->
+                    <div class="log-item ${kickCfg.enabled ? 'active-item' : ''}" id="item-kick">
+                        <div class="log-item-header">
+                            <div class="log-item-info">
+                                <strong>👢 Expulsões</strong>
+                                <span>Quando um membro for expulso</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="toggle-kick" ${kickCfg.enabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="log-channel-box ${kickCfg.enabled ? 'show' : ''}" id="channel-box-kick">
+                            <label>Canal de destino</label>
+                            <select id="channel-kick">
+                                <option value="">Selecione um canal</option>
+                                ${channelOptions(kickCfg.channel)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- TIMEOUT -->
+                    <div class="log-item ${timeoutCfg.enabled ? 'active-item' : ''}" id="item-timeout">
+                        <div class="log-item-header">
+                            <div class="log-item-info">
+                                <strong>🔇 Castigos (Timeout)</strong>
+                                <span>Aplicação e remoção de timeout</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="toggle-timeout" ${timeoutCfg.enabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="log-channel-box ${timeoutCfg.enabled ? 'show' : ''}" id="channel-box-timeout">
+                            <label>Canal de destino</label>
+                            <select id="channel-timeout">
+                                <option value="">Selecione um canal</option>
+                                ${channelOptions(timeoutCfg.channel)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- MESSAGE -->
+                    <div class="log-item ${messageCfg.enabled ? 'active-item' : ''}" id="item-message">
+                        <div class="log-item-header">
+                            <div class="log-item-info">
+                                <strong>🗑️ Mensagens</strong>
+                                <span>Mensagens apagadas</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="toggle-message" ${messageCfg.enabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="log-channel-box ${messageCfg.enabled ? 'show' : ''}" id="channel-box-message">
+                            <label>Canal de destino</label>
+                            <select id="channel-message">
+                                <option value="">Selecione um canal</option>
+                                ${channelOptions(messageCfg.channel)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- MEMBER -->
+                    <div class="log-item ${memberCfg.enabled ? 'active-item' : ''}" id="item-member">
+                        <div class="log-item-header">
+                            <div class="log-item-info">
+                                <strong>👤 Membros</strong>
+                                <span>Entrada e saída de membros</span>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" id="toggle-member" ${memberCfg.enabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="log-channel-box ${memberCfg.enabled ? 'show' : ''}" id="channel-box-member">
+                            <label>Canal de destino</label>
+                            <select id="channel-member">
+                                <option value="">Selecione um canal</option>
+                                ${channelOptions(memberCfg.channel)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <button class="save-btn" id="saveLogs" style="margin-top:10px;">Salvar Configurações de Logs</button>
                 </div>
             </div>
         </main>
@@ -415,6 +603,7 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => `
         const openBtn = document.getElementById('openSidebar');
         const closeBtn = document.getElementById('closeSidebar');
         const guildId = "${guild.id}";
+        const logTypes = ['ban', 'kick', 'timeout', 'message', 'member'];
 
         function openSidebar() {
             sidebar.classList.add('open');
@@ -451,6 +640,23 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => `
             if (diff < -80 && sidebar.classList.contains('open')) closeSidebar();
         }, { passive: true });
 
+        // Toggle → mostra/esconde seletor de canal
+        logTypes.forEach(type => {
+            const toggle = document.getElementById('toggle-' + type);
+            const box = document.getElementById('channel-box-' + type);
+            const item = document.getElementById('item-' + type);
+
+            toggle.addEventListener('change', () => {
+                if (toggle.checked) {
+                    box.classList.add('show');
+                    item.classList.add('active-item');
+                } else {
+                    box.classList.remove('show');
+                    item.classList.remove('active-item');
+                }
+            });
+        });
+
         // Salvar Prefixo
         document.getElementById('savePrefix').addEventListener('click', async () => {
             const btn = document.getElementById('savePrefix');
@@ -482,14 +688,12 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => `
             btn.disabled = true;
             btn.textContent = 'Salvando...';
 
-            const logs = {
-                channel: document.getElementById('logChannel').value || null,
-                ban: document.getElementById('logBan').checked,
-                kick: document.getElementById('logKick').checked,
-                timeout: document.getElementById('logTimeout').checked,
-                message: document.getElementById('logMessage').checked,
-                member: document.getElementById('logMember').checked
-            };
+            const logs = {};
+            logTypes.forEach(type => {
+                const enabled = document.getElementById('toggle-' + type).checked;
+                const channel = document.getElementById('channel-' + type).value || null;
+                logs[type] = { enabled, channel: enabled ? channel : null };
+            });
 
             try {
                 const res = await fetch('/api/guilds/' + guildId + '/logs', {
@@ -517,3 +721,4 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => `
 </body>
 </html>
 `;
+};
