@@ -14,6 +14,7 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
     const kickCfg = getLogConfig('kick');
     const timeoutCfg = getLogConfig('timeout');
     const messageCfg = getLogConfig('message');
+    const messageEditCfg = getLogConfig('messageEdit');
     const memberCfg = getLogConfig('member');
 
     const wEnabled = !!welcome.enabled;
@@ -63,39 +64,32 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
                     <span>${desc}</span>
                 </div>
                 <label class="toggle">
-                    <input type="checkbox" id="toggle-${id}" class="am-toggle" data-rule="${id}" ${en ? 'checked' : ''}>
+                    <input type="checkbox" id="toggle-${id}" ${en ? 'checked' : ''}>
                     <span class="toggle-slider"></span>
                 </label>
             </div>
             <div class="log-channel-box ${en ? 'show' : ''}" id="channel-box-${id}">
                 <label>Tipo de punição</label>
                 <select id="action-${id}">${actionOpts(cfg.action || 'timeout')}</select>
-
                 <label>Duração do timeout (minutos)</label>
                 <input type="number" id="duration-${id}" value="${cfg.duration || 10}" min="1" max="40320">
-
                 <label>Motivo da punição</label>
-                <input type="text" id="reason-${id}" value="${(cfg.reason || '').replace(/"/g, '&quot;')}" placeholder="Motivo que aparecerá no log/punição">
-
+                <input type="text" id="reason-${id}" value="${(cfg.reason || '').replace(/"/g, '&quot;')}" placeholder="Motivo da punição">
                 ${extraFields || ''}
             </div>
         </div>`;
     }
 
-    const badWordsExtra = `
-        <label>Palavras proibidas (separadas por vírgula)</label>
-        <textarea id="words-badWords" placeholder="palavra1, palavra2, ofensa">${(Array.isArray(bw.words) ? bw.words.join(', ') : '').replace(/</g, '&lt;')}</textarea>
-    `;
+    const logLabels = {
+        ban: ['🔨 Banimentos', 'Ban e desban'],
+        kick: ['👢 Expulsões', 'Kicks'],
+        timeout: ['🔇 Timeout', 'Castigos'],
+        message: ['🗑️ Mensagens apagadas', 'Quando uma msg é deletada'],
+        messageEdit: ['✏️ Mensagens editadas', 'Quando uma msg é editada'],
+        member: ['👤 Membros', 'Entrada e saída']
+    };
 
-    const spamExtra = `
-        <label>Limite de mensagens repetidas</label>
-        <input type="number" id="limit-spam" value="${sp.limit || 4}" min="2" max="20">
-    `;
-
-    const massExtra = `
-        <label>Limite de menções</label>
-        <input type="number" id="limit-massMention" value="${mm.limit || 5}" min="2" max="50">
-    `;
+    const logCfgs = { ban: banCfg, kick: kickCfg, timeout: timeoutCfg, message: messageCfg, messageEdit: messageEditCfg, member: memberCfg };
 
     return `
 <!DOCTYPE html>
@@ -111,20 +105,19 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
         .sidebar.open { transform: translateX(0); }
         .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 80; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
         .sidebar-overlay.show { opacity: 1; visibility: visible; }
-        .sidebar-server { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); margin-bottom: 10px; }
+        .sidebar-server { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); }
         .sidebar-server img, .sidebar-server .fb { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
         .sidebar-server .fb { background: var(--border); display: flex; align-items: center; justify-content: center; font-weight: 700; }
         .sidebar-server .name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .switch-server { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 11px 14px; margin-bottom: 20px; background: transparent; border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+        .switch-server { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 11px 14px; margin: 12px 0 20px; background: transparent; border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); font-size: 0.9rem; font-weight: 500; text-decoration: none; }
         .switch-server:hover { border-color: var(--primary); color: var(--primary); }
         .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 4px 8px; border-radius: 6px; margin-left: auto; }
-        .close-btn:hover { color: var(--text); background: var(--border); }
-        .menu-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; transition: all 0.2s; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-size: 0.95rem; }
+        .menu-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-size: 0.95rem; }
         .menu-item:hover, .menu-item.active { background: rgba(124, 58, 237, 0.15); color: #a78bfa; }
         .main-content { flex: 1; padding: 30px 20px; width: 100%; }
         .menu-toggle { background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 1.35rem; width: 42px; height: 42px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .menu-toggle:hover { border-color: var(--primary); color: var(--primary); }
-        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .page-header { display: flex; align-items: center; gap: 14px; margin-bottom: 30px; }
         .guild-title { display: flex; align-items: center; gap: 14px; }
         .guild-title img, .guild-title .fallback { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
         .fallback { background: var(--border); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem; }
@@ -134,25 +127,20 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
         .form-group { margin-bottom: 18px; }
         .form-group label { display: block; font-weight: 500; margin-bottom: 8px; font-size: 0.9rem; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 11px 14px; border-radius: 10px; font-size: 0.95rem; outline: none; font-family: inherit; }
-        .form-group textarea { min-height: 90px; resize: vertical; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); }
-        .form-group .hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; }
-        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
-        .save-btn { background: var(--primary); color: white; border: none; padding: 12px 22px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .save-btn { background: var(--primary); color: white; border: none; padding: 12px 22px; border-radius: 10px; font-weight: 600; cursor: pointer; }
         .save-btn:hover { background: var(--primary-hover); }
-        .save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .test-btn { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 12px 22px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .test-btn:hover { border-color: var(--primary); color: var(--primary); }
-        .toast { position: fixed; bottom: 30px; right: 30px; background: var(--success); color: white; padding: 14px 22px; border-radius: 12px; font-weight: 500; opacity: 0; transform: translateY(20px); transition: all 0.3s ease; z-index: 200; }
+        .test-btn { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 12px 22px; border-radius: 10px; font-weight: 600; cursor: pointer; }
+        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+        .toast { position: fixed; bottom: 30px; right: 30px; background: var(--success); color: white; padding: 14px 22px; border-radius: 12px; font-weight: 500; opacity: 0; transform: translateY(20px); transition: all 0.3s; z-index: 200; }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.error { background: var(--danger); }
         .section { display: none; }
         .section.active { display: block; }
-        .log-item { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; transition: border-color 0.2s; }
+        .log-item { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
         .log-item.active-item { border-color: rgba(124, 58, 237, 0.4); }
         .log-item-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
         .log-item-info { display: flex; flex-direction: column; gap: 2px; }
-        .log-item-info strong { font-size: 0.98rem; font-weight: 600; }
+        .log-item-info strong { font-size: 0.98rem; }
         .log-item-info span { font-size: 0.82rem; color: var(--text-muted); }
         .toggle { position: relative; width: 52px; height: 30px; flex-shrink: 0; }
         .toggle input { opacity: 0; width: 0; height: 0; }
@@ -168,11 +156,8 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
         .vars-hint { font-size: 0.75rem; color: var(--text-muted); line-height: 1.7; margin-bottom: 12px; }
         .vars-hint code { background: var(--card); padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; }
         .checkbox-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; cursor: pointer; font-size: 0.9rem; }
-        .checkbox-row input { width: 17px; height: 17px; accent-color: var(--primary); }
         .color-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-        .color-row input[type="color"] { width: 44px; height: 36px; border: none; background: none; cursor: pointer; padding: 0; }
-        .color-row input[type="text"] { flex: 1; }
-        .am-master { margin-bottom: 20px; }
+        .color-row input[type="color"] { width: 44px; height: 36px; border: none; background: none; cursor: pointer; }
         @media (min-width: 900px) {
             .sidebar { position: relative; top: 0; transform: translateX(0); }
             .sidebar-overlay { display: none !important; }
@@ -183,21 +168,17 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
 </head>
 <body>
     <nav class="navbar">
-        <div class="container" style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="container" style="display:flex;align-items:center;gap:14px;">
+            <button class="menu-toggle" id="openSidebar" title="Menu">☰</button>
             <div class="logo">Aeternus</div>
-            <div class="nav-links" style="display:flex;align-items:center;gap:10px;">
-                <a href="/dashboard" class="btn btn-outline">Voltar</a>
-                <a href="/logout" class="btn btn-outline">Sair</a>
-                <button class="menu-toggle" id="openSidebar" title="Menu">☰</button>
-            </div>
         </div>
     </nav>
 
     <div class="layout">
         <div class="sidebar-overlay" id="overlay"></div>
         <aside class="sidebar" id="sidebar">
-            <div style="display:flex;align-items:center;margin-bottom:12px;">
-                <div class="sidebar-server" style="flex:1;margin-bottom:0;">
+            <div style="display:flex;align-items:center;margin-bottom:4px;">
+                <div class="sidebar-server" style="flex:1;">
                     ${guildIcon ? `<img src="${guildIcon}" alt="">` : `<div class="fb">${guild.name.charAt(0)}</div>`}
                     <div class="name">${guild.name}</div>
                 </div>
@@ -226,9 +207,9 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
             <div class="section active" id="section-geral">
                 <div class="content-card">
                     <h2>Prefixo do Bot</h2>
-                    <p class="desc">Altere o prefixo usado nos comandos de texto deste servidor.</p>
+                    <p class="desc">Altere o prefixo dos comandos de texto.</p>
                     <div class="form-group">
-                        <label for="prefix">Prefixo atual</label>
+                        <label>Prefixo</label>
                         <input type="text" id="prefix" value="${config.prefix || '!'}" maxlength="5" style="max-width:200px;">
                     </div>
                     <button class="save-btn" id="savePrefix">Salvar Prefixo</button>
@@ -238,82 +219,68 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
             <div class="section" id="section-welcome">
                 <div class="content-card">
                     <h2>Mensagem de Boas-vindas</h2>
-                    <p class="desc">O bot envia automaticamente quando alguém entra no servidor.</p>
+                    <p class="desc">Enviada automaticamente quando alguém entra.</p>
                     <div class="log-item ${wEnabled ? 'active-item' : ''}" id="item-welcome">
                         <div class="log-item-header">
-                            <div class="log-item-info"><strong>👋 Boas-vindas automáticas</strong><span>Ativar mensagem ao entrar</span></div>
+                            <div class="log-item-info"><strong>👋 Boas-vindas</strong><span>Ativar mensagem ao entrar</span></div>
                             <label class="toggle"><input type="checkbox" id="toggle-welcome" ${wEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label>
                         </div>
                         <div class="log-channel-box ${wEnabled ? 'show' : ''}" id="channel-box-welcome">
-                            <label>Canal de destino</label>
-                            <select id="channel-welcome"><option value="">Selecione um canal</option>${channelOptions(wChannel)}</select>
+                            <label>Canal</label>
+                            <select id="channel-welcome"><option value="">Selecione</option>${channelOptions(wChannel)}</select>
                             <label>Mensagem</label>
                             <textarea id="welcome-message">${wMessage}</textarea>
                             <div class="vars-hint"><code>{user}</code> <code>{username}</code> <code>{tag}</code> <code>{id}</code> <code>{server}</code> <code>{memberCount}</code> <code>{createdAt}</code></div>
-                            <label class="checkbox-row"><input type="checkbox" id="welcome-mention" ${wMention ? 'checked' : ''}> Mencionar o usuário fora do embed</label>
+                            <label class="checkbox-row"><input type="checkbox" id="welcome-mention" ${wMention ? 'checked' : ''}> Mencionar fora do embed</label>
                             <label class="checkbox-row"><input type="checkbox" id="welcome-embed" ${wUseEmbed ? 'checked' : ''}> Enviar como Embed</label>
-                            <div id="embed-options" style="display:${wUseEmbed ? 'block' : 'none'};margin-top:8px;">
+                            <div id="embed-options" style="display:${wUseEmbed ? 'block' : 'none'};">
                                 <label>Título</label><input type="text" id="welcome-title" value="${wTitle}">
                                 <label>Autor</label><input type="text" id="welcome-author" value="${wAuthor}">
                                 <label>Cor</label><div class="color-row"><input type="color" id="welcome-color-picker" value="${wColor}"><input type="text" id="welcome-color" value="${wColor}"></div>
-                                <label>Imagem (URL)</label><input type="url" id="welcome-image" value="${wImage}">
+                                <label>Imagem URL</label><input type="url" id="welcome-image" value="${wImage}">
                                 <label>Rodapé</label><input type="text" id="welcome-footer" value="${wFooter}">
                             </div>
                         </div>
                     </div>
                     <div class="btn-row">
-                        <button class="save-btn" id="saveWelcome">Salvar Boas-vindas</button>
-                        <button class="test-btn" id="testWelcome">🧪 Testar mensagem</button>
+                        <button class="save-btn" id="saveWelcome">Salvar</button>
+                        <button class="test-btn" id="testWelcome">🧪 Testar</button>
                     </div>
                 </div>
             </div>
 
-            <!-- MODERAÇÃO AUTOMÁTICA -->
             <div class="section" id="section-moderacao">
                 <div class="content-card">
                     <h2>Moderação Automática</h2>
-                    <p class="desc">Ative o sistema e configure cada filtro com o tipo de punição e o motivo.</p>
-
-                    <div class="log-item am-master ${amEnabled ? 'active-item' : ''}" id="item-automod-master">
+                    <p class="desc">Filtros com punição e motivo configuráveis.</p>
+                    <div class="log-item ${amEnabled ? 'active-item' : ''}" id="item-automod-master">
                         <div class="log-item-header">
-                            <div class="log-item-info">
-                                <strong>🛡️ Sistema de AutoMod</strong>
-                                <span>Liga ou desliga toda a moderação automática</span>
-                            </div>
-                            <label class="toggle">
-                                <input type="checkbox" id="toggle-automod" ${amEnabled ? 'checked' : ''}>
-                                <span class="toggle-slider"></span>
-                            </label>
+                            <div class="log-item-info"><strong>🛡️ AutoMod</strong><span>Liga/desliga tudo</span></div>
+                            <label class="toggle"><input type="checkbox" id="toggle-automod" ${amEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label>
                         </div>
                     </div>
-
                     <div id="automod-rules" style="display:${amEnabled ? 'block' : 'none'};">
-                        ${ruleBlock('badWords', '🚫', 'Palavras proibidas', 'Pune quem usar palavras da lista', bw, badWordsExtra)}
-                        ${ruleBlock('invites', '🔗', 'Convites do Discord', 'Bloqueia links de convite', inv)}
-                        ${ruleBlock('links', '🌐', 'Links', 'Bloqueia qualquer link', lnk)}
-                        ${ruleBlock('spam', '📢', 'Spam', 'Mensagens repetidas em sequência', sp, spamExtra)}
-                        ${ruleBlock('massMention', '📣', 'Menções em massa', 'Muitas menções na mesma mensagem', mm, massExtra)}
+                        ${ruleBlock('badWords', '🚫', 'Palavras proibidas', 'Lista de palavras', bw, `<label>Palavras (vírgula)</label><textarea id="words-badWords">${(Array.isArray(bw.words) ? bw.words.join(', ') : '').replace(/</g, '&lt;')}</textarea>`)}
+                        ${ruleBlock('invites', '🔗', 'Convites Discord', 'Bloqueia invites', inv)}
+                        ${ruleBlock('links', '🌐', 'Links', 'Bloqueia links', lnk)}
+                        ${ruleBlock('spam', '📢', 'Spam', 'Msgs repetidas', sp, `<label>Limite</label><input type="number" id="limit-spam" value="${sp.limit || 4}" min="2">`)}
+                        ${ruleBlock('massMention', '📣', 'Menções em massa', 'Muitas menções', mm, `<label>Limite</label><input type="number" id="limit-massMention" value="${mm.limit || 5}" min="2">`)}
                     </div>
-
-                    <button class="save-btn" id="saveAutomod" style="margin-top:10px;">Salvar Moderação</button>
+                    <button class="save-btn" id="saveAutomod">Salvar Moderação</button>
                 </div>
             </div>
 
-            <div class="section" id="section-economia">
-                <div class="content-card"><h2>Economia</h2><p class="desc">Em breve.</p></div>
-            </div>
-            <div class="section" id="section-utilidades">
-                <div class="content-card"><h2>Utilidades</h2><p class="desc">Em breve.</p></div>
-            </div>
+            <div class="section" id="section-economia"><div class="content-card"><h2>Economia</h2><p class="desc">Em breve.</p></div></div>
+            <div class="section" id="section-utilidades"><div class="content-card"><h2>Utilidades</h2><p class="desc">Em breve.</p></div></div>
 
             <div class="section" id="section-logs">
                 <div class="content-card">
                     <h2>Logs de Auditoria</h2>
-                    <p class="desc">Ative cada tipo de log e escolha o canal.</p>
-                    ${['ban','kick','timeout','message','member'].map((type, i) => {
-                        const cfg = [banCfg,kickCfg,timeoutCfg,messageCfg,memberCfg][i];
-                        const labels = { ban:['🔨 Banimentos','Ban e desban'], kick:['👢 Expulsões','Kicks'], timeout:['🔇 Timeout','Castigos'], message:['🗑️ Mensagens','Apagadas'], member:['👤 Membros','Entrada/saída'] };
-                        return `<div class="log-item ${cfg.enabled ? 'active-item' : ''}" id="item-${type}"><div class="log-item-header"><div class="log-item-info"><strong>${labels[type][0]}</strong><span>${labels[type][1]}</span></div><label class="toggle"><input type="checkbox" id="toggle-${type}" ${cfg.enabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div class="log-channel-box ${cfg.enabled ? 'show' : ''}" id="channel-box-${type}"><label>Canal</label><select id="channel-${type}"><option value="">Selecione</option>${channelOptions(cfg.channel)}</select></div></div>`;
+                    <p class="desc">Ative e escolha o canal de cada evento.</p>
+                    ${['ban','kick','timeout','message','messageEdit','member'].map(type => {
+                        const cfg = logCfgs[type];
+                        const [title, desc] = logLabels[type];
+                        return `<div class="log-item ${cfg.enabled ? 'active-item' : ''}" id="item-${type}"><div class="log-item-header"><div class="log-item-info"><strong>${title}</strong><span>${desc}</span></div><label class="toggle"><input type="checkbox" id="toggle-${type}" ${cfg.enabled ? 'checked' : ''}><span class="toggle-slider"></span></label></div><div class="log-channel-box ${cfg.enabled ? 'show' : ''}" id="channel-box-${type}"><label>Canal</label><select id="channel-${type}"><option value="">Selecione</option>${channelOptions(cfg.channel)}</select></div></div>`;
                     }).join('')}
                     <button class="save-btn" id="saveLogs">Salvar Logs</button>
                 </div>
@@ -325,14 +292,31 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
 
     <script>
         const guildId = "${guild.id}";
-        const logTypes = ['ban','kick','timeout','message','member'];
+        const logTypes = ['ban','kick','timeout','message','messageEdit','member'];
         const amRules = ['badWords','invites','links','spam','massMention'];
-
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
-        document.getElementById('openSidebar').onclick = () => { sidebar.classList.add('open'); overlay.classList.add('show'); };
-        document.getElementById('closeSidebar').onclick = () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); };
-        overlay.onclick = () => { sidebar.classList.remove('open'); overlay.classList.remove('show'); };
+
+        function openSidebar() { sidebar.classList.add('open'); overlay.classList.add('show'); }
+        function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('show'); }
+
+        document.getElementById('openSidebar').onclick = openSidebar;
+        document.getElementById('closeSidebar').onclick = closeSidebar;
+        overlay.onclick = closeSidebar;
+
+        // Swipe: qualquer lugar — direita abre, esquerda fecha
+        let startX = 0, startY = 0;
+        document.addEventListener('touchstart', e => {
+            startX = e.changedTouches[0].screenX;
+            startY = e.changedTouches[0].screenY;
+        }, { passive: true });
+        document.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].screenX - startX;
+            const dy = Math.abs(e.changedTouches[0].screenY - startY);
+            if (dy > 80) return; // ignora scroll vertical
+            if (dx > 70) openSidebar();
+            if (dx < -70) closeSidebar();
+        }, { passive: true });
 
         document.querySelectorAll('.menu-item').forEach(item => {
             item.onclick = () => {
@@ -340,7 +324,7 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
                 document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
                 item.classList.add('active');
                 document.getElementById('section-' + item.dataset.section).classList.add('active');
-                sidebar.classList.remove('open'); overlay.classList.remove('show');
+                closeSidebar();
             };
         });
 
@@ -358,41 +342,34 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
         bindToggle('welcome');
         amRules.forEach(bindToggle);
 
-        const amMaster = document.getElementById('toggle-automod');
-        amMaster.onchange = () => {
-            document.getElementById('automod-rules').style.display = amMaster.checked ? 'block' : 'none';
-            document.getElementById('item-automod-master').classList.toggle('active-item', amMaster.checked);
+        document.getElementById('toggle-automod').onchange = e => {
+            document.getElementById('automod-rules').style.display = e.target.checked ? 'block' : 'none';
+            document.getElementById('item-automod-master').classList.toggle('active-item', e.target.checked);
         };
-
         document.getElementById('welcome-embed').onchange = e => {
             document.getElementById('embed-options').style.display = e.target.checked ? 'block' : 'none';
         };
-        document.getElementById('welcome-color-picker').oninput = e => { document.getElementById('welcome-color').value = e.target.value; };
+        document.getElementById('welcome-color-picker').oninput = e => {
+            document.getElementById('welcome-color').value = e.target.value;
+        };
 
         function showToast(msg, err) {
             const t = document.getElementById('toast');
             t.textContent = msg; t.classList.toggle('error', !!err); t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 3000);
         }
-
         async function post(url, body) {
-            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            return res;
+            return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         }
 
         document.getElementById('savePrefix').onclick = async () => {
-            const btn = document.getElementById('savePrefix');
             const prefix = document.getElementById('prefix').value.trim();
             if (!prefix || prefix.length > 5) return alert('Prefixo inválido');
-            btn.disabled = true;
             const res = await post('/api/guilds/' + guildId + '/prefix', { prefix });
-            showToast(res.ok ? 'Prefixo salvo!' : 'Erro', !res.ok);
-            btn.disabled = false;
+            showToast(res.ok ? 'Salvo!' : 'Erro', !res.ok);
         };
 
         document.getElementById('saveLogs').onclick = async () => {
-            const btn = document.getElementById('saveLogs');
-            btn.disabled = true;
             const logs = {};
             logTypes.forEach(type => {
                 const enabled = document.getElementById('toggle-' + type).checked;
@@ -400,7 +377,6 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
             });
             const res = await post('/api/guilds/' + guildId + '/logs', { logs });
             showToast(res.ok ? 'Logs salvos!' : 'Erro', !res.ok);
-            btn.disabled = false;
         };
 
         function getWelcomeData() {
@@ -419,28 +395,22 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
         }
 
         document.getElementById('saveWelcome').onclick = async () => {
-            const btn = document.getElementById('saveWelcome');
-            btn.disabled = true;
             const res = await post('/api/guilds/' + guildId + '/welcome', { welcome: getWelcomeData() });
-            showToast(res.ok ? 'Boas-vindas salvas!' : 'Erro', !res.ok);
-            btn.disabled = false;
+            showToast(res.ok ? 'Salvo!' : 'Erro', !res.ok);
         };
 
         document.getElementById('testWelcome').onclick = async () => {
-            const btn = document.getElementById('testWelcome');
             const data = getWelcomeData();
             if (!data.channel) return alert('Selecione um canal');
-            btn.disabled = true; btn.textContent = 'Enviando...';
+            const btn = document.getElementById('testWelcome');
+            btn.disabled = true;
             const res = await post('/api/guilds/' + guildId + '/welcome/test', { welcome: data });
             const json = await res.json().catch(() => ({}));
             showToast(res.ok ? 'Teste enviado!' : (json.error || 'Erro'), !res.ok);
-            btn.disabled = false; btn.textContent = '🧪 Testar mensagem';
+            btn.disabled = false;
         };
 
         document.getElementById('saveAutomod').onclick = async () => {
-            const btn = document.getElementById('saveAutomod');
-            btn.disabled = true; btn.textContent = 'Salvando...';
-
             function rule(id) {
                 return {
                     enabled: document.getElementById('toggle-' + id).checked,
@@ -449,29 +419,18 @@ module.exports = (guild, user, userAvatarUrl, config, channels) => {
                     reason: document.getElementById('reason-' + id).value || ''
                 };
             }
-
             const badWords = rule('badWords');
-            badWords.words = (document.getElementById('words-badWords').value || '')
-                .split(',').map(w => w.trim()).filter(Boolean);
-
+            badWords.words = (document.getElementById('words-badWords').value || '').split(',').map(w => w.trim()).filter(Boolean);
             const spam = rule('spam');
             spam.limit = parseInt(document.getElementById('limit-spam').value) || 4;
-
             const massMention = rule('massMention');
             massMention.limit = parseInt(document.getElementById('limit-massMention').value) || 5;
-
             const automod = {
                 enabled: document.getElementById('toggle-automod').checked,
-                badWords,
-                invites: rule('invites'),
-                links: rule('links'),
-                spam,
-                massMention
+                badWords, invites: rule('invites'), links: rule('links'), spam, massMention
             };
-
             const res = await post('/api/guilds/' + guildId + '/automod', { automod });
             showToast(res.ok ? 'Moderação salva!' : 'Erro', !res.ok);
-            btn.disabled = false; btn.textContent = 'Salvar Moderação';
         };
     </script>
 </body>
