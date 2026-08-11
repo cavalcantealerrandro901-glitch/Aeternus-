@@ -162,6 +162,16 @@ module.exports = (client) => {
         res.json({ success: true });
     });
 
+    // API: Boas-vindas
+    app.post('/api/guilds/:guildId/welcome', async (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.status(401).json({ error: 'Não autorizado' });
+
+        const welcome = req.body.welcome || {};
+        await db.setGuildConfig(req.params.guildId, { welcome });
+        res.json({ success: true });
+    });
+
     app.listen(PORT, () => {
         console.log(`🌐 Painel Web rodando na porta ${PORT}`);
     });
