@@ -6,8 +6,6 @@ async function sendLog(guild, type, embed) {
         const config = db.getGuildConfig(guild.id);
         const logs = config.logs || {};
 
-        // Novo formato: logs.ban = { enabled, channel }
-        // Compatibilidade com formato antigo
         let enabled = false;
         let channelId = null;
 
@@ -18,6 +16,14 @@ async function sendLog(guild, type, embed) {
             // Formato antigo
             enabled = logs[type] !== false;
             channelId = logs.channel || null;
+        }
+
+        // Compatibilidade: messageEdit usa canal de message se não configurado
+        if (type === 'messageEdit' && !channelId && logs.message) {
+            if (typeof logs.message === 'object') {
+                enabled = enabled || !!logs.message.enabled;
+                channelId = logs.message.channel || null;
+            }
         }
 
         if (!enabled || !channelId) return;
