@@ -23,18 +23,30 @@ module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl
             <div class="user-info">
                 <img src="${userAvatarUrl}" alt="Avatar" class="avatar">
                 <div>
-                    <div style="font-weight:600;font-size:1.1rem;">${user.global_name || user.username}</div>
+                    <div style="font-weight:600;font-size:1.15rem;">${user.global_name || user.username}</div>
                     <div style="color:var(--text-muted);font-size:0.9rem;">@${user.username}</div>
                 </div>
             </div>
         </div>
 
-        <h2 style="margin-bottom:20px;font-size:1.4rem;">Seus Servidores</h2>
+        <div style="margin-bottom: 28px;">
+            <h2 style="font-size:1.4rem;margin-bottom:6px;">Seus Servidores</h2>
+            <p style="color:var(--text-muted);font-size:0.95rem;">
+                Aqui aparecem apenas os servidores em que você tem permissão de Administrador e o bot Aeternus está presente.
+            </p>
+        </div>
 
         ${manageableGuilds.length === 0 ? `
-            <div class="card" style="text-align:center;padding:40px;">
-                <p style="color:var(--text-muted);margin-bottom:16px;">Você não tem nenhum servidor gerenciável com o bot.</p>
-                <a href="https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&scope=bot%20applications.commands&permissions=8" class="btn btn-primary" target="_blank">Adicionar Bot</a>
+            <div class="card" style="text-align:center;padding:50px 30px;">
+                <div style="font-size:2.5rem;margin-bottom:16px;">📭</div>
+                <h3 style="margin-bottom:10px;">Nenhum servidor encontrado</h3>
+                <p style="color:var(--text-muted);margin-bottom:24px;max-width:400px;margin-left:auto;margin-right:auto;">
+                    Você não possui nenhum servidor onde seja administrador e o bot esteja adicionado.
+                </p>
+                <a href="https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&scope=bot%20applications.commands&permissions=8" 
+                   class="btn btn-primary" target="_blank">
+                    Adicionar Aeternus a um Servidor
+                </a>
             </div>
         ` : `
             <div class="grid">
@@ -42,12 +54,12 @@ module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl
                     <a href="/dashboard/${g.id}" class="card guild-card">
                         <div class="guild-icon">
                             ${g.icon 
-                                ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png" style="width:100%;height:100%;border-radius:14px;">`
-                                : g.name.charAt(0)
+                                ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png" style="width:100%;height:100%;border-radius:14px;object-fit:cover;">`
+                                : g.name.charAt(0).toUpperCase()
                             }
                         </div>
-                        <div style="font-weight:600;font-size:1.05rem;">${g.name}</div>
-                        <div style="color:var(--text-muted);font-size:0.85rem;margin-top:4px;">Clique para configurar</div>
+                        <div style="font-weight:600;font-size:1.05rem;margin-bottom:4px;">${g.name}</div>
+                        <div style="color:var(--text-muted);font-size:0.85rem;">Clique para configurar</div>
                     </a>
                 `).join('')}
             </div>
