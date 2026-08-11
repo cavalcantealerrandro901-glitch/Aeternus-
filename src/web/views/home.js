@@ -27,10 +27,7 @@ module.exports = (user, bot, inviteUrl, supportUrl) => `
             <p>O bot completo para o seu servidor. Moderação, economia, utilidades e muito mais em um só lugar.</p>
             <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
                 <a href="${inviteUrl}" class="btn btn-primary" target="_blank">Adicionar ao Servidor</a>
-                ${user 
-                    ? `<a href="/dashboard" class="btn btn-outline">Abrir Dashboard</a>`
-                    : `<a href="/login" class="btn btn-outline">Fazer Login</a>`
-                }
+                <a href="${supportUrl}" class="btn btn-outline" target="_blank">Servidor de Suporte</a>
             </div>
         </div>
     </section>
