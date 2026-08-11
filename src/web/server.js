@@ -5,6 +5,7 @@ const db = require('../database/db');
 
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
+const renderGuild = require('./views/guild');
 
 module.exports = (client) => {
     const app = express();
@@ -22,18 +23,16 @@ module.exports = (client) => {
     const REDIRECT_URI = process.env.REDIRECT_URI || 'https://aeternus-q7gt.onrender.com/auth/discord/callback';
     const SUPPORT_URL = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/seu-suporte';
 
-    // ========== ROTAS ==========
-
     app.get('/', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
-        const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&scope=bot%20applications.commands&permissions=8`;
+        const inviteUrl = \`https://discord.com/oauth2/authorize?client_id=\${CLIENT_ID}&scope=bot%20applications.commands&permissions=8\`;
         res.send(renderHome(session?.user || null, client.user, inviteUrl, SUPPORT_URL));
     });
 
     app.get('/login', (req, res) => {
         if (!CLIENT_ID) return res.status(500).send('CLIENT_ID não configurado.');
         const encodedRedirect = encodeURIComponent(REDIRECT_URI);
-        const url = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodedRedirect}&response_type=code&scope=identify%20guilds`;
+        const url = \`https://discord.com/oauth2/authorize?client_id=\${CLIENT_ID}&redirect_uri=\${encodedRedirect}&response_type=code&scope=identify%20guilds\`;
         res.redirect(url);
     });
 
@@ -58,10 +57,10 @@ module.exports = (client) => {
             if (!tokenData.access_token) return res.redirect('/');
 
             const userRes = await fetch('https://discord.com/api/users/@me', {
-                headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
+                headers: { authorization: \`\${tokenData.token_type} \${tokenData.access_token}\` },
             });
             const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
-                headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
+                headers: { authorization: \`\${tokenData.token_type} \${tokenData.access_token}\` },
             });
 
             const user = await userRes.json();
@@ -110,12 +109,11 @@ module.exports = (client) => {
             botName: client.user.username,
             botAvatarUrl: client.user.displayAvatarURL(),
             userAvatarUrl: session.user.avatar
-                ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png`
+                ? \`https://cdn.discordapp.com/avatars/\${session.user.id}/\${session.user.avatar}.png\`
                 : 'https://cdn.discordapp.com/embed/avatars/0.png'
         }));
     });
 
-    // Rota temporária de servidor (depois expandimos)
     app.get('/dashboard/:guildId', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
@@ -123,35 +121,14 @@ module.exports = (client) => {
         const guild = getManageableGuilds(session.guilds).find(g => g.id === req.params.guildId);
         if (!guild) return res.redirect('/dashboard');
 
-        res.send(`
-            <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-                <meta charset="UTF-8">
-                <title>${guild.name} — Aeternus</title>
-                <link rel="stylesheet" href="/style.css">
-            </head>
-            <body>
-                <nav class="navbar">
-                    <div class="container">
-                        <div class="logo">Aeternus</div>
-                        <div class="nav-links">
-                            <a href="/dashboard" class="btn btn-outline">Voltar</a>
-                        </div>
-                    </div>
-                </nav>
-                <div class="container" style="padding-top:60px;text-align:center;">
-                    <h1 style="margin-bottom:12px;">${guild.name}</h1>
-                    <p style="color:var(--text-muted);">Painel de configurações em construção...</p>
-                    <br>
-                    <a href="/dashboard" class="btn btn-primary">Voltar ao Dashboard</a>
-                </div>
-            </body>
-            </html>
-        `);
+        const userAvatarUrl = session.user.avatar
+            ? \`https://cdn.discordapp.com/avatars/\${session.user.id}/\${session.user.avatar}.png\`
+            : 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+        res.send(renderGuild(guild, session.user, userAvatarUrl));
     });
 
     app.listen(PORT, () => {
-        console.log(`🌐 Painel Web rodando na porta ${PORT}`);
+        console.log(\`🌐 Painel Web rodando na porta \${PORT}\`);
     });
 };
