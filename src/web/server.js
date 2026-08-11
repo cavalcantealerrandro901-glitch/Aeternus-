@@ -97,6 +97,15 @@ module.exports = (client) => {
         });
     }
 
+    function requireSession(req, res) {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) {
+            res.status(401).json({ error: 'Não autorizado' });
+            return null;
+        }
+        return session;
+    }
+
     app.get('/dashboard', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
@@ -138,38 +147,68 @@ module.exports = (client) => {
         res.send(renderGuild(guild, session.user, userAvatarUrl, config, channels));
     });
 
-    // API: Prefixo
     app.post('/api/guilds/:guildId/prefix', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
+        if (!requireSession(req, res)) return;
         const prefix = (req.body.prefix || '').trim();
-        if (!prefix || prefix.length > 5) {
-            return res.status(400).json({ error: 'Prefixo inválido' });
-        }
-
+        if (!prefix || prefix.length > 5) return res.status(400).json({ error: 'Prefixo inválido' });
         await db.setGuildConfig(req.params.guildId, { prefix });
         res.json({ success: true });
     });
 
-    // API: Logs
     app.post('/api/guilds/:guildId/logs', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const logs = req.body.logs || {};
-        await db.setGuildConfig(req.params.guildId, { logs });
+        if (!requireSession(req, res)) return;
+        await db.setGuildConfig(req.params.guildId, { logs: req.body.logs || {} });
         res.json({ success: true });
     });
 
-    // API: Boas-vindas
     app.post('/api/guilds/:guildId/welcome', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.status(401).json({ error: 'Não autorizado' });
-
-        const welcome = req.body.welcome || {};
-        await db.setGuildConfig(req.params.guildId, { welcome });
+        if (!requireSession(req, res)) return;
+        await db.setGuildConfig(req.params.guildId, { welcome: req.body.welcome || {} });
         res.json({ success: true });
+    });
+
+    // Teste de boas-vindas — o bot envia a mensagem de verdade
+    app.post('/api/guilds/:guildId/welcome/test', async (req, res) => {
+        const session = requireSession(req, res);
+        if (!session) return;
+
+        const guildId = req.params.guildId;
+        const botGuild = client.guilds.cache.get(guildId);
+        if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado' });
+
+        const welcome = req.body.welcome || db.getGuildConfig(guildId).welcome || {};
+        if (!welcome.channel) return res.status(400).json({ error: 'Selecione um canal primeiro' });
+
+        const channel = botGuild.channels.cache.get(welcome.channel);
+        if (!channel || !channel.isTextBased()) {
+            return res.status(400).json({ error: 'Canal inválido' });
+        }
+
+        try {
+            // Usa o próprio usuário logado como "membro de teste"
+            const fakeMember = {
+                id: session.user.id,
+                user: {
+                    id: session.user.id,
+                    username: session.user.username,
+                    tag: session.user.username + (session.user.discriminator && session.user.discriminator !== '0' ? '#' + session.user.discriminator : ''),
+                    createdTimestamp: Date.now() - 86400000 * 30,
+                    displayAvatarURL: (opts) => session.user.avatar
+                        ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png?size=${opts?.size || 128}`
+                        : 'https://cdn.discordapp.com/embed/avatars/0.png'
+                },
+                guild: botGuild
+            };
+
+            const { buildWelcomePayload } = require('../bot/events/guildMemberAdd');
+            const payload = buildWelcomePayload(fakeMember, welcome);
+
+            await channel.send(payload);
+            res.json({ success: true });
+        } catch (err) {
+            console.error('Erro no teste de boas-vindas:', err);
+            res.status(500).json({ error: 'Erro ao enviar mensagem de teste' });
+        }
     });
 
     app.listen(PORT, () => {
