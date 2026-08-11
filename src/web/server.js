@@ -167,7 +167,12 @@ module.exports = (client) => {
         res.json({ success: true });
     });
 
-    // Teste de boas-vindas — o bot envia a mensagem de verdade
+    app.post('/api/guilds/:guildId/automod', async (req, res) => {
+        if (!requireSession(req, res)) return;
+        await db.setGuildConfig(req.params.guildId, { automod: req.body.automod || {} });
+        res.json({ success: true });
+    });
+
     app.post('/api/guilds/:guildId/welcome/test', async (req, res) => {
         const session = requireSession(req, res);
         if (!session) return;
@@ -185,7 +190,6 @@ module.exports = (client) => {
         }
 
         try {
-            // Usa o próprio usuário logado como "membro de teste"
             const fakeMember = {
                 id: session.user.id,
                 user: {
