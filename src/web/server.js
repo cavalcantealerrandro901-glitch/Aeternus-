@@ -1,6 +1,7 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
 const db = require('../database/db');
 
 const renderHome = require('./views/home');
@@ -138,13 +139,27 @@ module.exports = (client) => {
                 .sort((a, b) => a.name.localeCompare(b.name))
             : [];
 
+        const categories = botGuild
+            ? botGuild.channels.cache
+                .filter(c => c.type === ChannelType.GuildCategory)
+                .map(c => ({ id: c.id, name: c.name }))
+                .sort((a, b) => a.name.localeCompare(b.name))
+            : [];
+
+        const roles = botGuild
+            ? botGuild.roles.cache
+                .filter(r => r.name !== '@everyone' && !r.managed)
+                .map(r => ({ id: r.id, name: r.name }))
+                .sort((a, b) => a.name.localeCompare(b.name))
+            : [];
+
         const userAvatarUrl = session.user.avatar
             ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png`
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
         const config = db.getGuildConfig(guild.id);
 
-        res.send(renderGuild(guild, session.user, userAvatarUrl, config, channels));
+        res.send(renderGuild(guild, session.user, userAvatarUrl, config, channels, categories, roles));
     });
 
     app.post('/api/guilds/:guildId/prefix', async (req, res) => {
@@ -173,6 +188,53 @@ module.exports = (client) => {
         res.json({ success: true });
     });
 
+    // Salvar tickets + opcionalmente enviar painel
+    app.post('/api/guilds/:guildId/tickets', async (req, res) => {
+        if (!requireSession(req, res)) return;
+
+        const guildId = req.params.guildId;
+        const tickets = req.body.tickets || {};
+        const sendPanel = !!req.body.sendPanel;
+
+        await db.setGuildConfig(guildId, { tickets });
+
+        if (sendPanel) {
+            const botGuild = client.guilds.cache.get(guildId);
+            if (!botGuild) return res.status(404).json({ error: 'Servidor não encontrado' });
+            if (!tickets.panelChannel) return res.status(400).json({ error: 'Selecione o canal do painel' });
+
+            const channel = botGuild.channels.cache.get(tickets.panelChannel);
+            if (!channel || !channel.isTextBased()) {
+                return res.status(400).json({ error: 'Canal do painel inválido' });
+            }
+
+            try {
+                const embed = new EmbedBuilder()
+                    .setColor(tickets.embedColor ? parseInt(String(tickets.embedColor).replace('#', ''), 16) || 0x7c3aed : 0x7c3aed)
+                    .setTitle(tickets.embedTitle || '🎫 Central de Suporte')
+                    .setDescription(tickets.embedDescription || 'Clique no botão abaixo para abrir um ticket e falar com a equipe de suporte.')
+                    .setTimestamp();
+
+                if (tickets.embedImage) embed.setImage(tickets.embedImage);
+
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('aeternus_open_ticket')
+                        .setLabel(tickets.buttonLabel || 'Abrir Ticket')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('🎫')
+                );
+
+                await channel.send({ embeds: [embed], components: [row] });
+            } catch (err) {
+                console.error('Erro ao enviar painel de tickets:', err);
+                return res.status(500).json({ error: 'Config salvo, mas falhou ao enviar o painel' });
+            }
+        }
+
+        res.json({ success: true });
+    });
+
     app.post('/api/guilds/:guildId/welcome/test', async (req, res) => {
         const session = requireSession(req, res);
         if (!session) return;
@@ -195,7 +257,7 @@ module.exports = (client) => {
                 user: {
                     id: session.user.id,
                     username: session.user.username,
-                    tag: session.user.username + (session.user.discriminator && session.user.discriminator !== '0' ? '#' + session.user.discriminator : ''),
+                    tag: session.user.username,
                     createdTimestamp: Date.now() - 86400000 * 30,
                     displayAvatarURL: (opts) => session.user.avatar
                         ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png?size=${opts?.size || 128}`
@@ -205,9 +267,7 @@ module.exports = (client) => {
             };
 
             const { buildWelcomePayload } = require('../bot/events/guildMemberAdd');
-            const payload = buildWelcomePayload(fakeMember, welcome);
-
-            await channel.send(payload);
+            await channel.send(buildWelcomePayload(fakeMember, welcome));
             res.json({ success: true });
         } catch (err) {
             console.error('Erro no teste de boas-vindas:', err);
