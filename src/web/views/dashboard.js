@@ -1,10 +1,11 @@
-module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl, isOwner }) => `
+module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl, isOwner, canEditor }) => `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard — Aeternus</title>
+    ${botAvatarUrl ? `<link rel="icon" href="${botAvatarUrl}">` : ''}
     <link rel="stylesheet" href="/style.css">
     <style>
         .nav-right {
@@ -103,13 +104,32 @@ module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl
             align-items: center;
             width: 100%;
         }
+        .bot-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #aaa;
+            font-size: 0.85rem;
+        }
+        .bot-chip img {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="container">
-            <div class="logo">Aeternus</div>
+            <div class="logo" style="display:flex;align-items:center;gap:10px;">
+                ${botAvatarUrl ? `<img src="${botAvatarUrl}" alt="bot" style="width:32px;height:32px;border-radius:50%;">` : ''}
+                Aeternus
+            </div>
             <div class="nav-right">
+                <div class="bot-chip">
+                    ${botAvatarUrl ? `<img src="${botAvatarUrl}" alt="">` : ''}
+                    <span>${botName || 'Aeternus'}</span>
+                </div>
                 <button type="button" class="user-menu-btn" id="userMenuBtn" aria-haspopup="true" aria-expanded="false">
                     <img src="${userAvatarUrl}" alt="Avatar">
                     <span style="font-size:0.9rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user.global_name || user.username}</span>
@@ -119,10 +139,10 @@ module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl
                     <div class="muted">Conta</div>
                     <div style="padding:6px 12px 10px;font-size:0.9rem;color:#aaa;">
                         @${user.username}
-                        ${isOwner ? '<span class="badge-owner">DONO</span>' : ''}
+                        ${isOwner ? '<span class="badge-owner">DONO</span>' : canEditor ? '<span class="badge-owner">EDITOR</span>' : ''}
                     </div>
                     <div class="sep"></div>
-                    ${isOwner ? `
+                    ${canEditor || isOwner ? `
                     <a href="/editor" role="menuitem">
                         <span>🛠️</span>
                         <span>Sistema de Editor</span>
