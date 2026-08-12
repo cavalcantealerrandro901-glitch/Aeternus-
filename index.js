@@ -12,22 +12,21 @@ const fs = require('fs');
 const path = require('path');
 const startWebPanel = require('./src/web/server');
 const db = require('./src/database/db');
+const { startDailyNotifier } = require('./src/bot/utils/dailyNotifier');
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.DirectMessages
     ],
     partials: [Partials.Channel, Partials.Message, Partials.User]
 });
 
 client.commands = new Collection();
 
-// ======================================================
-// Carregar comandos recursivamente (pastas futuras ok)
-// ======================================================
 function loadCommands(dir) {
     if (!fs.existsSync(dir)) return;
 
@@ -59,12 +58,8 @@ function loadCommands(dir) {
     }
 }
 
-const commandsPath = path.join(__dirname, 'src/bot/commands');
-loadCommands(commandsPath);
+loadCommands(path.join(__dirname, 'src/bot/commands'));
 
-// ======================================================
-// Registrar slash commands automaticamente no Discord
-// ======================================================
 async function registerSlashCommands() {
     const body = [];
 
@@ -92,8 +87,6 @@ async function registerSlashCommands() {
     const rest = new REST({ version: '10' }).setToken(token);
 
     try {
-        // Se GUILD_ID existir, registra só nesse servidor (instantâneo, ideal para testes)
-        // Senão, registra globalmente (pode levar até ~1h para propagar)
         const guildId = process.env.GUILD_ID;
 
         if (guildId) {
@@ -111,9 +104,6 @@ async function registerSlashCommands() {
     }
 }
 
-// ======================================================
-// Carregar eventos
-// ======================================================
 function loadEvents(dir) {
     if (!fs.existsSync(dir)) return;
 
@@ -150,15 +140,13 @@ function loadEvents(dir) {
 
 loadEvents(path.join(__dirname, 'src/bot/events'));
 
-// ======================================================
-// Ready
-// ======================================================
 client.once(Events.ClientReady, async () => {
     console.log(`\n🎰 ${client.user.tag} está online!`);
     console.log(`📡 Servidores: ${client.guilds.cache.size}`);
 
     await db.connect();
     await registerSlashCommands();
+    startDailyNotifier(client);
     startWebPanel(client);
 });
 

@@ -8,18 +8,23 @@ const {
     ButtonStyle
 } = require('discord.js');
 const db = require('../../database/db');
+const { formatAlmas } = require('../utils/economy');
+const { RANKS, getRankByXp } = require('../utils/ranks');
 
 async function createTicket(interaction, optionLabel) {
     await interaction.deferReply({ ephemeral: true });
 
-    const config = db.getGuildConfig(interaction.guild.id);
+    const config = db.getGuildConfig(interaction.guild?.id || interaction.customId.split(':')[1]);
     const tickets = config.tickets || {};
 
     if (!tickets.enabled) {
         return interaction.editReply('⚠️ O sistema de tickets está desativado.');
     }
 
-    const existing = interaction.guild.channels.cache.find(
+    const guild = interaction.guild;
+    if (!guild) return interaction.editReply('Use este botão dentro de um servidor.');
+
+    const existing = guild.channels.cache.find(
         c => c.topic === `ticket-${interaction.user.id}` && c.type === ChannelType.GuildText
     );
     if (existing) {
@@ -28,7 +33,7 @@ async function createTicket(interaction, optionLabel) {
 
     try {
         const overwrites = [
-            { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+            { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
             {
                 id: interaction.user.id,
                 allow: [
@@ -65,7 +70,7 @@ async function createTicket(interaction, optionLabel) {
             .replace(/[^a-z0-9]/g, '')
             .slice(0, 20) || 'user';
 
-        const channel = await interaction.guild.channels.create({
+        const channel = await guild.channels.create({
             name: `ticket-${safeName}`,
             type: ChannelType.GuildText,
             parent: tickets.category || null,
@@ -186,6 +191,98 @@ async function closeTicket(interaction) {
     }, 5000);
 }
 
+async function handleDailyClaim(interaction) {
+    const parts = interaction.customId.split(':');
+    const guildId = parts[1] || interaction.guild?.id;
+    if (!guildId) {
+        return interaction.reply({ content: 'Servidor inválido.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const dailyCmd = require('../commands/daily');
+    const r = await dailyCmd.claimDaily(interaction.user.id, guildId);
+
+    if (r.error) {
+        return interaction.editReply({ content: `⚠️ ${r.error}` });
+    }
+
+    const embed = new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setTitle('💀 Tributo Coletado!')
+        .setDescription(
+            `${r.phrase}\n\n` +
+            `Você recebeu ${formatAlmas(r.amount, guildId)}\n` +
+            (r.bonus > 0 ? `Base: **${r.base.toLocaleString('pt-BR')}** + Bônus sequência: **${r.bonus.toLocaleString('pt-BR')}**\n` : '') +
+            `🔥 Sequência: **${r.streak} dia(s)**\n` +
+            `Saldo: ${formatAlmas(r.total, guildId)}`
+        )
+        .setTimestamp();
+
+    // tenta atualizar mensagem original se existir
+    try {
+        if (interaction.message && interaction.message.editable) {
+            await interaction.message.edit({ components: [] }).catch(() => {});
+        }
+    } catch {}
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+async function handleWork(interaction) {
+    const guildId = interaction.customId.split(':')[1] || interaction.guild?.id;
+    if (!guildId) {
+        return interaction.reply({ content: 'Servidor inválido.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const workCmd = require('../commands/work');
+    const r = await workCmd.doWork(interaction.user.id, guildId);
+
+    if (r.error) {
+        return interaction.editReply({ content: `⚠️ ${r.error}` });
+    }
+
+    const embed = new EmbedBuilder()
+        .setColor(r.leveledUp ? 0xf59e0b : 0x22c55e)
+        .setTitle(`${r.rank.emoji} Labuta concluída — ${r.rank.name}`)
+        .setDescription(
+            `${r.donePhrase}\n\n` +
+            `Ganhou ${formatAlmas(r.amount, guildId)}\n` +
+            `+**${r.gainedXp} XP** (total **${r.workXp}**)\n` +
+            (r.leveledUp ? `\n🎉 **Promoção!** Você alcançou **${r.rank.name}**!\n` : '') +
+            (r.next
+                ? `Próximo cargo: **${r.next.emoji} ${r.next.name}** (${r.next.minXp} XP)`
+                : `Você atingiu o cargo máximo: **Divindade**.`)
+            + `\n\nSaldo: ${formatAlmas(r.total, guildId)}`
+        )
+        .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
+}
+
+async function handleWorkRanks(interaction) {
+    const lines = RANKS.map(r =>
+        `${r.emoji} **${r.name}** — ${r.min.toLocaleString('pt-BR')}–${r.max.toLocaleString('pt-BR')} Almas · ${r.minXp}+ XP`
+    ).join('\n');
+
+    let userLine = '';
+    if (interaction.guild) {
+        const user = await db.getUser(interaction.user.id, interaction.guild.id);
+        const rank = getRankByXp(user.workXp || 0);
+        userLine = `\n\nSeu cargo: ${rank.emoji} **${rank.name}** (${user.workXp || 0} XP)`;
+    }
+
+    const embed = new EmbedBuilder()
+        .setColor(0x7c3aed)
+        .setTitle('📋 Cargos do Abismo')
+        .setDescription(lines + userLine)
+        .setFooter({ text: 'Trabalhe para subir de cargo e ganhar mais Almas' });
+
+    await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
@@ -203,7 +300,6 @@ module.exports = {
             return;
         }
 
-        // Select menu de categorias de ticket
         if (interaction.isStringSelectMenu() && interaction.customId === 'aeternus_ticket_select') {
             const value = interaction.values[0];
             const config = db.getGuildConfig(interaction.guild.id);
@@ -215,7 +311,21 @@ module.exports = {
 
         if (!interaction.isButton()) return;
 
-        // Abrir ticket por botão (multi)
+        if (interaction.customId.startsWith('aeternus_daily_claim')) {
+            await handleDailyClaim(interaction);
+            return;
+        }
+
+        if (interaction.customId.startsWith('aeternus_work:')) {
+            await handleWork(interaction);
+            return;
+        }
+
+        if (interaction.customId === 'aeternus_work_ranks') {
+            await handleWorkRanks(interaction);
+            return;
+        }
+
         if (interaction.customId.startsWith('aeternus_open_ticket')) {
             let label = null;
             if (interaction.customId.includes(':')) {
