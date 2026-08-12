@@ -15,6 +15,10 @@ async function notifyUsers(client) {
 
         for (const u of users) {
             try {
+                const cfg = db.getGuildConfig(u.guildId);
+                // respeita toggle do painel (padrão: ligado)
+                if (cfg.rewards && cfg.rewards.dailyDm === false) continue;
+
                 const discordUser = await client.users.fetch(u.userId).catch(() => null);
                 if (!discordUser) continue;
 
@@ -23,9 +27,10 @@ async function notifyUsers(client) {
                     .setTitle('🌌 Seu Daily está disponível!')
                     .setDescription(
                         `${dailyReadyPhrase()}\n\n` +
-                        `Entre no servidor e use **/daily** ou o botão abaixo para coletar.`
+                        `O tributo da meia-noite aguarda.\n` +
+                        `Use **/daily** no servidor ou o botão abaixo.`
                     )
-                    .setFooter({ text: 'Aeternus · Tributo da meia-noite' })
+                    .setFooter({ text: 'Aeternus · Tributo da meia-noite (BRT)' })
                     .setTimestamp();
 
                 const row = new ActionRowBuilder().addComponents(
@@ -38,16 +43,14 @@ async function notifyUsers(client) {
 
                 await discordUser.send({ embeds: [embed], components: [row] }).catch(() => null);
 
-                // marca notificado
                 await db.UserEconomy.updateOne(
                     { userId: u.userId, guildId: u.guildId },
                     { $set: { dailyNotifiedDate: today } }
                 );
                 sent++;
 
-                // rate limit amigável
                 await new Promise(r => setTimeout(r, 500));
-            } catch (err) {
+            } catch {
                 // DM fechada etc.
             }
         }
@@ -71,7 +74,6 @@ function scheduleNext(client) {
 
 function startDailyNotifier(client) {
     scheduleNext(client);
-    // também checa uma vez poucos minutos após boot (caso tenha reiniciado perto da meia-noite)
     setTimeout(() => notifyUsers(client), 15000);
 }
 

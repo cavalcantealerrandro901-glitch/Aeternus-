@@ -166,7 +166,6 @@ module.exports = (client) => {
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
         const config = db.getGuildConfig(guild.id);
-
         res.send(renderGuild(guild, session.user, userAvatarUrl, config, channels, categories, roles));
     });
 
@@ -198,8 +197,60 @@ module.exports = (client) => {
 
     app.post('/api/guilds/:guildId/economy', async (req, res) => {
         if (!requireSession(req, res)) return;
-        const economy = req.body.economy || {};
-        await db.setGuildConfig(req.params.guildId, { economy });
+        await db.setGuildConfig(req.params.guildId, { economy: req.body.economy || {} });
+        res.json({ success: true });
+    });
+
+    app.post('/api/guilds/:guildId/rewards', async (req, res) => {
+        if (!requireSession(req, res)) return;
+        const guildId = req.params.guildId;
+        const current = db.getGuildConfig(guildId);
+        const economy = { ...(current.economy || {}), ...(req.body.economy || {}) };
+        const rewards = req.body.rewards || {};
+        await db.setGuildConfig(guildId, { economy, rewards });
+        res.json({ success: true });
+    });
+
+    app.post('/api/guilds/:guildId/games', async (req, res) => {
+        if (!requireSession(req, res)) return;
+        const guildId = req.params.guildId;
+        const games = req.body.games || {};
+        const current = db.getGuildConfig(guildId);
+        const economy = { ...(current.economy || {}), games };
+        await db.setGuildConfig(guildId, { games, economy });
+        res.json({ success: true });
+    });
+
+    app.post('/api/guilds/:guildId/autorole', async (req, res) => {
+        if (!requireSession(req, res)) return;
+        await db.setGuildConfig(req.params.guildId, { autorole: req.body.autorole || {} });
+        res.json({ success: true });
+    });
+
+    app.post('/api/guilds/:guildId/announcements', async (req, res) => {
+        if (!requireSession(req, res)) return;
+        await db.setGuildConfig(req.params.guildId, { announcements: req.body.announcements || {} });
+        res.json({ success: true });
+    });
+
+    app.post('/api/guilds/:guildId/giveaways', async (req, res) => {
+        if (!requireSession(req, res)) return;
+        await db.setGuildConfig(req.params.guildId, { giveaways: req.body.giveaways || {} });
+        res.json({ success: true });
+    });
+
+    app.post('/api/guilds/:guildId/branding', async (req, res) => {
+        if (!requireSession(req, res)) return;
+        const guildId = req.params.guildId;
+        const branding = req.body.branding || {};
+        const current = db.getGuildConfig(guildId);
+        const economy = {
+            ...(current.economy || {}),
+            ...(req.body.economy || {}),
+            currency: branding.currency || current.economy?.currency || 'Almas',
+            symbol: branding.symbol || current.economy?.symbol || '💀'
+        };
+        await db.setGuildConfig(guildId, { branding, economy });
         res.json({ success: true });
     });
 

@@ -64,7 +64,6 @@ module.exports = {
     buildWelcomePayload,
 
     async execute(member) {
-        // Log de entrada
         const logEmbed = baseEmbed()
             .setColor(0x22c55e)
             .setTitle('📥 Membro Entrou')
@@ -74,9 +73,23 @@ module.exports = {
 
         await sendLog(member.guild, 'member', logEmbed);
 
+        const config = db.getGuildConfig(member.guild.id);
+
+        // Auto-cargo
+        try {
+            const ar = config.autorole || {};
+            if (ar.enabled && ar.roleId) {
+                const role = member.guild.roles.cache.get(ar.roleId);
+                if (role && member.manageable) {
+                    await member.roles.add(role, 'Aeternus Auto-Cargo').catch(() => {});
+                }
+            }
+        } catch (err) {
+            console.error('Erro autorole:', err.message);
+        }
+
         // Boas-vindas
         try {
-            const config = db.getGuildConfig(member.guild.id);
             const welcome = config.welcome || {};
             if (!welcome.enabled || !welcome.channel) return;
 

@@ -2,7 +2,19 @@ const db = require('../../database/db');
 
 function economyConfig(guildId) {
     const cfg = db.getGuildConfig(guildId);
-    return { ...db.DEFAULT_ECONOMY, ...(cfg.economy || {}) };
+    const base = { ...db.DEFAULT_ECONOMY, ...(cfg.economy || {}) };
+    // jogos podem estar em config.games ou economy.games
+    base.games = {
+        coinflip: true,
+        slots: true,
+        dice: true,
+        roulette: true,
+        ...(base.games || {}),
+        ...(cfg.games || {})
+    };
+    if (cfg.branding?.currency) base.currency = cfg.branding.currency;
+    if (cfg.branding?.symbol) base.symbol = cfg.branding.symbol;
+    return base;
 }
 
 function formatAlmas(amount, guildId) {
@@ -30,7 +42,6 @@ function formatTime(ms) {
     return `${sec}s`;
 }
 
-/** Data local YYYY-MM-DD no fuso America/Sao_Paulo */
 function todayKey(tz = 'America/Sao_Paulo') {
     try {
         return new Intl.DateTimeFormat('en-CA', {
@@ -46,7 +57,6 @@ function todayKey(tz = 'America/Sao_Paulo') {
 
 function yesterdayKey(tz = 'America/Sao_Paulo') {
     const now = new Date();
-    // aproxima ontem no fuso: subtrai 24h e formata
     const y = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     try {
         return new Intl.DateTimeFormat('en-CA', {
@@ -62,7 +72,6 @@ function yesterdayKey(tz = 'America/Sao_Paulo') {
 
 function msUntilNextMidnight(tz = 'America/Sao_Paulo') {
     const now = new Date();
-    // Calcula próxima meia-noite no fuso via iteração simples
     for (let h = 0; h < 48; h++) {
         const candidate = new Date(now.getTime() + h * 3600000);
         const parts = new Intl.DateTimeFormat('en-US', {
@@ -77,7 +86,6 @@ function msUntilNextMidnight(tz = 'America/Sao_Paulo') {
             return Math.max(1000, candidate.getTime() - now.getTime());
         }
     }
-    // fallback 1h
     return 3600000;
 }
 
