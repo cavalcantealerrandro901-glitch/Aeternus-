@@ -17,12 +17,17 @@ const renderDashboard = require('./views/dashboard');
 const renderGuild = require('./views/guild');
 const renderEditor = require('./views/editor');
 const registerEditorRoutes = require('./editorRoutes');
+const { registerWebhooks } = require('./webhooks');
 
 module.exports = (client) => {
     const app = express();
     const PORT = process.env.PORT || 10000;
 
     app.use(cookieParser());
+
+    // Webhooks GitHub precisam do body raw (antes do express.json)
+    registerWebhooks(app);
+
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
     app.use(express.static(path.join(__dirname, 'public')));
