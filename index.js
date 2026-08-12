@@ -1,5 +1,13 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, Partials, Events } = require('discord.js');
+const {
+    Client,
+    GatewayIntentBits,
+    Collection,
+    Partials,
+    Events,
+    REST,
+    Routes
+} = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const startWebPanel = require('./src/web/server');
@@ -17,42 +25,140 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Carregar comandos (quando existirem)
+// ======================================================
+// Carregar comandos recursivamente (pastas futuras ok)
+// ======================================================
+function loadCommands(dir) {
+    if (!fs.existsSync(dir)) return;
+
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+            loadCommands(fullPath);
+            continue;
+        }
+
+        if (!entry.name.endsWith('.js')) continue;
+
+        try {
+            delete require.cache[require.resolve(fullPath)];
+            const command = require(fullPath);
+
+            if (command?.data?.name && typeof command.execute === 'function') {
+                client.commands.set(command.data.name, command);
+                console.log(`✅ Comando carregado: ${command.data.name}`);
+            } else {
+                console.warn(`⚠️ Arquivo ignorado (sem data/execute): ${entry.name}`);
+            }
+        } catch (err) {
+            console.error(`❌ Erro ao carregar comando ${entry.name}:`, err.message);
+        }
+    }
+}
+
 const commandsPath = path.join(__dirname, 'src/bot/commands');
-if (fs.existsSync(commandsPath)) {
-    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-    for (const file of commandFiles) {
-        const command = require(`./src/bot/commands/${file}`);
-        if ('data' in command && 'execute' in command) {
-            client.commands.set(command.data.name, command);
-            console.log(`✅ Comando carregado: ${command.data.name}`);
+loadCommands(commandsPath);
+
+// ======================================================
+// Registrar slash commands automaticamente no Discord
+// ======================================================
+async function registerSlashCommands() {
+    const body = [];
+
+    for (const command of client.commands.values()) {
+        try {
+            body.push(command.data.toJSON());
+        } catch (err) {
+            console.error(`❌ Erro ao serializar comando ${command.data?.name}:`, err.message);
         }
     }
-}
 
-// Carregar eventos (quando existirem)
-const eventsPath = path.join(__dirname, 'src/bot/events');
-if (fs.existsSync(eventsPath)) {
-    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
-    for (const file of eventFiles) {
-        const event = require(`./src/bot/events/${file}`);
-        if (event.once) {
-            client.once(event.name, (...args) => event.execute(...args, client));
+    if (!body.length) {
+        console.log('ℹ️ Nenhum slash command para registrar.');
+        return;
+    }
+
+    const token = process.env.TOKEN;
+    const clientId = process.env.CLIENT_ID;
+
+    if (!token || !clientId) {
+        console.warn('⚠️ TOKEN ou CLIENT_ID ausente — comandos não foram registrados na API.');
+        return;
+    }
+
+    const rest = new REST({ version: '10' }).setToken(token);
+
+    try {
+        // Se GUILD_ID existir, registra só nesse servidor (instantâneo, ideal para testes)
+        // Senão, registra globalmente (pode levar até ~1h para propagar)
+        const guildId = process.env.GUILD_ID;
+
+        if (guildId) {
+            await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
+            console.log(`📡 ${body.length} comando(s) registrado(s) no servidor ${guildId}`);
         } else {
-            client.on(event.name, (...args) => event.execute(...args, client));
+            await rest.put(Routes.applicationCommands(clientId), { body });
+            console.log(`📡 ${body.length} comando(s) registrado(s) globalmente`);
         }
-        console.log(`✅ Evento carregado: ${event.name}`);
+
+        body.forEach(c => console.log(`   • /${c.name}`));
+    } catch (err) {
+        console.error('❌ Falha ao registrar slash commands:', err.message);
+        if (err.rawError) console.error(JSON.stringify(err.rawError, null, 2));
     }
 }
 
+// ======================================================
+// Carregar eventos
+// ======================================================
+function loadEvents(dir) {
+    if (!fs.existsSync(dir)) return;
+
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+            loadEvents(fullPath);
+            continue;
+        }
+
+        if (!entry.name.endsWith('.js')) continue;
+
+        try {
+            const event = require(fullPath);
+            if (!event?.name || typeof event.execute !== 'function') {
+                console.warn(`⚠️ Evento inválido: ${entry.name}`);
+                continue;
+            }
+
+            if (event.once) {
+                client.once(event.name, (...args) => event.execute(...args, client));
+            } else {
+                client.on(event.name, (...args) => event.execute(...args, client));
+            }
+            console.log(`✅ Evento carregado: ${event.name}`);
+        } catch (err) {
+            console.error(`❌ Erro ao carregar evento ${entry.name}:`, err.message);
+        }
+    }
+}
+
+loadEvents(path.join(__dirname, 'src/bot/events'));
+
+// ======================================================
+// Ready
+// ======================================================
 client.once(Events.ClientReady, async () => {
     console.log(`\n🎰 ${client.user.tag} está online!`);
     console.log(`📡 Servidores: ${client.guilds.cache.size}`);
 
-    // Conectar MongoDB
     await db.connect();
-
-    // Iniciar Painel Web
+    await registerSlashCommands();
     startWebPanel(client);
 });
 
