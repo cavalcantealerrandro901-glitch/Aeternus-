@@ -37,8 +37,29 @@ const userSchema = new mongoose.Schema({
 });
 userSchema.index({ userId: 1, guildId: 1 }, { unique: true });
 
+const editorSchema = new mongoose.Schema({
+    key: { type: String, default: 'global', unique: true },
+    github: {
+        owner: String,
+        repo: String,
+        branch: { type: String, default: 'main' },
+        tokenEnc: String
+    },
+    secrets: [{
+        name: String,
+        valueEnc: String,
+        updatedAt: Number
+    }],
+    chatHistory: [{
+        role: String,
+        content: String,
+        at: Number
+    }]
+});
+
 const GuildConfig = mongoose.model('GuildConfig', guildSchema);
 const UserEconomy = mongoose.model('UserEconomy', userSchema);
+const EditorConfig = mongoose.model('EditorConfig', editorSchema);
 const cache = new Map();
 
 const DEFAULT_ECONOMY = {
@@ -57,6 +78,7 @@ const DEFAULT_ECONOMY = {
 
 module.exports = {
     DEFAULT_ECONOMY,
+    EditorConfig,
 
     connect: async () => {
         if (!process.env.MONGO_URI) {
@@ -113,6 +135,28 @@ module.exports = {
         }
     },
 
+    getEditorConfig: async () => {
+        let doc = await EditorConfig.findOne({ key: 'global' });
+        if (!doc) {
+            doc = await EditorConfig.create({
+                key: 'global',
+                github: { branch: 'main' },
+                secrets: [],
+                chatHistory: []
+            });
+        }
+        return doc;
+    },
+
+    saveEditorConfig: async (data) => {
+        const updated = await EditorConfig.findOneAndUpdate(
+            { key: 'global' },
+            { $set: data },
+            { new: true, upsert: true }
+        );
+        return updated;
+    },
+
     getUser: async (userId, guildId) => {
         let user = await UserEconomy.findOne({ userId, guildId });
         if (!user) {
@@ -139,7 +183,6 @@ module.exports = {
         return UserEconomy.find({ guildId }).sort({ almas: -1 }).limit(limit).lean();
     },
 
-    /** Usuários que ainda não coletararam o daily hoje e podem receber DM */
     getUsersForDailyNotify: async (dateKey) => {
         return UserEconomy.find({
             $or: [
