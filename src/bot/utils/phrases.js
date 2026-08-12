@@ -1,49 +1,43 @@
+const { flavor } = require('./ai');
+
 const DAILY_READY = [
-    'O abismo sussurra seu nome... as Almas aguardam quem ousar coletá-las.',
-    'A meia-noite rasgou o véu. Seu tributo diário está pronto.',
-    'As sombras depositaram um presente em sua essência. Reclame-o antes que o vazio o engula.',
-    'O destino inclinou a balança a seu favor. Colete antes que os deuses menores invejem.',
-    'Fragmentos de eternidade giram à sua espera. Toque o selo e absorva o poder.',
-    'Uma corrente de poder pulsante espera ser absorvida. O abismo não espera os tíbios.',
-    'O grãozinho do abismo estremeceu: suas Almas diárias despertaram do sono eterno.',
-    'Entre a vida e o esquecimento, há um tributo com o seu nome gravado em osso negro.',
-    'Os ecos do além-mundo cantam: *hoje, o pacto está aberto.*',
-    'Uma fenda na realidade se abriu só para você. Atravesse-a e tome o que é seu.'
+    'Seu bônus diário já está disponível.',
+    'O daily de hoje está pronto para coletar.',
+    'Hora do daily — toque no botão para receber.',
+    'Recompensa diária liberada. Não esqueça de coletar.'
 ];
 
 const DAILY_CLAIMED = [
-    'As Almas se fundiram à sua essência. O abismo reconhece seu poder.',
-    'Você devorou o tributo do dia. Que a escuridão te fortaleça.',
-    'O ritual está completo. Mais um dia sob o domínio das Almas eternas.',
-    'O véu se fechou novamente... até a próxima meia-noite.',
-    'Seu nome foi gravado no livro das sombras. Volte quando o sol morrer de novo.',
-    'A sequência continua. O abismo sorri para os persistentes e esquece os fracos.',
-    'Poder absorvido. O próximo ciclo já começa a se formar nas profundezas.',
-    'As estrelas negras brilharam por um instante em sua direção.',
-    'Você selou o pacto. As Almas agora correm em suas veias como sangue divino.',
-    'O abismo sussurrou: *bom... muito bom. Continue.*'
+    'Daily coletado com sucesso.',
+    'Recompensa creditada na sua conta.',
+    'Pronto! Almas adicionadas ao saldo.',
+    'Daily ok. Volte amanhã após a meia-noite.'
 ];
 
 const WORK_START = [
-    'Você adentrou as minas do submundo em busca de Almas...',
-    'O contrato foi assinado com sangue. Hora de trabalhar.',
-    'As correntes do abismo puxam você para mais uma jornada.',
-    'Um chamado ecoa nas profundezas. Você responde sem hesitar.',
-    'Ferramentas em mãos, alma preparada. O trabalho começa.',
-    'Os mestres do abismo observam seu desempenho de perto.',
-    'Nas galerias onde a luz morre, você labuta por poder.',
-    'Cada golpe, cada passo, cada suspiro... tudo rende Almas.'
+    'Pronto para trabalhar e ganhar Almas?',
+    'Inicie o trabalho pelo botão abaixo.',
+    'Quanto maior o cargo, maior a faixa de pagamento.',
+    'Trabalho disponível. Clique para começar.'
 ];
 
 const WORK_DONE = [
-    'O suor da escuridão valeu a pena. Almas conquistadas.',
-    'Você retornou das profundezas carregando poder puro.',
-    'Mais um ciclo de labuta. O abismo recompensa os fiéis.',
-    'Seu cargo ecoa nas galerias. Respeito e Almas adquiridos.',
-    'A jornada terminou... por enquanto. Descanse, guerreiro.',
-    'Fragmentos coletados. Sua posição no ranking treme.',
-    'As sombras aplaudem em silêncio. Você mereceu este tributo.',
-    'O abismo não esquece quem trabalha. Nem quem desiste.'
+    'Trabalho concluído. Pagamento liberado.',
+    'Bom serviço — Almas creditadas.',
+    'Turno finalizado. XP e saldo atualizados.',
+    'Você terminou o expediente.'
+];
+
+const GAME_WIN = [
+    'Boa! Você ganhou esta rodada.',
+    'Vitória — saldo atualizado.',
+    'Acertou. Lucro na conta.'
+];
+
+const GAME_LOSE = [
+    'Não foi dessa vez.',
+    'Aposta perdida. Tente de novo com cuidado.',
+    'Resultado contra você nesta rodada.'
 ];
 
 function pick(arr) {
@@ -55,28 +49,84 @@ function dailyReadyPhrase() {
 }
 
 function dailyClaimedPhrase(streak, amount) {
-    const base = pick(DAILY_CLAIMED);
-    if (streak >= 7) {
-        return `${base}\n\n🌑 **Sequência lendária de ${streak} dias.** O abismo te observa com respeito.`;
-    }
-    if (streak >= 2) {
-        return `${base}\n\n🔥 Sequência de **${streak} dias** — o abismo intensifica sua recompensa.`;
-    }
+    let base = pick(DAILY_CLAIMED);
+    if (streak >= 7) base += ` Sequência de ${streak} dias.`;
+    else if (streak >= 2) base += ` Sequência: ${streak} dias.`;
     return base;
 }
 
 function workStartPhrase(rankName) {
-    return `${pick(WORK_START)}\n**Cargo:** ${rankName}`;
+    return `${pick(WORK_START)} Cargo: ${rankName}.`;
 }
 
 function workDonePhrase(rankName, amount) {
-    return `${pick(WORK_DONE)}\n**Cargo:** ${rankName}`;
+    return `${pick(WORK_DONE)} Cargo: ${rankName}.`;
+}
+
+async function aiDailyReady() {
+    return flavor(
+        'Frase curta avisando que o bônus diário (daily) de um bot de economia Discord está disponível.',
+        dailyReadyPhrase()
+    );
+}
+
+async function aiDailyClaimed(streak, amount) {
+    const fb = dailyClaimedPhrase(streak, amount);
+    return flavor(
+        `Usuário coletou daily. Sequência ${streak} dias. Valor ${amount} Almas. Uma frase curta de confirmação.`,
+        fb
+    );
+}
+
+async function aiWorkStart(rankName) {
+    return flavor(
+        `Frase curta convidando a trabalhar no bot. Cargo atual: ${rankName}.`,
+        workStartPhrase(rankName)
+    );
+}
+
+async function aiWorkDone(rankName, amount) {
+    return flavor(
+        `Trabalho concluído. Cargo ${rankName}. Ganhou ${amount} Almas. Frase curta.`,
+        workDonePhrase(rankName, amount)
+    );
+}
+
+async function aiGameResult(win, gameName, amount) {
+    const fb = win ? pick(GAME_WIN) : pick(GAME_LOSE);
+    return flavor(
+        `${gameName}: usuário ${win ? 'ganhou' : 'perdeu'} ${amount} Almas. Uma frase curta.`,
+        fb
+    );
+}
+
+async function aiPayNote(amount) {
+    return flavor(
+        `Transferência de ${amount} Almas entre usuários. Frase curta de confirmação.`,
+        'Transferência concluída.'
+    );
+}
+
+async function aiModNote(action, reason) {
+    return flavor(
+        `Ação de moderação ${action}. Motivo: ${reason || 'não informado'}. Frase curta neutra para o log.`,
+        reason || `Ação: ${action}`
+    );
 }
 
 module.exports = {
+    pick,
     dailyReadyPhrase,
     dailyClaimedPhrase,
     workStartPhrase,
     workDonePhrase,
-    pick
+    aiDailyReady,
+    aiDailyClaimed,
+    aiWorkStart,
+    aiWorkDone,
+    aiGameResult,
+    aiPayNote,
+    aiModNote,
+    GAME_WIN,
+    GAME_LOSE
 };

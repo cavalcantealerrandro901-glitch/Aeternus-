@@ -94,9 +94,9 @@ function buildSystemPrompt(context = {}) {
     return (
         `Você é ${name}, um assistente de IA no Discord.\n` +
         `Responda em português do Brasil.\n` +
-        `Seja direto, claro e curto (no máximo 2–4 frases, salvo se pedirem detalhe).\n` +
-        `Tom neutro e profissional. Sem tema de RPG, fantasia ou “abismo”.\n` +
-        `Não invente ações no Discord (ban, kick, pagamento).\n` +
+        `Seja direto, claro e curto (2–4 frases no máximo).\n` +
+        `Tom neutro e profissional. Sem RPG ou fantasia.\n` +
+        `Não invente ações no Discord.\n` +
         `Usuário: ${user}.`
     );
 }
@@ -107,8 +107,7 @@ async function chat(userMessage, context = {}) {
     if (!apiKey) {
         return {
             ok: false,
-            error:
-                'IA não configurada. Defina AI_API_KEY (ou GROQ_API_KEY) no Render.'
+            error: 'IA não configurada. Defina AI_API_KEY ou GROQ_API_KEY no Render.'
         };
     }
 
@@ -132,7 +131,7 @@ async function chat(userMessage, context = {}) {
                 model,
                 messages,
                 temperature: 0.6,
-                max_tokens: 280
+                max_tokens: context.maxTokens || 280
             })
         });
 
@@ -149,11 +148,12 @@ async function chat(userMessage, context = {}) {
         }
 
         const reply =
-            data?.choices?.[0]?.message?.content?.trim() ||
-            'Sem resposta da IA.';
+            data?.choices?.[0]?.message?.content?.trim() || 'Sem resposta da IA.';
 
-        pushHistory(userId, guildId, 'user', userMessage);
-        pushHistory(userId, guildId, 'assistant', reply);
+        if (!context.skipHistory) {
+            pushHistory(userId, guildId, 'user', userMessage);
+            pushHistory(userId, guildId, 'assistant', reply);
+        }
 
         return { ok: true, reply: reply.slice(0, MAX_REPLY), model };
     } catch (err) {
@@ -162,8 +162,59 @@ async function chat(userMessage, context = {}) {
     }
 }
 
+/**
+ * Frase curta para sistemas (economia, jogos, etc).
+ * Nunca quebra o fluxo: se falhar, devolve fallback.
+ */
+async function flavor(prompt, fallback = '', opts = {}) {
+    const timeoutMs = opts.timeoutMs || 2500;
+    try {
+        const work = (async () => {
+            const { apiKey, baseUrl, model } = await resolveApiConfig();
+            if (!apiKey) return null;
+
+            const res = await fetch(`${baseUrl}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model,
+                    temperature: 0.7,
+                    max_tokens: opts.maxTokens || 60,
+                    messages: [
+                        {
+                            role: 'system',
+                            content:
+                                'Gere UMA frase curta em português do Brasil. ' +
+                                'Tom casual e natural, sem RPG, sem poesia. Só o texto da frase.'
+                        },
+                        { role: 'user', content: String(prompt).slice(0, 500) }
+                    ]
+                })
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return null;
+            const text = data?.choices?.[0]?.message?.content?.trim();
+            return text ? text.replace(/^["']|["']$/g, '').slice(0, 220) : null;
+        })();
+
+        const result = await Promise.race([
+            work,
+            new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))
+        ]);
+
+        return result || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 module.exports = {
     chat,
+    flavor,
     clearHistory,
     getHistory,
     resolveApiConfig

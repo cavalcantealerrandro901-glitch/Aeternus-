@@ -14,7 +14,7 @@ const {
     formatTime
 } = require('../utils/economy');
 const { getRankByXp, getNextRank, xpForWork, RANKS } = require('../utils/ranks');
-const { workStartPhrase, workDonePhrase } = require('../utils/phrases');
+const { aiWorkStart, aiWorkDone, workStartPhrase, workDonePhrase } = require('../utils/phrases');
 
 async function doWork(userId, guildId) {
     const eco = economyConfig(guildId);
@@ -24,7 +24,7 @@ async function doWork(userId, guildId) {
     const cd = eco.workCooldownMs || 3600000;
     const left = cooldownLeft(user.lastWork, cd);
     if (left) {
-        return { error: `Você ainda está exausto. Volte em **${formatTime(left)}**.` };
+        return { error: `Aguarde **${formatTime(left)}** para trabalhar de novo.` };
     }
 
     const rank = getRankByXp(user.workXp || 0);
@@ -41,6 +41,9 @@ async function doWork(userId, guildId) {
     const next = getNextRank(user.workXp);
     const leveledUp = newRank.id > oldRankId;
 
+    const donePhrase =
+        (await aiWorkDone(newRank.name, amount)) || workDonePhrase(newRank.name, amount);
+
     return {
         amount,
         total: user.almas,
@@ -49,16 +52,15 @@ async function doWork(userId, guildId) {
         workXp: user.workXp,
         next,
         leveledUp,
-        startPhrase: workStartPhrase(rank.name),
-        donePhrase: workDonePhrase(newRank.name, amount)
+        donePhrase
     };
 }
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('work')
-        .setDescription('Trabalhe no abismo, ganhe Almas e XP de cargo'),
-    aliases: ['trabalhar', 'job', 'labuta'],
+        .setDescription('Trabalhe para ganhar Almas e XP de cargo'),
+    aliases: ['trabalhar', 'job'],
 
     doWork,
     RANKS,
@@ -66,16 +68,18 @@ module.exports = {
     async execute(interaction) {
         const preview = await db.getUser(interaction.user.id, interaction.guild.id);
         const rank = getRankByXp(preview.workXp || 0);
+        const start =
+            (await aiWorkStart(rank.name)) || workStartPhrase(rank.name);
 
         const embed = new EmbedBuilder()
             .setColor(0x3b82f6)
             .setTitle(`${rank.emoji} Trabalho — ${rank.name}`)
             .setDescription(
-                `${workStartPhrase(rank.name)}\n\n` +
-                `Faixa deste cargo: **${rank.min.toLocaleString('pt-BR')} — ${rank.max.toLocaleString('pt-BR')}** Almas\n` +
-                `XP atual: **${preview.workXp || 0}**`
+                `${start}\n\n` +
+                `Faixa: **${rank.min.toLocaleString('pt-BR')} — ${rank.max.toLocaleString('pt-BR')}** Almas\n` +
+                `XP: **${preview.workXp || 0}**`
             )
-            .setFooter({ text: 'Clique para iniciar a labuta' });
+            .setFooter({ text: 'Clique para trabalhar' });
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -87,7 +91,6 @@ module.exports = {
                 .setCustomId('aeternus_work_ranks')
                 .setLabel('Ver cargos')
                 .setStyle(ButtonStyle.Secondary)
-                .setEmoji('📋')
         );
 
         await interaction.reply({ embeds: [embed], components: [row] });
@@ -96,12 +99,14 @@ module.exports = {
     async executePrefix(message) {
         const preview = await db.getUser(message.author.id, message.guild.id);
         const rank = getRankByXp(preview.workXp || 0);
+        const start =
+            (await aiWorkStart(rank.name)) || workStartPhrase(rank.name);
 
         const embed = new EmbedBuilder()
             .setColor(0x3b82f6)
             .setTitle(`${rank.emoji} Trabalho — ${rank.name}`)
             .setDescription(
-                `${workStartPhrase(rank.name)}\n\n` +
+                `${start}\n\n` +
                 `Faixa: **${rank.min.toLocaleString('pt-BR')} — ${rank.max.toLocaleString('pt-BR')}** Almas\n` +
                 `XP: **${preview.workXp || 0}**`
             );
@@ -116,7 +121,6 @@ module.exports = {
                 .setCustomId('aeternus_work_ranks')
                 .setLabel('Ver cargos')
                 .setStyle(ButtonStyle.Secondary)
-                .setEmoji('📋')
         );
 
         await message.reply({ embeds: [embed], components: [row] });

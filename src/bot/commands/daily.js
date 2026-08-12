@@ -13,13 +13,17 @@ const {
     yesterdayKey,
     calcDailyReward
 } = require('../utils/economy');
-const { dailyReadyPhrase, dailyClaimedPhrase } = require('../utils/phrases');
+const { aiDailyReady, aiDailyClaimed, dailyClaimedPhrase } = require('../utils/phrases');
 
 async function canClaim(userId, guildId) {
     const user = await db.getUser(userId, guildId);
     const today = todayKey();
     if (user.lastDailyDate === today) {
-        return { ok: false, user, reason: 'Você já coletou o daily de hoje. Volte após a **meia-noite**.' };
+        return {
+            ok: false,
+            user,
+            reason: 'Você já coletou o daily de hoje. Volte após a **meia-noite**.'
+        };
     }
     return { ok: true, user, today };
 }
@@ -35,7 +39,6 @@ async function claimDaily(userId, guildId) {
     const today = check.today;
     const yesterday = yesterdayKey();
 
-    // Sequência: se coletou ontem, continua; senão reinicia
     let streak = user.dailyStreak || 0;
     if (user.lastDailyDate === yesterday) streak += 1;
     else streak = 1;
@@ -45,8 +48,10 @@ async function claimDaily(userId, guildId) {
     user.lastDaily = Date.now();
     user.lastDailyDate = today;
     user.dailyStreak = streak;
-    user.dailyNotifiedDate = today; // já avisado/coletado hoje
+    user.dailyNotifiedDate = today;
     await user.save();
+
+    const phrase = await aiDailyClaimed(streak, reward.total);
 
     return {
         amount: reward.total,
@@ -54,22 +59,22 @@ async function claimDaily(userId, guildId) {
         bonus: reward.bonus,
         streak,
         total: user.almas,
-        phrase: dailyClaimedPhrase(streak, reward.total)
+        phrase: phrase || dailyClaimedPhrase(streak, reward.total)
     };
 }
 
-function buildReadyEmbed(guildId) {
-    const phrase = dailyReadyPhrase();
+async function buildReadyEmbed(guildId) {
+    const phrase = await aiDailyReady();
     return new EmbedBuilder()
         .setColor(0x7c3aed)
-        .setTitle('🌌 Tributo do Abismo')
+        .setTitle('Daily disponível')
         .setDescription(
             `${phrase}\n\n` +
-            `Recompensa base: **5.000 — 60.000** Almas\n` +
+            `Recompensa: **5.000 — 60.000** Almas\n` +
             `Sequência: a cada **2 dias**, bônus de **+500 a +2.000**\n\n` +
-            `Clique no botão para selar o pacto e coletar.`
+            `Clique no botão para coletar.`
         )
-        .setFooter({ text: 'Disponível todo dia a partir da meia-noite (BRT)' })
+        .setFooter({ text: 'Disponível todo dia a partir da meia-noite' })
         .setTimestamp();
 }
 
@@ -79,14 +84,14 @@ function claimButton(guildId) {
             .setCustomId(`aeternus_daily_claim:${guildId}`)
             .setLabel('Coletar Daily')
             .setStyle(ButtonStyle.Primary)
-            .setEmoji('💀')
+            .setEmoji('💰')
     );
 }
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('daily')
-        .setDescription('Colete seu tributo diário de Almas (meia-noite)'),
+        .setDescription('Colete seu bônus diário de Almas'),
     aliases: ['diario', 'tributo'],
 
     claimDaily,
@@ -103,16 +108,16 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xef4444)
-                        .setTitle('⏳ Daily já coletado')
+                        .setTitle('Daily já coletado')
                         .setDescription(check.reason)
-                        .setFooter({ text: `Sequência atual: ${check.user.dailyStreak || 0} dias` })
+                        .setFooter({ text: `Sequência: ${check.user.dailyStreak || 0} dias` })
                 ],
                 ephemeral: true
             });
         }
 
         await interaction.reply({
-            embeds: [buildReadyEmbed(guildId)],
+            embeds: [await buildReadyEmbed(guildId)],
             components: [claimButton(guildId)]
         });
     },
@@ -126,15 +131,15 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xef4444)
-                        .setTitle('⏳ Daily já coletado')
+                        .setTitle('Daily já coletado')
                         .setDescription(check.reason)
-                        .setFooter({ text: `Sequência atual: ${check.user.dailyStreak || 0} dias` })
+                        .setFooter({ text: `Sequência: ${check.user.dailyStreak || 0} dias` })
                 ]
             });
         }
 
         await message.reply({
-            embeds: [buildReadyEmbed(guildId)],
+            embeds: [await buildReadyEmbed(guildId)],
             components: [claimButton(guildId)]
         });
     }
