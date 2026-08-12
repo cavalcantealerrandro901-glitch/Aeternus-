@@ -1,7 +1,15 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
+    ChannelType
+} = require('discord.js');
 const db = require('../database/db');
 
 const renderHome = require('./views/home');
@@ -188,13 +196,28 @@ module.exports = (client) => {
         res.json({ success: true });
     });
 
-    // Salvar tickets + opcionalmente enviar painel
     app.post('/api/guilds/:guildId/tickets', async (req, res) => {
         if (!requireSession(req, res)) return;
 
         const guildId = req.params.guildId;
         const tickets = req.body.tickets || {};
         const sendPanel = !!req.body.sendPanel;
+
+        // Garante options com ids
+        if (Array.isArray(tickets.options)) {
+            tickets.options = tickets.options
+                .filter(o => o && o.label)
+                .map((o, i) => ({
+                    id: o.id || String(i + 1),
+                    label: String(o.label).slice(0, 80),
+                    emoji: o.emoji || '🎫',
+                    description: o.description ? String(o.description).slice(0, 100) : ''
+                }));
+        } else {
+            tickets.options = [{ id: '1', label: tickets.buttonLabel || 'Abrir Ticket', emoji: '🎫', description: '' }];
+        }
+
+        if (!tickets.displayMode) tickets.displayMode = 'buttons';
 
         await db.setGuildConfig(guildId, { tickets });
 
@@ -212,23 +235,64 @@ module.exports = (client) => {
                 const embed = new EmbedBuilder()
                     .setColor(tickets.embedColor ? parseInt(String(tickets.embedColor).replace('#', ''), 16) || 0x7c3aed : 0x7c3aed)
                     .setTitle(tickets.embedTitle || '🎫 Central de Suporte')
-                    .setDescription(tickets.embedDescription || 'Clique no botão abaixo para abrir um ticket e falar com a equipe de suporte.')
+                    .setDescription(tickets.embedDescription || 'Escolha uma opção abaixo para abrir um ticket.')
                     .setTimestamp();
 
                 if (tickets.embedImage) embed.setImage(tickets.embedImage);
 
-                const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('aeternus_open_ticket')
-                        .setLabel(tickets.buttonLabel || 'Abrir Ticket')
-                        .setStyle(ButtonStyle.Primary)
-                        .setEmoji('🎫')
-                );
+                const options = tickets.options.length
+                    ? tickets.options
+                    : [{ id: '1', label: 'Abrir Ticket', emoji: '🎫', description: '' }];
 
-                await channel.send({ embeds: [embed], components: [row] });
+                let components;
+
+                if (tickets.displayMode === 'select') {
+                    const menu = new StringSelectMenuBuilder()
+                        .setCustomId('aeternus_ticket_select')
+                        .setPlaceholder('Selecione o tipo de ticket...')
+                        .addOptions(
+                            options.slice(0, 25).map(o => {
+                                const opt = new StringSelectMenuOptionBuilder()
+                                    .setLabel(o.label)
+                                    .setValue(o.id);
+                                if (o.description) opt.setDescription(o.description);
+                                if (o.emoji) {
+                                    try { opt.setEmoji(o.emoji); } catch {}
+                                }
+                                return opt;
+                            })
+                        );
+                    components = [new ActionRowBuilder().addComponents(menu)];
+                } else {
+                    // Botões — máx 5 por row, até 5 rows
+                    const rows = [];
+                    let current = new ActionRowBuilder();
+                    let count = 0;
+
+                    for (const o of options.slice(0, 25)) {
+                        if (count === 5) {
+                            rows.push(current);
+                            current = new ActionRowBuilder();
+                            count = 0;
+                        }
+                        const btn = new ButtonBuilder()
+                            .setCustomId(`aeternus_open_ticket:${o.id}`)
+                            .setLabel(o.label.slice(0, 80))
+                            .setStyle(ButtonStyle.Primary);
+                        if (o.emoji) {
+                            try { btn.setEmoji(o.emoji); } catch {}
+                        }
+                        current.addComponents(btn);
+                        count++;
+                    }
+                    if (count > 0) rows.push(current);
+                    components = rows;
+                }
+
+                await channel.send({ embeds: [embed], components });
             } catch (err) {
                 console.error('Erro ao enviar painel de tickets:', err);
-                return res.status(500).json({ error: 'Config salvo, mas falhou ao enviar o painel' });
+                return res.status(500).json({ error: 'Config salvo, mas falhou ao enviar o painel: ' + err.message });
             }
         }
 
