@@ -193,7 +193,6 @@ async function runPrefixCommand(message, client, config) {
     }
 }
 
-/** Responde quando o bot é mencionado ou em reply à própria mensagem */
 async function runAiMention(message, client) {
     const content = message.content || '';
     const botId = client.user.id;
@@ -208,7 +207,6 @@ async function runAiMention(message, client) {
 
     if (!mentioned && !isReplyToBot) return false;
 
-    // Remove menção do texto
     let prompt = content.replace(new RegExp(`<@!?${botId}>`, 'g'), '').trim();
 
     if (!prompt && isReplyToBot) {
@@ -216,15 +214,13 @@ async function runAiMention(message, client) {
     }
 
     if (!prompt) {
-        await message.reply(
-            'Os ecos do abismo aguardam sua pergunta… Mencione-me com uma mensagem.'
-        );
+        await message.reply('Mencione-me com uma pergunta. Ex: clima em SP, info do servidor.');
         return true;
     }
 
     if (/^(reset|limpar|esquecer)$/i.test(prompt)) {
         clearHistory(message.author.id, message.guild?.id);
-        await message.reply('🧹 Memória desta conversa apagada.');
+        await message.reply('Memória desta conversa apagada.');
         return true;
     }
 
@@ -235,7 +231,8 @@ async function runAiMention(message, client) {
         guildId: message.guild?.id,
         username: message.author.username,
         guildName: message.guild?.name,
-        botName: client.user.username
+        botName: client.user.username,
+        guild: message.guild || null
     });
 
     if (!result.ok) {
@@ -260,15 +257,12 @@ module.exports = {
         const config = db.getGuildConfig(message.guild.id);
         const c = client || message.client;
 
-        // 1) Comandos em prefixo
         const usedCommand = await runPrefixCommand(message, c, config);
         if (usedCommand) return;
 
-        // 2) IA por menção / reply
         const usedAi = await runAiMention(message, c);
         if (usedAi) return;
 
-        // 3) AutoMod
         await runAutomod(message, config.automod || {});
     }
 };

@@ -1,16 +1,16 @@
-const {
-    SlashCommandBuilder,
-    EmbedBuilder
-} = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { chat, clearHistory } = require('../utils/ai');
 
 async function runAi(ctx, prompt, options = {}) {
-    const isInteraction = !!ctx.isChatInputCommand;
+    const isInteraction = typeof ctx.isChatInputCommand === 'function'
+        ? ctx.isChatInputCommand()
+        : !!ctx.commandName;
     const user = ctx.user || ctx.author;
     const guild = ctx.guild;
 
     if (!prompt || !String(prompt).trim()) {
-        const msg = 'Pergunte algo ao abismo… Ex: `/ai o que são Almas?`';
+        const msg =
+            'Pergunte algo. Ex: clima em São Paulo, quantos membros tem o servidor, quem criou o bot.';
         if (isInteraction) return ctx.reply({ content: msg, ephemeral: true });
         return ctx.reply(msg);
     }
@@ -30,7 +30,8 @@ async function runAi(ctx, prompt, options = {}) {
         guildId: guild?.id,
         username: user.username,
         guildName: guild?.name,
-        botName: ctx.client?.user?.username || 'Aeternus'
+        botName: ctx.client?.user?.username || 'Aeternus',
+        guild: guild || null
     });
 
     if (!result.ok) {
@@ -60,11 +61,11 @@ async function runAi(ctx, prompt, options = {}) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('ai')
-        .setDescription('Fale com a IA abissal do Aeternus')
+        .setDescription('Fale com a IA do Aeternus')
         .addStringOption((o) =>
             o
                 .setName('mensagem')
-                .setDescription('Sua pergunta ou mensagem')
+                .setDescription('Sua pergunta (clima, servidor, data, etc.)')
                 .setRequired(true)
         )
         .addBooleanOption((o) =>
@@ -74,7 +75,7 @@ module.exports = {
                 .setRequired(false)
         ),
 
-    aliases: ['ia', 'ask', 'perguntar', 'grok'],
+    aliases: ['ia', 'ask', 'perguntar'],
 
     async execute(interaction) {
         const prompt = interaction.options.getString('mensagem');

@@ -1,9 +1,10 @@
 const db = require('../../database/db');
 const { decrypt } = require('./cryptoSecrets');
+const { buildLiveFacts, getCreatorInfo } = require('./aiContext');
 
 const history = new Map();
 const MAX_HISTORY = 8;
-const MAX_REPLY = 1200;
+const MAX_REPLY = 1500;
 
 async function resolveApiConfig() {
     let apiKey =
@@ -87,17 +88,21 @@ function clearHistory(userId, guildId) {
     history.delete(historyKey(userId, guildId));
 }
 
-function buildSystemPrompt(context = {}) {
+function buildSystemPrompt(context = {}, liveFacts = '') {
     const name = context.botName || 'Aeternus';
     const user = context.username || 'usuário';
+    const creator = getCreatorInfo();
 
     return (
-        `Você é ${name}, um assistente de IA no Discord.\n` +
-        `Responda em português do Brasil.\n` +
-        `Seja direto, claro e curto (2–4 frases no máximo).\n` +
-        `Tom neutro e profissional. Sem RPG ou fantasia.\n` +
-        `Não invente ações no Discord.\n` +
-        `Usuário: ${user}.`
+        `Você é ${name}, assistente de IA do Discord.\n` +
+        `Responda em português do Brasil, de forma clara e objetiva (em geral 2–5 frases).\n` +
+        `Tom neutro e profissional. Sem RPG.\n` +
+        `Use os FATOS AO VIVO abaixo quando a pergunta for sobre data, hora, clima, servidor ou criador.\n` +
+        `Não invente números do servidor: use só o que está nos fatos.\n` +
+        `Não invente que executou ban/kick/pagamento.\n` +
+        `Moeda do bot: Almas. Criador: ${creator.name}.\n` +
+        `Usuário atual: ${user}.\n\n` +
+        `=== FATOS AO VIVO ===\n${liveFacts || 'Nenhum fato extra.'}\n=== FIM DOS FATOS ===`
     );
 }
 
@@ -114,8 +119,16 @@ async function chat(userMessage, context = {}) {
     const userId = context.userId || 'anon';
     const guildId = context.guildId || null;
 
+    let liveFacts = '';
+    try {
+        liveFacts = await buildLiveFacts(userMessage, context.guild || null);
+    } catch (err) {
+        console.error('buildLiveFacts:', err.message);
+        liveFacts = 'Fatos ao vivo indisponíveis no momento.';
+    }
+
     const messages = [
-        { role: 'system', content: buildSystemPrompt(context) },
+        { role: 'system', content: buildSystemPrompt(context, liveFacts) },
         ...getHistory(userId, guildId),
         { role: 'user', content: String(userMessage).slice(0, 3000) }
     ];
@@ -130,8 +143,8 @@ async function chat(userMessage, context = {}) {
             body: JSON.stringify({
                 model,
                 messages,
-                temperature: 0.6,
-                max_tokens: context.maxTokens || 280
+                temperature: 0.55,
+                max_tokens: context.maxTokens || 320
             })
         });
 
@@ -162,10 +175,6 @@ async function chat(userMessage, context = {}) {
     }
 }
 
-/**
- * Frase curta para sistemas (economia, jogos, etc).
- * Nunca quebra o fluxo: se falhar, devolve fallback.
- */
 async function flavor(prompt, fallback = '', opts = {}) {
     const timeoutMs = opts.timeoutMs || 2500;
     try {
@@ -188,7 +197,7 @@ async function flavor(prompt, fallback = '', opts = {}) {
                             role: 'system',
                             content:
                                 'Gere UMA frase curta em português do Brasil. ' +
-                                'Tom casual e natural, sem RPG, sem poesia. Só o texto da frase.'
+                                'Tom casual e natural, sem RPG. Só o texto da frase.'
                         },
                         { role: 'user', content: String(prompt).slice(0, 500) }
                     ]
