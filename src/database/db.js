@@ -6,23 +6,59 @@ const guildSchema = new mongoose.Schema({
     logs: { type: Object, default: {} },
     welcome: { type: Object, default: {} },
     automod: { type: Object, default: {} },
+    tickets: { type: Object, default: {} },
+    economy: { type: Object, default: {} },
     updates: { type: Object, default: {} },
     customCommands: { type: Array, default: [] },
-    tickets: { type: Object, default: {} },
     flirt: { type: Object, default: {} }
 });
 
+const userSchema = new mongoose.Schema({
+    userId: { type: String, required: true },
+    guildId: { type: String, required: true },
+    almas: { type: Number, default: 0 },
+    bank: { type: Number, default: 0 },
+    lastDaily: { type: Number, default: 0 },
+    lastWork: { type: Number, default: 0 },
+    wins: { type: Number, default: 0 },
+    losses: { type: Number, default: 0 },
+    totalBet: { type: Number, default: 0 },
+    totalWon: { type: Number, default: 0 }
+});
+userSchema.index({ userId: 1, guildId: 1 }, { unique: true });
+
 const GuildConfig = mongoose.model('GuildConfig', guildSchema);
+const UserEconomy = mongoose.model('UserEconomy', userSchema);
 const cache = new Map();
 
+const DEFAULT_ECONOMY = {
+    enabled: true,
+    currency: 'Almas',
+    symbol: '💀',
+    startingBalance: 100,
+    dailyMin: 150,
+    dailyMax: 400,
+    workMin: 50,
+    workMax: 250,
+    workCooldownMs: 3600000,
+    games: {
+        coinflip: true,
+        slots: true,
+        dice: true,
+        roulette: true
+    }
+};
+
 module.exports = {
+    DEFAULT_ECONOMY,
+
     connect: async () => {
         if (!process.env.MONGO_URI) {
-            console.warn("⚠️ MONGO_URI não configurado!");
+            console.warn('⚠️ MONGO_URI não configurado!');
             return;
         }
         await mongoose.connect(process.env.MONGO_URI);
-        console.log("📦 Conectado ao MongoDB com sucesso!");
+        console.log('📦 Conectado ao MongoDB com sucesso!');
 
         const configs = await GuildConfig.find();
         configs.forEach(c => cache.set(c.guildId, c.toObject()));
@@ -36,13 +72,18 @@ module.exports = {
                 logs: {},
                 welcome: {},
                 automod: {},
+                tickets: {},
+                economy: { ...DEFAULT_ECONOMY },
                 updates: {},
                 customCommands: [],
-                tickets: {},
                 flirt: {}
             };
         }
-        return cache.get(guildId);
+        const cfg = cache.get(guildId);
+        if (!cfg.economy || Object.keys(cfg.economy).length === 0) {
+            cfg.economy = { ...DEFAULT_ECONOMY };
+        }
+        return cfg;
     },
 
     setGuildConfig: async (guildId, data) => {
@@ -58,5 +99,33 @@ module.exports = {
             console.error(`Erro ao salvar config do servidor ${guildId}:`, err);
             return false;
         }
-    }
+    },
+
+    getUser: async (userId, guildId) => {
+        let user = await UserEconomy.findOne({ userId, guildId });
+        if (!user) {
+            const cfg = module.exports.getGuildConfig(guildId);
+            const start = cfg.economy?.startingBalance ?? 100;
+            user = await UserEconomy.create({ userId, guildId, almas: start });
+        }
+        return user;
+    },
+
+    saveUser: async (user) => {
+        await user.save();
+        return user;
+    },
+
+    addAlmas: async (userId, guildId, amount) => {
+        const user = await module.exports.getUser(userId, guildId);
+        user.almas = Math.max(0, (user.almas || 0) + amount);
+        await user.save();
+        return user;
+    },
+
+    getLeaderboard: async (guildId, limit = 10) => {
+        return UserEconomy.find({ guildId }).sort({ almas: -1 }).limit(limit).lean();
+    },
+
+    UserEconomy
 };
