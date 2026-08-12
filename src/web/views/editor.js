@@ -2,6 +2,7 @@ module.exports = ({ user, userAvatarUrl, botAvatarUrl, editorMeta }) => {
   const meta = editorMeta || { owner: '', repo: '', branch: 'main', hasToken: false, secrets: [] };
   const secretsList = (meta.secrets || []).map(n => `<span class="sec-chip">${n}</span>`).join('') || '<span style="color:#666">Nenhum</span>';
   const fav = botAvatarUrl || '';
+  const esc = (s) => String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -10,89 +11,90 @@ module.exports = ({ user, userAvatarUrl, botAvatarUrl, editorMeta }) => {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Editor — Aeternus</title>
 ${fav ? `<link rel="icon" href="${fav}">` : ''}
-<link rel="stylesheet" href="/style.css">
 <style>
 :root{--bg:#0b0b12;--card:#14141f;--border:#252536;--text:#eee;--muted:#888;--primary:#7c3aed}
-body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;margin:0}
-.navbar{height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;background:rgba(20,20,31,.95);gap:12px}
-.logo{font-weight:800;background:linear-gradient(90deg,#a78bfa,#7c3aed);-webkit-background-clip:text;color:transparent;display:flex;align-items:center;gap:10px}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;margin:0}
+.navbar{height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px}
+.logo{font-weight:800;color:#a78bfa;display:flex;align-items:center;gap:10px}
 .logo img{width:32px;height:32px;border-radius:50%}
 .nav-right{margin-left:auto;display:flex;gap:10px}
 .wrap{max-width:960px;margin:0 auto;padding:24px 16px 80px}
-.badge{display:inline-block;background:linear-gradient(90deg,#7c3aed,#a78bfa);color:#fff;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;margin-bottom:12px}
+.badge{display:inline-block;background:#7c3aed;color:#fff;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;margin-bottom:12px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:800px){.grid{grid-template-columns:1fr}}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px}
 .card h2{font-size:1.05rem;margin:0 0 8px}.desc{color:var(--muted);font-size:.85rem;margin-bottom:14px}
 label{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 5px}
-input,textarea{width:100%;box-sizing:border-box;background:#0b0b12;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;font:inherit}
-input.secret{letter-spacing:.08em}
+input,textarea{width:100%;background:#0b0b12;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;font:inherit}
 .btn{background:var(--primary);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;margin-top:10px;margin-right:8px}
-.btn2{background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;margin-top:10px}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn2{background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;margin-top:10px;text-decoration:none;display:inline-block}
 .sec-chip{display:inline-block;background:#1a1a28;border:1px solid var(--border);border-radius:8px;padding:4px 8px;margin:2px;font-size:.8rem;color:#c4b5fd}
 .chat{display:flex;flex-direction:column;height:480px}
 .chat-log{flex:1;overflow:auto;background:#0b0b12;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px}
 .msg{margin-bottom:12px;padding:10px 12px;border-radius:12px;font-size:.9rem;line-height:1.45;white-space:pre-wrap;word-break:break-word}
 .msg.user{background:rgba(124,58,237,.18);border:1px solid rgba(124,58,237,.35)}
 .msg.bot{background:#12121c;border:1px solid var(--border)}
-.msg .who{font-size:.7rem;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.msg .who{font-size:.7rem;color:var(--muted);margin-bottom:4px}
 .chat-row{display:flex;gap:8px}
 .chat-row textarea{flex:1;min-height:72px;resize:vertical}
-.toast{position:fixed;bottom:20px;right:20px;background:#22c55e;color:#fff;padding:12px 16px;border-radius:12px;opacity:0;transition:.3s;z-index:50}.toast.show{opacity:1}.toast.err{background:#ef4444}
-.status-line{font-size:.85rem;color:#a78bfa;margin-bottom:8px}
+.toast{position:fixed;bottom:20px;right:20px;background:#22c55e;color:#fff;padding:12px 16px;border-radius:12px;opacity:0;transition:.3s;z-index:50;max-width:90vw}
+.toast.show{opacity:1}.toast.err{background:#ef4444}
+.status-line{font-size:.85rem;color:#a78bfa;margin:8px 0}
 </style>
 </head>
 <body>
 <nav class="navbar">
   <div class="logo">${fav ? `<img src="${fav}" alt="bot">` : ''}Aeternus Editor</div>
   <div class="nav-right">
-    <a href="/dashboard" class="btn2" style="text-decoration:none;display:inline-block">Servidores</a>
-    <a href="/logout" class="btn2" style="text-decoration:none;display:inline-block">Deslogar</a>
+    <a href="/dashboard" class="btn2">Servidores</a>
+    <a href="/logout" class="btn2">Deslogar</a>
   </div>
 </nav>
 
 <div class="wrap">
-  <div class="badge">IA LIVRE · EDITOR</div>
-  <h1 style="margin:0 0 6px;font-size:1.5rem">🛠️ Sistema de Editor</h1>
-  <p class="desc">Descreva o que quer em português. A IA lê, edita e grava no GitHub de forma profissional — sem comandos rígidos.</p>
+  <div class="badge">EDITOR IA</div>
+  <h1 style="margin:0 0 6px;font-size:1.5rem">Sistema de Editor</h1>
+  <p class="desc">Descreva o que quer em português. A IA aplica no GitHub.</p>
 
   <div class="grid" style="margin-bottom:16px">
     <div class="card">
-      <h2>🔗 Repositório GitHub</h2>
-      <p class="desc">Owner, repo e branch. Token só no cofre.</p>
+      <h2>Repositório GitHub</h2>
+      <p class="desc">Owner, repo e branch. Token no cofre.</p>
       <label>Owner</label>
-      <input id="gh-owner" value="${(meta.owner||'').replace(/"/g,'&quot;')}" placeholder="seu-usuario">
+      <input id="gh-owner" value="${esc(meta.owner)}" placeholder="seu-usuario">
       <label>Repositório</label>
-      <input id="gh-repo" value="${(meta.repo||'').replace(/"/g,'&quot;')}" placeholder="Aeternus-">
+      <input id="gh-repo" value="${esc(meta.repo)}" placeholder="Aeternus-">
       <label>Branch</label>
-      <input id="gh-branch" value="${(meta.branch||'main').replace(/"/g,'&quot;')}" placeholder="main">
-      <button class="btn" id="saveRepo">Salvar conexão</button>
-      <button class="btn2" id="testRepo">Testar</button>
-      <div class="status-line" id="repoStatus">Token: ${meta.hasToken ? '✅ configurado (oculto)' : '❌ não configurado'}</div>
+      <input id="gh-branch" value="${esc(meta.branch || 'main')}" placeholder="main">
+      <button type="button" class="btn" id="saveRepo">Salvar conexão</button>
+      <button type="button" class="btn2" id="testRepo">Testar</button>
+      <div class="status-line" id="repoStatus">Token: ${meta.hasToken ? 'configurado' : 'não configurado'}</div>
     </div>
 
     <div class="card">
-      <h2>🔐 Cofre de Segredos</h2>
-      <p class="desc">APIs e tokens. O valor nunca é exibido de novo.</p>
-      <label>Nome (ex: GITHUB_TOKEN)</label>
+      <h2>Cofre de Segredos</h2>
+      <p class="desc">GITHUB_TOKEN, AI_API_KEY, etc. Valor não é mostrado de novo.</p>
+      <label>Nome</label>
       <input id="sec-name" placeholder="GITHUB_TOKEN" autocomplete="off">
-      <label>Valor (secreto)</label>
-      <input id="sec-value" class="secret" type="password" placeholder="••••••••" autocomplete="new-password">
-      <button class="btn" id="saveSecret">Salvar segredo</button>
+      <label>Valor</label>
+      <input id="sec-value" type="password" placeholder="••••••••" autocomplete="new-password">
+      <button type="button" class="btn" id="saveSecret">Salvar segredo</button>
       <div style="margin-top:12px"><span class="desc">Salvos:</span><div id="sec-list">${secretsList}</div></div>
     </div>
   </div>
 
   <div class="card">
-    <h2>💬 Editor IA</h2>
-    <p class="desc">Ex.: <em>"Crie um comando ranking com top 10 Almas"</em> · <em>"Corrija o bug do daily"</em> · <em>"Liste src/bot"</em></p>
+    <h2>Chat do Editor</h2>
+    <p class="desc">Ex.: "liste src/bot" · "leia index.js" · "crie um comando ping"</p>
     <div class="chat">
       <div class="chat-log" id="chatLog">
-        <div class="msg bot"><div class="who">Aeternus IA</div>Editor online. Descreva o que deseja — eu planejo e aplico no repositório. Configure <b>GITHUB_TOKEN</b> e <b>AI_API_KEY</b>.</div>
+        <div class="msg bot"><div class="who">Editor</div>Online. Configure GITHUB_TOKEN e AI_API_KEY, depois descreva o que precisa.</div>
       </div>
       <div class="chat-row">
-        <textarea id="chatInput" placeholder="Descreva a alteração que você quer..."></textarea>
-        <button class="btn" id="sendChat" style="align-self:flex-end">Enviar</button>
+        <textarea id="chatInput" placeholder="Descreva a alteração..."></textarea>
+        <button type="button" class="btn" id="sendChat">Enviar</button>
       </div>
     </div>
   </div>
@@ -100,68 +102,123 @@ input.secret{letter-spacing:.08em}
 
 <div class="toast" id="toast"></div>
 <script>
-function toast(m,err){var t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(err?' err':'');setTimeout(function(){t.classList.remove('show')},2800)}
-async function post(url,body){
-  var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
-  var j=await r.json().catch(function(){return{}});
-  return {ok:r.ok,status:r.status,json:j};
-}
-function addMsg(role,text){
-  var log=document.getElementById('chatLog');
-  var d=document.createElement('div');
-  d.className='msg '+role;
-  d.innerHTML='<div class="who">'+(role==='user'?'Você':'Aeternus IA')+'</div>'+escapeHtml(text).replace(/\n/g,'<br>');
-  log.appendChild(d);
-  log.scrollTop=log.scrollHeight;
-}
-function escapeHtml(s){
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-document.getElementById('saveRepo').onclick=async function(){
-  var r=await post('/api/editor/repo',{
-    owner:document.getElementById('gh-owner').value.trim(),
-    repo:document.getElementById('gh-repo').value.trim(),
-    branch:document.getElementById('gh-branch').value.trim()||'main'
+(function () {
+  function toast(m, err) {
+    var t = document.getElementById('toast');
+    t.textContent = m;
+    t.className = 'toast show' + (err ? ' err' : '');
+    setTimeout(function () { t.classList.remove('show'); }, 3500);
+  }
+
+  async function post(url, body) {
+    try {
+      var r = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+      var j = {};
+      try { j = await r.json(); } catch (e) {}
+      return { ok: r.ok, status: r.status, json: j };
+    } catch (e) {
+      return { ok: false, status: 0, json: { error: e.message || 'Falha de rede' } };
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function addMsg(role, text) {
+    var log = document.getElementById('chatLog');
+    var d = document.createElement('div');
+    d.className = 'msg ' + role;
+    d.innerHTML = '<div class="who">' + (role === 'user' ? 'Você' : 'Editor') + '</div>' +
+      escapeHtml(text).replace(/\n/g, '<br>');
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function errMsg(r) {
+    if (r.status === 401) return 'Sessão expirada. Faça login de novo.';
+    if (r.status === 403) return 'Sem permissão no Editor.';
+    return (r.json && (r.json.error || r.json.reply)) || ('Erro HTTP ' + r.status);
+  }
+
+  var saveRepo = document.getElementById('saveRepo');
+  var testRepo = document.getElementById('testRepo');
+  var saveSecret = document.getElementById('saveSecret');
+  var sendChat = document.getElementById('sendChat');
+  var chatInput = document.getElementById('chatInput');
+
+  if (saveRepo) saveRepo.addEventListener('click', async function () {
+    saveRepo.disabled = true;
+    var r = await post('/api/editor/repo', {
+      owner: document.getElementById('gh-owner').value.trim(),
+      repo: document.getElementById('gh-repo').value.trim(),
+      branch: document.getElementById('gh-branch').value.trim() || 'main'
+    });
+    saveRepo.disabled = false;
+    toast(r.ok ? 'Conexão salva' : errMsg(r), !r.ok);
   });
-  toast(r.ok?'Conexão salva':(r.json.error||'Erro'),!r.ok);
-};
-document.getElementById('testRepo').onclick=async function(){
-  var r=await post('/api/editor/test',{});
-  if(r.ok) toast('OK: '+r.json.full_name);
-  else toast(r.json.error||'Falha no teste',true);
-};
-document.getElementById('saveSecret').onclick=async function(){
-  var name=document.getElementById('sec-name').value.trim();
-  var value=document.getElementById('sec-value').value;
-  if(!name||!value) return toast('Preencha nome e valor',true);
-  var r=await post('/api/editor/secret',{name:name,value:value});
-  if(r.ok){
-    toast('Segredo salvo');
-    document.getElementById('sec-value').value='';
-    if(r.json.secrets){
-      document.getElementById('sec-list').innerHTML=r.json.secrets.map(function(n){return '<span class="sec-chip">'+n+'</span>'}).join('')||'<span style="color:#666">Nenhum</span>';
+
+  if (testRepo) testRepo.addEventListener('click', async function () {
+    testRepo.disabled = true;
+    var r = await post('/api/editor/test', {});
+    testRepo.disabled = false;
+    if (r.ok) toast('OK: ' + (r.json.full_name || 'conectado'));
+    else toast(errMsg(r), true);
+  });
+
+  if (saveSecret) saveSecret.addEventListener('click', async function () {
+    var name = document.getElementById('sec-name').value.trim();
+    var value = document.getElementById('sec-value').value;
+    if (!name || !value) return toast('Preencha nome e valor', true);
+    saveSecret.disabled = true;
+    var r = await post('/api/editor/secret', { name: name, value: value });
+    saveSecret.disabled = false;
+    if (r.ok) {
+      toast('Segredo salvo');
+      document.getElementById('sec-value').value = '';
+      if (r.json.secrets) {
+        document.getElementById('sec-list').innerHTML = r.json.secrets.map(function (n) {
+          return '<span class="sec-chip">' + escapeHtml(n) + '</span>';
+        }).join('') || '<span style="color:#666">Nenhum</span>';
+      }
+      var up = name.toUpperCase();
+      if (up === 'GITHUB_TOKEN' || up === 'GH_TOKEN') {
+        document.getElementById('repoStatus').textContent = 'Token: configurado';
+      }
+    } else toast(errMsg(r), true);
+  });
+
+  async function doSend() {
+    var text = chatInput.value.trim();
+    if (!text) return;
+    addMsg('user', text);
+    chatInput.value = '';
+    sendChat.disabled = true;
+    addMsg('bot', 'Processando...');
+    var r = await post('/api/editor/chat', { message: text });
+    sendChat.disabled = false;
+    var log = document.getElementById('chatLog');
+    if (log.lastChild) log.removeChild(log.lastChild);
+    if (r.ok) addMsg('bot', r.json.reply || 'Sem resposta');
+    else addMsg('bot', 'Erro: ' + errMsg(r));
+  }
+
+  if (sendChat) sendChat.addEventListener('click', doSend);
+  if (chatInput) chatInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      doSend();
     }
-    if(name.toUpperCase()==='GITHUB_TOKEN'||name.toUpperCase()==='GH_TOKEN'){
-      document.getElementById('repoStatus').textContent='Token: ✅ configurado (oculto)';
-    }
-  } else toast(r.json.error||'Erro',true);
-};
-async function sendChat(){
-  var input=document.getElementById('chatInput');
-  var text=input.value.trim();
-  if(!text) return;
-  addMsg('user',text);
-  input.value='';
-  addMsg('bot','⏳ Pensando e aplicando...');
-  var r=await post('/api/editor/chat',{message:text});
-  var log=document.getElementById('chatLog');
-  if(log.lastChild) log.removeChild(log.lastChild);
-  addMsg('bot', r.json.reply || r.json.error || 'Sem resposta');
-}
-document.getElementById('sendChat').onclick=sendChat;
-document.getElementById('chatInput').addEventListener('keydown',function(e){
-  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
-});
+  });
+})();
 </script>
 </body>
 </html>`;

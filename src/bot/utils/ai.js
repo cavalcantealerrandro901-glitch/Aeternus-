@@ -1,14 +1,14 @@
 const db = require('../../database/db');
 const { decrypt } = require('./cryptoSecrets');
 
-/** Histórico por usuário+servidor (memória curta) */
 const history = new Map();
-const MAX_HISTORY = 12;
-const MAX_REPLY = 1900;
+const MAX_HISTORY = 8;
+const MAX_REPLY = 1200;
 
 async function resolveApiConfig() {
     let apiKey =
         process.env.AI_API_KEY ||
+        process.env.GROQ_API_KEY ||
         process.env.OPENAI_API_KEY ||
         process.env.XAI_API_KEY ||
         process.env.GROK_API_KEY ||
@@ -35,15 +35,22 @@ async function resolveApiConfig() {
                 }
                 return null;
             };
-            apiKey = pick(['AI_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'GROK_API_KEY']);
+            apiKey = pick([
+                'AI_API_KEY',
+                'GROQ_API_KEY',
+                'OPENAI_API_KEY',
+                'XAI_API_KEY',
+                'GROK_API_KEY'
+            ]);
             if (!baseUrl) baseUrl = pick(['AI_BASE_URL', 'OPENAI_BASE_URL']);
             if (!model) model = pick(['AI_MODEL', 'OPENAI_MODEL']);
         } catch {}
     }
 
-    // Padrão: API compatível OpenAI (xAI Grok se não houver base)
     if (!baseUrl) {
-        if (process.env.XAI_API_KEY || process.env.GROK_API_KEY) {
+        if (process.env.GROQ_API_KEY || (apiKey && String(apiKey).startsWith('gsk_'))) {
+            baseUrl = 'https://api.groq.com/openai/v1';
+        } else if (process.env.XAI_API_KEY || process.env.GROK_API_KEY) {
             baseUrl = 'https://api.x.ai/v1';
         } else {
             baseUrl = 'https://api.openai.com/v1';
@@ -52,7 +59,9 @@ async function resolveApiConfig() {
     baseUrl = String(baseUrl).replace(/\/$/, '');
 
     if (!model) {
-        model = baseUrl.includes('x.ai') ? 'grok-3' : 'gpt-4o-mini';
+        if (baseUrl.includes('groq.com')) model = 'llama-3.1-8b-instant';
+        else if (baseUrl.includes('x.ai')) model = 'grok-3';
+        else model = 'gpt-4o-mini';
     }
 
     return { apiKey, baseUrl, model };
@@ -69,7 +78,7 @@ function getHistory(userId, guildId) {
 function pushHistory(userId, guildId, role, content) {
     const key = historyKey(userId, guildId);
     const list = history.get(key) || [];
-    list.push({ role, content: String(content).slice(0, 4000) });
+    list.push({ role, content: String(content).slice(0, 2000) });
     while (list.length > MAX_HISTORY) list.shift();
     history.set(key, list);
 }
@@ -80,18 +89,15 @@ function clearHistory(userId, guildId) {
 
 function buildSystemPrompt(context = {}) {
     const name = context.botName || 'Aeternus';
-    const user = context.username || 'viajante';
-    const guild = context.guildName || 'o abismo';
+    const user = context.username || 'usuário';
 
     return (
-        `Você é ${name}, uma inteligência abissal que habita o Discord.\n` +
-        `Personalidade: misteriosa, eloquente, um pouco sombria, mas útil e leal.\n` +
-        `Moeda do servidor: Almas (💀). Tema: apostas, destino, poder e consequência.\n` +
-        `Responda sempre em português do Brasil, de forma clara e envolvente.\n` +
-        `Não invente que executou ações no Discord (ban, kick, pagamento) a menos que o sistema confirme.\n` +
-        `Seja conciso em respostas simples; pode ser mais longo em explicações.\n` +
-        `Usuário atual: ${user}. Servidor: ${guild}.\n` +
-        `Se perguntarem quem você é: IA do bot Aeternus, guardião das Almas.`
+        `Você é ${name}, um assistente de IA no Discord.\n` +
+        `Responda em português do Brasil.\n` +
+        `Seja direto, claro e curto (no máximo 2–4 frases, salvo se pedirem detalhe).\n` +
+        `Tom neutro e profissional. Sem tema de RPG, fantasia ou “abismo”.\n` +
+        `Não invente ações no Discord (ban, kick, pagamento).\n` +
+        `Usuário: ${user}.`
     );
 }
 
@@ -102,7 +108,7 @@ async function chat(userMessage, context = {}) {
         return {
             ok: false,
             error:
-                'IA não configurada. Defina `AI_API_KEY` (ou `XAI_API_KEY` / `OPENAI_API_KEY`) nas variáveis do Render ou no cofre do Editor.'
+                'IA não configurada. Defina AI_API_KEY (ou GROQ_API_KEY) no Render.'
         };
     }
 
@@ -112,7 +118,7 @@ async function chat(userMessage, context = {}) {
     const messages = [
         { role: 'system', content: buildSystemPrompt(context) },
         ...getHistory(userId, guildId),
-        { role: 'user', content: String(userMessage).slice(0, 4000) }
+        { role: 'user', content: String(userMessage).slice(0, 3000) }
     ];
 
     try {
@@ -125,8 +131,8 @@ async function chat(userMessage, context = {}) {
             body: JSON.stringify({
                 model,
                 messages,
-                temperature: 0.85,
-                max_tokens: 800
+                temperature: 0.6,
+                max_tokens: 280
             })
         });
 
@@ -144,7 +150,7 @@ async function chat(userMessage, context = {}) {
 
         const reply =
             data?.choices?.[0]?.message?.content?.trim() ||
-            '…o abismo permaneceu em silêncio.';
+            'Sem resposta da IA.';
 
         pushHistory(userId, guildId, 'user', userMessage);
         pushHistory(userId, guildId, 'assistant', reply);
