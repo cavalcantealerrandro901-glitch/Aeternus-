@@ -31,11 +31,11 @@ module.exports = {
             const list = await db.listEditorPermissions();
             const owner = process.env.OWNER_ID;
             const lines = [];
-            if (owner) lines.push(`👑 Dono: <@${owner}> (\\`${owner}\\`)`);
+            if (owner) lines.push(`👑 Dono: <@${owner}> (\`${owner}\`)`);
             if (!list.length) {
                 lines.push('Nenhum editor adicional autorizado.');
             } else {
-                list.forEach(id => lines.push(`🛠️ <@${id}> (\\`${id}\\`)`));
+                list.forEach(id => lines.push(`🛠️ <@${id}> (\`${id}\`)`));
             }
             const embed = new EmbedBuilder()
                 .setColor(0x7c3aed)
@@ -48,10 +48,11 @@ module.exports = {
         const remove =
             ['remover', 'remove', 'tirar', 'revoke', 'del', 'delete'].includes(sub);
 
-        const target =
-            message.mentions.users.first() ||
-            (args[remove ? 1 : 0] && !remove ? await message.client.users.fetch(args[0]).catch(() => null) : null) ||
-            (remove && args[1] ? await message.client.users.fetch(args[1]).catch(() => null) : null);
+        let target = message.mentions.users.first();
+        if (!target) {
+            const id = remove ? args[1] : args[0];
+            if (id) target = await message.client.users.fetch(id).catch(() => null);
+        }
 
         if (!target) {
             return message.reply(
@@ -68,13 +69,19 @@ module.exports = {
 
         if (remove) {
             await db.removeEditorPermission(target.id);
-            return message.reply(`🗑️ Acesso ao **Editor** removido de **${target.tag}**.`);
+            return message.reply(`🗑️ Acesso ao **Editor** removido de **${target.tag || target.username}**.`);
         }
 
         await db.addEditorPermission(target.id);
+        const base =
+            process.env.PANEL_URL ||
+            (process.env.REDIRECT_URI
+                ? process.env.REDIRECT_URI.replace(/\/auth\/discord\/callback\/?$/, '')
+                : 'https://aeternus-q7gt.onrender.com');
+
         return message.reply(
-            `✅ **${target.tag}** agora pode acessar o **Sistema de Editor** no painel.\n` +
-            `Peça para logar em: ${process.env.PANEL_URL || process.env.REDIRECT_URI?.replace('/auth/discord/callback', '') || 'seu painel'}`
+            `✅ **${target.tag || target.username}** agora pode acessar o **Sistema de Editor** no painel.\n` +
+            `Peça para logar em: ${base}`
         );
     }
 };

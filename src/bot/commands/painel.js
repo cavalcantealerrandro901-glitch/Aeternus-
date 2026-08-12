@@ -20,7 +20,7 @@ module.exports = {
 
     async execute(interaction) {
         await interaction.reply({
-            content: `Use o prefixo: \\!painel`,
+            content: 'Use o prefixo: `!painel`',
             ephemeral: true
         });
     },
