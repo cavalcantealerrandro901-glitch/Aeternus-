@@ -1,5 +1,6 @@
 const github = require('./githubEditor');
 const { encrypt, decrypt } = require('./cryptoSecrets');
+const { triggerRenderDeploy } = require('../../web/webhooks');
 
 async function handleEditorMessage(message, editorConfig, saveConfig) {
     const text = String(message || '').trim();
@@ -15,12 +16,12 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
                 '`status` — mostra conexão atual\n' +
                 '`listar [pasta]` — lista arquivos\n' +
                 '`ler caminho/arquivo` — lê conteúdo\n' +
-                '`criar caminho/arquivo` + bloco de código (```)\n' +
-                '`editar caminho/arquivo` + bloco de código (```)\n' +
-                '`apagar caminho/arquivo` — remove arquivo\n' +
-                '`segredo NOME=valor` — salva segredo criptografado\n' +
-                '`segredos` — lista nomes (valores ocultos)\n' +
-                '`apagar segredo NOME` — remove um segredo'
+                '`criar` / `editar` + bloco de código\n' +
+                '`apagar caminho/arquivo`\n' +
+                '`segredo NOME=valor` — modo secreto\n' +
+                '`segredos` — lista nomes\n' +
+                '`deploy` — dispara Deploy Hook do Render\n' +
+                '`apagar segredo NOME`'
         };
     }
 
@@ -35,6 +36,18 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
                 `Token: ${hasToken ? '✅ configurado (oculto)' : '❌ ausente'}\n` +
                 `Segredos: **${(editorConfig.secrets || []).length}**`
         };
+    }
+
+    if (lower === 'deploy' || lower === 'redeploy') {
+        const result = await triggerRenderDeploy('comando do editor');
+        if (!result.ok) {
+            return {
+                reply:
+                    `❌ Não foi possível disparar o deploy: ${result.error}\n` +
+                    'Salve o segredo `RENDER_DEPLOY_HOOK` (URL do Deploy Hook no Render) ou a env `RENDER_DEPLOY_HOOK`.'
+            };
+        }
+        return { reply: '🚀 Deploy no Render disparado! Aguarde o build (1–3 min).' };
     }
 
     const connectMatch = text.match(/^conectar\s+([\w.-]+)\/([\w.-]+)(?:\s+([\w./-]+))?/i);
@@ -52,7 +65,7 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
             };
         } catch (err) {
             return {
-                reply: `Repo salvo (**${connectMatch[1]}/${connectMatch[2]}**), mas falhou ao testar: ${err.message}\nVerifique o token GitHub nos segredos.`
+                reply: `Repo salvo (**${connectMatch[1]}/${connectMatch[2]}**), mas falhou ao testar: ${err.message}`
             };
         }
     }
@@ -73,7 +86,7 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
         }
 
         await saveConfig(editorConfig);
-        return { reply: `🔐 Segredo **${name}** salvo (modo secreto — valor nunca é exibido de novo).` };
+        return { reply: `🔐 Segredo **${name}** salvo (modo secreto).` };
     }
 
     if (lower === 'segredos' || lower === 'listar segredos') {
@@ -119,9 +132,7 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
             const file = await github.getFile(editorConfig, readMatch[1].trim());
             const body = file.decoded || '';
             const truncated = body.length > 6000 ? body.slice(0, 6000) + '\n… (cortado)' : body;
-            return {
-                reply: `**${file.path}**\n\`\`\`\n${truncated}\n\`\`\``
-            };
+            return { reply: `**${file.path}**\n\`\`\`\n${truncated}\n\`\`\`` };
         } catch (err) {
             return { reply: `❌ ${err.message}` };
         }
@@ -139,7 +150,14 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
                 content,
                 `Aeternus Editor: ${action} ${filePath}`
             );
-            return { reply: `✅ Arquivo **${filePath}** ${action === 'criar' ? 'criado' : 'atualizado'} no GitHub.` };
+            let extra = '';
+            if (process.env.AUTO_RENDER_ON_EDITOR === 'true') {
+                const d = await triggerRenderDeploy(`editor: ${action} ${filePath}`);
+                extra = d.ok ? '\n🚀 Deploy Render disparado automaticamente.' : `\n⚠️ Deploy não disparado: ${d.error}`;
+            }
+            return {
+                reply: `✅ Arquivo **${filePath}** ${action === 'criar' ? 'criado' : 'atualizado'} no GitHub.${extra}\nDigite **deploy** se quiser forçar o Render agora.`
+            };
         } catch (err) {
             return { reply: `❌ ${err.message}` };
         }
@@ -157,12 +175,8 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
 
     return {
         reply:
-            'Não entendi o comando.\nDigite **ajuda** para ver o que posso fazer.\n\n' +
-            'Exemplos:\n' +
-            '`conectar seu-user/Aeternus- main`\n' +
-            '`segredo GITHUB_TOKEN=ghp_...`\n' +
-            '`listar src/bot`\n' +
-            '`criar src/teste.js` + bloco de código'
+            'Não entendi o comando. Digite **ajuda**.\n\n' +
+            '`conectar user/repo main` · `segredo GITHUB_TOKEN=...` · `deploy`'
     };
 }
 
