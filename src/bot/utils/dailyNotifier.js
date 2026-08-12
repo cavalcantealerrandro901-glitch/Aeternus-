@@ -1,13 +1,13 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../../database/db');
 const { todayKey, msUntilNextMidnight } = require('./economy');
-const { dailyReadyPhrase } = require('./phrases');
+const { aiDailyReady, dailyReadyPhrase } = require('./phrases');
 
 let timer = null;
 
 async function notifyUsers(client) {
     const today = todayKey();
-    console.log(`🌙 Daily notifier — verificando ${today}`);
+    console.log(`Daily notifier — ${today}`);
 
     try {
         const users = await db.getUsersForDailyNotify(today);
@@ -16,21 +16,20 @@ async function notifyUsers(client) {
         for (const u of users) {
             try {
                 const cfg = db.getGuildConfig(u.guildId);
-                // respeita toggle do painel (padrão: ligado)
                 if (cfg.rewards && cfg.rewards.dailyDm === false) continue;
 
                 const discordUser = await client.users.fetch(u.userId).catch(() => null);
                 if (!discordUser) continue;
 
+                const phrase = (await aiDailyReady()) || dailyReadyPhrase();
+
                 const embed = new EmbedBuilder()
                     .setColor(0x7c3aed)
-                    .setTitle('🌌 Seu Daily está disponível!')
+                    .setTitle('Daily disponível')
                     .setDescription(
-                        `${dailyReadyPhrase()}\n\n` +
-                        `O tributo da meia-noite aguarda.\n` +
-                        `Use **/daily** no servidor ou o botão abaixo.`
+                        `${phrase}\n\nUse **/daily** no servidor ou o botão abaixo.`
                     )
-                    .setFooter({ text: 'Aeternus · Tributo da meia-noite (BRT)' })
+                    .setFooter({ text: 'Aeternus' })
                     .setTimestamp();
 
                 const row = new ActionRowBuilder().addComponents(
@@ -38,7 +37,7 @@ async function notifyUsers(client) {
                         .setCustomId(`aeternus_daily_claim:${u.guildId}`)
                         .setLabel('Coletar Daily')
                         .setStyle(ButtonStyle.Primary)
-                        .setEmoji('💀')
+                        .setEmoji('💰')
                 );
 
                 await discordUser.send({ embeds: [embed], components: [row] }).catch(() => null);
@@ -48,33 +47,28 @@ async function notifyUsers(client) {
                     { $set: { dailyNotifiedDate: today } }
                 );
                 sent++;
-
-                await new Promise(r => setTimeout(r, 500));
-            } catch {
-                // DM fechada etc.
-            }
+                if (sent % 5 === 0) await new Promise((r) => setTimeout(r, 1200));
+            } catch {}
         }
 
-        console.log(`🌙 Daily notifier — ${sent} DMs enviadas`);
+        console.log(`Daily notifier: ${sent} DM(s)`);
     } catch (err) {
-        console.error('Erro no daily notifier:', err.message);
+        console.error('Daily notifier erro:', err.message);
     }
 }
 
 function scheduleNext(client) {
-    const ms = msUntilNextMidnight();
-    console.log(`🌙 Próximo daily notify em ~${Math.round(ms / 60000)} min`);
-
+    const ms = msUntilNextMidnight() + 2000;
     if (timer) clearTimeout(timer);
     timer = setTimeout(async () => {
         await notifyUsers(client);
         scheduleNext(client);
-    }, ms + 2000);
+    }, ms);
+    console.log(`Próximo daily notify em ${Math.round(ms / 60000)} min`);
 }
 
 function startDailyNotifier(client) {
     scheduleNext(client);
-    setTimeout(() => notifyUsers(client), 15000);
 }
 
 module.exports = { startDailyNotifier, notifyUsers };
