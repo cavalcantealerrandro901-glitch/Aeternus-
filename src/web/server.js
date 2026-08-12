@@ -15,6 +15,7 @@ const db = require('../database/db');
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderGuild = require('./views/guild');
+const renderEditor = require('./views/editor');
 
 module.exports = (client) => {
     const app = express();
@@ -31,6 +32,11 @@ module.exports = (client) => {
     const CLIENT_SECRET = process.env.CLIENT_SECRET;
     const REDIRECT_URI = process.env.REDIRECT_URI || 'https://aeternus-q7gt.onrender.com/auth/discord/callback';
     const SUPPORT_URL = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/seu-suporte';
+    const OWNER_ID = process.env.OWNER_ID || '';
+
+    function isOwner(user) {
+        return !!(OWNER_ID && user && String(user.id) === String(OWNER_ID));
+    }
 
     app.get('/', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
@@ -120,16 +126,30 @@ module.exports = (client) => {
         if (!session) return res.redirect('/login');
 
         const manageableGuilds = getManageableGuilds(session.guilds);
+        const userAvatarUrl = session.user.avatar
+            ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png`
+            : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
         res.send(renderDashboard({
             user: session.user,
             manageableGuilds,
             botName: client.user.username,
             botAvatarUrl: client.user.displayAvatarURL(),
-            userAvatarUrl: session.user.avatar
-                ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png`
-                : 'https://cdn.discordapp.com/embed/avatars/0.png'
+            userAvatarUrl,
+            isOwner: isOwner(session.user)
         }));
+    });
+
+    app.get('/editor', (req, res) => {
+        const session = sessions[req.cookies?.sessionId];
+        if (!session) return res.redirect('/login');
+        if (!isOwner(session.user)) return res.status(403).send('Acesso negado. Apenas o dono do bot pode usar o editor.');
+
+        const userAvatarUrl = session.user.avatar
+            ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png`
+            : 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+        res.send(renderEditor({ user: session.user, userAvatarUrl }));
     });
 
     app.get('/dashboard/:guildId', (req, res) => {
