@@ -1,14 +1,17 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../../database/db');
 const { economyConfig, formatAlmas } = require('../utils/economy');
+const { aiGameResult } = require('../utils/phrases');
 
-const SYMBOLS = ['🍒', '🍋', '🍇', '💎', '7️⃣', '💀'];
+const SYMBOLS = ['🍒', '🍋', '🍇', '💎', '7️⃣', '⭐'];
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('slots')
         .setDescription('Caça-níqueis de Almas')
-        .addIntegerOption(o => o.setName('quantidade').setDescription('Aposta').setRequired(true).setMinValue(1)),
+        .addIntegerOption((o) =>
+            o.setName('quantidade').setDescription('Aposta').setRequired(true).setMinValue(1)
+        ),
     aliases: ['slot', 'caca'],
 
     async run(userId, guildId, amount) {
@@ -20,10 +23,12 @@ module.exports = {
         if (user.almas < amount) return { error: 'Saldo insuficiente.' };
 
         const roll = () => SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
-        const a = roll(), b = roll(), c = roll();
+        const a = roll();
+        const b = roll();
+        const c = roll();
 
         let mult = 0;
-        if (a === b && b === c) mult = a === '💀' ? 10 : a === '7️⃣' ? 7 : a === '💎' ? 5 : 3;
+        if (a === b && b === c) mult = a === '⭐' ? 10 : a === '7️⃣' ? 7 : a === '💎' ? 5 : 3;
         else if (a === b || b === c || a === c) mult = 1.5;
 
         const win = mult > 0;
@@ -40,7 +45,8 @@ module.exports = {
         user.totalBet = (user.totalBet || 0) + amount;
         await user.save();
 
-        return { slots: [a, b, c], win, prize, amount, total: user.almas, mult };
+        const note = await aiGameResult(win, 'slots', win ? prize : amount);
+        return { slots: [a, b, c], win, prize, amount, total: user.almas, mult, note };
     },
 
     async execute(interaction) {
@@ -50,12 +56,14 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor(r.win ? 0x22c55e : 0xef4444)
-            .setTitle('🎰 Slots')
-            .setDescription(`**[ ${r.slots.join(' | ')} ]**\n\n` +
-                (r.win
-                    ? `Você ganhou ${formatAlmas(r.prize, interaction.guild.id)} (x${r.mult})!`
-                    : `Você perdeu ${formatAlmas(r.amount, interaction.guild.id)}.`) +
-                `\nSaldo: ${formatAlmas(r.total, interaction.guild.id)}`)
+            .setTitle('Slots')
+            .setDescription(
+                `${r.note || ''}\n\n**[ ${r.slots.join(' | ')} ]**\n` +
+                    (r.win
+                        ? `Ganhou ${formatAlmas(r.prize, interaction.guild.id)} (x${r.mult})`
+                        : `Perdeu ${formatAlmas(r.amount, interaction.guild.id)}`) +
+                    `\nSaldo: ${formatAlmas(r.total, interaction.guild.id)}`
+            )
             .setTimestamp();
 
         await interaction.reply({ embeds: [embed] });
@@ -70,12 +78,14 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor(r.win ? 0x22c55e : 0xef4444)
-            .setTitle('🎰 Slots')
-            .setDescription(`**[ ${r.slots.join(' | ')} ]**\n\n` +
-                (r.win
-                    ? `Você ganhou ${formatAlmas(r.prize, message.guild.id)} (x${r.mult})!`
-                    : `Você perdeu ${formatAlmas(r.amount, message.guild.id)}.`) +
-                `\nSaldo: ${formatAlmas(r.total, message.guild.id)}`)
+            .setTitle('Slots')
+            .setDescription(
+                `${r.note || ''}\n\n**[ ${r.slots.join(' | ')} ]**\n` +
+                    (r.win
+                        ? `Ganhou ${formatAlmas(r.prize, message.guild.id)} (x${r.mult})`
+                        : `Perdeu ${formatAlmas(r.amount, message.guild.id)}`) +
+                    `\nSaldo: ${formatAlmas(r.total, message.guild.id)}`
+            )
             .setTimestamp();
 
         await message.reply({ embeds: [embed] });
