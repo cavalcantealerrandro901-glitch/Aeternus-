@@ -1,6 +1,7 @@
-module.exports = ({ user, userAvatarUrl, editorMeta }) => {
+module.exports = ({ user, userAvatarUrl, botAvatarUrl, editorMeta }) => {
   const meta = editorMeta || { owner: '', repo: '', branch: 'main', hasToken: false, secrets: [] };
   const secretsList = (meta.secrets || []).map(n => `<span class="sec-chip">${n}</span>`).join('') || '<span style="color:#666">Nenhum</span>';
+  const fav = botAvatarUrl || '';
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -8,12 +9,14 @@ module.exports = ({ user, userAvatarUrl, editorMeta }) => {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Editor — Aeternus</title>
+${fav ? `<link rel="icon" href="${fav}">` : ''}
 <link rel="stylesheet" href="/style.css">
 <style>
 :root{--bg:#0b0b12;--card:#14141f;--border:#252536;--text:#eee;--muted:#888;--primary:#7c3aed}
 body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;margin:0}
-.navbar{height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;background:rgba(20,20,31,.95)}
-.logo{font-weight:800;background:linear-gradient(90deg,#a78bfa,#7c3aed);-webkit-background-clip:text;color:transparent}
+.navbar{height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;background:rgba(20,20,31,.95);gap:12px}
+.logo{font-weight:800;background:linear-gradient(90deg,#a78bfa,#7c3aed);-webkit-background-clip:text;color:transparent;display:flex;align-items:center;gap:10px}
+.logo img{width:32px;height:32px;border-radius:50%}
 .nav-right{margin-left:auto;display:flex;gap:10px}
 .wrap{max-width:960px;margin:0 auto;padding:24px 16px 80px}
 .badge{display:inline-block;background:linear-gradient(90deg,#7c3aed,#a78bfa);color:#fff;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;margin-bottom:12px}
@@ -27,21 +30,21 @@ input.secret{letter-spacing:.08em}
 .btn{background:var(--primary);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;margin-top:10px;margin-right:8px}
 .btn2{background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;margin-top:10px}
 .sec-chip{display:inline-block;background:#1a1a28;border:1px solid var(--border);border-radius:8px;padding:4px 8px;margin:2px;font-size:.8rem;color:#c4b5fd}
-.chat{display:flex;flex-direction:column;height:420px}
+.chat{display:flex;flex-direction:column;height:480px}
 .chat-log{flex:1;overflow:auto;background:#0b0b12;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px}
 .msg{margin-bottom:12px;padding:10px 12px;border-radius:12px;font-size:.9rem;line-height:1.45;white-space:pre-wrap;word-break:break-word}
 .msg.user{background:rgba(124,58,237,.18);border:1px solid rgba(124,58,237,.35)}
 .msg.bot{background:#12121c;border:1px solid var(--border)}
 .msg .who{font-size:.7rem;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
 .chat-row{display:flex;gap:8px}
-.chat-row textarea{flex:1;min-height:52px;resize:vertical}
+.chat-row textarea{flex:1;min-height:72px;resize:vertical}
 .toast{position:fixed;bottom:20px;right:20px;background:#22c55e;color:#fff;padding:12px 16px;border-radius:12px;opacity:0;transition:.3s;z-index:50}.toast.show{opacity:1}.toast.err{background:#ef4444}
 .status-line{font-size:.85rem;color:#a78bfa;margin-bottom:8px}
 </style>
 </head>
 <body>
 <nav class="navbar">
-  <div class="logo">Aeternus Editor</div>
+  <div class="logo">${fav ? `<img src="${fav}" alt="bot">` : ''}Aeternus Editor</div>
   <div class="nav-right">
     <a href="/dashboard" class="btn2" style="text-decoration:none;display:inline-block">Servidores</a>
     <a href="/logout" class="btn2" style="text-decoration:none;display:inline-block">Deslogar</a>
@@ -49,15 +52,15 @@ input.secret{letter-spacing:.08em}
 </nav>
 
 <div class="wrap">
-  <div class="badge">ACESSO DONO</div>
+  <div class="badge">IA LIVRE · EDITOR</div>
   <h1 style="margin:0 0 6px;font-size:1.5rem">🛠️ Sistema de Editor</h1>
-  <p class="desc">Conecte qualquer repositório GitHub, guarde tokens em modo secreto e envie comandos para criar/editar arquivos.</p>
+  <p class="desc">Descreva o que quer em português. A IA lê, edita e grava no GitHub de forma profissional — sem comandos rígidos.</p>
 
   <div class="grid" style="margin-bottom:16px">
     <div class="card">
       <h2>🔗 Repositório GitHub</h2>
-      <p class="desc">Owner, nome do repo e branch. Token fica só no modo secreto.</p>
-      <label>Owner (usuário/org)</label>
+      <p class="desc">Owner, repo e branch. Token só no cofre.</p>
+      <label>Owner</label>
       <input id="gh-owner" value="${(meta.owner||'').replace(/"/g,'&quot;')}" placeholder="seu-usuario">
       <label>Repositório</label>
       <input id="gh-repo" value="${(meta.repo||'').replace(/"/g,'&quot;')}" placeholder="Aeternus-">
@@ -70,7 +73,7 @@ input.secret{letter-spacing:.08em}
 
     <div class="card">
       <h2>🔐 Cofre de Segredos</h2>
-      <p class="desc">APIs, tokens e chaves. Depois de salvar, o valor **nunca** é mostrado de novo.</p>
+      <p class="desc">APIs e tokens. O valor nunca é exibido de novo.</p>
       <label>Nome (ex: GITHUB_TOKEN)</label>
       <input id="sec-name" placeholder="GITHUB_TOKEN" autocomplete="off">
       <label>Valor (secreto)</label>
@@ -81,14 +84,14 @@ input.secret{letter-spacing:.08em}
   </div>
 
   <div class="card">
-    <h2>💬 Falar com o Editor</h2>
-    <p class="desc">Digite o comando e envie. Exemplos: <code>ajuda</code> · <code>listar src</code> · <code>conectar user/repo main</code></p>
+    <h2>💬 Editor IA</h2>
+    <p class="desc">Ex.: <em>"Crie um comando ranking com top 10 Almas"</em> · <em>"Corrija o bug do daily"</em> · <em>"Liste src/bot"</em></p>
     <div class="chat">
       <div class="chat-log" id="chatLog">
-        <div class="msg bot"><div class="who">Aeternus</div>Editor online. Digite <b>ajuda</b> para ver os comandos. Configure o <b>GITHUB_TOKEN</b> no cofre antes de editar arquivos.</div>
+        <div class="msg bot"><div class="who">Aeternus IA</div>Editor online. Descreva o que deseja — eu planejo e aplico no repositório. Configure <b>GITHUB_TOKEN</b> e <b>AI_API_KEY</b>.</div>
       </div>
       <div class="chat-row">
-        <textarea id="chatInput" placeholder="Ex: listar src/bot  |  criar src/teste.js + bloco de código"></textarea>
+        <textarea id="chatInput" placeholder="Descreva a alteração que você quer..."></textarea>
         <button class="btn" id="sendChat" style="align-self:flex-end">Enviar</button>
       </div>
     </div>
@@ -107,14 +110,13 @@ function addMsg(role,text){
   var log=document.getElementById('chatLog');
   var d=document.createElement('div');
   d.className='msg '+role;
-  d.innerHTML='<div class="who">'+(role==='user'?'Você':'Aeternus')+'</div>'+escapeHtml(text).replace(/\n/g,'<br>');
+  d.innerHTML='<div class="who">'+(role==='user'?'Você':'Aeternus IA')+'</div>'+escapeHtml(text).replace(/\n/g,'<br>');
   log.appendChild(d);
   log.scrollTop=log.scrollHeight;
 }
 function escapeHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
 document.getElementById('saveRepo').onclick=async function(){
   var r=await post('/api/editor/repo',{
     owner:document.getElementById('gh-owner').value.trim(),
@@ -144,14 +146,16 @@ document.getElementById('saveSecret').onclick=async function(){
     }
   } else toast(r.json.error||'Erro',true);
 };
-
 async function sendChat(){
   var input=document.getElementById('chatInput');
   var text=input.value.trim();
   if(!text) return;
   addMsg('user',text);
   input.value='';
+  addMsg('bot','⏳ Pensando e aplicando...');
   var r=await post('/api/editor/chat',{message:text});
+  var log=document.getElementById('chatLog');
+  if(log.lastChild) log.removeChild(log.lastChild);
   addMsg('bot', r.json.reply || r.json.error || 'Sem resposta');
 }
 document.getElementById('sendChat').onclick=sendChat;

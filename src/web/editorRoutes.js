@@ -4,18 +4,16 @@ const { handleEditorMessage } = require('../bot/utils/editorChat');
 const db = require('../database/db');
 const renderEditor = require('./views/editor');
 
-/**
- * Rotas do Sistema de Editor (apenas OWNER_ID)
- */
-module.exports = function registerEditorRoutes(app, { sessions, isOwner }) {
-    function requireOwner(req, res) {
+module.exports = function registerEditorRoutes(app, { sessions, isOwner, client }) {
+    async function requireEditor(req, res) {
         const session = sessions[req.cookies?.sessionId];
         if (!session) {
             res.status(401).json({ error: 'Não autorizado' });
             return null;
         }
-        if (!isOwner(session.user)) {
-            res.status(403).json({ error: 'Apenas o dono pode usar o editor' });
+        const ok = await db.canAccessEditor(session.user.id);
+        if (!ok) {
+            res.status(403).json({ error: 'Sem permissão no Editor. Peça !editorperm ao dono.' });
             return null;
         }
         return session;
@@ -24,11 +22,26 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner }) {
     app.get('/editor', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
-        if (!isOwner(session.user)) return res.status(403).send('Acesso negado. Apenas o dono do bot pode usar o editor.');
+
+        const ok = await db.canAccessEditor(session.user.id);
+        if (!ok) {
+            return res
+                .status(403)
+                .send(
+                    '<!DOCTYPE html><html><body style="background:#0b0b12;color:#eee;font-family:sans-serif;padding:40px">' +
+                    '<h1>Acesso negado</h1><p>Você não tem permissão no Sistema de Editor.</p>' +
+                    '<p>O dono pode liberar com <code>!editorperm @você</code> no Discord.</p>' +
+                    '<p><a href="/dashboard" style="color:#a78bfa">Voltar</a></p></body></html>'
+                );
+        }
 
         const userAvatarUrl = session.user.avatar
             ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png`
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+        const botAvatarUrl = client?.user
+            ? client.user.displayAvatarURL({ size: 128, extension: 'png' })
+            : '/favicon.ico';
 
         const doc = await db.getEditorConfig();
         const editorMeta = {
@@ -36,14 +49,22 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner }) {
             repo: doc.github?.repo || '',
             branch: doc.github?.branch || 'main',
             hasToken: !!doc.github?.tokenEnc,
-            secrets: (doc.secrets || []).map(s => s.name)
+            secrets: (doc.secrets || []).map(s => s.name),
+            isOwner: isOwner(session.user)
         };
 
-        res.send(renderEditor({ user: session.user, userAvatarUrl, editorMeta }));
+        res.send(
+            renderEditor({
+                user: session.user,
+                userAvatarUrl,
+                botAvatarUrl,
+                editorMeta
+            })
+        );
     });
 
     app.post('/api/editor/repo', async (req, res) => {
-        if (!requireOwner(req, res)) return;
+        if (!(await requireEditor(req, res))) return;
         try {
             const doc = await db.getEditorConfig();
             const github = {
@@ -60,10 +81,12 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner }) {
     });
 
     app.post('/api/editor/test', async (req, res) => {
-        if (!requireOwner(req, res)) return;
+        if (!(await requireEditor(req, res))) return;
         try {
             const doc = await db.getEditorConfig();
-            const info = await githubEditor.testConnection(doc.toObject ? doc.toObject() : doc);
+            const info = await githubEditor.testConnection(
+                doc.toObject ? doc.toObject() : doc
+            );
             res.json(info);
         } catch (err) {
             res.status(400).json({ error: err.message });
@@ -71,11 +94,12 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner }) {
     });
 
     app.post('/api/editor/secret', async (req, res) => {
-        if (!requireOwner(req, res)) return;
+        if (!(await requireEditor(req, res))) return;
         try {
             const name = String(req.body.name || '').trim().toUpperCase();
             const value = String(req.body.value || '');
-            if (!name || !value) return res.status(400).json({ error: 'Nome e valor obrigatórios' });
+            if (!name || !value)
+                return res.status(400).json({ error: 'Nome e valor obrigatórios' });
 
             const doc = await db.getEditorConfig();
             const secrets = [...(doc.secrets || [])];
@@ -97,7 +121,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner }) {
     });
 
     app.post('/api/editor/chat', async (req, res) => {
-        if (!requireOwner(req, res)) return;
+        if (!(await requireEditor(req, res))) return;
         try {
             const message = String(req.body.message || '');
             const doc = await db.getEditorConfig();
@@ -107,7 +131,8 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner }) {
                 const payload = {
                     github: data.github,
                     secrets: data.secrets,
-                    chatHistory: (data.chatHistory || []).slice(-40)
+                    allowedEditors: data.allowedEditors,
+                    chatHistory: (data.chatHistory || cfg.chatHistory || []).slice(-40)
                 };
                 await db.saveEditorConfig(payload);
                 cfg = { ...cfg, ...payload };
@@ -115,13 +140,15 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner }) {
 
             const result = await handleEditorMessage(message, cfg, saveConfig);
 
-            const history = [...(cfg.chatHistory || []),
+            const history = [
+                ...(cfg.chatHistory || []),
                 { role: 'user', content: message, at: Date.now() },
                 { role: 'bot', content: result.reply, at: Date.now() }
             ].slice(-40);
             await db.saveEditorConfig({
                 github: cfg.github,
                 secrets: cfg.secrets,
+                allowedEditors: cfg.allowedEditors,
                 chatHistory: history
             });
 
