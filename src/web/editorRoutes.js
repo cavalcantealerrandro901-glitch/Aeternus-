@@ -8,12 +8,14 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
     async function requireEditor(req, res) {
         const session = sessions[req.cookies?.sessionId];
         if (!session) {
-            res.status(401).json({ error: 'Não autorizado' });
+            res.status(401).json({ error: 'Não autorizado. Faça login de novo.' });
             return null;
         }
         const ok = await db.canAccessEditor(session.user.id);
         if (!ok) {
-            res.status(403).json({ error: 'Sem permissão no Editor. Peça !editorperm ao dono.' });
+            res.status(403).json({
+                error: 'Sem permissão no Editor. O dono libera com !daracesso @você'
+            });
             return null;
         }
         return session;
@@ -30,7 +32,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
                 .send(
                     '<!DOCTYPE html><html><body style="background:#0b0b12;color:#eee;font-family:sans-serif;padding:40px">' +
                     '<h1>Acesso negado</h1><p>Você não tem permissão no Sistema de Editor.</p>' +
-                    '<p>O dono pode liberar com <code>!editorperm @você</code> no Discord.</p>' +
+                    '<p>O dono libera com <code>!daracesso @você</code> no Discord.</p>' +
                     '<p><a href="/dashboard" style="color:#a78bfa">Voltar</a></p></body></html>'
                 );
         }
@@ -41,7 +43,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
 
         const botAvatarUrl = client?.user
             ? client.user.displayAvatarURL({ size: 128, extension: 'png' })
-            : '/favicon.ico';
+            : '';
 
         const doc = await db.getEditorConfig();
         const editorMeta = {
@@ -49,7 +51,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
             repo: doc.github?.repo || '',
             branch: doc.github?.branch || 'main',
             hasToken: !!doc.github?.tokenEnc,
-            secrets: (doc.secrets || []).map(s => s.name),
+            secrets: (doc.secrets || []).map((s) => s.name),
             isOwner: isOwner(session.user)
         };
 
@@ -76,6 +78,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
             await db.saveEditorConfig({ github });
             res.json({ success: true });
         } catch (err) {
+            console.error('editor/repo', err);
             res.status(500).json({ error: err.message });
         }
     });
@@ -89,6 +92,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
             );
             res.json(info);
         } catch (err) {
+            console.error('editor/test', err);
             res.status(400).json({ error: err.message });
         }
     });
@@ -98,12 +102,13 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
         try {
             const name = String(req.body.name || '').trim().toUpperCase();
             const value = String(req.body.value || '');
-            if (!name || !value)
+            if (!name || !value) {
                 return res.status(400).json({ error: 'Nome e valor obrigatórios' });
+            }
 
             const doc = await db.getEditorConfig();
             const secrets = [...(doc.secrets || [])];
-            const idx = secrets.findIndex(s => s.name === name);
+            const idx = secrets.findIndex((s) => s.name === name);
             const entry = { name, valueEnc: encrypt(value), updatedAt: Date.now() };
             if (idx >= 0) secrets[idx] = entry;
             else secrets.push(entry);
@@ -114,8 +119,9 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
             }
 
             await db.saveEditorConfig({ secrets, github });
-            res.json({ success: true, secrets: secrets.map(s => s.name) });
+            res.json({ success: true, secrets: secrets.map((s) => s.name) });
         } catch (err) {
+            console.error('editor/secret', err);
             res.status(500).json({ error: err.message });
         }
     });
@@ -145,6 +151,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
                 { role: 'user', content: message, at: Date.now() },
                 { role: 'bot', content: result.reply, at: Date.now() }
             ].slice(-40);
+
             await db.saveEditorConfig({
                 github: cfg.github,
                 secrets: cfg.secrets,
@@ -155,7 +162,10 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
             res.json({ reply: result.reply });
         } catch (err) {
             console.error('Editor chat:', err);
-            res.status(500).json({ error: err.message, reply: '❌ ' + err.message });
+            res.status(500).json({
+                error: err.message,
+                reply: 'Erro: ' + err.message
+            });
         }
     });
 };
