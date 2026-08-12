@@ -50,6 +50,8 @@ const editorSchema = new mongoose.Schema({
         valueEnc: String,
         updatedAt: Number
     }],
+    /** IDs Discord autorizados a usar o Editor (além do OWNER_ID) */
+    allowedEditors: { type: [String], default: [] },
     chatHistory: [{
         role: String,
         content: String,
@@ -142,6 +144,7 @@ module.exports = {
                 key: 'global',
                 github: { branch: 'main' },
                 secrets: [],
+                allowedEditors: [],
                 chatHistory: []
             });
         }
@@ -155,6 +158,36 @@ module.exports = {
             { new: true, upsert: true }
         );
         return updated;
+    },
+
+    /** true se for OWNER_ID ou estiver em allowedEditors */
+    canAccessEditor: async (userId) => {
+        const owner = process.env.OWNER_ID || '';
+        if (owner && String(userId) === String(owner)) return true;
+        const doc = await module.exports.getEditorConfig();
+        const list = doc.allowedEditors || [];
+        return list.map(String).includes(String(userId));
+    },
+
+    addEditorPermission: async (userId) => {
+        const doc = await module.exports.getEditorConfig();
+        const list = new Set((doc.allowedEditors || []).map(String));
+        list.add(String(userId));
+        const arr = [...list];
+        await module.exports.saveEditorConfig({ allowedEditors: arr });
+        return arr;
+    },
+
+    removeEditorPermission: async (userId) => {
+        const doc = await module.exports.getEditorConfig();
+        const arr = (doc.allowedEditors || []).filter(id => String(id) !== String(userId));
+        await module.exports.saveEditorConfig({ allowedEditors: arr });
+        return arr;
+    },
+
+    listEditorPermissions: async () => {
+        const doc = await module.exports.getEditorConfig();
+        return doc.allowedEditors || [];
     },
 
     getUser: async (userId, guildId) => {
