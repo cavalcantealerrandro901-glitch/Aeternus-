@@ -196,6 +196,13 @@ module.exports = (client) => {
         res.json({ success: true });
     });
 
+    app.post('/api/guilds/:guildId/economy', async (req, res) => {
+        if (!requireSession(req, res)) return;
+        const economy = req.body.economy || {};
+        await db.setGuildConfig(req.params.guildId, { economy });
+        res.json({ success: true });
+    });
+
     app.post('/api/guilds/:guildId/tickets', async (req, res) => {
         if (!requireSession(req, res)) return;
 
@@ -203,7 +210,6 @@ module.exports = (client) => {
         const tickets = req.body.tickets || {};
         const sendPanel = !!req.body.sendPanel;
 
-        // Garante options com ids
         if (Array.isArray(tickets.options)) {
             tickets.options = tickets.options
                 .filter(o => o && o.label)
@@ -264,7 +270,6 @@ module.exports = (client) => {
                         );
                     components = [new ActionRowBuilder().addComponents(menu)];
                 } else {
-                    // Botões — máx 5 por row, até 5 rows
                     const rows = [];
                     let current = new ActionRowBuilder();
                     let count = 0;
