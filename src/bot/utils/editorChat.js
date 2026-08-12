@@ -1,7 +1,6 @@
 const github = require('./githubEditor');
 const { encrypt, decrypt } = require('./cryptoSecrets');
-const { triggerRenderDeploy } = require('../../web/webhooks');
-const { chat: aiChat, resolveApiConfig } = require('./ai');
+const { resolveApiConfig } = require('./ai');
 
 function extractJsonBlock(text) {
     if (!text) return null;
@@ -77,14 +76,13 @@ async function executeActions(actions, editorConfig, saveConfig) {
             } else if (type === 'delete') {
                 await github.deleteFile(cfg, action.path, action.message);
                 logs.push(`🗑️ Removido **${action.path}**`);
-            } else if (type === 'deploy') {
-                const r = await triggerRenderDeploy(action.reason || 'editor AI');
-                logs.push(r.ok ? '🚀 Deploy Render disparado' : `⚠️ Deploy: ${r.error}`);
             } else if (type === 'test_repo') {
                 const info = await github.testConnection(cfg);
                 logs.push(`✅ Conexão OK: **${info.full_name}** (branch ${info.default_branch})`);
             } else if (type === 'reply') {
                 if (action.text) logs.push(String(action.text));
+            } else if (type === 'deploy') {
+                logs.push('ℹ️ Deploy automático não está ativo. O Render atualiza sozinho ao dar push no GitHub.');
             } else {
                 logs.push(`⚠️ Ação desconhecida: ${type}`);
             }
@@ -121,26 +119,15 @@ async function handleWithAI(message, editorConfig, saveConfig) {
         '- {"type":"read","path":"arquivo.js"}\n' +
         '- {"type":"write","path":"arquivo.js","content":"código completo","message":"commit msg"}\n' +
         '- {"type":"delete","path":"arquivo.js"}\n' +
-        '- {"type":"deploy","reason":"..."}\n' +
         'Regras profissionais:\n' +
         '1. Antes de editar, se precisar do conteúdo atual, use read primeiro (pode haver várias actions em sequência).\n' +
         '2. Em write, envie o arquivo COMPLETO e correto, limpo, production-ready.\n' +
         '3. Não invente tokens. Não apague arquivos sem o usuário pedir.\n' +
         '4. Se a tarefa for só conversa, actions pode ser [].\n' +
         '5. Prefira mudanças mínimas e corretas.\n' +
+        '6. Não use ação de deploy.\n' +
         `Repo atual: ${g.owner || '—'}/${g.repo || '—'} branch ${g.branch || 'main'}. Token GitHub: ${g.tokenEnc ? 'sim' : 'não'}. Segredos: ${secretsNames}.`;
 
-    // Usa histórico interno simples via ai.js history key editor
-    const result = await aiChat(message, {
-        userId: 'editor-panel',
-        guildId: 'editor',
-        username: 'Editor',
-        guildName: 'Aeternus',
-        botName: 'Aeternus Editor AI'
-    });
-
-    // Override: chamada direta com system custom (ai.js usa system fixo)
-    // Refaz chamada com system do editor
     const { baseUrl, model } = await resolveApiConfig();
     const res = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
@@ -200,7 +187,6 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
         };
     }
 
-    // Atalhos mínimos sem IA
     const lower = text.toLowerCase();
     if (lower === 'ajuda' || lower === 'help') {
         return {
@@ -210,9 +196,9 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
                 '• "Liste os arquivos em src/bot/commands"\n' +
                 '• "Leia o index.js e explique"\n' +
                 '• "Crie o comando !ping com embed"\n' +
-                '• "Conecte o repo user/Aeternus- na branch main"\n' +
-                '• "Dispare o deploy no Render"\n\n' +
-                'Configure `AI_API_KEY` + `GITHUB_TOKEN` no cofre ou no Render.'
+                '• "Conecte o repo user/Aeternus- na branch main"\n\n' +
+                'Configure `AI_API_KEY` + `GITHUB_TOKEN` no cofre ou no Render.\n' +
+                'O deploy no Render continua automático pelo Git (push).'
         };
     }
 
