@@ -1,20 +1,6 @@
 const github = require('./githubEditor');
-const { encrypt, decrypt, maskSecret } = require('./cryptoSecrets');
+const { encrypt, decrypt } = require('./cryptoSecrets');
 
-/**
- * Interpreta mensagens do dono e executa ações no repositório / segredos.
- * Formatos suportados (PT):
- *  - conectar owner/repo [branch]
- *  - listar [pasta]
- *  - ler caminho/arquivo.js
- *  - criar caminho/arquivo.js\n```\nconteúdo\n```
- *  - editar caminho/arquivo.js\n```\nconteúdo\n```
- *  - apagar caminho/arquivo.js
- *  - segredo NOME=valor
- *  - segredos
- *  - status
- *  - ajuda
- */
 async function handleEditorMessage(message, editorConfig, saveConfig) {
     const text = String(message || '').trim();
     if (!text) return { reply: 'Envie uma instrução. Digite **ajuda** para ver os comandos.' };
@@ -29,11 +15,11 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
                 '`status` — mostra conexão atual\n' +
                 '`listar [pasta]` — lista arquivos\n' +
                 '`ler caminho/arquivo` — lê conteúdo\n' +
-                '`criar caminho/arquivo` + bloco ```código```\n' +
-                '`editar caminho/arquivo` + bloco ```código```\n' +
+                '`criar caminho/arquivo` + bloco de código (```)\n' +
+                '`editar caminho/arquivo` + bloco de código (```)\n' +
                 '`apagar caminho/arquivo` — remove arquivo\n' +
                 '`segredo NOME=valor` — salva segredo criptografado\n' +
-                '`segredos` — lista nomes dos segredos (valores ocultos)\n' +
+                '`segredos` — lista nomes (valores ocultos)\n' +
                 '`apagar segredo NOME` — remove um segredo'
         };
     }
@@ -43,15 +29,14 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
         const hasToken = !!g.tokenEnc;
         return {
             reply:
-                `**Status**\n` +
+                '**Status**\n' +
                 `Repo: **${g.owner || '—'}**/**${g.repo || '—'}**\n` +
                 `Branch: **${g.branch || 'main'}**\n` +
                 `Token: ${hasToken ? '✅ configurado (oculto)' : '❌ ausente'}\n` +
-                `Segredos: **${(editorConfig.secrets || []).length}**'
+                `Segredos: **${(editorConfig.secrets || []).length}**`
         };
     }
 
-    // conectar owner/repo [branch]
     const connectMatch = text.match(/^conectar\s+([\w.-]+)\/([\w.-]+)(?:\s+([\w./-]+))?/i);
     if (connectMatch) {
         editorConfig.github = editorConfig.github || {};
@@ -72,7 +57,6 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
         }
     }
 
-    // segredo NOME=valor
     const secretMatch = text.match(/^segredo\s+([A-Za-z0-9_]+)\s*=\s*(.+)$/is);
     if (secretMatch) {
         const name = secretMatch[1].toUpperCase();
@@ -83,7 +67,6 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
         if (idx >= 0) editorConfig.secrets[idx] = entry;
         else editorConfig.secrets.push(entry);
 
-        // atalho: se for GITHUB_TOKEN, grava também no github.tokenEnc
         if (name === 'GITHUB_TOKEN' || name === 'GH_TOKEN') {
             editorConfig.github = editorConfig.github || {};
             editorConfig.github.tokenEnc = encrypt(value);
@@ -112,14 +95,13 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
         return { reply: `🗑️ Segredo **${name}** removido.` };
     }
 
-    // listar [path]
     const listMatch = text.match(/^listar(?:\s+(.+))?$/i);
     if (listMatch) {
         try {
             const files = await github.listFiles(editorConfig, listMatch[1] || '');
             const lines = files.slice(0, 80).map(f => {
                 const icon = f.type === 'dir' ? '📁' : '📄';
-                return `${icon} \\`${f.path}\\``;
+                return `${icon} \`${f.path}\``;
             });
             return {
                 reply: lines.length
@@ -131,22 +113,20 @@ async function handleEditorMessage(message, editorConfig, saveConfig) {
         }
     }
 
-    // ler path
     const readMatch = text.match(/^ler\s+(.+)$/i);
     if (readMatch) {
         try {
             const file = await github.getFile(editorConfig, readMatch[1].trim());
             const body = file.decoded || '';
             const truncated = body.length > 6000 ? body.slice(0, 6000) + '\n… (cortado)' : body;
-            return { reply: `**${file.path}**\n\\\`\
-${truncated}\n\
-` };
+            return {
+                reply: `**${file.path}**\n\`\`\`\n${truncated}\n\`\`\``
+            };
         } catch (err) {
             return { reply: `❌ ${err.message}` };
         }
     }
 
-    // criar/editar path + code block
     const writeMatch = text.match(/^(criar|editar|escrever)\s+([^\n]+)\s*[\n\r]+```(?:[a-zA-Z0-9]*)?[\n\r]([\s\S]*?)```/i);
     if (writeMatch) {
         const action = writeMatch[1].toLowerCase();
@@ -165,7 +145,6 @@ ${truncated}\n\
         }
     }
 
-    // apagar path
     const delMatch = text.match(/^(?:apagar|deletar|remover)\s+(?!segredo)(.+)$/i);
     if (delMatch) {
         try {
