@@ -30,10 +30,79 @@ function formatTime(ms) {
     return `${sec}s`;
 }
 
+/** Data local YYYY-MM-DD no fuso America/Sao_Paulo */
+function todayKey(tz = 'America/Sao_Paulo') {
+    try {
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: tz,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(new Date());
+    } catch {
+        return new Date().toISOString().slice(0, 10);
+    }
+}
+
+function yesterdayKey(tz = 'America/Sao_Paulo') {
+    const now = new Date();
+    // aproxima ontem no fuso: subtrai 24h e formata
+    const y = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    try {
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: tz,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(y);
+    } catch {
+        return y.toISOString().slice(0, 10);
+    }
+}
+
+function msUntilNextMidnight(tz = 'America/Sao_Paulo') {
+    const now = new Date();
+    // Calcula próxima meia-noite no fuso via iteração simples
+    for (let h = 0; h < 48; h++) {
+        const candidate = new Date(now.getTime() + h * 3600000);
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false
+        }).formatToParts(candidate);
+        const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+        const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+        if (hour === 0 && minute === 0) {
+            return Math.max(1000, candidate.getTime() - now.getTime());
+        }
+    }
+    // fallback 1h
+    return 3600000;
+}
+
+/**
+ * Recompensa daily: base 5k-60k + bônus de streak
+ * A cada 2 dias de sequência, +500 a +2k (acumulativo por par de dias)
+ */
+function calcDailyReward(streak) {
+    const base = randomInt(5000, 60000);
+    const pairs = Math.floor(Math.max(0, streak - 1) / 2);
+    let bonus = 0;
+    for (let i = 0; i < pairs; i++) {
+        bonus += randomInt(500, 2000);
+    }
+    return { base, bonus, total: base + bonus };
+}
+
 module.exports = {
     economyConfig,
     formatAlmas,
     randomInt,
     cooldownLeft,
-    formatTime
+    formatTime,
+    todayKey,
+    yesterdayKey,
+    msUntilNextMidnight,
+    calcDailyReward
 };

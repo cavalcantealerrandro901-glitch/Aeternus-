@@ -8,6 +8,12 @@ const guildSchema = new mongoose.Schema({
     automod: { type: Object, default: {} },
     tickets: { type: Object, default: {} },
     economy: { type: Object, default: {} },
+    rewards: { type: Object, default: {} },
+    games: { type: Object, default: {} },
+    autorole: { type: Object, default: {} },
+    announcements: { type: Object, default: {} },
+    giveaways: { type: Object, default: {} },
+    branding: { type: Object, default: {} },
     updates: { type: Object, default: {} },
     customCommands: { type: Array, default: [] },
     flirt: { type: Object, default: {} }
@@ -19,7 +25,11 @@ const userSchema = new mongoose.Schema({
     almas: { type: Number, default: 0 },
     bank: { type: Number, default: 0 },
     lastDaily: { type: Number, default: 0 },
+    lastDailyDate: { type: String, default: '' },
+    dailyStreak: { type: Number, default: 0 },
+    dailyNotifiedDate: { type: String, default: '' },
     lastWork: { type: Number, default: 0 },
+    workXp: { type: Number, default: 0 },
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
     totalBet: { type: Number, default: 0 },
@@ -35,11 +45,7 @@ const DEFAULT_ECONOMY = {
     enabled: true,
     currency: 'Almas',
     symbol: '💀',
-    startingBalance: 100,
-    dailyMin: 150,
-    dailyMax: 400,
-    workMin: 50,
-    workMax: 250,
+    startingBalance: 1000,
     workCooldownMs: 3600000,
     games: {
         coinflip: true,
@@ -74,6 +80,12 @@ module.exports = {
                 automod: {},
                 tickets: {},
                 economy: { ...DEFAULT_ECONOMY },
+                rewards: {},
+                games: {},
+                autorole: {},
+                announcements: {},
+                giveaways: {},
+                branding: {},
                 updates: {},
                 customCommands: [],
                 flirt: {}
@@ -105,7 +117,7 @@ module.exports = {
         let user = await UserEconomy.findOne({ userId, guildId });
         if (!user) {
             const cfg = module.exports.getGuildConfig(guildId);
-            const start = cfg.economy?.startingBalance ?? 100;
+            const start = cfg.economy?.startingBalance ?? 1000;
             user = await UserEconomy.create({ userId, guildId, almas: start });
         }
         return user;
@@ -125,6 +137,17 @@ module.exports = {
 
     getLeaderboard: async (guildId, limit = 10) => {
         return UserEconomy.find({ guildId }).sort({ almas: -1 }).limit(limit).lean();
+    },
+
+    /** Usuários que ainda não coletararam o daily hoje e podem receber DM */
+    getUsersForDailyNotify: async (dateKey) => {
+        return UserEconomy.find({
+            $or: [
+                { lastDailyDate: { $ne: dateKey } },
+                { lastDailyDate: { $exists: false } }
+            ],
+            dailyNotifiedDate: { $ne: dateKey }
+        }).limit(200).lean();
     },
 
     UserEconomy
