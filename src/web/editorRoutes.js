@@ -1,17 +1,40 @@
+const crypto = require('crypto');
 const { encrypt, decrypt } = require('../bot/utils/cryptoSecrets');
 const githubEditor = require('../bot/utils/githubEditor');
 const { handleEditorMessage } = require('../bot/utils/editorChat');
 const db = require('../database/db');
 const renderEditor = require('./views/editor');
 
+/** state OAuth em memória (curto) */
+const oauthStates = new Map();
+
+function cleanStates() {
+    const now = Date.now();
+    for (const [k, v] of oauthStates) {
+        if (now - v.at > 15 * 60 * 1000) oauthStates.delete(k);
+    }
+}
+
 module.exports = function registerEditorRoutes(app, { sessions, isOwner, client }) {
-    const GH_CLIENT_ID = process.env.GITHUB_CLIENT_ID || '';
-    const GH_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || '';
-    const GH_REDIRECT =
-        process.env.GITHUB_REDIRECT_URI ||
-        (process.env.PANEL_URL
-            ? `${process.env.PANEL_URL.replace(/\/$/, '')}/auth/github/callback`
-            : 'https://aeternus-q7gt.onrender.com/auth/github/callback');
+    const GH_CLIENT_ID = (process.env.GITHUB_CLIENT_ID || '').trim();
+    const GH_CLIENT_SECRET = (process.env.GITHUB_CLIENT_SECRET || '').trim();
+
+    function panelBase(req) {
+        if (process.env.PANEL_URL) return process.env.PANEL_URL.replace(/\/$/, '');
+        if (process.env.GITHUB_REDIRECT_URI) {
+            return process.env.GITHUB_REDIRECT_URI.replace(/\/auth\/github\/callback\/?$/, '');
+        }
+        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        const host = req.headers['x-forwarded-host'] || req.headers.host;
+        return `${proto}://${host}`;
+    }
+
+    function githubRedirectUri(req) {
+        if (process.env.GITHUB_REDIRECT_URI) {
+            return process.env.GITHUB_REDIRECT_URI.trim();
+        }
+        return `${panelBase(req)}/auth/github/callback`;
+    }
 
     async function requireEditor(req, res) {
         const session = sessions[req.cookies?.sessionId];
@@ -22,7 +45,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
         const ok = await db.canAccessEditor(session.user.id);
         if (!ok) {
             res.status(403).json({
-                error: 'Sem permissão no Editor. O dono libera com !daracesso @você'
+                error: 'Sem permissão no Editor. Use !daracesso @user'
             });
             return null;
         }
@@ -32,8 +55,15 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
     async function userGithubCtx(discordId) {
         const link = await db.getEditorGithubLink(discordId);
         if (!link?.tokenEnc) return { token: null, meta: null, link: null };
+        let token = '';
+        try {
+            token = decrypt(link.tokenEnc);
+        } catch {
+            token = '';
+        }
+        if (!token) return { token: null, meta: null, link };
         return {
-            token: decrypt(link.tokenEnc),
+            token,
             meta: {
                 owner: link.selected?.owner || '',
                 repo: link.selected?.repo || '',
@@ -43,53 +73,72 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
         };
     }
 
-    // —— OAuth GitHub ——
+    // —— Iniciar OAuth GitHub (scope repo) ——
     app.get('/auth/github', async (req, res) => {
-        const session = sessions[req.cookies?.sessionId];
-        if (!session) return res.redirect('/login');
-        const ok = await db.canAccessEditor(session.user.id);
-        if (!ok) return res.status(403).send('Sem permissão no Editor.');
+        try {
+            const session = sessions[req.cookies?.sessionId];
+            if (!session) return res.redirect('/login');
 
-        if (!GH_CLIENT_ID) {
-            return res
-                .status(500)
-                .send('GITHUB_CLIENT_ID não configurado no Render.');
+            const ok = await db.canAccessEditor(session.user.id);
+            if (!ok) {
+                return res
+                    .status(403)
+                    .send('Sem permissão no Editor. O dono libera com !daracesso.');
+            }
+
+            if (!GH_CLIENT_ID || !GH_CLIENT_SECRET) {
+                return res
+                    .status(500)
+                    .send(
+                        'Configure GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET no Render.'
+                    );
+            }
+
+            cleanStates();
+            const state = crypto.randomBytes(24).toString('hex');
+            oauthStates.set(state, {
+                discordId: String(session.user.id),
+                at: Date.now()
+            });
+
+            const redirectUri = githubRedirectUri(req);
+            const params = new URLSearchParams({
+                client_id: GH_CLIENT_ID,
+                redirect_uri: redirectUri,
+                // repo = leitura/escrita em repos públicos e privados
+                scope: 'repo user:email read:user',
+                state,
+                allow_signup: 'true'
+            });
+
+            console.log('[GitHub OAuth] redirect_uri=', redirectUri);
+            res.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`);
+        } catch (err) {
+            console.error('auth/github:', err);
+            res.status(500).send('Erro ao iniciar login GitHub: ' + err.message);
         }
-
-        const state = Buffer.from(
-            JSON.stringify({ d: session.user.id, t: Date.now() })
-        ).toString('base64url');
-
-        const params = new URLSearchParams({
-            client_id: GH_CLIENT_ID,
-            redirect_uri: GH_REDIRECT,
-            scope: 'repo read:user',
-            state,
-            allow_signup: 'true'
-        });
-
-        res.redirect(`https://github.com/login/oauth/authorize?${params}`);
     });
 
     app.get('/auth/github/callback', async (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
 
-        const { code, state, error } = req.query;
+        const { code, state, error, error_description } = req.query;
+
         if (error) {
+            console.error('GitHub OAuth denied:', error, error_description);
             return res.redirect('/editor?gh=denied');
         }
-        if (!code) return res.redirect('/editor?gh=error');
+        if (!code || !state) return res.redirect('/editor?gh=error');
+
+        const st = oauthStates.get(String(state));
+        oauthStates.delete(String(state));
+        if (!st || String(st.discordId) !== String(session.user.id)) {
+            return res.redirect('/editor?gh=state');
+        }
 
         try {
-            if (state) {
-                const parsed = JSON.parse(
-                    Buffer.from(String(state), 'base64url').toString('utf8')
-                );
-                if (String(parsed.d) !== String(session.user.id)) {
-                    return res.status(403).send('State inválido.');
-                }
-            }
+            const redirectUri = githubRedirectUri(req);
 
             const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
                 method: 'POST',
@@ -100,14 +149,21 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
                 body: JSON.stringify({
                     client_id: GH_CLIENT_ID,
                     client_secret: GH_CLIENT_SECRET,
-                    code,
-                    redirect_uri: GH_REDIRECT
+                    code: String(code),
+                    redirect_uri: redirectUri
                 })
             });
+
             const tokenData = await tokenRes.json();
             if (!tokenData.access_token) {
                 console.error('GitHub token error:', tokenData);
                 return res.redirect('/editor?gh=token_error');
+            }
+
+            // Confirma scopes
+            const scope = String(tokenData.scope || '');
+            if (!scope.split(/[\s,]+/).includes('repo')) {
+                console.warn('GitHub token sem scope repo:', scope);
             }
 
             const ghUser = await githubEditor.getAuthenticatedUser(tokenData.access_token);
@@ -116,19 +172,16 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
                 githubId: String(ghUser.id),
                 login: ghUser.login,
                 tokenEnc: encrypt(tokenData.access_token),
-                scope: tokenData.scope || 'repo,read:user',
+                scope: scope || 'repo',
                 linkedAt: Date.now()
             });
 
-            // Guarda na sessão em memória também
-            session.github = {
-                login: ghUser.login,
-                id: ghUser.id
-            };
+            session.github = { login: ghUser.login, id: ghUser.id };
+            console.log(`[GitHub OAuth] ${session.user.id} ↔ @${ghUser.login} scopes=${scope}`);
 
             res.redirect('/editor?gh=ok');
         } catch (err) {
-            console.error('GitHub OAuth:', err);
+            console.error('GitHub OAuth callback:', err);
             res.redirect('/editor?gh=error');
         }
     });
@@ -146,10 +199,13 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
         try {
             const session = sessions[req.cookies?.sessionId];
             const ctx = await userGithubCtx(session.user.id);
-            if (!ctx.token) return res.status(400).json({ error: 'Conecte o GitHub primeiro.' });
+            if (!ctx.token) {
+                return res.status(400).json({ error: 'Conecte o GitHub primeiro.' });
+            }
             const repos = await githubEditor.listUserRepos(ctx.token);
-            res.json({ repos });
+            res.json({ repos, login: ctx.link?.login || null });
         } catch (err) {
+            console.error('editor/repos:', err);
             res.status(400).json({ error: err.message });
         }
     });
@@ -158,16 +214,23 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
         if (!(await requireEditor(req, res))) return;
         try {
             const session = sessions[req.cookies?.sessionId];
-            const owner = (req.body.owner || '').trim();
-            const repo = (req.body.repo || '').trim();
+            let owner = (req.body.owner || '').trim();
+            let repo = (req.body.repo || '').trim();
             const branch = (req.body.branch || 'main').trim() || 'main';
+
+            // aceita full_name "owner/repo"
+            if ((!owner || !repo) && req.body.full_name) {
+                const parts = String(req.body.full_name).split('/');
+                owner = parts[0] || owner;
+                repo = parts[1] || repo;
+            }
+
             if (!owner || !repo) {
                 return res.status(400).json({ error: 'Owner e repo obrigatórios' });
             }
 
             await db.setEditorSelectedRepo(session.user.id, { owner, repo, branch });
 
-            // Também atualiza config global (fallback para IA do editor)
             const doc = await db.getEditorConfig();
             const github = {
                 ...(doc.github?.toObject?.() || doc.github || {}),
@@ -189,6 +252,9 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
         try {
             const session = sessions[req.cookies?.sessionId];
             const ctx = await userGithubCtx(session.user.id);
+            if (!ctx.token) {
+                return res.status(400).json({ error: 'Conecte o GitHub primeiro.' });
+            }
             const doc = await db.getEditorConfig();
             const info = await githubEditor.testConnection(
                 doc.toObject ? doc.toObject() : doc,
@@ -232,7 +298,6 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
             let cfg = doc.toObject ? doc.toObject() : { ...doc };
 
             const ctx = await userGithubCtx(session.user.id);
-            // Injeta token/repo do usuário no config usado pelo chat
             if (ctx.token) {
                 cfg = {
                     ...cfg,
@@ -241,7 +306,6 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
                         owner: ctx.meta.owner || cfg.github?.owner,
                         repo: ctx.meta.repo || cfg.github?.repo,
                         branch: ctx.meta.branch || cfg.github?.branch || 'main',
-                        // token em memória só para esta requisição (não salvar plaintext)
                         _runtimeToken: ctx.token
                     }
                 };
@@ -309,7 +373,7 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
             return res.status(403).send(
                 '<!DOCTYPE html><html><body style="background:#0b0b12;color:#eee;font-family:sans-serif;padding:40px">' +
                     '<h1>Acesso negado</h1><p>Sem permissão no Editor.</p>' +
-                    '<p>O dono libera com <code>!daracesso @você</code>.</p>' +
+                    '<p>Libere com <code>!daracesso @você</code>.</p>' +
                     '<p><a href="/dashboard" style="color:#a78bfa">Voltar</a></p></body></html>'
             );
         }
@@ -325,25 +389,25 @@ module.exports = function registerEditorRoutes(app, { sessions, isOwner, client 
         const doc = await db.getEditorConfig();
         const link = await db.getEditorGithubLink(session.user.id);
 
-        const editorMeta = {
-            owner: link?.selected?.owner || doc.github?.owner || '',
-            repo: link?.selected?.repo || doc.github?.repo || '',
-            branch: link?.selected?.branch || doc.github?.branch || 'main',
-            hasToken: !!(link?.tokenEnc || doc.github?.tokenEnc),
-            githubLinked: !!link?.tokenEnc,
-            githubLogin: link?.login || '',
-            secrets: (doc.secrets || []).map((s) => s.name),
-            isOwner: isOwner(session.user),
-            ghClientConfigured: !!GH_CLIENT_ID,
-            ghStatus: req.query.gh || ''
-        };
-
         res.send(
             renderEditor({
                 user: session.user,
                 userAvatarUrl,
                 botAvatarUrl,
-                editorMeta
+                editorMeta: {
+                    owner: link?.selected?.owner || doc.github?.owner || '',
+                    repo: link?.selected?.repo || doc.github?.repo || '',
+                    branch: link?.selected?.branch || doc.github?.branch || 'main',
+                    hasToken: !!link?.tokenEnc,
+                    githubLinked: !!link?.tokenEnc,
+                    githubLogin: link?.login || '',
+                    githubScope: link?.scope || '',
+                    secrets: (doc.secrets || []).map((s) => s.name),
+                    isOwner: isOwner(session.user),
+                    ghClientConfigured: !!(GH_CLIENT_ID && GH_CLIENT_SECRET),
+                    ghStatus: req.query.gh || '',
+                    redirectHint: githubRedirectUri(req)
+                }
             })
         );
     });

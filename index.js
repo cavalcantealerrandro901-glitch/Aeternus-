@@ -4,9 +4,7 @@ const {
     GatewayIntentBits,
     Collection,
     Partials,
-    Events,
-    REST,
-    Routes
+    Events
 } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -47,6 +45,13 @@ function loadCommands(dir) {
             const command = require(fullPath);
 
             if (command?.data?.name && typeof command.execute === 'function') {
+                // evita sobrescrever com o mesmo módulo (ex: editorperm → acessoeditor)
+                if (client.commands.has(command.data.name)) {
+                    const prev = client.commands.get(command.data.name);
+                    if (prev === command) continue;
+                    console.warn(`⚠️ Comando duplicado /${command.data.name} em ${entry.name} — mantendo o primeiro`);
+                    continue;
+                }
                 client.commands.set(command.data.name, command);
                 console.log(`✅ Comando carregado: ${command.data.name}`);
             } else {
@@ -60,14 +65,22 @@ function loadCommands(dir) {
 
 loadCommands(path.join(__dirname, 'src/bot/commands'));
 
+function isSnowflake(id) {
+    return typeof id === 'string' && /^\d{17,20}$/.test(id.trim());
+}
+
 async function registerSlashCommands() {
     const body = [];
+    const seen = new Set();
 
     for (const command of client.commands.values()) {
         try {
-            body.push(command.data.toJSON());
+            const json = command.data.toJSON();
+            if (!json?.name || seen.has(json.name)) continue;
+            seen.add(json.name);
+            body.push(json);
         } catch (err) {
-            console.error(`❌ Erro ao serializar comando ${command.data?.name}:`, err.message);
+            console.error(`❌ Serializar /${command.data?.name}:`, err.message);
         }
     }
 
@@ -76,31 +89,43 @@ async function registerSlashCommands() {
         return;
     }
 
-    const token = process.env.TOKEN;
-    const clientId = process.env.CLIENT_ID;
-
-    if (!token || !clientId) {
-        console.warn('⚠️ TOKEN ou CLIENT_ID ausente — comandos não foram registrados na API.');
-        return;
-    }
-
-    const rest = new REST({ version: '10' }).setToken(token);
-
     try {
-        const guildId = process.env.GUILD_ID;
-
-        if (guildId) {
-            await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
-            console.log(`📡 ${body.length} comando(s) registrado(s) no servidor ${guildId}`);
-        } else {
-            await rest.put(Routes.applicationCommands(clientId), { body });
-            console.log(`📡 ${body.length} comando(s) registrado(s) globalmente`);
+        // Mais confiável: usa a application do bot já logado (não depende de CLIENT_ID)
+        if (!client.application) {
+            await client.application?.fetch?.();
         }
 
-        body.forEach(c => console.log(`   • /${c.name}`));
+        const guildId = (process.env.GUILD_ID || '').trim();
+
+        if (guildId && isSnowflake(guildId)) {
+            const guild = await client.guilds.fetch(guildId).catch(() => null);
+            if (guild) {
+                await guild.commands.set(body);
+                console.log(`📡 ${body.length} slash command(s) no servidor ${guild.name} (${guildId})`);
+            } else {
+                console.warn(`⚠️ GUILD_ID ${guildId} inválido ou bot fora do servidor — registrando global`);
+                await client.application.commands.set(body);
+                console.log(`📡 ${body.length} slash command(s) globalmente`);
+            }
+        } else {
+            if (guildId) {
+                console.warn(`⚠️ GUILD_ID "${guildId}" não é snowflake — usando registro global`);
+            }
+            await client.application.commands.set(body);
+            console.log(`📡 ${body.length} slash command(s) registrados globalmente`);
+            console.log('   (Globais podem levar até ~1h para aparecer em todos os servidores)');
+        }
+
+        body.forEach((c) => console.log(`   • /${c.name}`));
     } catch (err) {
         console.error('❌ Falha ao registrar slash commands:', err.message);
+        if (err.code) console.error('   code:', err.code);
         if (err.rawError) console.error(JSON.stringify(err.rawError, null, 2));
+        if (err.status === 401 || err.code === 50035) {
+            console.error(
+                '   Dica: confira se TOKEN é do mesmo bot e se CLIENT_ID/GUILD_ID são só números (sem aspas extras).'
+            );
+        }
     }
 }
 
@@ -140,14 +165,32 @@ function loadEvents(dir) {
 
 loadEvents(path.join(__dirname, 'src/bot/events'));
 
-client.once(Events.ClientReady, async () => {
-    console.log(`\n🎰 ${client.user.tag} está online!`);
-    console.log(`📡 Servidores: ${client.guilds.cache.size}`);
+client.once(Events.ClientReady, async (readyClient) => {
+    console.log(`\n🎰 ${readyClient.user.tag} está online!`);
+    console.log(`📡 Servidores: ${readyClient.guilds.cache.size}`);
+    console.log(`🆔 Application ID: ${readyClient.user.id}`);
+
+    // CLIENT_ID no Render deve ser igual a este ID (application id do bot)
+    const envClientId = (process.env.CLIENT_ID || '').trim();
+    if (envClientId && envClientId !== readyClient.user.id) {
+        console.warn(
+            `⚠️ CLIENT_ID no Render (${envClientId}) ≠ ID do bot logado (${readyClient.user.id}). Ajuste o CLIENT_ID.`
+        );
+    }
 
     await db.connect();
     await registerSlashCommands();
-    startDailyNotifier(client);
-    startWebPanel(client);
+    startDailyNotifier(readyClient);
+    startWebPanel(readyClient);
 });
 
-client.login(process.env.TOKEN);
+const token = (process.env.TOKEN || '').trim();
+if (!token) {
+    console.error('❌ TOKEN não definido nas variáveis de ambiente.');
+    process.exit(1);
+}
+
+client.login(token).catch((err) => {
+    console.error('❌ Login Discord falhou:', err.message);
+    process.exit(1);
+});
