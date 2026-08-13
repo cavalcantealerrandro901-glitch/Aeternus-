@@ -3,8 +3,8 @@ const { decrypt } = require('./cryptoSecrets');
 const { buildLiveFacts, getCreatorInfo } = require('./aiContext');
 
 const history = new Map();
-const MAX_HISTORY = 8;
-const MAX_REPLY = 1800;
+const MAX_HISTORY = 6;
+const MAX_REPLY = 500;
 
 async function resolveApiConfig() {
     let apiKey =
@@ -66,7 +66,7 @@ function getHistory(userId, guildId) {
 function pushHistory(userId, guildId, role, content) {
     const key = historyKey(userId, guildId);
     const list = history.get(key) || [];
-    list.push({ role, content: String(content).slice(0, 2000) });
+    list.push({ role, content: String(content).slice(0, 800) });
     while (list.length > MAX_HISTORY) list.shift();
     history.set(key, list);
 }
@@ -81,15 +81,15 @@ function buildSystemPrompt(context = {}, liveFacts = '') {
     const creator = getCreatorInfo();
 
     return (
-        `Você é ${name}, assistente de IA do Discord.\n` +
-        `Responda em português do Brasil, claro e objetivo.\n` +
+        `Você é ${name}, assistente no Discord.\n` +
+        `Responda SEMPRE em português do Brasil.\n` +
+        `REGRA PRINCIPAL: respostas CURTAS — no máximo 1 a 2 frases. Sem listas longas. Sem rodeios.\n` +
+        `Se for saldo: diga só o número. Se for clima: só temperatura e condição. Se for comandos: no máximo 5 itens.\n` +
         `Tom neutro. Sem RPG.\n` +
-        `Você PODE informar saldos de Almas, transferências e lista de comandos usando os FATOS AO VIVO.\n` +
-        `Não invente saldos: use só os números dos fatos.\n` +
-        `Não execute ban/kick/pagamento sozinho — apenas explique os comandos.\n` +
-        `Moeda: Almas. Criador: ${creator.name}.\n` +
-        `Usuário atual: ${user} (ID ${context.userId || '?'}).\n\n` +
-        `=== FATOS AO VIVO ===\n${liveFacts || 'Nenhum fato extra.'}\n=== FIM ===`
+        `Use só os FATOS AO VIVO para números (saldo, membros, clima).\n` +
+        `Não invente ações (ban/kick/pay).\n` +
+        `Moeda: Almas. Criador: ${creator.name}. Usuário: ${user}.\n\n` +
+        `FATOS:\n${liveFacts || '—'}`
     );
 }
 
@@ -114,13 +114,13 @@ async function chat(userMessage, context = {}) {
         });
     } catch (err) {
         console.error('buildLiveFacts:', err.message);
-        liveFacts = 'Fatos ao vivo indisponíveis.';
+        liveFacts = 'Fatos indisponíveis.';
     }
 
     const messages = [
         { role: 'system', content: buildSystemPrompt(context, liveFacts) },
         ...getHistory(userId, guildId),
-        { role: 'user', content: String(userMessage).slice(0, 3000) }
+        { role: 'user', content: String(userMessage).slice(0, 1500) }
     ];
 
     try {
@@ -133,8 +133,8 @@ async function chat(userMessage, context = {}) {
             body: JSON.stringify({
                 model,
                 messages,
-                temperature: 0.5,
-                max_tokens: context.maxTokens || 450
+                temperature: 0.4,
+                max_tokens: context.maxTokens || 120
             })
         });
 
@@ -146,14 +146,15 @@ async function chat(userMessage, context = {}) {
             return { ok: false, error: String(msg) };
         }
 
-        const reply = data?.choices?.[0]?.message?.content?.trim() || 'Sem resposta da IA.';
+        let reply = data?.choices?.[0]?.message?.content?.trim() || 'Sem resposta.';
+        if (reply.length > MAX_REPLY) reply = reply.slice(0, MAX_REPLY - 1) + '…';
 
         if (!context.skipHistory) {
             pushHistory(userId, guildId, 'user', userMessage);
             pushHistory(userId, guildId, 'assistant', reply);
         }
 
-        return { ok: true, reply: reply.slice(0, MAX_REPLY), model };
+        return { ok: true, reply, model };
     } catch (err) {
         console.error('AI chat falhou:', err);
         return { ok: false, error: err.message || 'Erro de conexão com a IA' };
@@ -161,7 +162,7 @@ async function chat(userMessage, context = {}) {
 }
 
 async function flavor(prompt, fallback = '', opts = {}) {
-    const timeoutMs = opts.timeoutMs || 2500;
+    const timeoutMs = opts.timeoutMs || 2000;
     try {
         const work = (async () => {
             const { apiKey, baseUrl, model } = await resolveApiConfig();
@@ -174,22 +175,21 @@ async function flavor(prompt, fallback = '', opts = {}) {
                 },
                 body: JSON.stringify({
                     model,
-                    temperature: 0.7,
-                    max_tokens: opts.maxTokens || 60,
+                    temperature: 0.6,
+                    max_tokens: opts.maxTokens || 40,
                     messages: [
                         {
                             role: 'system',
-                            content:
-                                'Gere UMA frase curta em português do Brasil. Tom natural, sem RPG. Só a frase.'
+                            content: 'Uma frase bem curta em português. Máximo 12 palavras. Sem RPG.'
                         },
-                        { role: 'user', content: String(prompt).slice(0, 500) }
+                        { role: 'user', content: String(prompt).slice(0, 300) }
                     ]
                 })
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) return null;
             const text = data?.choices?.[0]?.message?.content?.trim();
-            return text ? text.replace(/^["']|["']$/g, '').slice(0, 220) : null;
+            return text ? text.replace(/^["']|["']$/g, '').slice(0, 100) : null;
         })();
 
         const result = await Promise.race([
