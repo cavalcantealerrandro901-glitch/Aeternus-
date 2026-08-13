@@ -1,5 +1,4 @@
 const github = require('./githubEditor');
-const { encrypt, decrypt } = require('./cryptoSecrets');
 const { resolveApiConfig } = require('./ai');
 
 function extractJsonBlock(text) {
@@ -26,6 +25,17 @@ function userCtxFrom(cfg, opts = {}) {
     return { token, ...meta };
 }
 
+function needGithub(opts, cfg) {
+    const uctx = userCtxFrom(cfg, opts);
+    if (!uctx.token) {
+        return 'GitHub não conectado. Clique em "Conectar com GitHub" e autorize o acesso aos repositórios.';
+    }
+    if (!uctx.owner || !uctx.repo) {
+        return 'Nenhum repositório selecionado. Carregue a lista, escolha o repo e clique em Salvar.';
+    }
+    return null;
+}
+
 async function executeActions(actions, editorConfig, saveConfig, opts = {}) {
     const logs = [];
     let cfg = editorConfig;
@@ -40,37 +50,35 @@ async function executeActions(actions, editorConfig, saveConfig, opts = {}) {
                 if (action.repo) cfg.github.repo = String(action.repo).trim();
                 if (action.branch) cfg.github.branch = String(action.branch).trim();
                 await saveConfig(cfg);
-                logs.push(
-                    `Repo: ${cfg.github.owner}/${cfg.github.repo} (${cfg.github.branch || 'main'})`
-                );
-            } else if (type === 'set_secret') {
-                const name = String(action.name || '').trim().toUpperCase();
-                const value = String(action.value || '');
-                if (!name || !value) {
-                    logs.push('set_secret sem nome/valor');
+                logs.push(`Repo: ${cfg.github.owner}/${cfg.github.repo} (${cfg.github.branch || 'main'})`);
+            } else if (type === 'list') {
+                const miss = needGithub(opts, cfg);
+                if (miss) {
+                    logs.push(miss);
                     continue;
                 }
-                cfg.secrets = cfg.secrets || [];
-                const idx = cfg.secrets.findIndex((s) => s.name === name);
-                const entry = { name, valueEnc: encrypt(value), updatedAt: Date.now() };
-                if (idx >= 0) cfg.secrets[idx] = entry;
-                else cfg.secrets.push(entry);
-                await saveConfig(cfg);
-                logs.push(`Segredo ${name} salvo`);
-            } else if (type === 'list') {
                 const files = await github.listFiles(cfg, action.path || '', uctx());
                 const lines = files
-                    .slice(0, 40)
-                    .map((f) => (f.type === 'dir' ? '📁 ' : '📄 ') + f.path);
+                    .slice(0, 50)
+                    .map((f) => (f.type === 'dir' ? '📁 ' : '📄 ') + (f.path || f.name));
                 logs.push('Lista:\n' + (lines.join('\n') || '(vazio)'));
             } else if (type === 'read') {
+                const miss = needGithub(opts, cfg);
+                if (miss) {
+                    logs.push(miss);
+                    continue;
+                }
                 const file = await github.getFile(cfg, action.path, uctx());
                 const body = file.decoded || '';
-                const cut = body.length > 5000 ? body.slice(0, 5000) + '\n…' : body;
+                const cut = body.length > 4500 ? body.slice(0, 4500) + '\n…' : body;
                 logs.push(`Lido ${file.path}:\n\`\`\`\n${cut}\n\`\`\``);
             } else if (type === 'write' || type === 'create' || type === 'edit') {
+                const miss = needGithub(opts, cfg);
+                if (miss) {
+                    logs.push(miss);
+                    continue;
+                }
                 const path = action.path;
-                const content = action.content ?? '';
                 if (!path) {
                     logs.push('write sem path');
                     continue;
@@ -78,25 +86,36 @@ async function executeActions(actions, editorConfig, saveConfig, opts = {}) {
                 await github.putFile(
                     cfg,
                     path,
-                    content,
-                    action.message || `Aeternus AI Editor: ${path}`,
+                    action.content ?? '',
+                    action.message || `Aeternus Editor: ${path}`,
                     uctx()
                 );
-                logs.push(`Arquivo ${path} gravado`);
+                logs.push(`Arquivo ${path} gravado no GitHub`);
             } else if (type === 'delete') {
+                const miss = needGithub(opts, cfg);
+                if (miss) {
+                    logs.push(miss);
+                    continue;
+                }
                 await github.deleteFile(cfg, action.path, action.message, uctx());
                 logs.push(`Removido ${action.path}`);
             } else if (type === 'test_repo') {
+                if (!opts.userToken && !cfg?.github?._runtimeToken) {
+                    logs.push('GitHub não conectado.');
+                    continue;
+                }
                 const info = await github.testConnection(cfg, uctx());
                 logs.push(
                     info.full_name
-                        ? `OK: ${info.full_name}`
-                        : `GitHub: ${info.login || 'conectado'}`
+                        ? `OK: ${info.full_name} (branch ${info.default_branch || '?'})`
+                        : `GitHub OK: @${info.login || '?'}`
                 );
             } else if (type === 'reply') {
                 if (action.text) logs.push(String(action.text));
+            } else if (type === 'set_secret') {
+                logs.push('Cofre removido. Coloque chaves só no Render (AI_API_KEY, etc.).');
             } else if (type === 'deploy') {
-                logs.push('Deploy: o Render atualiza sozinho no push.');
+                logs.push('Deploy: Render atualiza no push do GitHub.');
             } else {
                 logs.push(`Ação desconhecida: ${type}`);
             }
@@ -108,93 +127,171 @@ async function executeActions(actions, editorConfig, saveConfig, opts = {}) {
     return { logs, cfg };
 }
 
-async function handleWithAI(message, editorConfig, saveConfig, opts = {}) {
-    const { apiKey } = await resolveApiConfig();
-    if (!apiKey) {
+/** Comandos locais — funcionam SEM chave de IA */
+async function handleLocal(text, editorConfig, saveConfig, opts) {
+    const t = text.trim();
+    const lower = t.toLowerCase();
+
+    if (/^(ajuda|help|\?)$/i.test(lower)) {
         return {
             reply:
-                'IA do Editor sem chave. Defina AI_API_KEY no Render. Conecte o GitHub pelo botão da página.'
+                'Comandos rápidos (sem IA):\n' +
+                '• status — conexão e repo\n' +
+                '• testar — testa acesso ao GitHub\n' +
+                '• listar [pasta] — lista arquivos\n' +
+                '• ler caminho/arquivo.js — lê arquivo\n\n' +
+                'Com IA (AI_API_KEY no Render): descreva em português o que quer criar/editar.'
+        };
+    }
+
+    if (/^(status|info)$/i.test(lower)) {
+        const uctx = userCtxFrom(editorConfig, opts);
+        return {
+            reply:
+                `GitHub token: ${uctx.token ? 'sim' : 'não'}\n` +
+                `Repo: ${uctx.owner || '—'}/${uctx.repo || '—'}\n` +
+                `Branch: ${uctx.branch || 'main'}\n` +
+                `IA: ${(await resolveApiConfig()).apiKey ? 'configurada' : 'sem AI_API_KEY no Render'}`
+        };
+    }
+
+    if (/^(testar|teste|test)$/i.test(lower)) {
+        const { logs } = await executeActions([{ type: 'test_repo' }], editorConfig, saveConfig, opts);
+        return { reply: logs.join('\n') };
+    }
+
+    const listMatch = lower.match(/^(listar|lista|list|ls)\s*(.*)$/i);
+    if (listMatch) {
+        const path = (listMatch[2] || '').trim();
+        const { logs } = await executeActions(
+            [{ type: 'list', path }],
+            editorConfig,
+            saveConfig,
+            opts
+        );
+        return { reply: logs.join('\n') };
+    }
+
+    const readMatch = t.match(/^(ler|leia|read|cat)\s+(.+)$/i);
+    if (readMatch) {
+        const path = readMatch[2].trim().replace(/^[`'"]|[`'"]$/g, '');
+        const { logs } = await executeActions(
+            [{ type: 'read', path }],
+            editorConfig,
+            saveConfig,
+            opts
+        );
+        return { reply: logs.join('\n').slice(0, 3500) };
+    }
+
+    const repoMatch = t.match(/^(repo|reposit[oó]rio)\s+([\w.-]+)\/([\w.-]+)(?:\s+([\w./-]+))?$/i);
+    if (repoMatch) {
+        const { logs } = await executeActions(
+            [
+                {
+                    type: 'set_repo',
+                    owner: repoMatch[2],
+                    repo: repoMatch[3],
+                    branch: repoMatch[4] || 'main'
+                }
+            ],
+            editorConfig,
+            saveConfig,
+            opts
+        );
+        return { reply: logs.join('\n') };
+    }
+
+    return null;
+}
+
+async function handleWithAI(message, editorConfig, saveConfig, opts = {}) {
+    const cfgApi = await resolveApiConfig();
+    if (!cfgApi.apiKey) {
+        return {
+            reply:
+                'Sem AI_API_KEY no Render — IA desligada.\n' +
+                'Ainda funciona: status | testar | listar | ler caminho/arquivo.js\n' +
+                'Para editar com linguagem natural, adicione AI_API_KEY ou GROQ_API_KEY no Render.'
         };
     }
 
     const g = editorConfig.github || {};
-    const linked = !!(opts.userToken || g._runtimeToken || g.tokenEnc);
-    const secretsNames = (editorConfig.secrets || []).map((s) => s.name).join(', ') || 'nenhum';
+    const linked = !!(opts.userToken || g._runtimeToken);
+    const uctx = userCtxFrom(editorConfig, opts);
 
     const system =
-        'Você é o Editor IA do Aeternus. O usuário descreve o que quer no código.\n' +
-        'Responda com um JSON: {"reply":"texto curto","actions":[...]}\n' +
-        'Ações: set_repo, list, read, write, delete, test_repo, reply, set_secret.\n' +
-        'Em write envie o arquivo completo. Não invente tokens.\n' +
-        `Repo: ${g.owner || '—'}/${g.repo || '—'} (${g.branch || 'main'}). GitHub OAuth: ${linked ? 'sim' : 'não'}. Segredos: ${secretsNames}.`;
+        'Você é o Editor do bot Aeternus no GitHub.\n' +
+        'Responda APENAS um JSON válido: {"reply":"texto curto","actions":[...]}\n' +
+        'Ações: list, read, write, delete, test_repo, set_repo, reply.\n' +
+        'write precisa de path + content (arquivo completo).\n' +
+        'Não invente tokens. Não use set_secret.\n' +
+        `GitHub OAuth: ${linked ? 'sim' : 'não'}. Repo: ${uctx.owner || '—'}/${uctx.repo || '—'} branch ${uctx.branch || 'main'}.`;
 
-    const { baseUrl, model } = await resolveApiConfig();
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model,
-            temperature: 0.3,
-            max_tokens: 4000,
-            messages: [
-                { role: 'system', content: system },
-                {
-                    role: 'user',
-                    content: 'Pedido:\n' + message + '\n\nResponda só JSON {"reply","actions"}.'
-                }
-            ]
-        })
-    });
+    try {
+        const res = await fetch(`${cfgApi.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${cfgApi.apiKey}`
+            },
+            body: JSON.stringify({
+                model: cfgApi.model,
+                temperature: 0.2,
+                max_tokens: 3500,
+                messages: [
+                    { role: 'system', content: system },
+                    {
+                        role: 'user',
+                        content: 'Pedido do usuário:\n' + message + '\n\nSó JSON {"reply","actions"}.'
+                    }
+                ]
+            })
+        });
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-        return {
-            reply: 'IA falhou: ' + (data?.error?.message || data?.error || res.statusText)
-        };
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const msg = data?.error?.message || data?.error || res.statusText;
+            return { reply: `IA falhou (${res.status}): ${msg}` };
+        }
+
+        const content = data?.choices?.[0]?.message?.content || '';
+        const parsed = extractJsonBlock(content);
+        if (!parsed) {
+            return {
+                reply:
+                    'IA respondeu sem JSON válido. Use: listar | ler arquivo | testar\n\n' +
+                    content.slice(0, 600)
+            };
+        }
+
+        const { logs } = await executeActions(
+            parsed.actions || [],
+            editorConfig,
+            saveConfig,
+            opts
+        );
+        const human = parsed.reply || 'OK.';
+        return { reply: (logs.length ? human + '\n\n' + logs.join('\n') : human).slice(0, 3500) };
+    } catch (err) {
+        return { reply: 'Erro na IA: ' + (err.message || String(err)) };
     }
-
-    const content = data?.choices?.[0]?.message?.content || '';
-    const parsed = extractJsonBlock(content);
-    if (!parsed) {
-        return {
-            reply: content.slice(0, 800) || 'Não interpretei a resposta. Tente de novo.'
-        };
-    }
-
-    const { logs } = await executeActions(
-        parsed.actions || [],
-        editorConfig,
-        saveConfig,
-        opts
-    );
-    const human = parsed.reply || 'OK.';
-    const body = logs.length ? human + '\n\n' + logs.join('\n') : human;
-    return { reply: body.slice(0, 3500) };
 }
 
 async function handleEditorMessage(message, editorConfig, saveConfig, opts = {}) {
     const text = String(message || '').trim();
     if (!text) {
-        return { reply: 'Descreva o que quer alterar no repositório.' };
+        return { reply: 'Digite um comando. Ex: status | listar | ler index.js | ajuda' };
     }
-    if (/^(ajuda|help)$/i.test(text)) {
-        return {
-            reply:
-                '1) Conecte o GitHub\n2) Escolha o repositório\n3) Descreva a alteração\nEx: "liste src/bot" ou "leia index.js"'
-        };
+
+    try {
+        const local = await handleLocal(text, editorConfig, saveConfig, opts);
+        if (local) return local;
+        return handleWithAI(text, editorConfig, saveConfig, opts);
+    } catch (err) {
+        console.error('handleEditorMessage:', err);
+        return { reply: 'Erro no editor: ' + err.message };
     }
-    return handleWithAI(text, editorConfig, saveConfig, opts);
 }
 
-function getSecretValue(editorConfig, name) {
-    const s = (editorConfig.secrets || []).find(
-        (x) => x.name === String(name).toUpperCase()
-    );
-    if (!s) return null;
-    return decrypt(s.valueEnc);
-}
-
-module.exports = { handleEditorMessage, getSecretValue };
+module.exports = { handleEditorMessage };

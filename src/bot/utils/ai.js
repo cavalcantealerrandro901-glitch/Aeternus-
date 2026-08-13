@@ -1,11 +1,11 @@
 const db = require('../../database/db');
-const { decrypt } = require('./cryptoSecrets');
 const { buildLiveFacts, getCreatorInfo } = require('./aiContext');
 
 const history = new Map();
 const MAX_HISTORY = 10;
 const MAX_REPLY = 500;
 
+/** Só variáveis de ambiente do Render (cofre removido) */
 async function resolveApiConfig() {
     let apiKey =
         process.env.AI_API_KEY ||
@@ -15,25 +15,15 @@ async function resolveApiConfig() {
         process.env.GROK_API_KEY ||
         null;
 
-    let baseUrl = process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || null;
-    let model = process.env.AI_MODEL || process.env.OPENAI_MODEL || null;
+    if (apiKey) apiKey = String(apiKey).trim();
 
-    if (!apiKey) {
-        try {
-            const doc = await db.getEditorConfig();
-            const secrets = doc.secrets || [];
-            const pick = (names) => {
-                for (const n of names) {
-                    const s = secrets.find((x) => x.name === n);
-                    if (s) return decrypt(s.valueEnc);
-                }
-                return null;
-            };
-            apiKey = pick(['AI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'GROK_API_KEY']);
-            if (!baseUrl) baseUrl = pick(['AI_BASE_URL', 'OPENAI_BASE_URL']);
-            if (!model) model = pick(['AI_MODEL', 'OPENAI_MODEL']);
-        } catch {}
-    }
+    let baseUrl = (
+        process.env.AI_BASE_URL ||
+        process.env.OPENAI_BASE_URL ||
+        ''
+    ).trim();
+
+    let model = (process.env.AI_MODEL || process.env.OPENAI_MODEL || '').trim();
 
     if (!baseUrl) {
         if (process.env.GROQ_API_KEY || (apiKey && String(apiKey).startsWith('gsk_'))) {
@@ -44,7 +34,7 @@ async function resolveApiConfig() {
             baseUrl = 'https://api.openai.com/v1';
         }
     }
-    baseUrl = String(baseUrl).replace(/\/$/, '');
+    baseUrl = baseUrl.replace(/\/$/, '');
 
     if (!model) {
         if (baseUrl.includes('groq.com')) model = 'llama-3.1-8b-instant';
@@ -99,7 +89,6 @@ function buildSystemPrompt(context = {}, liveFacts = '') {
     return (
         `Você é ${name}, assistente no Discord.\n` +
         `Português do Brasil. Respostas CURTAS: 1–2 frases.\n` +
-        `Pode usar fatos sobre dono, admins, cargos, perfil de membros, saldo e comandos.\n` +
         `Não invente dados — só o que está em FATOS.\n` +
         `Moeda: Almas. Criador: ${creator.name}. Usuário: ${user}.\n\n` +
         `FATOS:\n${liveFacts || '—'}`
