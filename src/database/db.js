@@ -46,6 +46,18 @@ const transferSchema = new mongoose.Schema({
 });
 transferSchema.index({ guildId: 1, at: -1 });
 
+/** Últimas frases do usuário com a IA (máx. 10) */
+const aiMemorySchema = new mongoose.Schema({
+    userId: { type: String, required: true },
+    guildId: { type: String, required: true },
+    messages: [{
+        role: { type: String, enum: ['user', 'assistant'], required: true },
+        content: { type: String, required: true },
+        at: { type: Number, default: () => Date.now() }
+    }]
+});
+aiMemorySchema.index({ userId: 1, guildId: 1 }, { unique: true });
+
 const editorSchema = new mongoose.Schema({
     key: { type: String, default: 'global', unique: true },
     github: {
@@ -70,6 +82,7 @@ const editorSchema = new mongoose.Schema({
 const GuildConfig = mongoose.model('GuildConfig', guildSchema);
 const UserEconomy = mongoose.model('UserEconomy', userSchema);
 const TransferLog = mongoose.model('TransferLog', transferSchema);
+const AiMemory = mongoose.model('AiMemory', aiMemorySchema);
 const EditorConfig = mongoose.model('EditorConfig', editorSchema);
 const cache = new Map();
 
@@ -92,6 +105,7 @@ module.exports = {
     EditorConfig,
     UserEconomy,
     TransferLog,
+    AiMemory,
 
     connect: async () => {
         if (!process.env.MONGO_URI) {
@@ -240,6 +254,45 @@ module.exports = {
             q.$or = [{ fromId: String(userId) }, { toId: String(userId) }];
         }
         return TransferLog.find(q).sort({ at: -1 }).limit(limit).lean();
+    },
+
+    /** Memória IA: últimas mensagens (até 10 pares ≈ 20 entradas, mas só user count 10) */
+    getAiMemory: async (userId, guildId) => {
+        const doc = await AiMemory.findOne({
+            userId: String(userId),
+            guildId: String(guildId || 'dm')
+        }).lean();
+        return doc?.messages || [];
+    },
+
+    appendAiMemory: async (userId, guildId, userText, assistantText) => {
+        const gid = String(guildId || 'dm');
+        const uid = String(userId);
+        let doc = await AiMemory.findOne({ userId: uid, guildId: gid });
+        if (!doc) {
+            doc = new AiMemory({ userId: uid, guildId: gid, messages: [] });
+        }
+        const now = Date.now();
+        doc.messages.push(
+            { role: 'user', content: String(userText).slice(0, 500), at: now },
+            { role: 'assistant', content: String(assistantText).slice(0, 500), at: now }
+        );
+        // Manter só as últimas 10 falas do usuário (+ respostas = 20)
+        while (doc.messages.filter((m) => m.role === 'user').length > 10) {
+            doc.messages.shift();
+        }
+        if (doc.messages.length > 20) {
+            doc.messages = doc.messages.slice(-20);
+        }
+        await doc.save();
+        return doc.messages;
+    },
+
+    clearAiMemory: async (userId, guildId) => {
+        await AiMemory.deleteOne({
+            userId: String(userId),
+            guildId: String(guildId || 'dm')
+        });
     },
 
     getUsersForDailyNotify: async (dateKey) => {

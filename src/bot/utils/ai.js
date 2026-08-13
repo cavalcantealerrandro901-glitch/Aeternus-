@@ -3,7 +3,7 @@ const { decrypt } = require('./cryptoSecrets');
 const { buildLiveFacts, getCreatorInfo } = require('./aiContext');
 
 const history = new Map();
-const MAX_HISTORY = 6;
+const MAX_HISTORY = 10;
 const MAX_REPLY = 500;
 
 async function resolveApiConfig() {
@@ -66,13 +66,29 @@ function getHistory(userId, guildId) {
 function pushHistory(userId, guildId, role, content) {
     const key = historyKey(userId, guildId);
     const list = history.get(key) || [];
-    list.push({ role, content: String(content).slice(0, 800) });
-    while (list.length > MAX_HISTORY) list.shift();
+    list.push({ role, content: String(content).slice(0, 500) });
+    while (list.length > MAX_HISTORY * 2) list.shift();
     history.set(key, list);
 }
 
 function clearHistory(userId, guildId) {
     history.delete(historyKey(userId, guildId));
+    db.clearAiMemory(userId, guildId).catch(() => {});
+}
+
+async function loadPersistedHistory(userId, guildId) {
+    try {
+        const mem = await db.getAiMemory(userId, guildId);
+        if (!mem.length) return getHistory(userId, guildId);
+        const mapped = mem.map((m) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: String(m.content).slice(0, 500)
+        }));
+        history.set(historyKey(userId, guildId), mapped.slice(-(MAX_HISTORY * 2)));
+        return mapped.slice(-(MAX_HISTORY * 2));
+    } catch {
+        return getHistory(userId, guildId);
+    }
 }
 
 function buildSystemPrompt(context = {}, liveFacts = '') {
@@ -82,12 +98,9 @@ function buildSystemPrompt(context = {}, liveFacts = '') {
 
     return (
         `Você é ${name}, assistente no Discord.\n` +
-        `Responda SEMPRE em português do Brasil.\n` +
-        `REGRA PRINCIPAL: respostas CURTAS — no máximo 1 a 2 frases. Sem listas longas. Sem rodeios.\n` +
-        `Se for saldo: diga só o número. Se for clima: só temperatura e condição. Se for comandos: no máximo 5 itens.\n` +
-        `Tom neutro. Sem RPG.\n` +
-        `Use só os FATOS AO VIVO para números (saldo, membros, clima).\n` +
-        `Não invente ações (ban/kick/pay).\n` +
+        `Português do Brasil. Respostas CURTAS: 1–2 frases.\n` +
+        `Pode usar fatos sobre dono, admins, cargos, perfil de membros, saldo e comandos.\n` +
+        `Não invente dados — só o que está em FATOS.\n` +
         `Moeda: Almas. Criador: ${creator.name}. Usuário: ${user}.\n\n` +
         `FATOS:\n${liveFacts || '—'}`
     );
@@ -117,9 +130,11 @@ async function chat(userMessage, context = {}) {
         liveFacts = 'Fatos indisponíveis.';
     }
 
+    const past = await loadPersistedHistory(userId, guildId);
+
     const messages = [
         { role: 'system', content: buildSystemPrompt(context, liveFacts) },
-        ...getHistory(userId, guildId),
+        ...past,
         { role: 'user', content: String(userMessage).slice(0, 1500) }
     ];
 
@@ -152,6 +167,9 @@ async function chat(userMessage, context = {}) {
         if (!context.skipHistory) {
             pushHistory(userId, guildId, 'user', userMessage);
             pushHistory(userId, guildId, 'assistant', reply);
+            db.appendAiMemory(userId, guildId, userMessage, reply).catch((e) =>
+                console.error('appendAiMemory:', e.message)
+            );
         }
 
         return { ok: true, reply, model };
@@ -180,7 +198,7 @@ async function flavor(prompt, fallback = '', opts = {}) {
                     messages: [
                         {
                             role: 'system',
-                            content: 'Uma frase bem curta em português. Máximo 12 palavras. Sem RPG.'
+                            content: 'Uma frase bem curta em português. Máximo 12 palavras.'
                         },
                         { role: 'user', content: String(prompt).slice(0, 300) }
                     ]

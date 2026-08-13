@@ -1,3 +1,4 @@
+const { PermissionFlagsBits } = require('discord.js');
 const db = require('../../database/db');
 const { listCommandsFromClient, listCommandsText } = require('./commandCatalog');
 
@@ -158,6 +159,28 @@ function wantsLeaderboard(text) {
     return /\b(ranking|leaderboard|top\s*\d*|mais ricos|quem tem mais almas)\b/i.test(text || '');
 }
 
+function wantsStaff(text) {
+    return /\b(admin|admins|administradores|moderadores|staff|equipe|dono do servidor|owner|quem (é|e) o dono)\b/i.test(
+        text || ''
+    );
+}
+
+function wantsRoles(text) {
+    return /\b(cargos|roles|lista de cargos|quais cargos)\b/i.test(text || '');
+}
+
+function wantsAbout(text) {
+    return /\b(sobre mim|sobre (ele|ela|o usuário|o user)|quem (é|e)|perfil|info (do|da)|userinfo)\b/i.test(
+        text || ''
+    );
+}
+
+function wantsMemory(text) {
+    return /\b(o que (eu )?falei|minhas (últimas )?frases|histórico|historico|lembra|você lembra)\b/i.test(
+        text || ''
+    );
+}
+
 function formatNum(n) {
     return Math.floor(Number(n) || 0).toLocaleString('pt-BR');
 }
@@ -177,6 +200,104 @@ async function resolveUserEconomy(userId, guildId) {
     };
 }
 
+async function getStaffFacts(guild) {
+    const lines = [];
+    try {
+        let ownerTag = guild.ownerId;
+        try {
+            const owner = await guild.fetchOwner();
+            ownerTag = `${owner.user.tag || owner.user.username} (ID ${owner.id})`;
+        } catch {
+            ownerTag = `ID ${guild.ownerId}`;
+        }
+        lines.push(`Dono do servidor: ${ownerTag}`);
+
+        // Admins / moderadores no cache (limitado)
+        const admins = [];
+        const mods = [];
+        for (const [, m] of guild.members.cache) {
+            if (m.user.bot) continue;
+            if (m.id === guild.ownerId) continue;
+            if (m.permissions.has(PermissionFlagsBits.Administrator)) {
+                admins.push(m.user.username);
+            } else if (
+                m.permissions.has(PermissionFlagsBits.ModerateMembers) ||
+                m.permissions.has(PermissionFlagsBits.ManageMessages) ||
+                m.permissions.has(PermissionFlagsBits.KickMembers) ||
+                m.permissions.has(PermissionFlagsBits.BanMembers)
+            ) {
+                mods.push(m.user.username);
+            }
+            if (admins.length >= 12 && mods.length >= 12) break;
+        }
+        if (admins.length) lines.push(`Administradores (cache): ${admins.slice(0, 12).join(', ')}`);
+        else lines.push('Administradores: nenhum além do dono no cache (ou não carregados).');
+        if (mods.length) lines.push(`Moderadores (cache): ${mods.slice(0, 12).join(', ')}`);
+    } catch (err) {
+        lines.push('Staff: falha ao ler membros — ' + err.message);
+    }
+    return lines;
+}
+
+function getRolesFacts(guild) {
+    try {
+        const roles = [...guild.roles.cache.values()]
+            .filter((r) => r.id !== guild.id)
+            .sort((a, b) => b.position - a.position)
+            .slice(0, 25)
+            .map((r) => `${r.name} (${r.members?.cache?.size ?? '?'} membros)`);
+        return roles.length
+            ? 'Cargos (top 25): ' + roles.join(' · ')
+            : 'Nenhum cargo listado.';
+    } catch {
+        return 'Cargos indisponíveis.';
+    }
+}
+
+async function getMemberAbout(guild, userId) {
+    try {
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (!member) return `Membro ${userId}: não encontrado neste servidor.`;
+
+        const u = member.user;
+        const roles = member.roles.cache
+            .filter((r) => r.id !== guild.id)
+            .sort((a, b) => b.position - a.position)
+            .map((r) => r.name)
+            .slice(0, 15);
+
+        const perms = [];
+        if (member.id === guild.ownerId) perms.push('dono do servidor');
+        if (member.permissions.has(PermissionFlagsBits.Administrator)) perms.push('Administrador');
+        if (member.permissions.has(PermissionFlagsBits.ModerateMembers)) perms.push('Moderar membros');
+        if (member.permissions.has(PermissionFlagsBits.ManageGuild)) perms.push('Gerenciar servidor');
+        if (member.permissions.has(PermissionFlagsBits.ManageChannels)) perms.push('Gerenciar canais');
+
+        const joined = member.joinedTimestamp
+            ? new Date(member.joinedTimestamp).toISOString().slice(0, 10)
+            : '?';
+        const created = u.createdTimestamp
+            ? new Date(u.createdTimestamp).toISOString().slice(0, 10)
+            : '?';
+
+        // Bio pública do Discord não vem de forma confiável para bots; usamos o que a API entrega
+        const display = member.displayName || u.globalName || u.username;
+
+        return (
+            `Perfil ${display} (@${u.username}, ID ${u.id}): ` +
+            `entrou ${joined}, conta ${created}. ` +
+            `Cargos: ${roles.join(', ') || 'nenhum'}. ` +
+            `Permissões chave: ${perms.join(', ') || 'padrão'}. ` +
+            (member.premiumSince ? 'Booster. ' : '') +
+            (member.communicationDisabledUntil && member.communicationDisabledUntil > new Date()
+                ? 'Em timeout. '
+                : '')
+        );
+    } catch (err) {
+        return `Perfil ${userId}: erro — ${err.message}`;
+    }
+}
+
 async function buildLiveFacts(messageText, guild, extra = {}) {
     const lines = [];
     const dt = getDateTimeInfo();
@@ -194,80 +315,105 @@ async function buildLiveFacts(messageText, guild, extra = {}) {
         const s = getServerInfo(guild);
         if (s) {
             lines.push(
-                `Servidor atual: "${s.name}" (ID ${s.id}). Membros ≈ ${s.memberCount}. ` +
+                `Servidor: "${s.name}" (ID ${s.id}). Membros ≈ ${s.memberCount}. ` +
                     `Texto: ${s.textChannels}, voz: ${s.voiceChannels}, cargos: ${s.roles}. ` +
-                    `Boost nível ${s.boostLevel} (${s.boosts}).` +
-                    (s.ownerId ? ` Dono do servidor ID: ${s.ownerId}.` : '')
+                    `Boost ${s.boostLevel}/${s.boosts}.` +
+                    (s.description ? ` Descrição: ${s.description.slice(0, 120)}.` : '') +
+                    (s.ownerId ? ` Dono ID: ${s.ownerId}.` : '')
             );
         }
 
         const prefix = db.getGuildConfig(guild.id).prefix || '!';
 
-        // Comandos
-        if (wantsCommands(messageText) || /\b(tudo que (você|voce) (faz|pode))\b/i.test(messageText)) {
+        if (wantsStaff(messageText) || wantsAbout(messageText)) {
+            const staff = await getStaffFacts(guild);
+            lines.push(...staff);
+        }
+
+        if (wantsRoles(messageText)) {
+            lines.push(getRolesFacts(guild));
+        }
+
+        if (wantsAbout(messageText) || extractMentionIds(messageText).length) {
+            const askerId = extra.userId;
+            if (askerId && /\bsobre mim\b/i.test(messageText || '')) {
+                lines.push(await getMemberAbout(guild, askerId));
+                try {
+                    const eco = await resolveUserEconomy(askerId, guild.id);
+                    lines.push(
+                        `Economia: ${formatNum(eco.almas)} Almas, banco ${formatNum(eco.bank)}, W/L ${eco.wins}/${eco.losses}.`
+                    );
+                } catch {}
+            }
+            for (const id of extractMentionIds(messageText).slice(0, 3)) {
+                lines.push(await getMemberAbout(guild, id));
+                try {
+                    const eco = await resolveUserEconomy(id, guild.id);
+                    lines.push(
+                        `Economia de ${id}: ${formatNum(eco.almas)} Almas, banco ${formatNum(eco.bank)}.`
+                    );
+                } catch {}
+            }
+        }
+
+        if (wantsCommands(messageText)) {
             const catalog = extra.client
                 ? listCommandsFromClient(extra.client, prefix)
                 : listCommandsText(prefix);
-            lines.push('Comandos disponíveis:\n' + catalog);
+            lines.push('Comandos:\n' + catalog);
         }
 
-        // Saldos
         if (wantsBalance(messageText) || wantsTransfers(messageText)) {
             const askerId = extra.userId;
             if (askerId) {
                 const self = await resolveUserEconomy(askerId, guild.id);
                 lines.push(
-                    `Saldo de quem perguntou (ID ${askerId}): carteira ${formatNum(self.almas)} Almas, ` +
-                        `banco ${formatNum(self.bank)}, sequência daily ${self.dailyStreak}, ` +
-                        `W/L ${self.wins}/${self.losses}, apostado total ${formatNum(self.totalBet)}, ` +
-                        `ganho total ${formatNum(self.totalWon)}.`
+                    `Saldo de quem perguntou: ${formatNum(self.almas)} Almas (banco ${formatNum(self.bank)}), ` +
+                        `daily ${self.dailyStreak}d, W/L ${self.wins}/${self.losses}.`
                 );
             }
-
-            const mentioned = extractMentionIds(messageText).filter((id) => id !== askerId);
-            for (const id of mentioned.slice(0, 5)) {
+            for (const id of extractMentionIds(messageText).filter((x) => x !== askerId).slice(0, 5)) {
                 const e = await resolveUserEconomy(id, guild.id);
-                lines.push(
-                    `Saldo do usuário ID ${id}: carteira ${formatNum(e.almas)} Almas, banco ${formatNum(e.bank)}, ` +
-                        `W/L ${e.wins}/${e.losses}.`
-                );
+                lines.push(`Saldo ${id}: ${formatNum(e.almas)} Almas (banco ${formatNum(e.bank)}).`);
             }
         }
 
-        // Transferências
         if (wantsTransfers(messageText)) {
             const targetId = extractMentionIds(messageText)[0] || extra.userId;
-            const txs = await db.getTransfers(guild.id, {
-                userId: targetId || null,
-                limit: 8
-            });
-            if (!txs.length) {
-                lines.push('Nenhuma transferência registrada ainda neste servidor (ou para este usuário).');
-            } else {
+            const txs = await db.getTransfers(guild.id, { userId: targetId || null, limit: 8 });
+            if (!txs.length) lines.push('Sem transferências registradas.');
+            else {
                 lines.push(
-                    'Últimas transferências (mais recentes primeiro):\n' +
+                    'Transferências recentes:\n' +
                         txs
                             .map(
                                 (t) =>
-                                    `• ${formatNum(t.amount)} Almas de ${t.fromId} → ${t.toId} em ${new Date(t.at).toISOString()}`
+                                    `• ${formatNum(t.amount)} de ${t.fromId} → ${t.toId} (${new Date(t.at).toISOString().slice(0, 16)})`
                             )
                             .join('\n')
                 );
             }
         }
 
-        // Ranking
         if (wantsLeaderboard(messageText)) {
             const top = await db.getLeaderboard(guild.id, 10);
-            if (!top.length) {
-                lines.push('Ranking vazio neste servidor.');
-            } else {
+            lines.push(
+                top.length
+                    ? 'Top 10:\n' + top.map((u, i) => `${i + 1}. ${u.userId}: ${formatNum(u.almas)}`).join('\n')
+                    : 'Ranking vazio.'
+            );
+        }
+
+        if (wantsMemory(messageText) && extra.userId) {
+            const mem = await db.getAiMemory(extra.userId, guild.id);
+            const userLines = mem.filter((m) => m.role === 'user').slice(-10);
+            if (userLines.length) {
                 lines.push(
-                    'Top 10 Almas:\n' +
-                        top
-                            .map((u, i) => `${i + 1}. ${u.userId}: ${formatNum(u.almas)} Almas`)
-                            .join('\n')
+                    'Últimas frases do usuário com a IA:\n' +
+                        userLines.map((m, i) => `${i + 1}. ${m.content}`).join('\n')
                 );
+            } else {
+                lines.push('Ainda não há frases salvas deste usuário com a IA.');
             }
         }
     }
@@ -278,9 +424,7 @@ async function buildLiveFacts(messageText, guild, extra = {}) {
         if (w.error) lines.push(`Clima: ${w.error}`);
         else {
             lines.push(
-                `Clima em ${w.city}${w.region ? ', ' + w.region : ''}: ` +
-                    `${w.temperature}${w.unit}, sensação ${w.feelsLike}${w.unit}, ` +
-                    `${w.description}, umidade ${w.humidity}%, vento ${w.wind} km/h.`
+                `Clima ${w.city}: ${w.temperature}${w.unit}, ${w.description}, umidade ${w.humidity}%.`
             );
         }
     }
@@ -300,5 +444,9 @@ module.exports = {
     wantsTransfers,
     wantsCommands,
     wantsLeaderboard,
+    wantsStaff,
+    wantsRoles,
+    wantsAbout,
+    wantsMemory,
     buildLiveFacts
 };
