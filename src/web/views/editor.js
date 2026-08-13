@@ -10,14 +10,21 @@ module.exports = ({ user, userAvatarUrl, botAvatarUrl, editorMeta }) => {
       .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;');
 
-  const ghBanner =
-    meta.ghStatus === 'ok'
-      ? '<div class="ok-banner">GitHub conectado.</div>'
-      : meta.ghStatus === 'denied'
-        ? '<div class="err-banner">Permissão GitHub negada.</div>'
-        : meta.ghStatus
-          ? '<div class="err-banner">Falha no login GitHub.</div>'
-          : '';
+  let ghBanner = '';
+  if (meta.ghStatus === 'ok') {
+    ghBanner = '<div class="ok-banner">GitHub conectado com permissão de repositórios (repo).</div>';
+  } else if (meta.ghStatus === 'denied') {
+    ghBanner = '<div class="err-banner">Você negou a permissão no GitHub. Conecte de novo e aceite o acesso aos repos.</div>';
+  } else if (meta.ghStatus === 'state') {
+    ghBanner = '<div class="err-banner">Sessão OAuth inválida. Tente Conectar com GitHub outra vez.</div>';
+  } else if (meta.ghStatus === 'token_error') {
+    ghBanner =
+      '<div class="err-banner">Erro ao trocar o código por token. Confira GITHUB_CLIENT_SECRET e se o Callback URL no GitHub é exatamente: <code>' +
+      esc(meta.redirectHint) +
+      '</code></div>';
+  } else if (meta.ghStatus) {
+    ghBanner = '<div class="err-banner">Falha no login GitHub. Tente novamente.</div>';
+  }
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -37,12 +44,13 @@ ${fav ? `<link rel="icon" href="${fav}">` : ''}
 .badge{display:inline-block;background:#7c3aed;color:#fff;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:8px;margin-bottom:12px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:800px){.grid{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px}
 .card h2{font-size:1.05rem;margin:0 0 8px}.desc{color:var(--muted);font-size:.85rem;margin-bottom:14px}
 label{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 5px}
 input,textarea,select{width:100%;background:#0b0b12;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;font:inherit}
 .btn{background:var(--primary);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;margin-top:10px;margin-right:8px}
-.btn:disabled{opacity:.5}.btn2{background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;margin-top:10px;text-decoration:none;display:inline-block}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn2{background:transparent;border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;margin-top:10px;text-decoration:none;display:inline-block}
 .btn-gh{background:#238636;color:#fff;border:none;padding:12px 18px;border-radius:10px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;margin-top:8px}
 .sec-chip{display:inline-block;background:#1a1a28;border:1px solid var(--border);border-radius:8px;padding:4px 8px;margin:2px;font-size:.8rem;color:#c4b5fd}
 .chat{display:flex;flex-direction:column;height:420px}
@@ -56,7 +64,8 @@ input,textarea,select{width:100%;background:#0b0b12;border:1px solid var(--borde
 .toast.show{opacity:1}.toast.err{background:#ef4444}
 .status-line{font-size:.85rem;color:#a78bfa;margin:8px 0}
 .ok-banner{background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#86efac;padding:10px 14px;border-radius:10px;margin-bottom:14px}
-.err-banner{background:rgba(239,68,68,.15);border:1px solid #ef4444;color:#fca5a5;padding:10px 14px;border-radius:10px;margin-bottom:14px}
+.err-banner{background:rgba(239,68,68,.15);border:1px solid #ef4444;color:#fca5a5;padding:10px 14px;border-radius:10px;margin-bottom:14px;word-break:break-word}
+code{background:#1a1a28;padding:2px 6px;border-radius:4px;font-size:.85em}
 </style>
 </head>
 <body>
@@ -70,63 +79,62 @@ input,textarea,select{width:100%;background:#0b0b12;border:1px solid var(--borde
 
 <div class="wrap">
   ${ghBanner}
-  <div class="badge">EDITOR · GITHUB OAUTH</div>
+  <div class="badge">EDITOR · GITHUB</div>
   <h1 style="margin:0 0 6px;font-size:1.5rem">Sistema de Editor</h1>
-  <p class="desc">Usuários autorizados conectam a <b>própria conta GitHub</b> e liberam acesso aos repositórios (scope <code>repo</code>).</p>
+  <p class="desc">Login GitHub com permissão <code>repo</code> (ler e editar repositórios).</p>
 
-  <div class="card" style="margin-bottom:16px">
+  <div class="card">
     <h2>1. Conta GitHub</h2>
     ${
       meta.githubLinked
-        ? `<p class="status-line">Conectado como <b>@${esc(meta.githubLogin)}</b></p>
-           <button type="button" class="btn2" id="disconnectGh">Desconectar GitHub</button>
-           <button type="button" class="btn" id="loadRepos">Carregar meus repositórios</button>`
+        ? `<p class="status-line">Conectado: <b>@${esc(meta.githubLogin)}</b>${meta.githubScope ? ' · scopes: ' + esc(meta.githubScope) : ''}</p>
+           <button type="button" class="btn2" id="btnDisconnect">Desconectar</button>
+           <button type="button" class="btn" id="btnLoadRepos">Carregar repositórios</button>`
         : meta.ghClientConfigured
-          ? `<p class="desc">Faça login no GitHub e autorize o acesso aos repositórios.</p>
-             <a class="btn-gh" href="/auth/github">Conectar com GitHub</a>`
-          : `<p class="desc">Configure no Render: <code>GITHUB_CLIENT_ID</code>, <code>GITHUB_CLIENT_SECRET</code> e <code>GITHUB_REDIRECT_URI</code>.</p>`
+          ? `<p class="desc">Ao conectar, o GitHub pede acesso aos seus repositórios.</p>
+             <a class="btn-gh" id="btnConnect" href="/auth/github">Conectar com GitHub</a>`
+          : `<p class="desc">Falta configurar no Render: <code>GITHUB_CLIENT_ID</code> e <code>GITHUB_CLIENT_SECRET</code>.</p>
+             <p class="desc">Callback URL no GitHub App deve ser:<br><code>${esc(meta.redirectHint)}</code></p>`
     }
   </div>
 
-  <div class="grid" style="margin-bottom:16px">
+  <div class="grid">
     <div class="card">
       <h2>2. Repositório</h2>
-      <p class="desc">Escolha na lista ou digite owner/repo.</p>
-      <label>Repositórios da conta</label>
+      <label>Lista da conta</label>
       <select id="repoSelect"><option value="">— carregue a lista —</option></select>
       <label>Owner</label>
       <input id="gh-owner" value="${esc(meta.owner)}" placeholder="usuario">
-      <label>Repositório</label>
+      <label>Repo</label>
       <input id="gh-repo" value="${esc(meta.repo)}" placeholder="Aeternus-">
       <label>Branch</label>
       <input id="gh-branch" value="${esc(meta.branch || 'main')}" placeholder="main">
-      <button type="button" class="btn" id="saveRepo">Salvar repositório</button>
-      <button type="button" class="btn2" id="testRepo">Testar</button>
-      <div class="status-line" id="repoStatus">Token: ${meta.hasToken ? 'OK' : 'não conectado'}</div>
+      <button type="button" class="btn" id="btnSaveRepo">Salvar repositório</button>
+      <button type="button" class="btn2" id="btnTestRepo">Testar acesso</button>
+      <div class="status-line" id="repoStatus">GitHub: ${meta.hasToken ? 'token OK' : 'não conectado'}</div>
     </div>
 
     <div class="card">
-      <h2>3. Cofre (APIs)</h2>
-      <p class="desc">Ex.: AI_API_KEY. O GitHub agora vem do OAuth.</p>
+      <h2>3. Cofre (API keys)</h2>
+      <p class="desc">Ex.: AI_API_KEY. GitHub agora é pelo OAuth.</p>
       <label>Nome</label>
       <input id="sec-name" placeholder="AI_API_KEY" autocomplete="off">
       <label>Valor</label>
       <input id="sec-value" type="password" placeholder="••••••••" autocomplete="new-password">
-      <button type="button" class="btn" id="saveSecret">Salvar segredo</button>
+      <button type="button" class="btn" id="btnSaveSecret">Salvar segredo</button>
       <div style="margin-top:12px"><span class="desc">Salvos:</span><div id="sec-list">${secretsList}</div></div>
     </div>
   </div>
 
   <div class="card">
     <h2>4. Chat do Editor</h2>
-    <p class="desc">Descreva a alteração. Ex.: "liste src/bot" · "leia index.js"</p>
     <div class="chat">
       <div class="chat-log" id="chatLog">
-        <div class="msg bot"><div class="who">Editor</div>Conecte o GitHub, escolha o repo e descreva o que precisa.</div>
+        <div class="msg bot"><div class="who">Editor</div>Conecte o GitHub, escolha o repo e descreva a alteração.</div>
       </div>
       <div class="chat-row">
-        <textarea id="chatInput" placeholder="Descreva a alteração..."></textarea>
-        <button type="button" class="btn" id="sendChat">Enviar</button>
+        <textarea id="chatInput" placeholder="Ex: liste src/bot"></textarea>
+        <button type="button" class="btn" id="btnSend">Enviar</button>
       </div>
     </div>
   </div>
@@ -134,121 +142,198 @@ input,textarea,select{width:100%;background:#0b0b12;border:1px solid var(--borde
 
 <div class="toast" id="toast"></div>
 <script>
-(function(){
-  function toast(m,err){var t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(err?' err':'');setTimeout(function(){t.classList.remove('show')},3500)}
-  async function post(url,body){
-    try{
-      var r=await fetch(url,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(body||{})});
-      var j={};try{j=await r.json()}catch(e){}
-      return{ok:r.ok,status:r.status,json:j};
-    }catch(e){return{ok:false,status:0,json:{error:e.message}}}
-  }
-  async function get(url){
-    try{
-      var r=await fetch(url,{credentials:'same-origin',headers:{Accept:'application/json'}});
-      var j={};try{j=await r.json()}catch(e){}
-      return{ok:r.ok,status:r.status,json:j};
-    }catch(e){return{ok:false,status:0,json:{error:e.message}}}
-  }
-  function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-  function addMsg(role,text){
-    var log=document.getElementById('chatLog');
-    var d=document.createElement('div');
-    d.className='msg '+role;
-    d.innerHTML='<div class="who">'+(role==='user'?'Você':'Editor')+'</div>'+escapeHtml(text).replace(/\n/g,'<br>');
-    log.appendChild(d);log.scrollTop=log.scrollHeight;
-  }
-  function errMsg(r){
-    if(r.status===401)return 'Sessão expirada. Login de novo.';
-    if(r.status===403)return 'Sem permissão no Editor.';
-    return(r.json&&(r.json.error||r.json.reply))||('HTTP '+r.status);
+(function () {
+  var AUTO_LOAD = ${meta.githubLinked ? 'true' : 'false'};
+
+  function toast(m, err) {
+    var t = document.getElementById('toast');
+    t.textContent = m;
+    t.className = 'toast show' + (err ? ' err' : '');
+    setTimeout(function () { t.classList.remove('show'); }, 3500);
   }
 
-  var loadRepos=document.getElementById('loadRepos');
-  if(loadRepos) loadRepos.addEventListener('click', async function(){
-    loadRepos.disabled=true;
-    var r=await get('/api/editor/repos');
-    loadRepos.disabled=false;
-    if(!r.ok) return toast(errMsg(r),true);
-    var sel=document.getElementById('repoSelect');
-    sel.innerHTML='<option value="">— escolha —</option>';
-    (r.json.repos||[]).forEach(function(repo){
-      var o=document.createElement('option');
-      o.value=repo.owner+'/'+repo.name;
-      o.textContent=(repo.private?'🔒 ':'')+repo.full_name;
-      o.dataset.owner=repo.owner;
-      o.dataset.name=repo.name;
-      o.dataset.branch=repo.default_branch||'main';
+  async function post(url, body) {
+    try {
+      var r = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+      var j = {};
+      try { j = await r.json(); } catch (e) {}
+      return { ok: r.ok, status: r.status, json: j };
+    } catch (e) {
+      return { ok: false, status: 0, json: { error: e.message || 'Rede' } };
+    }
+  }
+
+  async function get(url) {
+    try {
+      var r = await fetch(url, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' }
+      });
+      var j = {};
+      try { j = await r.json(); } catch (e) {}
+      return { ok: r.ok, status: r.status, json: j };
+    } catch (e) {
+      return { ok: false, status: 0, json: { error: e.message || 'Rede' } };
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function errMsg(r) {
+    if (r.status === 401) return 'Sessão expirada — faça login no Discord de novo.';
+    if (r.status === 403) return 'Sem permissão no Editor.';
+    return (r.json && (r.json.error || r.json.reply)) || ('Erro HTTP ' + r.status);
+  }
+
+  function addMsg(role, text) {
+    var log = document.getElementById('chatLog');
+    var d = document.createElement('div');
+    d.className = 'msg ' + role;
+    d.innerHTML =
+      '<div class="who">' +
+      (role === 'user' ? 'Você' : 'Editor') +
+      '</div>' +
+      escapeHtml(text).replace(/\n/g, '<br>');
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function fillRepos(repos) {
+    var sel = document.getElementById('repoSelect');
+    sel.innerHTML = '<option value="">— escolha —</option>';
+    (repos || []).forEach(function (repo) {
+      var o = document.createElement('option');
+      o.value = repo.full_name;
+      o.textContent = (repo.private ? '🔒 ' : '') + repo.full_name;
+      o.setAttribute('data-owner', repo.owner);
+      o.setAttribute('data-name', repo.name);
+      o.setAttribute('data-branch', repo.default_branch || 'main');
       sel.appendChild(o);
     });
-    toast((r.json.repos||[]).length+' repositórios');
-  });
-
-  var repoSelect=document.getElementById('repoSelect');
-  if(repoSelect) repoSelect.addEventListener('change', function(){
-    var o=repoSelect.selectedOptions[0];
-    if(!o||!o.dataset.owner) return;
-    document.getElementById('gh-owner').value=o.dataset.owner;
-    document.getElementById('gh-repo').value=o.dataset.name;
-    document.getElementById('gh-branch').value=o.dataset.branch||'main';
-  });
-
-  var disconnectGh=document.getElementById('disconnectGh');
-  if(disconnectGh) disconnectGh.addEventListener('click', async function(){
-    var r=await post('/api/editor/github/disconnect',{});
-    if(r.ok) location.href='/editor';
-    else toast(errMsg(r),true);
-  });
-
-  document.getElementById('saveRepo').addEventListener('click', async function(){
-    var r=await post('/api/editor/repo',{
-      owner:document.getElementById('gh-owner').value.trim(),
-      repo:document.getElementById('gh-repo').value.trim(),
-      branch:document.getElementById('gh-branch').value.trim()||'main'
-    });
-    toast(r.ok?'Repositório salvo':errMsg(r),!r.ok);
-  });
-
-  document.getElementById('testRepo').addEventListener('click', async function(){
-    var r=await post('/api/editor/test',{});
-    if(r.ok) toast('OK: '+(r.json.full_name||r.json.login||'conectado'));
-    else toast(errMsg(r),true);
-  });
-
-  document.getElementById('saveSecret').addEventListener('click', async function(){
-    var name=document.getElementById('sec-name').value.trim();
-    var value=document.getElementById('sec-value').value;
-    if(!name||!value) return toast('Preencha nome e valor',true);
-    var r=await post('/api/editor/secret',{name:name,value:value});
-    if(r.ok){
-      toast('Segredo salvo');
-      document.getElementById('sec-value').value='';
-      if(r.json.secrets){
-        document.getElementById('sec-list').innerHTML=r.json.secrets.map(function(n){
-          return '<span class="sec-chip">'+escapeHtml(n)+'</span>';
-        }).join('')||'<span style="color:#666">Nenhum</span>';
-      }
-    } else toast(errMsg(r),true);
-  });
-
-  async function doSend(){
-    var input=document.getElementById('chatInput');
-    var text=input.value.trim();
-    if(!text) return;
-    addMsg('user',text); input.value='';
-    document.getElementById('sendChat').disabled=true;
-    addMsg('bot','Processando...');
-    var r=await post('/api/editor/chat',{message:text});
-    document.getElementById('sendChat').disabled=false;
-    var log=document.getElementById('chatLog');
-    if(log.lastChild) log.removeChild(log.lastChild);
-    if(r.ok) addMsg('bot', r.json.reply||'Sem resposta');
-    else addMsg('bot','Erro: '+errMsg(r));
   }
-  document.getElementById('sendChat').addEventListener('click', doSend);
-  document.getElementById('chatInput').addEventListener('keydown', function(e){
-    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doSend()}
+
+  async function loadRepos() {
+    var btn = document.getElementById('btnLoadRepos');
+    if (btn) btn.disabled = true;
+    var r = await get('/api/editor/repos');
+    if (btn) btn.disabled = false;
+    if (!r.ok) {
+      toast(errMsg(r), true);
+      return;
+    }
+    fillRepos(r.json.repos);
+    toast((r.json.repos || []).length + ' repositórios');
+  }
+
+  var btnLoad = document.getElementById('btnLoadRepos');
+  if (btnLoad) btnLoad.addEventListener('click', function (e) {
+    e.preventDefault();
+    loadRepos();
   });
+
+  var btnDisc = document.getElementById('btnDisconnect');
+  if (btnDisc) btnDisc.addEventListener('click', async function (e) {
+    e.preventDefault();
+    btnDisc.disabled = true;
+    var r = await post('/api/editor/github/disconnect', {});
+    btnDisc.disabled = false;
+    if (r.ok) location.href = '/editor';
+    else toast(errMsg(r), true);
+  });
+
+  var sel = document.getElementById('repoSelect');
+  if (sel) sel.addEventListener('change', function () {
+    var o = sel.selectedOptions[0];
+    if (!o || !o.getAttribute('data-owner')) return;
+    document.getElementById('gh-owner').value = o.getAttribute('data-owner');
+    document.getElementById('gh-repo').value = o.getAttribute('data-name');
+    document.getElementById('gh-branch').value = o.getAttribute('data-branch') || 'main';
+  });
+
+  document.getElementById('btnSaveRepo').addEventListener('click', async function (e) {
+    e.preventDefault();
+    var btn = e.currentTarget;
+    btn.disabled = true;
+    var r = await post('/api/editor/repo', {
+      owner: document.getElementById('gh-owner').value.trim(),
+      repo: document.getElementById('gh-repo').value.trim(),
+      branch: document.getElementById('gh-branch').value.trim() || 'main'
+    });
+    btn.disabled = false;
+    toast(r.ok ? 'Repositório salvo' : errMsg(r), !r.ok);
+  });
+
+  document.getElementById('btnTestRepo').addEventListener('click', async function (e) {
+    e.preventDefault();
+    var btn = e.currentTarget;
+    btn.disabled = true;
+    var r = await post('/api/editor/test', {});
+    btn.disabled = false;
+    if (r.ok) toast('OK: ' + (r.json.full_name || r.json.login || 'conectado'));
+    else toast(errMsg(r), true);
+  });
+
+  document.getElementById('btnSaveSecret').addEventListener('click', async function (e) {
+    e.preventDefault();
+    var name = document.getElementById('sec-name').value.trim();
+    var value = document.getElementById('sec-value').value;
+    if (!name || !value) return toast('Preencha nome e valor', true);
+    var btn = e.currentTarget;
+    btn.disabled = true;
+    var r = await post('/api/editor/secret', { name: name, value: value });
+    btn.disabled = false;
+    if (r.ok) {
+      toast('Segredo salvo');
+      document.getElementById('sec-value').value = '';
+      if (r.json.secrets) {
+        document.getElementById('sec-list').innerHTML =
+          r.json.secrets
+            .map(function (n) {
+              return '<span class="sec-chip">' + escapeHtml(n) + '</span>';
+            })
+            .join('') || '<span style="color:#666">Nenhum</span>';
+      }
+    } else toast(errMsg(r), true);
+  });
+
+  async function doSend() {
+    var input = document.getElementById('chatInput');
+    var text = input.value.trim();
+    if (!text) return;
+    addMsg('user', text);
+    input.value = '';
+    var btn = document.getElementById('btnSend');
+    btn.disabled = true;
+    addMsg('bot', 'Processando...');
+    var r = await post('/api/editor/chat', { message: text });
+    btn.disabled = false;
+    var log = document.getElementById('chatLog');
+    if (log.lastChild) log.removeChild(log.lastChild);
+    if (r.ok) addMsg('bot', r.json.reply || 'Sem resposta');
+    else addMsg('bot', 'Erro: ' + errMsg(r));
+  }
+
+  document.getElementById('btnSend').addEventListener('click', function (e) {
+    e.preventDefault();
+    doSend();
+  });
+  document.getElementById('chatInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      doSend();
+    }
+  });
+
+  if (AUTO_LOAD) {
+    setTimeout(function () { loadRepos(); }, 400);
+  }
 })();
 </script>
 </body>
