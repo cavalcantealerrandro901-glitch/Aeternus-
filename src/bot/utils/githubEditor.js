@@ -13,7 +13,11 @@ async function ghFetch(path, token, options = {}) {
     });
     const text = await res.text();
     let data;
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    try {
+        data = text ? JSON.parse(text) : {};
+    } catch {
+        data = { raw: text };
+    }
     if (!res.ok) {
         const msg = data.message || res.statusText || 'Erro GitHub';
         const err = new Error(msg);
@@ -24,33 +28,56 @@ async function ghFetch(path, token, options = {}) {
     return data;
 }
 
-function getToken(editorConfig) {
-    if (!editorConfig?.github?.tokenEnc) return null;
-    return decrypt(editorConfig.github.tokenEnc);
+/** Token do usuário (OAuth) ou token global do config */
+function resolveToken(editorConfig, userGithubToken) {
+    if (userGithubToken) return userGithubToken;
+    if (editorConfig?.github?.tokenEnc) return decrypt(editorConfig.github.tokenEnc);
+    return null;
 }
 
-async function listFiles(editorConfig, dirPath = '') {
-    const token = getToken(editorConfig);
-    if (!token) throw new Error('Token GitHub não configurado.');
-    const { owner, repo, branch } = editorConfig.github;
-    if (!owner || !repo) throw new Error('Repositório não configurado.');
+function getRepoMeta(editorConfig, userMeta) {
+    const owner = userMeta?.owner || editorConfig?.github?.owner;
+    const repo = userMeta?.repo || editorConfig?.github?.repo;
+    const branch = userMeta?.branch || editorConfig?.github?.branch || 'main';
+    return { owner, repo, branch };
+}
 
-    const ref = branch || 'main';
+async function listUserRepos(token) {
+    const data = await ghFetch('/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member', token);
+    return (Array.isArray(data) ? data : []).map((r) => ({
+        full_name: r.full_name,
+        owner: r.owner?.login,
+        name: r.name,
+        private: r.private,
+        default_branch: r.default_branch,
+        html_url: r.html_url
+    }));
+}
+
+async function getAuthenticatedUser(token) {
+    return ghFetch('/user', token);
+}
+
+async function listFiles(editorConfig, dirPath = '', userCtx = {}) {
+    const token = resolveToken(editorConfig, userCtx.token);
+    if (!token) throw new Error('GitHub não conectado. Faça login com o GitHub.');
+    const { owner, repo, branch } = getRepoMeta(editorConfig, userCtx);
+    if (!owner || !repo) throw new Error('Selecione um repositório.');
+
     const path = dirPath ? `/${dirPath.replace(/^\/+/, '')}` : '';
     const data = await ghFetch(
-        `/repos/${owner}/${repo}/contents${path}?ref=${encodeURIComponent(ref)}`,
+        `/repos/${owner}/${repo}/contents${path}?ref=${encodeURIComponent(branch)}`,
         token
     );
     return Array.isArray(data) ? data : [data];
 }
 
-async function getFile(editorConfig, filePath) {
-    const token = getToken(editorConfig);
-    if (!token) throw new Error('Token GitHub não configurado.');
-    const { owner, repo, branch } = editorConfig.github;
-    const ref = branch || 'main';
+async function getFile(editorConfig, filePath, userCtx = {}) {
+    const token = resolveToken(editorConfig, userCtx.token);
+    if (!token) throw new Error('GitHub não conectado.');
+    const { owner, repo, branch } = getRepoMeta(editorConfig, userCtx);
     const data = await ghFetch(
-        `/repos/${owner}/${repo}/contents/${filePath.replace(/^\/+/, '')}?ref=${encodeURIComponent(ref)}`,
+        `/repos/${owner}/${repo}/contents/${filePath.replace(/^\/+/, '')}?ref=${encodeURIComponent(branch)}`,
         token
     );
     if (data.encoding === 'base64' && data.content) {
@@ -59,16 +86,16 @@ async function getFile(editorConfig, filePath) {
     return data;
 }
 
-async function putFile(editorConfig, filePath, content, message) {
-    const token = getToken(editorConfig);
-    if (!token) throw new Error('Token GitHub não configurado.');
-    const { owner, repo, branch } = editorConfig.github;
-    if (!owner || !repo) throw new Error('Repositório não configurado.');
+async function putFile(editorConfig, filePath, content, message, userCtx = {}) {
+    const token = resolveToken(editorConfig, userCtx.token);
+    if (!token) throw new Error('GitHub não conectado.');
+    const { owner, repo, branch } = getRepoMeta(editorConfig, userCtx);
+    if (!owner || !repo) throw new Error('Selecione um repositório.');
 
     const path = filePath.replace(/^\/+/, '');
     let sha;
     try {
-        const existing = await getFile(editorConfig, path);
+        const existing = await getFile(editorConfig, path, userCtx);
         sha = existing.sha;
     } catch (e) {
         if (e.status !== 404) throw e;
@@ -88,12 +115,12 @@ async function putFile(editorConfig, filePath, content, message) {
     });
 }
 
-async function deleteFile(editorConfig, filePath, message) {
-    const token = getToken(editorConfig);
-    if (!token) throw new Error('Token GitHub não configurado.');
-    const { owner, repo, branch } = editorConfig.github;
+async function deleteFile(editorConfig, filePath, message, userCtx = {}) {
+    const token = resolveToken(editorConfig, userCtx.token);
+    if (!token) throw new Error('GitHub não conectado.');
+    const { owner, repo, branch } = getRepoMeta(editorConfig, userCtx);
     const path = filePath.replace(/^\/+/, '');
-    const existing = await getFile(editorConfig, path);
+    const existing = await getFile(editorConfig, path, userCtx);
 
     return ghFetch(`/repos/${owner}/${repo}/contents/${path}`, token, {
         method: 'DELETE',
@@ -106,13 +133,20 @@ async function deleteFile(editorConfig, filePath, message) {
     });
 }
 
-async function testConnection(editorConfig) {
-    const token = getToken(editorConfig);
-    if (!token) throw new Error('Token GitHub não configurado.');
-    const { owner, repo } = editorConfig.github || {};
-    if (!owner || !repo) throw new Error('Informe owner e repo.');
+async function testConnection(editorConfig, userCtx = {}) {
+    const token = resolveToken(editorConfig, userCtx.token);
+    if (!token) throw new Error('GitHub não conectado.');
+    const { owner, repo } = getRepoMeta(editorConfig, userCtx);
+    if (!owner || !repo) {
+        const me = await getAuthenticatedUser(token);
+        return { login: me.login, id: me.id, note: 'Conectado. Selecione um repositório.' };
+    }
     const data = await ghFetch(`/repos/${owner}/${repo}`, token);
-    return { full_name: data.full_name, default_branch: data.default_branch, private: data.private };
+    return {
+        full_name: data.full_name,
+        default_branch: data.default_branch,
+        private: data.private
+    };
 }
 
 module.exports = {
@@ -121,5 +155,8 @@ module.exports = {
     putFile,
     deleteFile,
     testConnection,
-    getToken
+    listUserRepos,
+    getAuthenticatedUser,
+    resolveToken,
+    getRepoMeta
 };
