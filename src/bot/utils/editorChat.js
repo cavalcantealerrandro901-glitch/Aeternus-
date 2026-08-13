@@ -15,52 +15,64 @@ function extractJson(text) {
     }
 }
 
+function extractCodeBlock(text) {
+    const m = text.match(/```(?:[\w.-]*)?\n([\s\S]*?)```/);
+    return m ? m[1] : null;
+}
+
 async function runLocal(text, ctx) {
-    const t = text.trim();
+    const t = String(text || '').trim();
+    if (!t) return 'Digite algo. Ex: ajuda';
     const lower = t.toLowerCase();
-    const { token, owner, repo, branch } = ctx;
+    const { token, owner, repo, branch } = ctx || {};
 
     if (/^(ajuda|help|\?)$/i.test(lower)) {
-        return (
-            'Comandos:\n' +
-            '• status — conexão\n' +
-            '• testar — testa GitHub\n' +
-            '• listar [pasta]\n' +
-            '• ler caminho/arquivo.js\n' +
-            '• repo dono/nome [branch]\n' +
+        return [
+            'Comandos locais (sempre funcionam):',
+            '• ajuda | status',
+            '• testar — testa GitHub',
+            '• listar [pasta]',
+            '• ler caminho/arquivo.js',
+            '• escrever caminho/arquivo.js + código em ```blocos```',
+            '• apagar caminho/arquivo.js',
+            '• repo dono/nome [branch]',
+            '',
             'Com AI_API_KEY: descreva a alteração em português.'
-        );
+        ].join('\n');
     }
 
     if (/^(status|info)$/i.test(lower)) {
-        const api = await resolveApiConfig();
-        return (
-            `Token: ${token ? 'sim' : 'não'}\n` +
-            `Repo: ${owner || '—'}/${repo || '—'}\n` +
-            `Branch: ${branch || 'main'}\n` +
-            `IA: ${api.apiKey ? 'sim' : 'não (AI_API_KEY)'}`
-        );
+        const api = await resolveApiConfig().catch(() => ({ apiKey: null }));
+        return [
+            `GitHub: ${token ? 'conectado' : 'não conectado'}`,
+            token ? `Login: @${ctx.login || '?'}` : '',
+            `Repo: ${owner && repo ? owner + '/' + repo : 'nenhum'}`,
+            `Branch: ${branch || 'main'}`,
+            `IA: ${api?.apiKey ? 'sim' : 'não'}`
+        ]
+            .filter(Boolean)
+            .join('\n');
     }
 
     if (/^(testar|teste|test)$/i.test(lower)) {
-        if (!token) return 'Conecte o GitHub primeiro.';
+        if (!token) return 'Conecte o GitHub (botão verde).';
         if (owner && repo) {
             const r = await gh.getRepo(token, owner, repo);
-            return `OK: ${r.full_name} (${r.default_branch})`;
+            return `OK: ${r.full_name} · branch padrão ${r.default_branch}`;
         }
         const u = await gh.me(token);
-        return `OK: @${u.login} — escolha um repositório.`;
+        return `OK: @${u.login} · escolha e salve um repositório.`;
     }
 
     const listM = lower.match(/^(listar|lista|list|ls)\s*(.*)$/);
     if (listM) {
         if (!token) return 'Conecte o GitHub.';
-        if (!owner || !repo) return 'Salve um repositório antes.';
+        if (!owner || !repo) return 'Salve owner/repo primeiro.';
         const files = await gh.listContents(token, owner, repo, listM[2].trim(), branch);
         return (
             'Arquivos:\n' +
             files
-                .slice(0, 60)
+                .slice(0, 80)
                 .map((f) => (f.type === 'dir' ? '📁 ' : '📄 ') + (f.path || f.name))
                 .join('\n')
         );
@@ -69,18 +81,43 @@ async function runLocal(text, ctx) {
     const readM = t.match(/^(ler|leia|read|cat)\s+(.+)$/i);
     if (readM) {
         if (!token) return 'Conecte o GitHub.';
-        if (!owner || !repo) return 'Salve um repositório antes.';
+        if (!owner || !repo) return 'Salve owner/repo primeiro.';
         const path = readM[2].trim().replace(/^[`'"]|[`'"]$/g, '');
         const file = await gh.readFile(token, owner, repo, path, branch);
         const body = file.decoded || '';
-        const cut = body.length > 4000 ? body.slice(0, 4000) + '\n…' : body;
-        return `${file.path}:\n\`\`\`\n${cut}\n\`\`\``;
+        const cut = body.length > 6000 ? body.slice(0, 6000) + '\n…' : body;
+        return `${file.path} (${body.length} chars):\n\`\`\`\n${cut}\n\`\`\``;
+    }
+
+    const writeM = t.match(/^(escrever|write|salvar|gravar)\s+(\S+)\s*([\s\S]*)$/i);
+    if (writeM) {
+        if (!token) return 'Conecte o GitHub.';
+        if (!owner || !repo) return 'Salve owner/repo primeiro.';
+        const path = writeM[2].trim();
+        let content = writeM[3] || '';
+        const block = extractCodeBlock(content);
+        if (block != null) content = block;
+        else content = content.replace(/^\n+/, '');
+        if (!content.trim()) {
+            return 'Envie o código depois do caminho, preferencialmente em ```bloco```.';
+        }
+        await gh.writeFile(token, owner, repo, path, content, branch, `Aeternus: update ${path}`);
+        return `Arquivo gravado: ${path} (${content.length} chars) em ${owner}/${repo}`;
+    }
+
+    const delM = t.match(/^(apagar|delete|rm|remover)\s+(\S+)$/i);
+    if (delM) {
+        if (!token) return 'Conecte o GitHub.';
+        if (!owner || !repo) return 'Salve owner/repo primeiro.';
+        const path = delM[2].trim();
+        await gh.deleteFile(token, owner, repo, path, branch, `Aeternus: delete ${path}`);
+        return `Removido: ${path}`;
     }
 
     const repoM = t.match(/^(repo|reposit[oó]rio)\s+([\w.-]+)\/([\w.-]+)(?:\s+([\w./-]+))?$/i);
     if (repoM) {
         return {
-            reply: `Repo definido: ${repoM[2]}/${repoM[3]} (${repoM[4] || 'main'})`,
+            reply: `Repo ativo: ${repoM[2]}/${repoM[3]} (${repoM[4] || 'main'})`,
             setRepo: { owner: repoM[2], repo: repoM[3], branch: repoM[4] || 'main' }
         };
     }
@@ -89,18 +126,24 @@ async function runLocal(text, ctx) {
 }
 
 async function runAI(text, ctx) {
-    const api = await resolveApiConfig();
-    if (!api.apiKey) {
+    let api;
+    try {
+        api = await resolveApiConfig();
+    } catch {
+        api = {};
+    }
+    if (!api?.apiKey) {
         return (
             'Sem AI_API_KEY no Render.\n' +
-            'Use: status | testar | listar | ler arquivo.js'
+            'Use comandos: ajuda | status | listar | ler arquivo | escrever arquivo + ```código```'
         );
     }
 
     const system =
-        'Editor GitHub do Aeternus. Responda só JSON: {"reply":"...","actions":[...]}\n' +
-        'Ações: list path, read path, write path+content, delete path, test, reply text.\n' +
-        `Token: ${ctx.token ? 'sim' : 'não'}. Repo: ${ctx.owner || '—'}/${ctx.repo || '—'} branch ${ctx.branch || 'main'}.`;
+        'Você é o editor de código do bot Aeternus. Responda SEMPRE em JSON puro:\n' +
+        '{"reply":"texto curto","actions":[{"type":"write|read|list|delete|test|reply","path":"...","content":"...","message":"..."}]}\n' +
+        'type write precisa de path e content completo do arquivo.\n' +
+        `GitHub: ${ctx.token ? 'sim' : 'não'}. Repo: ${ctx.owner || '—'}/${ctx.repo || '—'} branch ${ctx.branch || 'main'}.`;
 
     const res = await fetch(`${api.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -110,31 +153,41 @@ async function runAI(text, ctx) {
         },
         body: JSON.stringify({
             model: api.model,
-            temperature: 0.2,
-            max_tokens: 3500,
+            temperature: 0.15,
+            max_tokens: 4000,
             messages: [
                 { role: 'system', content: system },
-                { role: 'user', content: text + '\n\nSó JSON.' }
+                { role: 'user', content: String(text).slice(0, 8000) }
             ]
         })
     });
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-        return `IA erro (${res.status}): ${data?.error?.message || data?.error || res.statusText}`;
+        return `IA (${res.status}): ${data?.error?.message || data?.error || res.statusText}`;
     }
 
     const content = data?.choices?.[0]?.message?.content || '';
     const parsed = extractJson(content);
-    if (!parsed) return content.slice(0, 800) || 'IA sem JSON válido.';
+    if (!parsed) {
+        return content.slice(0, 1500) || 'IA sem resposta útil. Tente: escrever path + ```código```';
+    }
 
     const logs = [];
     for (const action of parsed.actions || []) {
         const type = String(action.type || '').toLowerCase();
         try {
+            if (!ctx.token && ['list', 'read', 'write', 'delete', 'test'].includes(type)) {
+                logs.push(`${type}: conecte o GitHub`);
+                continue;
+            }
+            if (['list', 'read', 'write', 'delete'].includes(type) && (!ctx.owner || !ctx.repo)) {
+                logs.push(`${type}: salve um repositório`);
+                continue;
+            }
+
             if (type === 'test') {
-                if (!ctx.token) logs.push('Sem token');
-                else if (ctx.owner && ctx.repo) {
+                if (ctx.owner && ctx.repo) {
                     const r = await gh.getRepo(ctx.token, ctx.owner, ctx.repo);
                     logs.push(`OK ${r.full_name}`);
                 } else {
@@ -151,7 +204,7 @@ async function runAI(text, ctx) {
                 );
                 logs.push(
                     files
-                        .slice(0, 40)
+                        .slice(0, 50)
                         .map((f) => (f.type === 'dir' ? '📁 ' : '📄 ') + (f.path || f.name))
                         .join('\n')
                 );
@@ -163,10 +216,8 @@ async function runAI(text, ctx) {
                     action.path,
                     ctx.branch
                 );
-                logs.push(
-                    (f.decoded || '').slice(0, 3000) +
-                        ((f.decoded || '').length > 3000 ? '\n…' : '')
-                );
+                const body = f.decoded || '';
+                logs.push(body.slice(0, 4000) + (body.length > 4000 ? '\n…' : ''));
             } else if (type === 'write') {
                 await gh.writeFile(
                     ctx.token,
@@ -175,7 +226,7 @@ async function runAI(text, ctx) {
                     action.path,
                     action.content ?? '',
                     ctx.branch,
-                    action.message
+                    action.message || `Aeternus: ${action.path}`
                 );
                 logs.push(`Gravado ${action.path}`);
             } else if (type === 'delete') {
@@ -197,23 +248,24 @@ async function runAI(text, ctx) {
     }
 
     const human = parsed.reply || 'OK';
-    return (logs.length ? human + '\n\n' + logs.join('\n') : human).slice(0, 3500);
+    return (logs.length ? human + '\n\n' + logs.join('\n') : human).slice(0, 4000);
 }
 
 async function handleEditorMessage(text, ctx) {
     const msg = String(text || '').trim();
-    if (!msg) return { reply: 'Digite um comando. Ex: status' };
+    if (!msg) return { reply: 'Mensagem vazia. Digite ajuda.' };
 
     try {
-        const local = await runLocal(msg, ctx);
-        if (local) {
+        const local = await runLocal(msg, ctx || {});
+        if (local != null) {
             if (typeof local === 'object' && local.reply) return local;
-            return { reply: local };
+            return { reply: String(local) };
         }
-        const reply = await runAI(msg, ctx);
-        return { reply };
+        const reply = await runAI(msg, ctx || {});
+        return { reply: String(reply || 'Sem resposta.') };
     } catch (err) {
-        return { reply: 'Erro: ' + err.message };
+        console.error('handleEditorMessage:', err);
+        return { reply: 'Erro: ' + (err.message || String(err)) };
     }
 }
 
