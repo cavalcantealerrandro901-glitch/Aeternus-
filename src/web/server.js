@@ -16,6 +16,7 @@ const db = require('../database/db');
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderGuild = require('./views/guild');
+const registerEditorRoutes = require('./editorRoutes');
 
 function cookieOpts() {
     return {
@@ -155,6 +156,7 @@ module.exports = (client) => {
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
         const botAvatarUrl = client.user.displayAvatarURL({ size: 256, extension: 'png' });
+        const canEditor = await db.canAccessEditor(session.user.id);
         res.send(
             renderDashboard({
                 user: session.user,
@@ -162,10 +164,13 @@ module.exports = (client) => {
                 botName: client.user.username,
                 botAvatarUrl,
                 userAvatarUrl,
-                isOwner: isOwner(session.user)
+                isOwner: isOwner(session.user),
+                canEditor
             })
         );
     });
+
+    registerEditorRoutes(app, { sessions, isOwner, client });
 
     app.get('/dashboard/:guildId', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
