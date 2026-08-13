@@ -7,26 +7,21 @@ const spamMap = new Map();
 async function applyPunishment(message, action, duration, reason) {
     const member = message.member;
     if (!member) return false;
-
     if (
         member.permissions.has(PermissionFlagsBits.ModerateMembers) ||
         member.permissions.has(PermissionFlagsBits.Administrator)
     ) {
         return false;
     }
-
     try {
         await message.delete().catch(() => {});
         const fullReason = reason || 'Moderação automática — Aeternus';
-
         switch (action) {
             case 'delete':
                 break;
             case 'warn':
                 await message.channel
-                    .send({
-                        content: `⚠️ ${member} recebeu um aviso.\n**Motivo:** ${fullReason}`
-                    })
+                    .send({ content: `⚠️ ${member} recebeu um aviso.\n**Motivo:** ${fullReason}` })
                     .then((m) => setTimeout(() => m.delete().catch(() => {}), 8000));
                 break;
             case 'timeout': {
@@ -37,9 +32,7 @@ async function applyPunishment(message, action, duration, reason) {
                         .send({
                             content: `🔇 ${member} foi silenciado por **${minutes} min**.\n**Motivo:** ${fullReason}`
                         })
-                        .then((m) =>
-                            setTimeout(() => m.delete().catch(() => {}), 8000)
-                        );
+                        .then((m) => setTimeout(() => m.delete().catch(() => {}), 8000));
                 }
                 break;
             }
@@ -53,28 +46,25 @@ async function applyPunishment(message, action, duration, reason) {
         }
         return true;
     } catch (err) {
-        console.error('Erro ao aplicar punição automod:', err.message);
+        console.error('Erro automod:', err.message);
         return false;
     }
 }
 
 async function runAutomod(message, automod) {
     if (!automod?.enabled) return;
-
     const content = message.content || '';
     const lower = content.toLowerCase();
 
     const badWords = automod.badWords || {};
     if (badWords.enabled && Array.isArray(badWords.words) && badWords.words.length) {
-        const found = badWords.words.find(
-            (w) => w && lower.includes(String(w).toLowerCase())
-        );
+        const found = badWords.words.find((w) => w && lower.includes(String(w).toLowerCase()));
         if (found) {
             await applyPunishment(
                 message,
                 badWords.action || 'timeout',
                 badWords.duration || 10,
-                badWords.reason || `Palavra proibida detectada: ${found}`
+                badWords.reason || `Palavra proibida: ${found}`
             );
             return true;
         }
@@ -82,30 +72,26 @@ async function runAutomod(message, automod) {
 
     const invites = automod.invites || {};
     if (invites.enabled) {
-        const inviteRegex =
-            /(discord\.gg\/|discord\.com\/invite\/|discordapp\.com\/invite\/)/i;
-        if (inviteRegex.test(content)) {
+        if (/(discord\.gg\/|discord\.com\/invite\/|discordapp\.com\/invite\/)/i.test(content)) {
             await applyPunishment(
                 message,
                 invites.action || 'timeout',
                 invites.duration || 10,
-                invites.reason || 'Envio de convite do Discord não permitido'
+                invites.reason || 'Convite não permitido'
             );
             return true;
         }
     }
 
     const links = automod.links || {};
-    if (links.enabled) {
-        if (/https?:\/\/|www\./i.test(content)) {
-            await applyPunishment(
-                message,
-                links.action || 'delete',
-                links.duration || 5,
-                links.reason || 'Envio de links não permitido'
-            );
-            return true;
-        }
+    if (links.enabled && /https?:\/\/|www\./i.test(content)) {
+        await applyPunishment(
+            message,
+            links.action || 'delete',
+            links.duration || 5,
+            links.reason || 'Links não permitidos'
+        );
+        return true;
     }
 
     const massMention = automod.massMention || {};
@@ -129,7 +115,6 @@ async function runAutomod(message, automod) {
         const key = `${message.guild.id}-${message.author.id}`;
         const now = Date.now();
         const entry = spamMap.get(key);
-
         if (entry && entry.content === content && now - entry.lastMsg < 7000) {
             entry.count += 1;
             entry.lastMsg = now;
@@ -146,29 +131,18 @@ async function runAutomod(message, automod) {
         } else {
             spamMap.set(key, { content, count: 1, lastMsg: now });
         }
-
-        if (spamMap.size > 500) {
-            for (const [k, v] of spamMap) {
-                if (now - v.lastMsg > 15000) spamMap.delete(k);
-            }
-        }
     }
-
     return false;
 }
 
 async function runPrefixCommand(message, client, config) {
     const prefix = config.prefix || '!';
     const content = message.content || '';
-
     if (!content.startsWith(prefix)) return false;
-
     const withoutPrefix = content.slice(prefix.length).trim();
     if (!withoutPrefix) return false;
-
     const args = withoutPrefix.split(/\s+/);
     const commandName = args.shift().toLowerCase();
-
     let command = client.commands.get(commandName);
     if (!command) {
         command = client.commands.find(
@@ -177,17 +151,12 @@ async function runPrefixCommand(message, client, config) {
                 cmd.aliases.map((a) => a.toLowerCase()).includes(commandName)
         );
     }
-
-    if (!command) return false;
-
+    if (!command || typeof command.executePrefix !== 'function') return false;
     try {
-        if (typeof command.executePrefix === 'function') {
-            await command.executePrefix(message, args, client);
-            return true;
-        }
-        return false;
+        await command.executePrefix(message, args, client);
+        return true;
     } catch (err) {
-        console.error(`Erro no comando prefixo ${commandName}:`, err);
+        console.error(`Erro prefixo ${commandName}:`, err);
         await message.reply('⚠️ Erro ao executar este comando.').catch(() => {});
         return true;
     }
@@ -196,7 +165,6 @@ async function runPrefixCommand(message, client, config) {
 async function runAiMention(message, client) {
     const content = message.content || '';
     const botId = client.user.id;
-
     const mentioned = message.mentions.users.has(botId);
     const isReplyToBot =
         message.reference?.messageId &&
@@ -208,13 +176,9 @@ async function runAiMention(message, client) {
     if (!mentioned && !isReplyToBot) return false;
 
     let prompt = content.replace(new RegExp(`<@!?${botId}>`, 'g'), '').trim();
-
-    if (!prompt && isReplyToBot) {
-        prompt = content.trim() || 'continue';
-    }
-
+    if (!prompt && isReplyToBot) prompt = content.trim() || 'continue';
     if (!prompt) {
-        await message.reply('Mencione-me com uma pergunta. Ex: clima em SP, info do servidor.');
+        await message.reply('Pergunte algo. Ex: meu saldo, comandos, clima em SP.');
         return true;
     }
 
@@ -232,7 +196,8 @@ async function runAiMention(message, client) {
         username: message.author.username,
         guildName: message.guild?.name,
         botName: client.user.username,
-        guild: message.guild || null
+        guild: message.guild || null,
+        client
     });
 
     if (!result.ok) {
@@ -240,11 +205,7 @@ async function runAiMention(message, client) {
         return true;
     }
 
-    const text =
-        result.reply.length > 2000
-            ? result.reply.slice(0, 1990) + '…'
-            : result.reply;
-
+    const text = result.reply.length > 2000 ? result.reply.slice(0, 1990) + '…' : result.reply;
     await message.reply({ content: text });
     return true;
 }
@@ -253,16 +214,10 @@ module.exports = {
     name: Events.MessageCreate,
     async execute(message, client) {
         if (!message.guild || message.author.bot) return;
-
         const config = db.getGuildConfig(message.guild.id);
         const c = client || message.client;
-
-        const usedCommand = await runPrefixCommand(message, c, config);
-        if (usedCommand) return;
-
-        const usedAi = await runAiMention(message, c);
-        if (usedAi) return;
-
+        if (await runPrefixCommand(message, c, config)) return;
+        if (await runAiMention(message, c)) return;
         await runAutomod(message, config.automod || {});
     }
 };

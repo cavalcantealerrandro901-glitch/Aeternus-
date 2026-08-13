@@ -4,7 +4,7 @@ const { buildLiveFacts, getCreatorInfo } = require('./aiContext');
 
 const history = new Map();
 const MAX_HISTORY = 8;
-const MAX_REPLY = 1500;
+const MAX_REPLY = 1800;
 
 async function resolveApiConfig() {
     let apiKey =
@@ -15,15 +15,8 @@ async function resolveApiConfig() {
         process.env.GROK_API_KEY ||
         null;
 
-    let baseUrl =
-        process.env.AI_BASE_URL ||
-        process.env.OPENAI_BASE_URL ||
-        null;
-
-    let model =
-        process.env.AI_MODEL ||
-        process.env.OPENAI_MODEL ||
-        null;
+    let baseUrl = process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || null;
+    let model = process.env.AI_MODEL || process.env.OPENAI_MODEL || null;
 
     if (!apiKey) {
         try {
@@ -36,13 +29,7 @@ async function resolveApiConfig() {
                 }
                 return null;
             };
-            apiKey = pick([
-                'AI_API_KEY',
-                'GROQ_API_KEY',
-                'OPENAI_API_KEY',
-                'XAI_API_KEY',
-                'GROK_API_KEY'
-            ]);
+            apiKey = pick(['AI_API_KEY', 'GROQ_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'GROK_API_KEY']);
             if (!baseUrl) baseUrl = pick(['AI_BASE_URL', 'OPENAI_BASE_URL']);
             if (!model) model = pick(['AI_MODEL', 'OPENAI_MODEL']);
         } catch {}
@@ -95,14 +82,14 @@ function buildSystemPrompt(context = {}, liveFacts = '') {
 
     return (
         `Você é ${name}, assistente de IA do Discord.\n` +
-        `Responda em português do Brasil, de forma clara e objetiva (em geral 2–5 frases).\n` +
-        `Tom neutro e profissional. Sem RPG.\n` +
-        `Use os FATOS AO VIVO abaixo quando a pergunta for sobre data, hora, clima, servidor ou criador.\n` +
-        `Não invente números do servidor: use só o que está nos fatos.\n` +
-        `Não invente que executou ban/kick/pagamento.\n` +
-        `Moeda do bot: Almas. Criador: ${creator.name}.\n` +
-        `Usuário atual: ${user}.\n\n` +
-        `=== FATOS AO VIVO ===\n${liveFacts || 'Nenhum fato extra.'}\n=== FIM DOS FATOS ===`
+        `Responda em português do Brasil, claro e objetivo.\n` +
+        `Tom neutro. Sem RPG.\n` +
+        `Você PODE informar saldos de Almas, transferências e lista de comandos usando os FATOS AO VIVO.\n` +
+        `Não invente saldos: use só os números dos fatos.\n` +
+        `Não execute ban/kick/pagamento sozinho — apenas explique os comandos.\n` +
+        `Moeda: Almas. Criador: ${creator.name}.\n` +
+        `Usuário atual: ${user} (ID ${context.userId || '?'}).\n\n` +
+        `=== FATOS AO VIVO ===\n${liveFacts || 'Nenhum fato extra.'}\n=== FIM ===`
     );
 }
 
@@ -121,10 +108,13 @@ async function chat(userMessage, context = {}) {
 
     let liveFacts = '';
     try {
-        liveFacts = await buildLiveFacts(userMessage, context.guild || null);
+        liveFacts = await buildLiveFacts(userMessage, context.guild || null, {
+            userId,
+            client: context.client || null
+        });
     } catch (err) {
         console.error('buildLiveFacts:', err.message);
-        liveFacts = 'Fatos ao vivo indisponíveis no momento.';
+        liveFacts = 'Fatos ao vivo indisponíveis.';
     }
 
     const messages = [
@@ -143,25 +133,20 @@ async function chat(userMessage, context = {}) {
             body: JSON.stringify({
                 model,
                 messages,
-                temperature: 0.55,
-                max_tokens: context.maxTokens || 320
+                temperature: 0.5,
+                max_tokens: context.maxTokens || 450
             })
         });
 
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-            const msg =
-                data?.error?.message ||
-                data?.error ||
-                res.statusText ||
-                'Falha na API de IA';
+            const msg = data?.error?.message || data?.error || res.statusText || 'Falha na API';
             console.error('AI API error:', res.status, msg);
             return { ok: false, error: String(msg) };
         }
 
-        const reply =
-            data?.choices?.[0]?.message?.content?.trim() || 'Sem resposta da IA.';
+        const reply = data?.choices?.[0]?.message?.content?.trim() || 'Sem resposta da IA.';
 
         if (!context.skipHistory) {
             pushHistory(userId, guildId, 'user', userMessage);
@@ -181,7 +166,6 @@ async function flavor(prompt, fallback = '', opts = {}) {
         const work = (async () => {
             const { apiKey, baseUrl, model } = await resolveApiConfig();
             if (!apiKey) return null;
-
             const res = await fetch(`${baseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -196,14 +180,12 @@ async function flavor(prompt, fallback = '', opts = {}) {
                         {
                             role: 'system',
                             content:
-                                'Gere UMA frase curta em português do Brasil. ' +
-                                'Tom casual e natural, sem RPG. Só o texto da frase.'
+                                'Gere UMA frase curta em português do Brasil. Tom natural, sem RPG. Só a frase.'
                         },
                         { role: 'user', content: String(prompt).slice(0, 500) }
                     ]
                 })
             });
-
             const data = await res.json().catch(() => ({}));
             if (!res.ok) return null;
             const text = data?.choices?.[0]?.message?.content?.trim();
@@ -214,7 +196,6 @@ async function flavor(prompt, fallback = '', opts = {}) {
             work,
             new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))
         ]);
-
         return result || fallback;
     } catch {
         return fallback;

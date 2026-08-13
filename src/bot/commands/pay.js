@@ -27,6 +27,12 @@ module.exports = {
         await from.save();
         await to.save();
 
+        try {
+            await db.logTransfer({ guildId, fromId, toId, amount });
+        } catch (err) {
+            console.error('logTransfer:', err.message);
+        }
+
         const note = await aiPayNote(amount);
         return { amount, fromTotal: from.almas, toTotal: to.almas, note };
     },
@@ -36,12 +42,7 @@ module.exports = {
         const amount = interaction.options.getInteger('quantidade');
         if (target.bot) return interaction.reply({ content: 'Não pode pagar bots.', ephemeral: true });
 
-        const r = await this.run(
-            interaction.user.id,
-            target.id,
-            interaction.guild.id,
-            amount
-        );
+        const r = await this.run(interaction.user.id, target.id, interaction.guild.id, amount);
         if (r.error) return interaction.reply({ content: `⚠️ ${r.error}`, ephemeral: true });
 
         const embed = new EmbedBuilder()

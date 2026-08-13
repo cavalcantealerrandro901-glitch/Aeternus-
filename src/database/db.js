@@ -37,6 +37,15 @@ const userSchema = new mongoose.Schema({
 });
 userSchema.index({ userId: 1, guildId: 1 }, { unique: true });
 
+const transferSchema = new mongoose.Schema({
+    guildId: { type: String, required: true, index: true },
+    fromId: { type: String, required: true, index: true },
+    toId: { type: String, required: true, index: true },
+    amount: { type: Number, required: true },
+    at: { type: Number, default: () => Date.now() }
+});
+transferSchema.index({ guildId: 1, at: -1 });
+
 const editorSchema = new mongoose.Schema({
     key: { type: String, default: 'global', unique: true },
     github: {
@@ -50,7 +59,6 @@ const editorSchema = new mongoose.Schema({
         valueEnc: String,
         updatedAt: Number
     }],
-    /** IDs Discord autorizados a usar o Editor (além do OWNER_ID) */
     allowedEditors: { type: [String], default: [] },
     chatHistory: [{
         role: String,
@@ -61,6 +69,7 @@ const editorSchema = new mongoose.Schema({
 
 const GuildConfig = mongoose.model('GuildConfig', guildSchema);
 const UserEconomy = mongoose.model('UserEconomy', userSchema);
+const TransferLog = mongoose.model('TransferLog', transferSchema);
 const EditorConfig = mongoose.model('EditorConfig', editorSchema);
 const cache = new Map();
 
@@ -81,6 +90,8 @@ const DEFAULT_ECONOMY = {
 module.exports = {
     DEFAULT_ECONOMY,
     EditorConfig,
+    UserEconomy,
+    TransferLog,
 
     connect: async () => {
         if (!process.env.MONGO_URI) {
@@ -152,21 +163,18 @@ module.exports = {
     },
 
     saveEditorConfig: async (data) => {
-        const updated = await EditorConfig.findOneAndUpdate(
+        return EditorConfig.findOneAndUpdate(
             { key: 'global' },
             { $set: data },
             { new: true, upsert: true }
         );
-        return updated;
     },
 
-    /** true se for OWNER_ID ou estiver em allowedEditors */
     canAccessEditor: async (userId) => {
         const owner = process.env.OWNER_ID || '';
         if (owner && String(userId) === String(owner)) return true;
         const doc = await module.exports.getEditorConfig();
-        const list = doc.allowedEditors || [];
-        return list.map(String).includes(String(userId));
+        return (doc.allowedEditors || []).map(String).includes(String(userId));
     },
 
     addEditorPermission: async (userId) => {
@@ -216,6 +224,24 @@ module.exports = {
         return UserEconomy.find({ guildId }).sort({ almas: -1 }).limit(limit).lean();
     },
 
+    logTransfer: async ({ guildId, fromId, toId, amount }) => {
+        return TransferLog.create({
+            guildId: String(guildId),
+            fromId: String(fromId),
+            toId: String(toId),
+            amount: Math.floor(Number(amount) || 0),
+            at: Date.now()
+        });
+    },
+
+    getTransfers: async (guildId, { userId = null, limit = 10 } = {}) => {
+        const q = { guildId: String(guildId) };
+        if (userId) {
+            q.$or = [{ fromId: String(userId) }, { toId: String(userId) }];
+        }
+        return TransferLog.find(q).sort({ at: -1 }).limit(limit).lean();
+    },
+
     getUsersForDailyNotify: async (dateKey) => {
         return UserEconomy.find({
             $or: [
@@ -224,7 +250,5 @@ module.exports = {
             ],
             dailyNotifiedDate: { $ne: dateKey }
         }).limit(200).lean();
-    },
-
-    UserEconomy
+    }
 };
