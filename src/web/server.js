@@ -1,6 +1,7 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const crypto = require('crypto');
 const {
     EmbedBuilder,
     ActionRowBuilder,
@@ -15,7 +16,6 @@ const db = require('../database/db');
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderGuild = require('./views/guild');
-const registerEditorRoutes = require('./editorRoutes');
 
 function cookieOpts() {
     return {
@@ -37,7 +37,6 @@ module.exports = (client) => {
     app.use(express.urlencoded({ extended: true }));
     app.use(express.static(path.join(__dirname, 'public')));
 
-    // CORS simples para same-origin fetch
     app.use((req, res, next) => {
         res.setHeader('X-Content-Type-Options', 'nosniff');
         next();
@@ -62,7 +61,6 @@ module.exports = (client) => {
         const botAvatarUrl = client.user
             ? client.user.displayAvatarURL({ size: 256, extension: 'png' })
             : '';
-        const renderHome = require('./views/home');
         res.send(renderHome(session?.user || null, client.user, inviteUrl, SUPPORT_URL, botAvatarUrl));
     });
 
@@ -106,7 +104,7 @@ module.exports = (client) => {
             const user = await userRes.json();
             const guilds = await guildsRes.json();
 
-            const sessionId = cryptoRandom();
+            const sessionId = crypto.randomBytes(24).toString('hex');
             sessions[sessionId] = { user, guilds, createdAt: Date.now() };
 
             res.cookie('sessionId', sessionId, cookieOpts());
@@ -116,10 +114,6 @@ module.exports = (client) => {
             res.redirect('/');
         }
     });
-
-    function cryptoRandom() {
-        return require('crypto').randomBytes(24).toString('hex');
-    }
 
     app.get('/logout', (req, res) => {
         const sessionId = req.cookies?.sessionId;
@@ -161,7 +155,6 @@ module.exports = (client) => {
             : 'https://cdn.discordapp.com/embed/avatars/0.png';
 
         const botAvatarUrl = client.user.displayAvatarURL({ size: 256, extension: 'png' });
-        const canEditor = await db.canAccessEditor(session.user.id);
         res.send(
             renderDashboard({
                 user: session.user,
@@ -169,14 +162,10 @@ module.exports = (client) => {
                 botName: client.user.username,
                 botAvatarUrl,
                 userAvatarUrl,
-                isOwner: isOwner(session.user),
-                canEditor
+                isOwner: isOwner(session.user)
             })
         );
     });
-
-    // Editor (precisa do mesmo objeto sessions)
-    registerEditorRoutes(app, { sessions, isOwner, client });
 
     app.get('/dashboard/:guildId', (req, res) => {
         const session = sessions[req.cookies?.sessionId];

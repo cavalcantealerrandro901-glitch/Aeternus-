@@ -1,4 +1,4 @@
-module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl, isOwner, canEditor }) => `
+module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl, isOwner }) => `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -139,16 +139,9 @@ module.exports = ({ user, manageableGuilds, botName, botAvatarUrl, userAvatarUrl
                     <div class="muted">Conta</div>
                     <div style="padding:6px 12px 10px;font-size:0.9rem;color:#aaa;">
                         @${user.username}
-                        ${isOwner ? '<span class="badge-owner">DONO</span>' : canEditor ? '<span class="badge-owner">EDITOR</span>' : ''}
+                        ${isOwner ? '<span class="badge-owner">DONO</span>' : ''}
                     </div>
                     <div class="sep"></div>
-                    ${canEditor || isOwner ? `
-                    <a href="/editor" role="menuitem">
-                        <span>🛠️</span>
-                        <span>Sistema de Editor</span>
-                    </a>
-                    <div class="sep"></div>
-                    ` : ''}
                     <a href="/logout" role="menuitem" style="color:#f87171;">
                         <span>🚪</span>
                         <span>Deslogar</span>
