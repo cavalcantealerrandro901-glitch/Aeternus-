@@ -46,7 +46,6 @@ const transferSchema = new mongoose.Schema({
 });
 transferSchema.index({ guildId: 1, at: -1 });
 
-/** Últimas frases do usuário com a IA (máx. 10) */
 const aiMemorySchema = new mongoose.Schema({
     userId: { type: String, required: true },
     guildId: { type: String, required: true },
@@ -57,6 +56,21 @@ const aiMemorySchema = new mongoose.Schema({
     }]
 });
 aiMemorySchema.index({ userId: 1, guildId: 1 }, { unique: true });
+
+/** Link OAuth GitHub por usuário Discord autorizado no Editor */
+const editorGithubSchema = new mongoose.Schema({
+    discordId: { type: String, required: true, unique: true },
+    githubId: String,
+    login: String,
+    tokenEnc: String,
+    scope: String,
+    linkedAt: Number,
+    selected: {
+        owner: String,
+        repo: String,
+        branch: { type: String, default: 'main' }
+    }
+});
 
 const editorSchema = new mongoose.Schema({
     key: { type: String, default: 'global', unique: true },
@@ -83,6 +97,7 @@ const GuildConfig = mongoose.model('GuildConfig', guildSchema);
 const UserEconomy = mongoose.model('UserEconomy', userSchema);
 const TransferLog = mongoose.model('TransferLog', transferSchema);
 const AiMemory = mongoose.model('AiMemory', aiMemorySchema);
+const EditorGithubLink = mongoose.model('EditorGithubLink', editorGithubSchema);
 const EditorConfig = mongoose.model('EditorConfig', editorSchema);
 const cache = new Map();
 
@@ -92,12 +107,7 @@ const DEFAULT_ECONOMY = {
     symbol: '💀',
     startingBalance: 1000,
     workCooldownMs: 3600000,
-    games: {
-        coinflip: true,
-        slots: true,
-        dice: true,
-        roulette: true
-    }
+    games: { coinflip: true, slots: true, dice: true, roulette: true }
 };
 
 module.exports = {
@@ -106,6 +116,7 @@ module.exports = {
     UserEconomy,
     TransferLog,
     AiMemory,
+    EditorGithubLink,
 
     connect: async () => {
         if (!process.env.MONGO_URI) {
@@ -114,9 +125,8 @@ module.exports = {
         }
         await mongoose.connect(process.env.MONGO_URI);
         console.log('📦 Conectado ao MongoDB com sucesso!');
-
         const configs = await GuildConfig.find();
-        configs.forEach(c => cache.set(c.guildId, c.toObject()));
+        configs.forEach((c) => cache.set(c.guildId, c.toObject()));
         console.log(`✅ Cache carregado com ${cache.size} servidores.`);
     },
 
@@ -202,7 +212,7 @@ module.exports = {
 
     removeEditorPermission: async (userId) => {
         const doc = await module.exports.getEditorConfig();
-        const arr = (doc.allowedEditors || []).filter(id => String(id) !== String(userId));
+        const arr = (doc.allowedEditors || []).filter((id) => String(id) !== String(userId));
         await module.exports.saveEditorConfig({ allowedEditors: arr });
         return arr;
     },
@@ -210,6 +220,30 @@ module.exports = {
     listEditorPermissions: async () => {
         const doc = await module.exports.getEditorConfig();
         return doc.allowedEditors || [];
+    },
+
+    getEditorGithubLink: async (discordId) => {
+        return EditorGithubLink.findOne({ discordId: String(discordId) }).lean();
+    },
+
+    saveEditorGithubLink: async (discordId, data) => {
+        return EditorGithubLink.findOneAndUpdate(
+            { discordId: String(discordId) },
+            { $set: { discordId: String(discordId), ...data } },
+            { upsert: true, new: true }
+        );
+    },
+
+    setEditorSelectedRepo: async (discordId, selected) => {
+        return EditorGithubLink.findOneAndUpdate(
+            { discordId: String(discordId) },
+            { $set: { selected } },
+            { upsert: true, new: true }
+        );
+    },
+
+    clearEditorGithubLink: async (discordId) => {
+        await EditorGithubLink.deleteOne({ discordId: String(discordId) });
     },
 
     getUser: async (userId, guildId) => {
@@ -250,13 +284,10 @@ module.exports = {
 
     getTransfers: async (guildId, { userId = null, limit = 10 } = {}) => {
         const q = { guildId: String(guildId) };
-        if (userId) {
-            q.$or = [{ fromId: String(userId) }, { toId: String(userId) }];
-        }
+        if (userId) q.$or = [{ fromId: String(userId) }, { toId: String(userId) }];
         return TransferLog.find(q).sort({ at: -1 }).limit(limit).lean();
     },
 
-    /** Memória IA: últimas mensagens (até 10 pares ≈ 20 entradas, mas só user count 10) */
     getAiMemory: async (userId, guildId) => {
         const doc = await AiMemory.findOne({
             userId: String(userId),
@@ -269,21 +300,14 @@ module.exports = {
         const gid = String(guildId || 'dm');
         const uid = String(userId);
         let doc = await AiMemory.findOne({ userId: uid, guildId: gid });
-        if (!doc) {
-            doc = new AiMemory({ userId: uid, guildId: gid, messages: [] });
-        }
+        if (!doc) doc = new AiMemory({ userId: uid, guildId: gid, messages: [] });
         const now = Date.now();
         doc.messages.push(
             { role: 'user', content: String(userText).slice(0, 500), at: now },
             { role: 'assistant', content: String(assistantText).slice(0, 500), at: now }
         );
-        // Manter só as últimas 10 falas do usuário (+ respostas = 20)
-        while (doc.messages.filter((m) => m.role === 'user').length > 10) {
-            doc.messages.shift();
-        }
-        if (doc.messages.length > 20) {
-            doc.messages = doc.messages.slice(-20);
-        }
+        while (doc.messages.filter((m) => m.role === 'user').length > 10) doc.messages.shift();
+        if (doc.messages.length > 20) doc.messages = doc.messages.slice(-20);
         await doc.save();
         return doc.messages;
     },
