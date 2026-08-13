@@ -15,25 +15,42 @@ const db = require('../database/db');
 const renderHome = require('./views/home');
 const renderDashboard = require('./views/dashboard');
 const renderGuild = require('./views/guild');
-const renderEditor = require('./views/editor');
 const registerEditorRoutes = require('./editorRoutes');
+
+function cookieOpts() {
+    return {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        maxAge: 1000 * 60 * 60 * 24 * 14,
+        path: '/'
+    };
+}
 
 module.exports = (client) => {
     const app = express();
     const PORT = process.env.PORT || 10000;
 
+    app.set('trust proxy', 1);
     app.use(cookieParser());
-    app.use(express.json());
+    app.use(express.json({ limit: '2mb' }));
     app.use(express.urlencoded({ extended: true }));
     app.use(express.static(path.join(__dirname, 'public')));
 
+    // CORS simples para same-origin fetch
+    app.use((req, res, next) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        next();
+    });
+
     const sessions = {};
 
-    const CLIENT_ID = process.env.CLIENT_ID;
-    const CLIENT_SECRET = process.env.CLIENT_SECRET;
-    const REDIRECT_URI = process.env.REDIRECT_URI || 'https://aeternus-q7gt.onrender.com/auth/discord/callback';
+    const CLIENT_ID = (process.env.CLIENT_ID || '').trim();
+    const CLIENT_SECRET = (process.env.CLIENT_SECRET || '').trim();
+    const REDIRECT_URI =
+        (process.env.REDIRECT_URI || 'https://aeternus-q7gt.onrender.com/auth/discord/callback').trim();
     const SUPPORT_URL = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/seu-suporte';
-    const OWNER_ID = process.env.OWNER_ID || '';
+    const OWNER_ID = (process.env.OWNER_ID || '').trim();
 
     function isOwner(user) {
         return !!(OWNER_ID && user && String(user.id) === String(OWNER_ID));
@@ -42,7 +59,10 @@ module.exports = (client) => {
     app.get('/', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&scope=bot%20applications.commands&permissions=8`;
-        const botAvatarUrl = client.user ? client.user.displayAvatarURL({ size: 256, extension: 'png' }) : '';
+        const botAvatarUrl = client.user
+            ? client.user.displayAvatarURL({ size: 256, extension: 'png' })
+            : '';
+        const renderHome = require('./views/home');
         res.send(renderHome(session?.user || null, client.user, inviteUrl, SUPPORT_URL, botAvatarUrl));
     });
 
@@ -65,39 +85,46 @@ module.exports = (client) => {
                     client_secret: CLIENT_SECRET,
                     grant_type: 'authorization_code',
                     code,
-                    redirect_uri: REDIRECT_URI,
+                    redirect_uri: REDIRECT_URI
                 }),
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
 
             const tokenData = await tokenRes.json();
-            if (!tokenData.access_token) return res.redirect('/');
+            if (!tokenData.access_token) {
+                console.error('Discord token fail:', tokenData);
+                return res.redirect('/');
+            }
 
             const userRes = await fetch('https://discord.com/api/users/@me', {
-                headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
+                headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` }
             });
             const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
-                headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` },
+                headers: { authorization: `${tokenData.token_type} ${tokenData.access_token}` }
             });
 
             const user = await userRes.json();
             const guilds = await guildsRes.json();
 
-            const sessionId = Math.random().toString(36).substring(2);
-            sessions[sessionId] = { user, guilds };
+            const sessionId = cryptoRandom();
+            sessions[sessionId] = { user, guilds, createdAt: Date.now() };
 
-            res.cookie('sessionId', sessionId, { httpOnly: true, maxAge: 1000 * 60 * 60 * 24 * 7 });
+            res.cookie('sessionId', sessionId, cookieOpts());
             res.redirect('/dashboard');
         } catch (err) {
-            console.error('Erro OAuth2:', err);
+            console.error('Erro OAuth2 Discord:', err);
             res.redirect('/');
         }
     });
 
+    function cryptoRandom() {
+        return require('crypto').randomBytes(24).toString('hex');
+    }
+
     app.get('/logout', (req, res) => {
         const sessionId = req.cookies?.sessionId;
         if (sessionId) delete sessions[sessionId];
-        res.clearCookie('sessionId');
+        res.clearCookie('sessionId', { path: '/' });
         res.redirect('/');
     });
 
@@ -106,9 +133,10 @@ module.exports = (client) => {
         const ADMIN = 0x8n;
         const MANAGE_GUILD = 0x20n;
 
-        return userGuilds.filter(g => {
+        return userGuilds.filter((g) => {
             const perms = BigInt(g.permissions || 0);
-            const hasPerm = (perms & ADMIN) === ADMIN || (perms & MANAGE_GUILD) === MANAGE_GUILD || g.owner;
+            const hasPerm =
+                (perms & ADMIN) === ADMIN || (perms & MANAGE_GUILD) === MANAGE_GUILD || g.owner;
             const botInGuild = client.guilds.cache.has(g.id);
             return hasPerm && botInGuild;
         });
@@ -134,46 +162,49 @@ module.exports = (client) => {
 
         const botAvatarUrl = client.user.displayAvatarURL({ size: 256, extension: 'png' });
         const canEditor = await db.canAccessEditor(session.user.id);
-        res.send(renderDashboard({
-            user: session.user,
-            manageableGuilds,
-            botName: client.user.username,
-            botAvatarUrl,
-            userAvatarUrl,
-            isOwner: isOwner(session.user),
-            canEditor
-        }));
+        res.send(
+            renderDashboard({
+                user: session.user,
+                manageableGuilds,
+                botName: client.user.username,
+                botAvatarUrl,
+                userAvatarUrl,
+                isOwner: isOwner(session.user),
+                canEditor
+            })
+        );
     });
 
+    // Editor (precisa do mesmo objeto sessions)
     registerEditorRoutes(app, { sessions, isOwner, client });
 
     app.get('/dashboard/:guildId', (req, res) => {
         const session = sessions[req.cookies?.sessionId];
         if (!session) return res.redirect('/login');
 
-        const guild = getManageableGuilds(session.guilds).find(g => g.id === req.params.guildId);
+        const guild = getManageableGuilds(session.guilds).find((g) => g.id === req.params.guildId);
         if (!guild) return res.redirect('/dashboard');
 
         const botGuild = client.guilds.cache.get(guild.id);
         const channels = botGuild
             ? botGuild.channels.cache
-                .filter(c => c.type === 0 || c.type === 5)
-                .map(c => ({ id: c.id, name: c.name }))
-                .sort((a, b) => a.name.localeCompare(b.name))
+                  .filter((c) => c.type === 0 || c.type === 5)
+                  .map((c) => ({ id: c.id, name: c.name }))
+                  .sort((a, b) => a.name.localeCompare(b.name))
             : [];
 
         const categories = botGuild
             ? botGuild.channels.cache
-                .filter(c => c.type === ChannelType.GuildCategory)
-                .map(c => ({ id: c.id, name: c.name }))
-                .sort((a, b) => a.name.localeCompare(b.name))
+                  .filter((c) => c.type === ChannelType.GuildCategory)
+                  .map((c) => ({ id: c.id, name: c.name }))
+                  .sort((a, b) => a.name.localeCompare(b.name))
             : [];
 
         const roles = botGuild
             ? botGuild.roles.cache
-                .filter(r => r.name !== '@everyone' && !r.managed)
-                .map(r => ({ id: r.id, name: r.name }))
-                .sort((a, b) => a.name.localeCompare(b.name))
+                  .filter((r) => r.name !== '@everyone' && !r.managed)
+                  .map((r) => ({ id: r.id, name: r.name }))
+                  .sort((a, b) => a.name.localeCompare(b.name))
             : [];
 
         const userAvatarUrl = session.user.avatar
@@ -278,7 +309,7 @@ module.exports = (client) => {
 
         if (Array.isArray(tickets.options)) {
             tickets.options = tickets.options
-                .filter(o => o && o.label)
+                .filter((o) => o && o.label)
                 .map((o, i) => ({
                     id: o.id || String(i + 1),
                     label: String(o.label).slice(0, 80),
@@ -286,7 +317,9 @@ module.exports = (client) => {
                     description: o.description ? String(o.description).slice(0, 100) : ''
                 }));
         } else {
-            tickets.options = [{ id: '1', label: tickets.buttonLabel || 'Abrir Ticket', emoji: '🎫', description: '' }];
+            tickets.options = [
+                { id: '1', label: tickets.buttonLabel || 'Abrir Ticket', emoji: '🎫', description: '' }
+            ];
         }
 
         if (!tickets.displayMode) tickets.displayMode = 'buttons';
@@ -305,9 +338,15 @@ module.exports = (client) => {
 
             try {
                 const embed = new EmbedBuilder()
-                    .setColor(tickets.embedColor ? parseInt(String(tickets.embedColor).replace('#', ''), 16) || 0x7c3aed : 0x7c3aed)
+                    .setColor(
+                        tickets.embedColor
+                            ? parseInt(String(tickets.embedColor).replace('#', ''), 16) || 0x7c3aed
+                            : 0x7c3aed
+                    )
                     .setTitle(tickets.embedTitle || '🎫 Central de Suporte')
-                    .setDescription(tickets.embedDescription || 'Escolha uma opção abaixo para abrir um ticket.')
+                    .setDescription(
+                        tickets.embedDescription || 'Escolha uma opção abaixo para abrir um ticket.'
+                    )
                     .setTimestamp();
 
                 if (tickets.embedImage) embed.setImage(tickets.embedImage);
@@ -323,13 +362,15 @@ module.exports = (client) => {
                         .setCustomId('aeternus_ticket_select')
                         .setPlaceholder('Selecione o tipo de ticket...')
                         .addOptions(
-                            options.slice(0, 25).map(o => {
+                            options.slice(0, 25).map((o) => {
                                 const opt = new StringSelectMenuOptionBuilder()
                                     .setLabel(o.label)
                                     .setValue(o.id);
                                 if (o.description) opt.setDescription(o.description);
                                 if (o.emoji) {
-                                    try { opt.setEmoji(o.emoji); } catch {}
+                                    try {
+                                        opt.setEmoji(o.emoji);
+                                    } catch {}
                                 }
                                 return opt;
                             })
@@ -351,7 +392,9 @@ module.exports = (client) => {
                             .setLabel(o.label.slice(0, 80))
                             .setStyle(ButtonStyle.Primary);
                         if (o.emoji) {
-                            try { btn.setEmoji(o.emoji); } catch {}
+                            try {
+                                btn.setEmoji(o.emoji);
+                            } catch {}
                         }
                         current.addComponents(btn);
                         count++;
@@ -363,7 +406,9 @@ module.exports = (client) => {
                 await channel.send({ embeds: [embed], components });
             } catch (err) {
                 console.error('Erro ao enviar painel de tickets:', err);
-                return res.status(500).json({ error: 'Config salvo, mas falhou ao enviar o painel: ' + err.message });
+                return res
+                    .status(500)
+                    .json({ error: 'Config salvo, mas falhou ao enviar o painel: ' + err.message });
             }
         }
 
@@ -394,9 +439,10 @@ module.exports = (client) => {
                     username: session.user.username,
                     tag: session.user.username,
                     createdTimestamp: Date.now() - 86400000 * 30,
-                    displayAvatarURL: (opts) => session.user.avatar
-                        ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png?size=${opts?.size || 128}`
-                        : 'https://cdn.discordapp.com/embed/avatars/0.png'
+                    displayAvatarURL: (opts) =>
+                        session.user.avatar
+                            ? `https://cdn.discordapp.com/avatars/${session.user.id}/${session.user.avatar}.png?size=${opts?.size || 128}`
+                            : 'https://cdn.discordapp.com/embed/avatars/0.png'
                 },
                 guild: botGuild
             };
