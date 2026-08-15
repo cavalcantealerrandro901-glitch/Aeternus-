@@ -1,12 +1,12 @@
 {
-  "name": "discord-bot",
+  "name": "aeternus-bot",
   "version": "1.0.0",
-  "description": "Bot do Discord com painel de verificação",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node src/index.js"
   },
   "dependencies": {
-    "discord.js": "^14.14.1"
+    "discord.js": "^14.14.1",
+    "express": "^4.19.2"
   }
 }
