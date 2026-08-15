@@ -3,6 +3,7 @@ const startDashboard = require('./server');
 const { addLog } = require('./logger');
 const { analyzeAndFix } = require('./healer');
 const { initAutoDeploy } = require('./deployer');
+const { getMaintenance } = require('./state');
 
 let globalClient = null;
 
@@ -23,12 +24,23 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
+// Exemplo de bloqueio por Modo de Manutenção ao receber mensagens
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+
+    if (getMaintenance()) {
+        await message.reply('⚠️ O bot está atualmente em **Modo de Manutenção** pelo painel. Tente novamente mais tarde!');
+        return;
+    }
+    
+    // Seus comandos normais viriam aqui...
+});
+
 client.once('ready', () => {
     globalClient = client;
     console.log(`Bot logado como ${client.user.tag}!`);
     addLog('INFO', `Bot conectado como ${client.user.tag}`);
     
-    // Inicia o painel e o sistema de checagem automática de repositório
     startDashboard(client);
     initAutoDeploy();
 });

@@ -1,7 +1,9 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const simpleGit = require('simple-git');
 const { logs } = require('./logger');
+const { getMaintenance, setMaintenance } = require('./state');
 const app = express();
 const git = simpleGit();
 
@@ -11,42 +13,56 @@ app.set('views', path.join(__dirname, '../views'));
 
 function startDashboard(client) {
     app.get('/', (req, res) => {
+        let envContent = '';
+        try {
+            envContent = fs.readFileSync(path.join(__dirname, '../.env'), 'utf8');
+        } catch (e) {
+            envContent = 'DISCORD_TOKEN=\nADMIN_PASSWORD=\nADMIN_USER_ID=';
+        }
+
         res.render('index', {
             memory: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
             guildCount: client.guilds.cache.size,
             logs: logs,
+            maintenance: getMaintenance(),
+            envContent: envContent,
             error: null
         });
     });
 
-    // Rota para configurar o repositório dinamicamente pelo painel
+    // Rota para salvar variáveis de ambiente no arquivo .env
+    app.post('/save-env', (req, res) => {
+        const { envData } = req.body;
+        try {
+            fs.writeFileSync(path.join(__dirname, '../.env'), envData, 'utf8');
+            logs.unshift({ type: 'CONFIG', message: 'Variáveis de ambiente atualizadas!', timestamp: new Date().toLocaleTimeString() });
+            res.redirect('/');
+        } catch (error) {
+            res.status(500).send("Erro ao salvar .env: " + error.message);
+        }
+    });
+
+    // Rota para alternar o Modo de Manutenção
+    app.post('/toggle-maintenance', (req, res) => {
+        const current = getMaintenance();
+        setMaintenance(!current);
+        logs.unshift({ type: 'STATUS', message: `Modo de Manutenção alterado para: ${!current ? 'ATIVADO' : 'DESATIVADO'}`, timestamp: new Date().toLocaleTimeString() });
+        res.redirect('/');
+    });
+
     app.post('/update-repo', async (req, res) => {
-        const { repoUser, repoUrl } = req.body;
+        const { repoUrl } = req.body;
         try {
             const remotes = await git.getRemotes(true);
-            const hasOrigin = remotes.some(r => r.name === 'origin');
-
-            if (hasOrigin) {
+            if (remotes.some(r => r.name === 'origin')) {
                 await git.remote(['set-url', 'origin', repoUrl]);
             } else {
                 await git.addRemote('origin', repoUrl);
             }
-
-            logs.unshift({ 
-                type: 'CONFIG', 
-                message: `Repositório configurado para: ${repoUrl} (${repoUser})`, 
-                timestamp: new Date().toLocaleTimeString() 
-            });
-            
+            logs.unshift({ type: 'CONFIG', message: `Repositório atualizado para: ${repoUrl}`, timestamp: new Date().toLocaleTimeString() });
             res.redirect('/');
         } catch (error) {
-            console.error('Erro ao configurar repositório:', error);
-            res.render('index', {
-                memory: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
-                guildCount: client.guilds.cache.size,
-                logs: logs,
-                error: "Erro ao configurar o repositório: " + error.message
-            });
+            res.redirect('/');
         }
     });
 
@@ -55,12 +71,7 @@ function startDashboard(client) {
             res.send("<h1>Reiniciando o bot...</h1>");
             setTimeout(() => process.exit(0), 1000);
         } else {
-            res.render('index', {
-                memory: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
-                guildCount: client.guilds.cache.size,
-                logs: logs,
-                error: "Senha incorreta!"
-            });
+            res.redirect('/');
         }
     });
 
