@@ -5,26 +5,43 @@
     <title>Painel Aeternus</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; padding: 20px; }
-        .container { width: 100%; max-width: 600px; background: #1e293b; padding: 20px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .container { width: 100%; max-width: 650px; background: #1e293b; padding: 20px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
         h1 { color: #38bdf8; text-align: center; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .card { background: #334155; padding: 15px; border-radius: 10px; text-align: center; }
-        .cmd-list { background: #0f172a; padding: 15px; border-radius: 10px; }
+        .terminal { background: #000; color: #00ff00; padding: 10px; border-radius: 8px; font-family: monospace; height: 150px; overflow-y: auto; text-align: left; font-size: 0.9em; margin-bottom: 20px; }
+        .log-item { margin-bottom: 4px; }
+        .restart-box { padding: 15px; border: 1px solid #ef4444; border-radius: 10px; }
+        input { padding: 8px; border-radius: 5px; border: none; width: 150px; }
+        button { padding: 8px 15px; border-radius: 5px; border: none; background: #ef4444; color: white; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Painel Aeternus</h1>
         <div class="stat-grid">
-            <div class="card">Status<br><strong>Online ✅</strong></div>
+            <div class="card">Servidores<br><strong><%= guildCount %></strong></div>
             <div class="card">RAM<br><strong><%= memory %> MB</strong></div>
         </div>
-        <div class="cmd-list">
-            <h3>Comandos Principais:</h3>
-            <ul>
-                <li><code>!status</code> - Info do servidor</li>
-                <li><code>!hostinfo</code> - Detalhes da hospedagem</li>
-            </ul>
+
+        <h3>Logs do Sistema</h3>
+        <div class="terminal">
+            <% if (logs.length === 0) { %>
+                <div>Nenhum log registrado ainda...</div>
+            <% } else { %>
+                <% logs.forEach(log => { %>
+                    <div class="log-item">[<%= log.timestamp %>] [<%= log.type %>]: <%= log.message %></div>
+                <% }) %>
+            <% } %>
+        </div>
+
+        <div class="restart-box">
+            <h3>Controle Administrativo</h3>
+            <form action="/restart" method="POST">
+                <input type="password" name="password" placeholder="Senha Admin" required>
+                <button type="submit">Reiniciar Bot</button>
+            </form>
+            <% if (error) { %> <p style="color: #ef4444; margin-top: 5px;"><%= error %></p> <% } %>
         </div>
     </div>
 </body>
