@@ -2,21 +2,30 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Aeternus Dashboard</title>
+    <title>Painel Aeternus</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; padding-top: 50px; }
-        .card { background: #1e1e1e; display: inline-block; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-        h1 { color: #00FF00; }
-        .stat { margin: 15px 0; font-size: 1.2em; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; padding: 20px; }
+        .container { width: 100%; max-width: 600px; background: #1e293b; padding: 20px; border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        h1 { color: #38bdf8; text-align: center; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .card { background: #334155; padding: 15px; border-radius: 10px; text-align: center; }
+        .cmd-list { background: #0f172a; padding: 15px; border-radius: 10px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>Aeternus Status</h1>
-        <div class="stat">Status: <strong style="color:green">Online ✅</strong></div>
-        <div class="stat">Servidores: <strong><%= guildCount %></strong></div>
-        <div class="stat">Uptime: <strong><%= uptime %></strong></div>
-        <div class="stat">Memória RAM: <strong><%= memory %> MB</strong></div>
+    <div class="container">
+        <h1>Painel Aeternus</h1>
+        <div class="stat-grid">
+            <div class="card">Status<br><strong>Online ✅</strong></div>
+            <div class="card">RAM<br><strong><%= memory %> MB</strong></div>
+        </div>
+        <div class="cmd-list">
+            <h3>Comandos Principais:</h3>
+            <ul>
+                <li><code>!status</code> - Info do servidor</li>
+                <li><code>!hostinfo</code> - Detalhes da hospedagem</li>
+            </ul>
+        </div>
     </div>
 </body>
 </html>
