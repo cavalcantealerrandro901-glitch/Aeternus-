@@ -1,13 +1,20 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getRandomPhrase } = require('../utils/phrases');
+const { createDailyImage } = require('../utils/imageGenerator');
 
 module.exports = {
     name: 'daily',
-    async execute(message) {
+    async execute(message, args, client) {
+        const guildIcon = message.guild.iconURL({ extension: 'png', size: 512 });
+        const botAvatar = client.user.displayAvatarURL({ extension: 'png', size: 512 });
+        const imageBuffer = await createDailyImage(guildIcon, botAvatar);
+        const attachment = new AttachmentBuilder(imageBuffer, { name: 'daily-panel.png' });
+
         const embed = new EmbedBuilder()
             .setColor('#2b2d31')
             .setTitle('💀 Painel de Recompensa Diária')
             .setDescription(`✨ *"${getRandomPhrase()}"*\n\nClique no botão abaixo para coletar suas almas diárias!`)
+            .setImage('attachment://daily-panel.png')
             .setFooter({ text: 'Sistema de Recompensas Aeternus' })
             .setTimestamp();
 
@@ -20,6 +27,7 @@ module.exports = {
 
         await message.reply({
             embeds: [embed],
+            files: [attachment],
             components: [row]
         });
     }
