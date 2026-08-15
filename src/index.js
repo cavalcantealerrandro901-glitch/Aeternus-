@@ -3,22 +3,19 @@ const startDashboard = require('./server');
 const { addLog } = require('./logger');
 const { analyzeAndFix } = require('./healer');
 
+let globalClient = null;
+
 process.on('uncaughtException', (error) => {
     console.error('Erro crítico:', error);
     addLog('ERRO', error.message);
-    
-    // Tenta autocorreção
-    const fixed = analyzeAndFix(error);
-    if (fixed) {
-        addLog('HEALER', 'O sistema tentou aplicar uma correção automática.');
-    }
+    analyzeAndFix(error, globalClient);
 });
 
 process.on('unhandledRejection', (reason) => {
     console.error('Rejeição não tratada:', reason);
     const msg = reason?.message || String(reason);
     addLog('ERRO', msg);
-    analyzeAndFix(reason);
+    analyzeAndFix(reason, globalClient);
 });
 
 const client = new Client({
@@ -26,6 +23,7 @@ const client = new Client({
 });
 
 client.once('ready', () => {
+    globalClient = client; // Salva a referência para os alertas de erro
     console.log(`Bot logado como ${client.user.tag}!`);
     addLog('INFO', `Bot conectado com sucesso como ${client.user.tag}`);
     startDashboard(client);
