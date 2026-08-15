@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/cavalcantealerrandro901-glitch/Aeternus-#readme",
   "dependencies": {
+    "axios": "^1.19.0",
     "discord.js": "^14.27.0",
     "dotenv": "^17.4.2",
     "jimp": "^0.22.12"
