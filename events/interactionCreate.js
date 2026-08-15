@@ -25,18 +25,18 @@ module.exports = {
         const type = parts[1];
         const targetId = parts[2];
 
-        // 🎁 Tratamento do Botão Daily + Notificação na DM
+        // 🎁 Tratamento do Botão Daily + Notificação na DM (Cooldown de 6 Minutos)
         if (action === 'daily' && type === 'claim') {
             const userId = interaction.user.id;
             const userDaily = db.getDaily(userId);
             const now = Date.now();
-            const cooldown = 24 * 60 * 60 * 1000; // 24 horas
+            const cooldown = 6 * 60 * 1000; // 6 minutos
 
             if (userDaily.lastClaimed && (now - userDaily.lastClaimed < cooldown)) {
                 const timeLeft = cooldown - (now - userDaily.lastClaimed);
-                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                return interaction.reply({ content: `⏳ Você já coletou seu daily hoje! Volte em **${hours}h ${minutes}m**.`, ephemeral: true });
+                const minutes = Math.floor(timeLeft / (1000 * 60));
+                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                return interaction.reply({ content: `⏳ Você já coletou sua recompensa recentemente! Volte em **${minutes}m ${seconds}s**.`, ephemeral: true });
             }
 
             let streak = userDaily.streak || 0;
@@ -62,19 +62,19 @@ module.exports = {
                 .setTitle(`🎉 Recompensa Coletada com Sucesso! ${emoji}`)
                 .setDescription(`✨ *"${phrase}"*`)
                 .addFields(
-                    { name: '🔥 Sequência (Streak)', value: `${streak} dia(s)`, inline: true },
+                    { name: '🔥 Sequência (Streak)', value: `${streak} vez(es)`, inline: true },
                     { name: '💀 Recompensa', value: `+${totalReward.toLocaleString()} almas`, inline: true }
                 )
                 .setTimestamp();
 
-            // 🕰️ Inicia o Timer para avisar na DM após 24 horas
+            // 🕰️ Inicia o Timer para avisar na DM após 6 minutos
             setTimeout(async () => {
                 try {
                     const userToNotify = await client.users.fetch(userId);
                     const notifEmbed = new EmbedBuilder()
                         .setColor('#9B59B6')
-                        .setTitle(`🎁 Seu Daily está pronto, ${userToNotify.username}!`)
-                        .setDescription(`As 24 horas se passaram e suas almas aguardam.\n\n✨ *"${generatePhrase()}"*`)
+                        .setTitle(`🎁 Sua recompensa está pronta, ${userToNotify.username}!`)
+                        .setDescription(`Os 6 minutos se passaram e suas almas aguardam.\n\n✨ *"${generatePhrase()}"*`)
                         .setFooter({ text: 'Volte ao servidor para coletar!' });
 
                     await userToNotify.send({ embeds: [notifEmbed] });
