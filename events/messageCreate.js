@@ -12,33 +12,29 @@ function formatTime(timestamp) {
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
-        // Ignora mensagens do próprio bot
         if (message.author.bot) return;
 
-        // 1. Sistema de "Paquera e Reações" (Ativo em TODOS os canais)
-        // Chance de 10% de interagir
-        if (Math.random() < 0.10) {
-            // Se for uma mensagem curta ou aleatória, o bot reage com emoji
-            if (message.content.length < 20 || Math.random() < 0.5) {
+        // 🎲 Chance de 5% de interagir (reagir ou paquerar)
+        if (Math.random() < 0.05) {
+            // 50% de chance de reagir com emoji, 50% de responder com paquera
+            if (Math.random() < 0.5) {
                 message.react(getRandomEmoji()).catch(() => {});
             } else {
-                // Se for mais longa, o bot "paquera" respondendo com uma frase
                 const flirt = getFlirt();
                 const phrase = generatePhrase();
                 const emoji = getRandomEmoji();
-                
                 message.reply(`🖤 ${flirt} ${emoji}\n\n*${phrase}*`).catch(() => {});
             }
         }
 
-        // 2. Sistema AFK
+        // Sistema AFK
         if (client.afk.has(message.author.id)) {
             client.afk.delete(message.author.id);
-            const welcomeMsg = await message.reply('🥀 A escuridão sente sua volta, mestre. Status AFK removido.');
+            const welcomeMsg = await message.reply('🥀 A escuridão sente sua volta. Status AFK removido.');
             setTimeout(() => welcomeMsg.delete().catch(() => {}), 5000);
         }
 
-        // 3. Verificação de Menções AFK
+        // Verificação de Menções AFK
         if (message.mentions.users.size > 0) {
             message.mentions.users.forEach(async user => {
                 if (client.afk.has(user.id)) {
@@ -55,7 +51,7 @@ module.exports = {
             });
         }
 
-        // 4. Processamento de comandos
+        // Processamento de comandos
         if (!message.content.startsWith('!')) return;
         const args = message.content.slice(1).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
