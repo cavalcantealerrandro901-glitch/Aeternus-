@@ -4,19 +4,19 @@ async function analyzeAndFix(error, client) {
     const errorMessage = error.message || String(error);
     addLog('HEALER', `Analisando erro: ${errorMessage}`);
 
-    // Envia o aviso automático no canal do Discord configurado
-    if (client && process.env.ERROR_CHANNEL_ID) {
+    // Envia o aviso automático no PV do usuário administrador configurado
+    if (client && process.env.ADMIN_USER_ID) {
         try {
-            const channel = await client.channels.fetch(process.env.ERROR_CHANNEL_ID);
-            if (channel) {
-                await channel.send(
-                    `🚨 **Alerta de Erro Detectado!**\n` +
+            const user = await client.users.fetch(process.env.ADMIN_USER_ID);
+            if (user) {
+                await user.send(
+                    `🚨 **Alerta de Erro no Bot Aeternus!**\n` +
                     `> **Detalhes:** \`${errorMessage}\`\n` +
-                    `> *O painel Aeternus identificou a falha e está tentando aplicar a autocorreção.*`
+                    `> *O painel identificou a falha e está tentando aplicar a autocorreção.*`
                 );
             }
         } catch (discordError) {
-            console.error('Não foi possível enviar o alerta no Discord:', discordError);
+            console.error('Não foi possível enviar a DM para o usuário:', discordError);
         }
     }
 
