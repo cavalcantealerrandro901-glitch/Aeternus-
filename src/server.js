@@ -1,9 +1,12 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
+const mongoose = require('mongoose');
 const simpleGit = require('simple-git');
 const { logs } = require('./logger');
 const { getMaintenance, setMaintenance } = require('./state');
+const { encrypt, decrypt } = require('./security');
+const Setting = require('./models/Setting');
+
 const app = express();
 const git = simpleGit();
 
@@ -11,42 +14,58 @@ app.use(express.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
+// Conexão com o MongoDB (se MONGO_URI estiver configurado)
+if (process.env.MONGO_URI) {
+    mongoose.connect(process.env.MONGO_URI).then(() => {
+        logs.unshift({ type: 'DB', message: 'Conectado ao MongoDB com sucesso!', timestamp: new Date().toLocaleTimeString() });
+    }).catch(err => {
+        logs.unshift({ type: 'ERRO', message: 'Falha ao conectar no MongoDB: ' + err.message, timestamp: new Date().toLocaleTimeString() });
+    });
+}
+
 function startDashboard(client) {
-    app.get('/', (req, res) => {
-        let envContent = '';
+    app.get('/', async (req, res) => {
+        let envText = '';
         try {
-            envContent = fs.readFileSync(path.join(__dirname, '../.env'), 'utf8');
+            const setting = await Setting.findOne({ key: 'env_vars' });
+            if (setting) {
+                envText = decrypt(setting.encryptedValue);
+            }
         } catch (e) {
-            envContent = 'DISCORD_TOKEN=\nADMIN_PASSWORD=\nADMIN_USER_ID=';
+            envText = 'Erro ao carregar do banco de dados';
         }
 
         res.render('index', {
             memory: (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2),
-            guildCount: client.guilds.cache.size,
+            guildCount: client ? client.guilds.cache.size : 0,
             logs: logs,
             maintenance: getMaintenance(),
-            envContent: envContent,
+            envContent: envText,
             error: null
         });
     });
 
-    // Rota para salvar variáveis de ambiente no arquivo .env
-    app.post('/save-env', (req, res) => {
+    // Salvar variáveis criptografadas no MongoDB
+    app.post('/save-env', async (req, res) => {
         const { envData } = req.body;
         try {
-            fs.writeFileSync(path.join(__dirname, '../.env'), envData, 'utf8');
-            logs.unshift({ type: 'CONFIG', message: 'Variáveis de ambiente atualizadas!', timestamp: new Date().toLocaleTimeString() });
+            const encrypted = encrypt(envData);
+            await Setting.findOneAndUpdate(
+                { key: 'env_vars' },
+                { encryptedValue: encrypted },
+                { upsert: true, new: true }
+            );
+            logs.unshift({ type: 'CONFIG', message: 'Variáveis criptografadas e salvas no MongoDB!', timestamp: new Date().toLocaleTimeString() });
             res.redirect('/');
         } catch (error) {
-            res.status(500).send("Erro ao salvar .env: " + error.message);
+            res.status(500).send("Erro ao salvar no MongoDB: " + error.message);
         }
     });
 
-    // Rota para alternar o Modo de Manutenção
     app.post('/toggle-maintenance', (req, res) => {
         const current = getMaintenance();
         setMaintenance(!current);
-        logs.unshift({ type: 'STATUS', message: `Modo de Manutenção alterado para: ${!current ? 'ATIVADO' : 'DESATIVADO'}`, timestamp: new Date().toLocaleTimeString() });
+        logs.unshift({ type: 'STATUS', message: `Modo de Manutenção: ${!current ? 'ATIVADO' : 'DESATIVADO'}`, timestamp: new Date().toLocaleTimeString() });
         res.redirect('/');
     });
 
@@ -59,7 +78,7 @@ function startDashboard(client) {
             } else {
                 await git.addRemote('origin', repoUrl);
             }
-            logs.unshift({ type: 'CONFIG', message: `Repositório atualizado para: ${repoUrl}`, timestamp: new Date().toLocaleTimeString() });
+            logs.unshift({ type: 'CONFIG', message: `Repositório alterado para: ${repoUrl}`, timestamp: new Date().toLocaleTimeString() });
             res.redirect('/');
         } catch (error) {
             res.redirect('/');
@@ -68,7 +87,7 @@ function startDashboard(client) {
 
     app.post('/restart', (req, res) => {
         if (req.body.password === process.env.ADMIN_PASSWORD) {
-            res.send("<h1>Reiniciando o bot...</h1>");
+            res.send("<h1>Reiniciando painel...</h1>");
             setTimeout(() => process.exit(0), 1000);
         } else {
             res.redirect('/');

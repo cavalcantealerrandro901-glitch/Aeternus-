@@ -9,6 +9,7 @@
     "discord.js": "^14.14.1",
     "ejs": "^6.0.1",
     "express": "^4.19.2",
+    "mongoose": "^9.9.2",
     "simple-git": "^3.36.0"
   }
 }
