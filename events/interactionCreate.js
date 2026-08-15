@@ -1,6 +1,6 @@
 const { PermissionsBitField, EmbedBuilder } = require('discord.js');
 const db = require('../utils/database');
-const { getRandomPhrase } = require('../utils/phrases');
+const { getRandomPhrase, generatePhrase, getRandomEmoji } = require('../utils/phrases');
 
 module.exports = {
     name: 'interactionCreate',
@@ -25,12 +25,12 @@ module.exports = {
         const type = parts[1];
         const targetId = parts[2];
 
-        // 🎁 Tratamento do Botão Daily
+        // 🎁 Tratamento do Botão Daily + Notificação na DM
         if (action === 'daily' && type === 'claim') {
             const userId = interaction.user.id;
             const userDaily = db.getDaily(userId);
             const now = Date.now();
-            const cooldown = 24 * 60 * 60 * 1000;
+            const cooldown = 24 * 60 * 60 * 1000; // 24 horas
 
             if (userDaily.lastClaimed && (now - userDaily.lastClaimed < cooldown)) {
                 const timeLeft = cooldown - (now - userDaily.lastClaimed);
@@ -55,16 +55,33 @@ module.exports = {
             db.setDaily(userId, streak, now);
 
             const phrase = getRandomPhrase();
+            const emoji = getRandomEmoji();
 
             const successEmbed = new EmbedBuilder()
                 .setColor('#57F287')
-                .setTitle('🎉 Recompensa Coletada com Sucesso!')
+                .setTitle(`🎉 Recompensa Coletada com Sucesso! ${emoji}`)
                 .setDescription(`✨ *"${phrase}"*`)
                 .addFields(
                     { name: '🔥 Sequência (Streak)', value: `${streak} dia(s)`, inline: true },
                     { name: '💀 Recompensa', value: `+${totalReward.toLocaleString()} almas`, inline: true }
                 )
                 .setTimestamp();
+
+            // 🕰️ Inicia o Timer para avisar na DM após 24 horas
+            setTimeout(async () => {
+                try {
+                    const userToNotify = await client.users.fetch(userId);
+                    const notifEmbed = new EmbedBuilder()
+                        .setColor('#9B59B6')
+                        .setTitle(`🎁 Seu Daily está pronto, ${userToNotify.username}!`)
+                        .setDescription(`As 24 horas se passaram e suas almas aguardam.\n\n✨ *"${generatePhrase()}"*`)
+                        .setFooter({ text: 'Volte ao servidor para coletar!' });
+
+                    await userToNotify.send({ embeds: [notifEmbed] });
+                } catch (err) {
+                    console.log(`Não foi possível enviar DM para ${userId}.`);
+                }
+            }, cooldown);
 
             return interaction.update({
                 embeds: [successEmbed],

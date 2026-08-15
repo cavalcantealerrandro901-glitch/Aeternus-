@@ -26,6 +26,17 @@ const objects = [
     "um tesouro sepultado."
 ];
 
+// Sistema de Emojis e Paquera Sombria
+const emojis = ['🖤', '🦇', '🥀', '🕸️', '🔮', '🌙', '💀', '😏', '✨', '🍷'];
+const flirts = [
+    "Sua alma tem um brilho fascinante...",
+    "Até as sombras ficam com inveja da sua presença...",
+    "Você traz uma luz perigosa para o meu abismo...",
+    "Minhas trevas ficam mais interessantes quando você está por perto...",
+    "Que aura encantadora você tem hoje...",
+    "É impossível ignorar a sua essência neste servidor..."
+];
+
 function getRandomPhrase() {
     const sub = subjects[Math.floor(Math.random() * subjects.length)];
     const act = actions[Math.floor(Math.random() * actions.length)];
@@ -43,5 +54,11 @@ module.exports = {
         } else {
             return getRandomPhrase();
         }
+    },
+    getRandomEmoji() {
+        return emojis[Math.floor(Math.random() * emojis.length)];
+    },
+    getFlirt() {
+        return flirts[Math.floor(Math.random() * flirts.length)];
     }
 };

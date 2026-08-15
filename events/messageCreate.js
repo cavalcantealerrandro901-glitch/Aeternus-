@@ -1,4 +1,5 @@
-// Função auxiliar para calcular o tempo passado
+const { generatePhrase, getRandomEmoji, getFlirt } = require('../utils/phrases');
+
 function formatTime(timestamp) {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
     if (seconds < 60) return `${seconds} segundos atrás`;
@@ -12,6 +13,19 @@ module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
         if (message.author.bot) return;
+
+        // 🎲 Chance de 10% de interagir (reagir ou paquerar)
+        if (Math.random() < 0.10) {
+            // 50% de chance de reagir, 50% de responder
+            if (Math.random() < 0.5) {
+                message.react(getRandomEmoji()).catch(() => {});
+            } else {
+                const flirt = getFlirt();
+                const phrase = generatePhrase();
+                const emoji = getRandomEmoji();
+                message.reply(`Olá, ${message.author}... ${emoji}\n*${flirt}*\n\n📜 Aliás: ${phrase}`).catch(() => {});
+            }
+        }
 
         // 1. Verifica se o autor estava AFK e remove
         if (client.afk.has(message.author.id)) {
@@ -33,7 +47,6 @@ module.exports = {
                         `⏱️ **Ausente há:** ${timeAgo}`
                     );
 
-                    // Apaga a mensagem após 7 segundos
                     setTimeout(() => {
                         afkMsg.delete().catch(() => {});
                     }, 7000);
@@ -51,6 +64,8 @@ module.exports = {
         if (!command) return;
 
         try {
+            // Reage ao comando executado com um emoji aleatório
+            message.react(getRandomEmoji()).catch(() => {});
             command.execute(message, args, client);
         } catch (error) {
             console.error(error);
