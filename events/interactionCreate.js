@@ -1,4 +1,4 @@
-const { PermissionsBitField } = require('discord.js');
+const { PermissionsBitField, EmbedBuilder } = require('discord.js');
 const db = require('../utils/database');
 const { getRandomPhrase } = require('../utils/phrases');
 
@@ -30,7 +30,7 @@ module.exports = {
             const userId = interaction.user.id;
             const userDaily = db.getDaily(userId);
             const now = Date.now();
-            const cooldown = 24 * 60 * 60 * 1000; // 24 horas
+            const cooldown = 24 * 60 * 60 * 1000;
 
             if (userDaily.lastClaimed && (now - userDaily.lastClaimed < cooldown)) {
                 const timeLeft = cooldown - (now - userDaily.lastClaimed);
@@ -39,7 +39,6 @@ module.exports = {
                 return interaction.reply({ content: `⏳ Você já coletou seu daily hoje! Volte em **${hours}h ${minutes}m**.`, ephemeral: true });
             }
 
-            // Calcula a sequência (streak): se passar de 48h sem coletar, reseta para 1. Senão, soma 1.
             let streak = userDaily.streak || 0;
             const twoDays = 48 * 60 * 60 * 1000;
             if (userDaily.lastClaimed && (now - userDaily.lastClaimed > twoDays)) {
@@ -48,7 +47,6 @@ module.exports = {
                 streak += 1;
             }
 
-            // A cada 2 dias de sequência, aumenta 2k. Base de 5000 almas.
             const baseReward = 5000;
             const bonus = Math.floor(streak / 2) * 2000;
             const totalReward = baseReward + bonus;
@@ -58,11 +56,18 @@ module.exports = {
 
             const phrase = getRandomPhrase();
 
+            const successEmbed = new EmbedBuilder()
+                .setColor('#57F287')
+                .setTitle('🎉 Recompensa Coletada com Sucesso!')
+                .setDescription(`✨ *"${phrase}"*`)
+                .addFields(
+                    { name: '🔥 Sequência (Streak)', value: `${streak} dia(s)`, inline: true },
+                    { name: '💀 Recompensa', value: `+${totalReward.toLocaleString()} almas`, inline: true }
+                )
+                .setTimestamp();
+
             return interaction.update({
-                content: `🎉 **Recompensa Coletada com Sucesso!**\n` +
-                         `✨ *"${phrase}"*\n\n` +
-                         `🔥 **Sequência (Streak):** ${streak} dia(s)\n` +
-                         `💀 **Recompensa:** +${totalReward.toLocaleString()} almas`,
+                embeds: [successEmbed],
                 components: []
             });
         }

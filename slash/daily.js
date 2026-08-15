@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { getRandomPhrase } = require('../utils/phrases');
 
 module.exports = {
@@ -6,6 +6,13 @@ module.exports = {
         .setName('daily')
         .setDescription('Resgata sua recompensa diária de almas'),
     async execute(interaction) {
+        const embed = new EmbedBuilder()
+            .setColor('#2b2d31')
+            .setTitle('💀 Painel de Recompensa Diária')
+            .setDescription(`✨ *"${getRandomPhrase()}"*\n\nClique no botão abaixo para coletar suas almas diárias!`)
+            .setFooter({ text: 'Sistema de Recompensas Aeternus' })
+            .setTimestamp();
+
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('daily_claim')
@@ -14,7 +21,7 @@ module.exports = {
         );
 
         await interaction.reply({
-            content: `💀 **Painel de Recompensa Diária**\n✨ *"${getRandomPhrase()}"*\n\nClique no botão abaixo para coletar suas almas diárias!`,
+            embeds: [embed],
             components: [row]
         });
     }
