@@ -1,15 +1,25 @@
 {
-  "name": "aeternus-bot",
+  "name": "aeternus",
   "version": "1.0.0",
-  "main": "src/index.js",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cavalcantealerrandro901-glitch/Aeternus-.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cavalcantealerrandro901-glitch/Aeternus-/issues"
+  },
+  "homepage": "https://github.com/cavalcantealerrandro901-glitch/Aeternus-#readme",
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "ejs": "^6.0.1",
-    "express": "^4.19.2",
-    "mongoose": "^9.9.2",
-    "simple-git": "^3.36.0"
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.4.2"
   }
 }
