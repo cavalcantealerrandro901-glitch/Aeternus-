@@ -3,11 +3,25 @@ const { PermissionsBitField } = require('discord.js');
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
+        // ⚡ Processamento de Comandos Slash
+        if (interaction.isChatInputCommand()) {
+            const command = client.slashCommands.get(interaction.commandName);
+            if (!command) return;
+
+            try {
+                await command.execute(interaction, client);
+            } catch (error) {
+                console.error(error);
+                await interaction.reply({ content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true });
+            }
+            return;
+        }
+
+        // 🔘 Processamento de Botões (Ban / Kick)
         if (!interaction.isButton()) return;
 
         const [action, type, targetId] = interaction.customId.split('_');
 
-        // Lógica de Banimento
         if (action === 'ban') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
                 return interaction.reply({ content: '❌ Você não tem permissão para fazer isso.', ephemeral: true });
@@ -34,7 +48,6 @@ module.exports = {
             }
         }
 
-        // Lógica de Expulsão (Kick)
         if (action === 'kick') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
                 return interaction.reply({ content: '❌ Você não tem permissão para fazer isso.', ephemeral: true });
