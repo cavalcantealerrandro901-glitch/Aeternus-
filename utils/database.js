@@ -7,6 +7,7 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 const ecoFile = path.join(dataDir, 'economy.json');
 const permFile = path.join(dataDir, 'permissions.json');
 const warnFile = path.join(dataDir, 'warnings.json');
+const dailyFile = path.join(dataDir, 'daily.json');
 
 function readJson(file) {
     if (!fs.existsSync(file)) return {};
@@ -49,5 +50,14 @@ module.exports = {
     getWarns(userId) {
         const data = readJson(warnFile);
         return data[userId] || [];
+    },
+    getDaily(userId) {
+        const data = readJson(dailyFile);
+        return data[userId] || { streak: 0, lastClaimed: 0 };
+    },
+    setDaily(userId, streak, time) {
+        const data = readJson(dailyFile);
+        data[userId] = { streak, lastClaimed: time };
+        writeJson(dailyFile, data);
     }
 };

@@ -1,5 +1,6 @@
 const { PermissionsBitField } = require('discord.js');
 const db = require('../utils/database');
+const { getRandomPhrase } = require('../utils/phrases');
 
 module.exports = {
     name: 'interactionCreate',
@@ -23,6 +24,48 @@ module.exports = {
         const action = parts[0];
         const type = parts[1];
         const targetId = parts[2];
+
+        // 🎁 Tratamento do Botão Daily
+        if (action === 'daily' && type === 'claim') {
+            const userId = interaction.user.id;
+            const userDaily = db.getDaily(userId);
+            const now = Date.now();
+            const cooldown = 24 * 60 * 60 * 1000; // 24 horas
+
+            if (userDaily.lastClaimed && (now - userDaily.lastClaimed < cooldown)) {
+                const timeLeft = cooldown - (now - userDaily.lastClaimed);
+                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                return interaction.reply({ content: `⏳ Você já coletou seu daily hoje! Volte em **${hours}h ${minutes}m**.`, ephemeral: true });
+            }
+
+            // Calcula a sequência (streak): se passar de 48h sem coletar, reseta para 1. Senão, soma 1.
+            let streak = userDaily.streak || 0;
+            const twoDays = 48 * 60 * 60 * 1000;
+            if (userDaily.lastClaimed && (now - userDaily.lastClaimed > twoDays)) {
+                streak = 1;
+            } else {
+                streak += 1;
+            }
+
+            // A cada 2 dias de sequência, aumenta 2k. Base de 5000 almas.
+            const baseReward = 5000;
+            const bonus = Math.floor(streak / 2) * 2000;
+            const totalReward = baseReward + bonus;
+
+            db.addBal(userId, totalReward);
+            db.setDaily(userId, streak, now);
+
+            const phrase = getRandomPhrase();
+
+            return interaction.update({
+                content: `🎉 **Recompensa Coletada com Sucesso!**\n` +
+                         `✨ *"${phrase}"*\n\n` +
+                         `🔥 **Sequência (Streak):** ${streak} dia(s)\n` +
+                         `💀 **Recompensa:** +${totalReward.toLocaleString()} almas`,
+                components: []
+            });
+        }
 
         // ⏱️ Tratamento de Timeout via Botão
         if (action === 'timeout') {
@@ -63,7 +106,7 @@ module.exports = {
             await interaction.reply({ content: `📋 **Histórico de Avisos:**\n${list}`, ephemeral: true });
         }
 
-        // 🛑 Ban / Kick (Mantidos dos comandos anteriores)
+        // 🛑 Ban / Kick
         if (action === 'ban' || action === 'kick') {
             const flag = action === 'ban' ? PermissionsBitField.Flags.BanMembers : PermissionsBitField.Flags.KickMembers;
             if (!interaction.member.permissions.has(flag)) {
