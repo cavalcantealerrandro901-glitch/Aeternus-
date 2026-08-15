@@ -6,6 +6,7 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
 const ecoFile = path.join(dataDir, 'economy.json');
 const permFile = path.join(dataDir, 'permissions.json');
+const warnFile = path.join(dataDir, 'warnings.json');
 
 function readJson(file) {
     if (!fs.existsSync(file)) return {};
@@ -37,5 +38,16 @@ module.exports = {
         if (allow && !data.allowed.includes(userId)) data.allowed.push(userId);
         if (!allow) data.allowed = data.allowed.filter(id => id !== userId);
         writeJson(permFile, data);
+    },
+    addWarn(userId, reason, moderator) {
+        const data = readJson(warnFile);
+        if (!data[userId]) data[userId] = [];
+        data[userId].push({ reason, moderator, date: new Date().toLocaleDateString() });
+        writeJson(warnFile, data);
+        return data[userId].length;
+    },
+    getWarns(userId) {
+        const data = readJson(warnFile);
+        return data[userId] || [];
     }
 };
