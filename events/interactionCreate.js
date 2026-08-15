@@ -9,9 +9,13 @@ module.exports = {
         if (interaction.isChatInputCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
             if (!command) return;
-            try { await command.execute(interaction, client); } catch (error) {
+            try { 
+                await command.execute(interaction, client); 
+            } catch (error) {
                 console.error(error);
-                await interaction.reply({ content: '❌ Ocorreu um erro.', flags: MessageFlags.Ephemeral });
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({ content: '❌ Ocorreu um erro.', flags: MessageFlags.Ephemeral });
+                }
             }
             return;
         }
@@ -21,7 +25,6 @@ module.exports = {
         const parts = interaction.customId.split('_');
         const action = parts[0];
         const type = parts[1];
-        const targetId = parts[2];
 
         if (action === 'daily' && type === 'claim') {
             const userId = interaction.user.id;
@@ -33,13 +36,20 @@ module.exports = {
                 const timeLeft = cooldown - (now - userDaily.lastClaimed);
                 const minutes = Math.floor(timeLeft / (1000 * 60));
                 const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-                return interaction.reply({ 
-                    content: `⏳ Você já coletou recentemente! Volte em **${minutes}m ${seconds}s**.`, 
-                    flags: MessageFlags.Ephemeral 
-                });
+                
+                if (!interaction.replied && !interaction.deferred) {
+                    return interaction.reply({ 
+                        content: `⏳ Você já coletou recentemente! Volte em **${minutes}m ${seconds}s**.`, 
+                        flags: MessageFlags.Ephemeral 
+                    });
+                }
+                return;
             }
 
-            await interaction.deferUpdate();
+            // Evita o erro 40060 verificando se já foi respondida ou adiada
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.deferUpdate();
+            }
 
             let streak = userDaily.streak || 0;
             const twoDays = 48 * 60 * 60 * 1000;
@@ -49,14 +59,13 @@ module.exports = {
             db.addBal(userId, totalReward);
             db.setDaily(userId, streak, now);
 
-            const guildIcon = interaction.guild.iconURL({ extension: 'png', size: 512 });
-            const botAvatar = client.user.displayAvatarURL({ extension: 'png', size: 512 });
-            const imageBuffer = await createDailyImage(guildIcon, botAvatar);
+            // Gera a imagem limpa apenas com o fundo temático
+            const imageBuffer = await createDailyImage();
             const attachment = new AttachmentBuilder(imageBuffer, { name: 'daily-reward.png' });
 
             const embed = new EmbedBuilder()
                 .setColor('#57F287')
-                .setTitle(`🎉 Coletado! ${getRandomEmoji()}`)
+                .setTitle(`🎉 Coletado com Sucesso! ${getRandomEmoji()}`)
                 .setDescription(`✨ *"${getRandomPhrase()}"*`)
                 .setImage('attachment://daily-reward.png')
                 .addFields(
@@ -67,17 +76,15 @@ module.exports = {
             setTimeout(async () => {
                 try {
                     const user = await client.users.fetch(userId);
-                    const buf = await createDailyImage(guildIcon, botAvatar);
+                    const buf = await createDailyImage();
                     await user.send({ 
                         embeds: [new EmbedBuilder().setTitle('🎁 Daily pronto!').setDescription(`*${generatePhrase()}*`).setImage('attachment://daily.png')],
                         files: [new AttachmentBuilder(buf, { name: 'daily.png' })]
                     });
-                } catch (e) { console.log('Erro DM'); }
+                } catch (e) { console.log('Erro ao enviar DM'); }
             }, cooldown);
 
             return interaction.editReply({ embeds: [embed], files: [attachment], components: [] });
         }
-        
-        // ... (resto da lógica de moderação permanece igual)
     }
 };
