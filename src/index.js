@@ -1,7 +1,8 @@
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits } = require('discord.js');
 const startDashboard = require('./server');
 const { addLog } = require('./logger');
 const { analyzeAndFix } = require('./healer');
+const { initAutoDeploy } = require('./deployer');
 
 let globalClient = null;
 
@@ -23,10 +24,13 @@ const client = new Client({
 });
 
 client.once('ready', () => {
-    globalClient = client; // Salva a referência para os alertas de erro
+    globalClient = client;
     console.log(`Bot logado como ${client.user.tag}!`);
-    addLog('INFO', `Bot conectado com sucesso como ${client.user.tag}`);
+    addLog('INFO', `Bot conectado como ${client.user.tag}`);
+    
+    // Inicia o painel e o sistema de checagem automática de repositório
     startDashboard(client);
+    initAutoDeploy();
 });
 
 client.login(process.env.DISCORD_TOKEN);

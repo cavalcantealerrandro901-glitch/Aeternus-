@@ -9,11 +9,12 @@
         h1 { color: #38bdf8; text-align: center; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .card { background: #334155; padding: 15px; border-radius: 10px; text-align: center; }
-        .terminal { background: #000; color: #00ff00; padding: 10px; border-radius: 8px; font-family: monospace; height: 150px; overflow-y: auto; text-align: left; font-size: 0.9em; margin-bottom: 20px; }
+        .terminal { background: #000; color: #00ff00; padding: 10px; border-radius: 8px; font-family: monospace; height: 140px; overflow-y: auto; text-align: left; font-size: 0.85em; margin-bottom: 20px; }
         .log-item { margin-bottom: 4px; }
-        .restart-box { padding: 15px; border: 1px solid #ef4444; border-radius: 10px; }
-        input { padding: 8px; border-radius: 5px; border: none; width: 150px; }
-        button { padding: 8px 15px; border-radius: 5px; border: none; background: #ef4444; color: white; cursor: pointer; }
+        .box { background: #334155; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        input { padding: 8px; border-radius: 5px; border: 1px solid #475569; background: #0f172a; color: white; width: calc(100% - 20px); margin-bottom: 10px; }
+        button { padding: 8px 15px; border-radius: 5px; border: none; background: #38bdf8; color: #0f172a; font-weight: bold; cursor: pointer; }
+        .btn-danger { background: #ef4444; color: white; }
     </style>
 </head>
 <body>
@@ -24,10 +25,21 @@
             <div class="card">RAM<br><strong><%= memory %> MB</strong></div>
         </div>
 
-        <h3>Logs do Sistema</h3>
+        <div class="box">
+            <h3>📂 Configuração do Repositório & Deploy</h3>
+            <form action="/update-repo" method="POST">
+                <label>Nome de Usuário / Organização:</label>
+                <input type="text" name="repoUser" placeholder="Ex: seu-usuario" required>
+                <label>Link do Repositório (HTTPS):</label>
+                <input type="text" name="repoUrl" placeholder="https://github.com/usuario/repo.git" required>
+                <button type="submit">Salvar e Conectar</button>
+            </form>
+        </div>
+
+        <h3>Logs do Sistema & Auto-Deploy</h3>
         <div class="terminal">
             <% if (logs.length === 0) { %>
-                <div>Nenhum log registrado ainda...</div>
+                <div>Aguardando eventos...</div>
             <% } else { %>
                 <% logs.forEach(log => { %>
                     <div class="log-item">[<%= log.timestamp %>] [<%= log.type %>]: <%= log.message %></div>
@@ -35,11 +47,11 @@
             <% } %>
         </div>
 
-        <div class="restart-box">
+        <div class="box" style="border: 1px solid #ef4444;">
             <h3>Controle Administrativo</h3>
             <form action="/restart" method="POST">
-                <input type="password" name="password" placeholder="Senha Admin" required>
-                <button type="submit">Reiniciar Bot</button>
+                <input type="password" name="password" placeholder="Senha Admin" required style="width: 150px; display: inline-block;">
+                <button type="submit" class="btn-danger">Reiniciar Bot</button>
             </form>
             <% if (error) { %> <p style="color: #ef4444; margin-top: 5px;"><%= error %></p> <% } %>
         </div>
