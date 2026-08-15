@@ -26,20 +26,22 @@ const objects = [
     "um tesouro sepultado."
 ];
 
+function getRandomPhrase() {
+    const sub = subjects[Math.floor(Math.random() * subjects.length)];
+    const act = actions[Math.floor(Math.random() * actions.length)];
+    const obj = objects[Math.floor(Math.random() * objects.length)];
+    return `${sub} ${act} ${obj}`;
+}
+
 module.exports = {
-    getRandomPhrase() {
-        const sub = subjects[Math.floor(Math.random() * subjects.length)];
-        const act = actions[Math.floor(Math.random() * actions.length)];
-        const obj = objects[Math.floor(Math.random() * objects.length)];
-        return `${sub} ${act} ${obj}`;
-    },
+    getRandomPhrase,
     generatePhrase(repliedText = null) {
         if (repliedText && repliedText.trim().length > 0) {
             const act = actions[Math.floor(Math.random() * actions.length)];
             const obj = objects[Math.floor(Math.random() * objects.length)];
             return `Analisando "${repliedText}", as forças do submundo declaram que isso ${act} ${obj}`;
         } else {
-            return this.getRandomPhrase();
+            return getRandomPhrase();
         }
     }
 };
