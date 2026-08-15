@@ -85,9 +85,10 @@ function startDashboard(client) {
         }
     });
 
-    // Rotas de controle do bot hospedado
+    // Controle dinâmico do bot hospedado
     app.post('/bot/start', (req, res) => {
-        startBotScript('src/index.js');
+        const { scriptPath } = req.body;
+        startBotScript(scriptPath);
         res.redirect('/');
     });
 

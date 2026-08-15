@@ -5,12 +5,13 @@ let botProcess = null;
 
 function startBotScript(scriptPath) {
     if (botProcess) {
-        addLog('HOST', 'O bot já está rodando!');
+        addLog('HOST', 'Já existe um bot ou processo rodando!');
         return false;
     }
 
-    addLog('HOST', `Iniciando o processo do bot: ${scriptPath}`);
-    botProcess = spawn('node', [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const targetPath = scriptPath || 'src/index.js';
+    addLog('HOST', `Iniciando o processo: ${targetPath}`);
+    botProcess = spawn('node', [targetPath], { stdio: ['pipe', 'pipe', 'pipe'] });
 
     botProcess.stdout.on('data', (data) => {
         addLog('BOT', data.toString().trim());
@@ -21,7 +22,7 @@ function startBotScript(scriptPath) {
     });
 
     botProcess.on('close', (code) => {
-        addLog('HOST', `O processo do bot foi encerrado com código ${code}`);
+        addLog('HOST', `O processo foi encerrado com código ${code}`);
         botProcess = null;
     });
 
@@ -30,11 +31,11 @@ function startBotScript(scriptPath) {
 
 function stopBotScript() {
     if (!botProcess) {
-        addLog('HOST', 'O bot já está desligado.');
+        addLog('HOST', 'Nenhum bot rodando no momento.');
         return false;
     }
 
-    addLog('HOST', 'Encerrando o bot...');
+    addLog('HOST', 'Encerrando o processo...');
     botProcess.kill();
     botProcess = null;
     return true;
