@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Aeternus Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: white; text-align: center; padding-top: 50px; }
+        .card { background: #1e1e1e; display: inline-block; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        h1 { color: #00FF00; }
+        .stat { margin: 15px 0; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Aeternus Status</h1>
+        <div class="stat">Status: <strong style="color:green">Online ✅</strong></div>
+        <div class="stat">Servidores: <strong><%= guildCount %></strong></div>
+        <div class="stat">Uptime: <strong><%= uptime %></strong></div>
+        <div class="stat">Memória RAM: <strong><%= memory %> MB</strong></div>
+    </div>
+</body>
+</html>
