@@ -6,6 +6,7 @@ const { logs } = require('./logger');
 const { getMaintenance, setMaintenance } = require('./state');
 const { encrypt, decrypt } = require('./security');
 const Setting = require('./models/Setting');
+const { startBotScript, stopBotScript, isBotRunning } = require('./processManager');
 
 const app = express();
 const git = simpleGit();
@@ -14,7 +15,6 @@ app.use(express.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
-// Conexão com o MongoDB (se MONGO_URI estiver configurado)
 if (process.env.MONGO_URI) {
     mongoose.connect(process.env.MONGO_URI).then(() => {
         logs.unshift({ type: 'DB', message: 'Conectado ao MongoDB com sucesso!', timestamp: new Date().toLocaleTimeString() });
@@ -41,11 +41,11 @@ function startDashboard(client) {
             logs: logs,
             maintenance: getMaintenance(),
             envContent: envText,
+            isRunning: isBotRunning(),
             error: null
         });
     });
 
-    // Salvar variáveis criptografadas no MongoDB
     app.post('/save-env', async (req, res) => {
         const { envData } = req.body;
         try {
@@ -83,6 +83,17 @@ function startDashboard(client) {
         } catch (error) {
             res.redirect('/');
         }
+    });
+
+    // Rotas de controle do bot hospedado
+    app.post('/bot/start', (req, res) => {
+        startBotScript('src/index.js');
+        res.redirect('/');
+    });
+
+    app.post('/bot/stop', (req, res) => {
+        stopBotScript();
+        res.redirect('/');
     });
 
     app.post('/restart', (req, res) => {

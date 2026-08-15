@@ -2,36 +2,30 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Painel Aeternus</title>
+    <title>Painel Aeternus - Hospedador</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; padding: 15px; margin: 0; }
         .container { width: 100%; max-width: 900px; }
         h1 { color: #38bdf8; text-align: center; margin-bottom: 20px; }
-        
-        /* Layout em Grade / Lado a Lado */
         .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
         @media (max-width: 768px) { .grid-row { grid-template-columns: 1fr; } }
-
         .box { background: #1e293b; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
         .card { background: #334155; padding: 12px; border-radius: 8px; text-align: center; }
-        
-        /* Terminal Gigante */
         .terminal-box { background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
-        .terminal { background: #000; color: #00ff00; padding: 12px; border-radius: 8px; font-family: monospace; height: 320px; overflow-y: auto; text-align: left; font-size: 0.85em; }
+        .terminal { background: #000; color: #00ff00; padding: 12px; border-radius: 8px; font-family: monospace; height: 300px; overflow-y: auto; text-align: left; font-size: 0.85em; }
         .log-item { margin-bottom: 4px; }
-
         input, textarea { padding: 8px; border-radius: 5px; border: 1px solid #475569; background: #0f172a; color: white; width: calc(100% - 18px); margin-bottom: 8px; }
-        textarea { height: 90px; resize: vertical; font-family: monospace; }
+        textarea { height: 80px; resize: vertical; font-family: monospace; }
         button { padding: 8px 12px; border-radius: 5px; border: none; background: #38bdf8; color: #0f172a; font-weight: bold; cursor: pointer; width: 100%; }
         .btn-danger { background: #ef4444; color: white; }
         .btn-warning { background: #f59e0b; color: white; }
+        .btn-success { background: #22c55e; color: white; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Painel Aeternus</h1>
 
-        <!-- Linha 1: Status e Modo de Manutenção lado a lado -->
         <div class="grid-row">
             <div class="box">
                 <h3>📊 Status Geral</h3>
@@ -42,36 +36,43 @@
             </div>
             
             <div class="box">
-                <h3>⚙️ Manutenção</h3>
-                <p style="margin: 5px 0 10px 0;">Status: <strong><%= maintenance ? '🔴 ATIVADO' : '🟢 DESATIVADO' %></strong></p>
-                <form action="/toggle-maintenance" method="POST">
-                    <button type="submit" class="btn-warning"><%= maintenance ? 'Desativar' : 'Ativar' %></button>
-                </form>
+                <h3>🤖 Controle do Bot Hospedado</h3>
+                <p style="margin: 2px 0 8px 0;">Estado: <strong><%= isRunning ? '🟢 Rodando' : '🔴 Desligado' %></strong></p>
+                <div style="display: flex; gap: 8px;">
+                    <form action="/bot/start" method="POST" style="flex: 1;"><button type="submit" class="btn-success">Ligar</button></form>
+                    <form action="/bot/stop" method="POST" style="flex: 1;"><button type="submit" class="btn-danger">Desligar</button></form>
+                </div>
             </div>
         </div>
 
-        <!-- Linha 2: Variáveis de Ambiente (MongoDB + Criptografia) e Repositório -->
         <div class="grid-row">
             <div class="box">
-                <h3>🔐 Variáveis (MongoDB + Criptografia)</h3>
-                <form action="/save-env" method="POST">
-                    <textarea name="envData" placeholder="CHAVE=valor"><%= envContent %></textarea>
-                    <button type="submit">Salvar no Banco</button>
+                <h3>⚙️ Manutenção</h3>
+                <p style="margin: 5px 0 8px 0;">Status: <strong><%= maintenance ? '🔴 ATIVADO' : '🟢 DESATIVADO' %></strong></p>
+                <form action="/toggle-maintenance" method="POST">
+                    <button type="submit" class="btn-warning"><%= maintenance ? 'Desativar' : 'Ativar' %></button>
                 </form>
             </div>
 
             <div class="box">
                 <h3>📂 Repositório & Deploy</h3>
-                <form action="/update-repo" method="POST" style="display: flex; flex-direction: column; justify-content: space-height; height: 100%;">
-                    <input type="text" name="repoUrl" placeholder="https://github.com/usuario/repo.git" required style="margin-top: 15px;">
-                    <button type="submit" style="margin-top: 25px;">Atualizar Link</button>
+                <form action="/update-repo" method="POST">
+                    <input type="text" name="repoUrl" placeholder="https://github.com/usuario/repo.git" required>
+                    <button type="submit" style="margin-top: 4px;">Atualizar Link</button>
                 </form>
             </div>
         </div>
 
-        <!-- Terminal Gigante de Logs -->
+        <div class="box" style="margin-bottom: 15px;">
+            <h3>🔐 Variáveis (MongoDB + Criptografia)</h3>
+            <form action="/save-env" method="POST">
+                <textarea name="envData" placeholder="CHAVE=valor"><%= envContent %></textarea>
+                <button type="submit">Salvar no Banco</button>
+            </form>
+        </div>
+
         <div class="terminal-box">
-            <h3>🖥️ Logs do Sistema & Auto-Deploy (Expandido)</h3>
+            <h3>🖥️ Logs do Sistema & Processo do Bot</h3>
             <div class="terminal">
                 <% if (logs.length === 0) { %>
                     <div>Aguardando eventos...</div>
@@ -83,12 +84,11 @@
             </div>
         </div>
 
-        <!-- Controle Administrativo -->
         <div class="box" style="border: 1px solid #ef4444;">
-            <h3>🚨 Controle Administrativo</h3>
+            <h3>🚨 Controle Administrativo do Painel</h3>
             <form action="/restart" method="POST" style="display: flex; gap: 10px;">
                 <input type="password" name="password" placeholder="Senha Admin" required style="margin-bottom: 0;">
-                <button type="submit" class="btn-danger" style="width: 150px;">Reiniciar</button>
+                <button type="submit" class="btn-danger" style="width: 150px;">Reiniciar Painel</button>
             </form>
         </div>
     </div>
