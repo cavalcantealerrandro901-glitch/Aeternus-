@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aeternus - Painel Diário</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background-color: #2b2d31;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            color: #57F287;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #b9bbbe;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: #57F287;
+            color: #1e1e1e;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background-color: #40c16b;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Aeternus Daily</h1>
+        <p>Resgate sua recompensa diária diretamente por aqui!</p>
+        <a href="#" class="btn" onclick="claimDaily()">Resgatar Recompensa</a>
+        <div id="result" style="margin-top: 15px; font-weight: bold;"></div>
+    </div>
+
+    <script>
+        function claimDaily() {
+            // Aqui você conectará com a API do seu bot
+            document.getElementById('result').innerText = '🎉 Recompensa resgatada com sucesso!';
+            document.getElementById('result').style.color = '#57F287';
+        }
+    </script>
+</body>
+</html>
