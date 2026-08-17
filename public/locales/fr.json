@@ -1,0 +1,14 @@
+{
+    "menu_panel": "PANNEAU",
+    "theme": "🌓 Changer de thème",
+    "language": "🌐 Langue",
+    "commands": "📜 Voir les commandes",
+    "servers": "⚙️ Gérer les serveurs",
+    "login": "Connexion",
+    "title": "AETERNUS",
+    "description": "Une nouvelle ère d'expériences et de connexions. Bienvenue dans le sanctuaire officiel du bot.",
+    "btn_settings": "Paramètres",
+    "btn_add": "Ajouter au serveur",
+    "cmd_title": "Commandes du bot",
+    "lang_title": "Sélectionner la langue"
+}

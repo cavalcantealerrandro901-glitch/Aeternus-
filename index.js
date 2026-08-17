@@ -1,12 +1,13 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { startServer } = require('./server');
 
 const client = new Client({
     intents: [
-        GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildMessages, 
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ]
 });
@@ -15,7 +16,7 @@ client.afk = new Map();
 client.commands = new Collection();
 client.slashCommands = new Collection();
 
-// Carregador de Comandos de Prefixo (!)
+// Carregador de Comandos de Prefixo
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -52,4 +53,35 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
-client.login(process.env.DISCORD_TOKEN);
+// Executor de comandos Slash seguro
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = client.slashCommands.get(interaction.commandName);
+    if (!command) return;
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error('❌ Erro no comando:', error);
+        try {
+            const errorMessage = { 
+                content: 'Ocorreu um erro ao executar este comando!', 
+                flags: [MessageFlags.Ephemeral] 
+            };
+
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp(errorMessage);
+            } else {
+                await interaction.reply(errorMessage);
+            }
+        } catch (err) {
+            // Evita crash caso a interação expire
+        }
+    }
+});
+
+// Inicializa o servidor web integrado
+startServer(client);
+
+client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);

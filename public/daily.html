@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aeternus - Painel Diário</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: #1e293b;
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            max-width: 420px;
+            width: 90%;
+            border: 1px solid #334155;
+        }
+        h1 {
+            color: #38bdf8;
+            margin-bottom: 12px;
+            font-size: 26px;
+        }
+        p {
+            color: #94a3b8;
+            margin-bottom: 24px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            background-color: #0f172a;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            border-color: #38bdf8;
+        }
+        .btn {
+            background-color: #38bdf8;
+            color: #0f172a;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .btn:hover {
+            background-color: #0ea5e9;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .btn-back {
+            background-color: transparent;
+            color: #94a3b8;
+            border: none;
+            margin-top: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: underline;
+        }
+        .btn-back:hover {
+            color: #fff;
+        }
+        #result {
+            margin-top: 20px;
+            font-weight: 500;
+            font-size: 14px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none;
+        }
+        .success {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .error {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Painel Diário</h1>
+        <p>Insira seu ID do Discord abaixo para resgatar sua recompensa diária.</p>
+        
+        <div class="input-group">
+            <label for="userId">Seu ID do Discord</label>
+            <input type="text" id="userId" placeholder="Ex: 123456789012345678">
+        </div>
+
+        <button class="btn" onclick="claimDaily()">Resgatar Recompensa</button>
+        <button class="btn-back" onclick="window.location.href='/'">Voltar ao Início</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function claimDaily() {
+            const userId = document.getElementById('userId').value.trim();
+            const resultDiv = document.getElementById('result');
+
+            if (!userId) {
+                resultDiv.innerText = "⚠️ Por favor, digite seu ID do Discord.";
+                resultDiv.className = "error";
+                resultDiv.style.display = "block";
+                return;
+            }
+
+            resultDiv.innerText = "Processando...";
+            resultDiv.className = "";
+            resultDiv.style.display = "block";
+            resultDiv.style.color = "#94a3b8";
+
+            try {
+                const response = await fetch(`/api/daily/${userId}`);
+                const data = await response.json();
+                
+                resultDiv.innerText = data.message;
+                resultDiv.className = data.success ? "success" : "error";
+            } catch (error) {
+                console.error("Erro:", error);
+                resultDiv.innerText = "❌ Erro ao conectar com o servidor.";
+                resultDiv.className = "error";
+            }
+        }
+    </script>
+</body>
+</html>

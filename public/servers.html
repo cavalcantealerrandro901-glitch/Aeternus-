@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aeternus - Servidores</title>
+    <link id="dynamicFavicon" rel="icon" href="">
+    <link rel="stylesheet" href="/theme.css">
+    <script src="/theme.js"></script>
+    <script src="/i18n.js"></script>
+    <style>
+        body { background-color: var(--bg-color, #f8fafc); color: var(--text-color, #0f172a); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; text-align: center; transition: 0.3s; box-sizing: border-box; }
+        
+        .top-bar { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+        .top-btn { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .top-btn:hover { border-color: #38bdf8; transform: translateY(-2px); }
+
+        .content-wrapper { margin-top: 90px; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 450px; }
+        .bot-avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid #38bdf8; margin-bottom: 15px; object-fit: cover; background: var(--card-bg, #fff); }
+        h1 { margin: 0 0 8px 0; font-size: 28px; }
+        p { color: #64748b; margin-bottom: 25px; font-size: 14px; }
+        
+        .servers-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-height: 55vh; overflow-y: auto; padding-right: 4px; }
+        .server-card { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); padding: 12px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: var(--text-color); transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .server-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
+        .server-info { display: flex; align-items: center; gap: 12px; }
+        .server-icon { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <a href="/" class="top-btn">Voltar ao Início</a>
+    </div>
+
+    <div class="content-wrapper">
+        <img id="botAvatar" src="" class="bot-avatar">
+        <h1>Aeternus</h1>
+        <p id="statusText">Selecione um servidor abaixo para gerenciar:</p>
+
+        <div id="serversList" class="servers-container">
+            <div style="color: #64748b;">Carregando servidores...</div>
+        </div>
+    </div>
+
+    <script src="/snow.js"></script>
+    <script>
+        fetch('/api/bot').then(r => r.json()).then(bot => {
+            if (bot.avatar) document.getElementById('botAvatar').src = bot.avatar;
+        }).catch(() => {});
+
+        fetch('/api/user/servers').then(async res => {
+            if (!res.ok) throw new Error('Não autenticado');
+            return res.json();
+        }).then(servers => {
+            const list = document.getElementById('serversList');
+            if (!servers || servers.length === 0) {
+                list.innerHTML = '<div style="color: #64748b;">Nenhum servidor encontrado ou sem permissão.</div>';
+                return;
+            }
+            list.innerHTML = servers.map(s => `
+                <a href="/dashboard?server=${s.id}" class="server-card">
+                    <div class="server-info">
+                        <img src="${s.icon ? `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png'}" class="server-icon">
+                        <span style="font-weight: bold;">${s.name}</span>
+                    </div>
+                    <span>⚙️</span>
+                </a>
+            `).join('');
+        }).catch(() => {
+            document.getElementById('statusText').innerText = "Você precisa fazer login para gerenciar os servidores.";
+            document.getElementById('serversList').innerHTML = `
+                <a href="/auth/discord" class="top-btn" style="display: block; text-align: center; padding: 12px; border-radius: 25px; text-decoration: none; width: 100%; box-sizing: border-box; background: #38bdf8; color: #fff;">Fazer Login com o Discord</a>
+            `;
+        });
+    </script>
+</body>
+</html>

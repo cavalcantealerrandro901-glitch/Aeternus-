@@ -1,0 +1,15 @@
+:root {
+    --bg-color: #f8fafc;
+    --card-bg: #ffffff;
+    --text-color: #0f172a;
+    --border-color: #cbd5e1;
+    --crystal-blue: #38bdf8;
+}
+
+[data-theme="dark"] {
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --text-color: #f8fafc;
+    --border-color: #334155;
+    --crystal-blue: #38bdf8;
+}

@@ -1,0 +1,10 @@
+{
+    "title": "Aeternus",
+    "login": "Login",
+    "menu": "Menu",
+    "add_server": "Adicionar ao Servidor",
+    "manage_servers": "Gerenciar Servidores",
+    "commands": "Ver Comandos",
+    "theme": "Alternar Tema",
+    "logout": "Sair / Deslogar"
+}

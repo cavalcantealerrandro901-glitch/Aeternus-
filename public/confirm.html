@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aeternus - Confirmação</title>
+    <style>
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; transition: 0.3s; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; box-sizing: border-box; }
+        
+        /* Menu Lateral 45% com transição suave */
+        .menu-btn { position: fixed; top: 20px; left: 20px; background: transparent; border: 1px solid var(--border-color); color: var(--text-color); padding: 10px 15px; border-radius: 8px; cursor: pointer; z-index: 1000; }
+        .dropdown-menu { position: fixed; top: 0; left: 0; width: 45vw; min-width: 260px; height: 100vh; background-color: var(--card-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 1001; padding: 60px 20px; box-sizing: border-box; transform: translateX(-100%); transition: transform 0.3s ease; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .dropdown-menu.active { transform: translateX(0); }
+        .close-btn { position: absolute; top: 20px; right: 20px; border: none; background: none; color: var(--text-color); font-size: 20px; cursor: pointer; padding: 5px 10px; border-radius: 8px; transition: 0.2s; }
+        .close-btn:hover { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .dropdown-item { padding: 15px 10px; color: var(--text-color); text-decoration: none; cursor: pointer; border: none; background: none; text-align: left; font-size: 16px; border-radius: 5px; }
+        .dropdown-item:hover { background: rgba(56, 189, 248, 0.1); color: var(--crystal-blue); }
+
+        /* Server Info Section */
+        .header-section { display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; }
+        .avatar { width: 75px; height: 75px; border-radius: 50%; border: 3px solid var(--crystal-blue); margin-bottom: 10px; }
+
+        /* Card de Confirmação */
+        .card { background: var(--card-bg); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); max-width: 400px; width: 100%; box-sizing: border-box; z-index: 10; }
+        .btn-action { background: var(--crystal-blue); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 15px; transition: 0.2s; }
+        .btn-action:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+    
+    <div class="dropdown-menu" id="dropdownMenu">
+        <button class="close-btn" onclick="toggleMenu()">✕</button>
+        <h3 style="color: var(--crystal-blue);">PAINEL</h3>
+        <button onclick="toggleTheme()" class="dropdown-item">🌓 Alternar Tema</button>
+        <a href="/servers" class="dropdown-item" id="backServersBtn">🔄 Escolher Servidor</a>
+    </div>
+
+    <div class="card">
+        <div class="header-section">
+            <img id="avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" class="avatar" alt="Avatar">
+            <h3 id="serverName" style="margin: 0; color: var(--text-color);">Carregando...</h3>
+            <p id="serverId" style="color: #64748b; margin: 4px 0; font-size: 13px;">ID: ...</p>
+        </div>
+        <h2 style="color: var(--crystal-blue); font-size: 18px; margin-top: 15px;">Confirmação</h2>
+        <p id="confirmText" style="font-size: 14px; margin-bottom: 20px;">Tem certeza que deseja prosseguir com esta ação?</p>
+        <button class="btn-action" onclick="confirmAction()">Confirmar</button>
+    </div>
+
+    <script>
+        function toggleMenu() { 
+            document.getElementById('dropdownMenu').classList.toggle('active'); 
+        }
+
+        // Gestos de toque (Swipe para abrir e fechar)
+        let touchstartX = 0;
+        let touchendX = 0;
+
+        function handleGesture() {
+            const menu = document.getElementById('dropdownMenu');
+            const distance = touchendX - touchstartX;
+            if (distance > 70) {
+                menu.classList.add('active');
+            } else if (distance < -70) {
+                menu.classList.remove('active');
+            }
+        }
+
+        document.addEventListener('touchstart', e => {
+            touchstartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            handleGesture();
+        });
+
+        // Carrega as informações do servidor selecionado pela URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const guildId = urlParams.get('guildId');
+
+        if (guildId) {
+            // Atualiza o link do menu para manter o contexto se necessário
+            document.getElementById('backServersBtn').href = `/servers`;
+
+            fetch('/api/servers').then(r => r.json()).then(servers => {
+                const server = servers.find(s => s.id === guildId);
+                if(server) {
+                    document.getElementById('avatar').src = server.icon;
+                    document.getElementById('serverName').innerText = server.name;
+                    document.getElementById('serverId').innerText = "ID: " + server.id;
+                }
+            }).catch(() => {
+                document.getElementById('serverName').innerText = "Erro ao carregar servidor";
+            });
+        } else {
+            document.getElementById('serverName').innerText = "Nenhum servidor";
+        }
+
+        function confirmAction() {
+            alert('Ação confirmada com sucesso!');
+            window.location.href = guildId ? `/dashboard?guildId=${guildId}` : '/servers';
+        }
+    </script>
+</body>
+</html>

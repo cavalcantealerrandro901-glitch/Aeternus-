@@ -1,0 +1,14 @@
+{
+    "menu_panel": "PANEL",
+    "theme": "🌓 Cambiar Tema",
+    "language": "🌐 Idioma",
+    "commands": "📜 Ver Comandos",
+    "servers": "⚙️ Gestionar Servidores",
+    "login": "Login",
+    "title": "AETERNUS",
+    "description": "Una nueva era de experiencias y conexiones. Bienvenido al santuario oficial del bot.",
+    "btn_settings": "Configuraciones",
+    "btn_add": "Añadir al Servidor",
+    "cmd_title": "Comandos del Bot",
+    "lang_title": "Seleccionar Idioma"
+}

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aeternus - Dashboard</title>
+    <style>
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; transition: 0.3s; overflow-x: hidden; }
+        
+        .menu-btn { position: fixed; top: 20px; left: 20px; background: transparent; border: 1px solid var(--border-color); color: var(--text-color); padding: 10px 15px; border-radius: 8px; cursor: pointer; z-index: 1000; }
+        .dropdown-menu { position: fixed; top: 0; left: 0; width: 45vw; min-width: 260px; height: 100vh; background-color: var(--card-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 1001; padding: 60px 20px; box-sizing: border-box; transform: translateX(-100%); transition: transform 0.3s ease; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .dropdown-menu.active { transform: translateX(0); }
+        .close-btn { position: absolute; top: 20px; right: 20px; border: none; background: none; color: var(--text-color); font-size: 20px; cursor: pointer; padding: 5px 10px; border-radius: 8px; transition: 0.2s; }
+        .close-btn:hover { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .dropdown-item { padding: 15px 10px; color: var(--text-color); text-decoration: none; cursor: pointer; border: none; background: none; text-align: left; font-size: 16px; border-radius: 5px; display: block; width: 100%; }
+        .dropdown-item:hover { background: rgba(56, 189, 248, 0.1); color: var(--crystal-blue); }
+
+        .header-section { display: flex; flex-direction: column; align-items: center; margin-top: 50px; margin-bottom: 20px; z-index: 10; position: relative; }
+        .avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--crystal-blue); margin-bottom: 10px; }
+        
+        .info-container { max-width: 600px; margin: 0 auto 15px auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; z-index: 10; position: relative; }
+        .info-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .info-card h4 { margin: 0 0 5px 0; color: #64748b; font-size: 13px; text-transform: uppercase; }
+        .info-card p { margin: 0; font-size: 16px; font-weight: bold; color: var(--text-color); }
+
+        .config-sections { max-width: 600px; margin: 0 auto 80px auto; display: flex; flex-direction: column; gap: 15px; z-index: 10; position: relative; }
+        .config-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 2000; }
+        .modal-overlay.active { display: flex; }
+        .modal-content { background: var(--card-bg); border: 1px solid var(--border-color); padding: 25px; border-radius: 16px; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); box-sizing: border-box; }
+        .modal-content input { width: 100%; padding: 10px; margin-top: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); box-sizing: border-box; }
+        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .modal-buttons button { padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; }
+
+        .action-bar {
+            position: fixed;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 12px 24px;
+            border-radius: 30px;
+            display: none;
+            gap: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            z-index: 999;
+        }
+        .action-bar.active { display: flex; }
+        .action-bar button { padding: 8px 18px; border-radius: 20px; font-weight: bold; cursor: pointer; border: none; }
+        .btn-reset { background: #334155; color: white; }
+        .btn-confirm { background: var(--crystal-blue); color: white; }
+
+        .notification {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            background: #10b981;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+    <button class="menu-btn" onclick="toggleMenu()">☰</button>
+    
+    <div class="dropdown-menu" id="dropdownMenu">
+        <button class="close-btn" onclick="toggleMenu()">✕</button>
+        <h3 style="color: var(--crystal-blue);">PAINEL</h3>
+        <button onclick="toggleTheme()" class="dropdown-item">🌓 Alternar Tema</button>
+        <button onclick="openConfigModal()" class="dropdown-item">⚙️ Configurar Prefixo</button>
+        <a href="/servers" class="dropdown-item" onclick="return checkNav(event)">🔄 Escolher Servidor</a>
+        <a href="/auth/logout" class="dropdown-item" style="color: #ef4444;" onclick="return checkNav(event)">🚪 Sair</a>
+    </div>
+
+    <div class="modal-overlay" id="configModal">
+        <div class="modal-content">
+            <h3 style="margin-top: 0; color: var(--crystal-blue);">Prefixo do Bot</h3>
+            <p style="color: #64748b; font-size: 13px; margin-bottom: 5px;">Personalize o caractere ou texto de comando para este servidor.</p>
+            <input type="text" id="prefixInput" placeholder="Ex: !" oninput="onFieldChange()">
+            <div class="modal-buttons">
+                <button style="background: #334155; color: white;" onclick="closeConfigModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="header-section">
+        <img id="avatar" src="" class="avatar" alt="Avatar">
+        <h2 id="serverName" style="margin: 0;">Carregando...</h2>
+        <p id="serverId" style="color: #64748b; margin: 5px 0;">ID: ...</p>
+    </div>
+
+    <div class="info-container" id="infoContainer">
+        <div class="info-card">
+            <h4>Membros</h4>
+            <p id="serverMembers">---</p>
+        </div>
+        <div class="info-card">
+            <h4>Cargos</h4>
+            <p id="serverRoles">---</p>
+        </div>
+        <div class="info-card">
+            <h4>Canais</h4>
+            <p id="serverChannels">---</p>
+        </div>
+    </div>
+
+    <div class="config-sections" id="configContainer">
+        <div class="config-card">
+            <h3 style="margin-top: 0; color: var(--crystal-blue);">Descrição do Servidor</h3>
+            <p id="serverDescription" style="color: var(--text-color); margin: 0; font-size: 14px; line-height: 1.5;">Carregando descrição...</p>
+        </div>
+    </div>
+
+    <div class="action-bar" id="actionBar">
+        <button class="btn-reset" onclick="resetSettings()">Resetar</button>
+        <button class="btn-confirm" onclick="saveSettings()">Confirmar</button>
+    </div>
+
+    <div class="notification" id="notification">Configurações salvas com sucesso! ✅</div>
+
+    <script>
+        function toggleMenu() { 
+            document.getElementById('dropdownMenu').classList.toggle('active'); 
+        }
+
+        function openConfigModal() {
+            toggleMenu();
+            document.getElementById('configModal').classList.add('active');
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').classList.remove('active');
+        }
+
+        let touchstartX = 0;
+        let touchendX = 0;
+
+        function handleGesture() {
+            const menu = document.getElementById('dropdownMenu');
+            const distance = touchendX - touchstartX;
+            if (distance > 70) {
+                menu.classList.add('active');
+            } else if (distance < -70) {
+                menu.classList.remove('active');
+            }
+        }
+
+        document.addEventListener('touchstart', e => {
+            touchstartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            handleGesture();
+        });
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const guildId = urlParams.get('guildId');
+
+        let originalData = { prefix: '!' };
+        let isDirty = false;
+
+        fetch('/api/servers').then(r => r.json()).then(servers => {
+            const server = servers.find(s => s.id === guildId);
+            if(server) {
+                document.getElementById('avatar').src = server.icon;
+                document.getElementById('serverName').innerText = server.name;
+                document.getElementById('serverId').innerText = "ID: " + server.id;
+                document.getElementById('serverMembers').innerText = server.memberCount;
+                document.getElementById('serverRoles').innerText = server.roleCount;
+                document.getElementById('serverChannels').innerText = server.channelCount;
+                document.getElementById('serverDescription').innerText = server.description;
+            }
+        });
+
+        fetch(`/api/prefix/${guildId}`).then(r => r.json()).then(data => {
+            if(data.prefix) {
+                originalData.prefix = data.prefix;
+                document.getElementById('prefixInput').value = data.prefix;
+            } else {
+                document.getElementById('prefixInput').value = '!';
+            }
+        });
+
+        function onFieldChange() {
+            const currentPrefix = document.getElementById('prefixInput').value;
+            isDirty = (currentPrefix !== originalData.prefix);
+            const actionBar = document.getElementById('actionBar');
+            if (isDirty) {
+                actionBar.classList.add('active');
+            } else {
+                actionBar.classList.remove('active');
+            }
+        }
+
+        async function saveSettings() {
+            const prefix = document.getElementById('prefixInput').value;
+            await fetch(`/api/prefix/${guildId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prefix })
+            });
+            originalData.prefix = prefix;
+            isDirty = false;
+            document.getElementById('actionBar').classList.remove('active');
+            closeConfigModal();
+            showNotification();
+        }
+
+        async function resetSettings() {
+            document.getElementById('prefixInput').value = originalData.prefix;
+            isDirty = false;
+            document.getElementById('actionBar').classList.remove('active');
+            
+            await fetch(`/api/prefix/${guildId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prefix: originalData.prefix })
+            });
+            closeConfigModal();
+            showNotification();
+        }
+
+        function showNotification() {
+            const notif = document.getElementById('notification');
+            notif.style.display = 'block';
+            setTimeout(() => {
+                notif.style.display = 'none';
+            }, 3000);
+        }
+
+        window.addEventListener('beforeunload', (e) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        function checkNav(e) {
+            if (isDirty) {
+                if (!confirm('Você tem configurações não salvas! Deseja sair mesmo assim?')) {
+                    e.preventDefault();
+                    return false;
+                }
+            }
+            return true;
+        }
+    </script>
+</body>
+</html>
