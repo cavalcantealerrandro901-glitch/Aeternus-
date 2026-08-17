@@ -6,7 +6,7 @@ module.exports = {
         .setDescription('Acesse o painel de controle do Aeternus'),
     
     async execute(interaction) {
-        const linkPainel = 'http://localhost:3000'; 
+        const linkPainel = 'https://aeternus-q7gt.onrender.com'; 
 
         const embed = new EmbedBuilder()
             .setTitle('Aeternus - Painel de Controle')
