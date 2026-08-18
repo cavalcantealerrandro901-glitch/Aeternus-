@@ -1,69 +1,35 @@
-const { generatePhrase, getRandomEmoji, getFlirt } = require('../utils/phrases');
-
-function formatTime(timestamp) {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 60) return `${seconds} segundos atrás`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes} minutos atrás`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours} horas atrás`;
-}
+const { Events } = require('discord.js');
+const fs = require('fs');
 
 module.exports = {
-    name: 'messageCreate',
+    name: Events.MessageCreate,
     async execute(message, client) {
-        if (message.author.bot) return;
+        if (message.author.bot || !message.guild) return;
 
-        // 🎲 Chance de 5% de interagir (reagir ou paquerar)
-        if (Math.random() < 0.05) {
-            // 50% de chance de reagir com emoji, 50% de responder com paquera
-            if (Math.random() < 0.5) {
-                message.react(getRandomEmoji()).catch(() => {});
-            } else {
-                const flirt = getFlirt();
-                const phrase = generatePhrase();
-                const emoji = getRandomEmoji();
-                message.reply(`🖤 ${flirt} ${emoji}\n\n*${phrase}*`).catch(() => {});
+        // Lê as configurações do arquivo
+        let settings = {};
+        try {
+            if (fs.existsSync('./settings.json')) {
+                settings = JSON.parse(fs.readFileSync('./settings.json', 'utf8'));
             }
-        }
+        } catch (e) { console.error("Erro ao ler settings.json", e); }
 
-        // Sistema AFK
-        if (client.afk.has(message.author.id)) {
-            client.afk.delete(message.author.id);
-            const welcomeMsg = await message.reply('🥀 A escuridão sente sua volta. Status AFK removido.');
-            setTimeout(() => welcomeMsg.delete().catch(() => {}), 5000);
-        }
+        // Pega o prefixo do servidor, se não existir, usa '!'
+        const guildSettings = settings[message.guild.id] || {};
+        const prefix = guildSettings.prefix || '!';
 
-        // Verificação de Menções AFK
-        if (message.mentions.users.size > 0) {
-            message.mentions.users.forEach(async user => {
-                if (client.afk.has(user.id)) {
-                    const afkData = client.afk.get(user.id);
-                    const timeAgo = formatTime(afkData.time);
-                    
-                    const afkMsg = await message.reply(
-                        `💀 **${user.username}** está mergulhado no abismo (AFK).\n` +
-                        `📝 **Motivo:** ${afkData.reason}\n` +
-                        `⏱️ **Ausente há:** ${timeAgo}`
-                    );
-                    setTimeout(() => afkMsg.delete().catch(() => {}), 7000);
-                }
-            });
-        }
+        if (!message.content.startsWith(prefix)) return;
 
-        // Processamento de comandos
-        if (!message.content.startsWith('!')) return;
-        const args = message.content.slice(1).trim().split(/ +/);
+        const args = message.content.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
+
         const command = client.commands.get(commandName);
         if (!command) return;
 
         try {
-            message.react(getRandomEmoji()).catch(() => {});
-            command.execute(message, args, client);
+            await command.execute(message, args);
         } catch (error) {
             console.error(error);
-            message.reply('❌ Ocorreu um erro nas trevas ao tentar executar esse comando!');
         }
     },
 };

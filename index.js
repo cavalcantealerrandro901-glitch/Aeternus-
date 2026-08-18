@@ -1,20 +1,48 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, MessageFlags } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const setupLogs = require('./logsHandler');
+const setupWelcome = require('./welcomeHandler');
 const { startServer } = require('./server');
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildVoiceStates
+    ],
+    partials: [
+        Partials.Message,
+        Partials.Channel,
+        Partials.Reaction
     ]
 });
 
 client.afk = new Map();
 client.commands = new Collection();
 client.slashCommands = new Collection();
+
+// Função para buscar as configurações gravadas do servidor
+async function getSettings(guildId) {
+    const filePath = path.join(__dirname, 'settings.json');
+    if (!fs.existsSync(filePath)) return {};
+
+    try {
+        const rawData = fs.readFileSync(filePath, 'utf8');
+        const allSettings = JSON.parse(rawData || '{}');
+        return allSettings[guildId] || {};
+    } catch (error) {
+        console.error('Erro ao ler settings.json:', error);
+        return {};
+    }
+}
+
+// Inicializa os ouvintes de Logs e Boas-Vindas
+setupLogs(client, getSettings);
+setupWelcome(client, getSettings);
 
 // Carregador de Comandos de Prefixo
 const commandsPath = path.join(__dirname, 'commands');
@@ -65,9 +93,9 @@ client.on('interactionCreate', async interaction => {
     } catch (error) {
         console.error('❌ Erro no comando:', error);
         try {
-            const errorMessage = { 
-                content: 'Ocorreu um erro ao executar este comando!', 
-                flags: [MessageFlags.Ephemeral] 
+            const errorMessage = {
+                content: 'Ocorreu um erro ao executar este comando!',
+                flags: [MessageFlags.Ephemeral]
             };
 
             if (interaction.replied || interaction.deferred) {

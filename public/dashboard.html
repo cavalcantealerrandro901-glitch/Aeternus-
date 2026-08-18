@@ -3,255 +3,949 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeternus - Dashboard</title>
+    <title>Aeternus - Painel do Servidor</title>
     <style>
-        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; transition: 0.3s; overflow-x: hidden; }
-        
-        .menu-btn { position: fixed; top: 20px; left: 20px; background: transparent; border: 1px solid var(--border-color); color: var(--text-color); padding: 10px 15px; border-radius: 8px; cursor: pointer; z-index: 1000; }
-        .dropdown-menu { position: fixed; top: 0; left: 0; width: 45vw; min-width: 260px; height: 100vh; background-color: var(--card-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 1001; padding: 60px 20px; box-sizing: border-box; transform: translateX(-100%); transition: transform 0.3s ease; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
-        .dropdown-menu.active { transform: translateX(0); }
-        .close-btn { position: absolute; top: 20px; right: 20px; border: none; background: none; color: var(--text-color); font-size: 20px; cursor: pointer; padding: 5px 10px; border-radius: 8px; transition: 0.2s; }
-        .close-btn:hover { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
-        .dropdown-item { padding: 15px 10px; color: var(--text-color); text-decoration: none; cursor: pointer; border: none; background: none; text-align: left; font-size: 16px; border-radius: 5px; display: block; width: 100%; }
-        .dropdown-item:hover { background: rgba(56, 189, 248, 0.1); color: var(--crystal-blue); }
+        body {
+            background-color: #0b0f19;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+        .menu-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            z-index: 100;
+        }
+        .menu-btn:hover { background: #374151; }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -320px;
+            width: 300px;
+            height: 100%;
+            background: #111827;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.5);
+            transition: left 0.3s ease;
+            z-index: 99;
+            padding: 80px 20px 20px 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            border-right: 1px solid #374151;
+        }
+        .sidebar.open { left: 0; }
+        .search-box {
+            position: sticky;
+            top: -20px;
+            background: #111827;
+            padding-bottom: 15px;
+            margin-bottom: 10px;
+            z-index: 10;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #38bdf8;
+            background: #1f2937;
+            color: #fff;
+            font-size: 13px;
+            box-sizing: border-box;
+            outline: none;
+        }
+        .category-title {
+            color: #38bdf8;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #374151;
+            padding-bottom: 5px;
+            font-weight: bold;
+        }
+        .category-title:first-of-type { margin-top: 0; }
+        .menu-item {
+            background: #1f2937;
+            border: 1px solid #374151;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        .menu-item:hover {
+            border-color: #38bdf8;
+            background: #374151;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: #111827;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            margin-top: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-sizing: border-box;
+            margin-bottom: 80px;
+        }
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .header img {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 2px solid #38bdf8;
+            object-fit: cover;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .stat-card {
+            background: #1f2937;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #374151;
+        }
+        .stat-card span {
+            display: block;
+            color: #9ca3af;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .stat-card strong { font-size: 16px; }
+        .desc-card {
+            background: #1f2937;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #374151;
+            width: 100%;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .desc-card h3 {
+            margin: 0 0 8px 0;
+            color: #38bdf8;
+            font-size: 14px;
+        }
+        .system-view {
+            width: 100%;
+            text-align: left;
+        }
+        .system-view h2 {
+            color: #38bdf8;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 20px;
+            border-bottom: 1px solid #374151;
+            padding-bottom: 10px;
+        }
+        .back-btn {
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            font-size: 13px;
+            margin-bottom: 15px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .back-btn:hover { color: #38bdf8; }
+        .input-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            text-align: left;
+        }
+        label {
+            margin-bottom: 5px;
+            color: #9ca3af;
+            font-size: 13px;
+        }
+        input, textarea, select {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #374151;
+            background: #1f2937;
+            color: #fff;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+            outline: none;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: #38bdf8;
+        }
 
-        .header-section { display: flex; flex-direction: column; align-items: center; margin-top: 50px; margin-bottom: 20px; z-index: 10; position: relative; }
-        .avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--crystal-blue); margin-bottom: 10px; }
-        
-        .info-container { max-width: 600px; margin: 0 auto 15px auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; z-index: 10; position: relative; }
-        .info-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .info-card h4 { margin: 0 0 5px 0; color: #64748b; font-size: 13px; text-transform: uppercase; }
-        .info-card p { margin: 0; font-size: 16px; font-weight: bold; color: var(--text-color); }
+        /* --- BOTÕES LIGA/DESLIGA (TOGGLE SWITCH) --- */
+        .log-card {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: border-color 0.2s;
+        }
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .log-title {
+            font-weight: bold;
+            font-size: 15px;
+            color: #f3f4f6;
+        }
+        .log-desc {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 3px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #374151;
+            transition: .3s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #38bdf8;
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
 
-        .config-sections { max-width: 600px; margin: 0 auto 80px auto; display: flex; flex-direction: column; gap: 15px; z-index: 10; position: relative; }
-        .config-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .channel-selector-area {
+            margin-top: 15px;
+            padding-top: 12px;
+            border-top: 1px solid #374151;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 2000; }
-        .modal-overlay.active { display: flex; }
-        .modal-content { background: var(--card-bg); border: 1px solid var(--border-color); padding: 25px; border-radius: 16px; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); box-sizing: border-box; }
-        .modal-content input { width: 100%; padding: 10px; margin-top: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); box-sizing: border-box; }
-        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .modal-buttons button { padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; }
-
+        /* Barra Flutuante (Salvar / Resetar) */
         .action-bar {
             position: fixed;
             bottom: 25px;
             left: 50%;
             transform: translateX(-50%);
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background: #111827;
+            border: 1px solid #38bdf8;
             padding: 12px 24px;
-            border-radius: 30px;
+            border-radius: 50px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
             display: none;
+            align-items: center;
             gap: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-            z-index: 999;
+            z-index: 1000;
+            animation: slideUp 0.3s ease;
         }
-        .action-bar.active { display: flex; }
-        .action-bar button { padding: 8px 18px; border-radius: 20px; font-weight: bold; cursor: pointer; border: none; }
-        .btn-reset { background: #334155; color: white; }
-        .btn-confirm { background: var(--crystal-blue); color: white; }
+        @keyframes slideUp {
+            from { transform: translate(-50%, 50px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .action-bar span {
+            font-size: 13px;
+            color: #e5e7eb;
+            font-weight: 500;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-reset {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .btn-reset:hover { background: #dc2626; }
+        .btn-save {
+            background: #38bdf8;
+            color: #0b0f19;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .btn-save:hover { background: #0ea5e9; }
 
-        .notification {
+        /* Modal Centralizado de Alterações Não Salvas */
+        .modal-overlay {
             position: fixed;
-            bottom: 25px;
-            right: 25px;
-            background: #10b981;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .modal-content {
+            background: #111827;
+            border: 1px solid #ef4444;
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 380px;
+            width: 85%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            animation: popIn 0.2s ease;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-content h3 {
+            color: #ef4444;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .modal-content p {
+            color: #9ca3af;
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .modal-content button {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+        }
+        .modal-content button:hover { background: #dc2626; }
+
+        #server-selector {
             display: none;
+            width: 100%;
+            text-align: left;
+        }
+        .server-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #1f2937;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            text-decoration: none;
+            color: #fff;
+            border: 1px solid #374151;
+        }
+        .server-item:hover { border-color: #38bdf8; }
+        .server-item img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+        #toast {
+            display: none;
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background: #10b981;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
             z-index: 1000;
         }
     </style>
 </head>
 <body>
 
-    <button class="menu-btn" onclick="toggleMenu()">☰</button>
-    
-    <div class="dropdown-menu" id="dropdownMenu">
-        <button class="close-btn" onclick="toggleMenu()">✕</button>
-        <h3 style="color: var(--crystal-blue);">PAINEL</h3>
-        <button onclick="toggleTheme()" class="dropdown-item">🌓 Alternar Tema</button>
-        <button onclick="openConfigModal()" class="dropdown-item">⚙️ Configurar Prefixo</button>
-        <a href="/servers" class="dropdown-item" onclick="return checkNav(event)">🔄 Escolher Servidor</a>
-        <a href="/auth/logout" class="dropdown-item" style="color: #ef4444;" onclick="return checkNav(event)">🚪 Sair</a>
-    </div>
+    <button class="menu-btn" onclick="toggleSidebar()">☰ Menu</button>
 
-    <div class="modal-overlay" id="configModal">
-        <div class="modal-content">
-            <h3 style="margin-top: 0; color: var(--crystal-blue);">Prefixo do Bot</h3>
-            <p style="color: #64748b; font-size: 13px; margin-bottom: 5px;">Personalize o caractere ou texto de comando para este servidor.</p>
-            <input type="text" id="prefixInput" placeholder="Ex: !" oninput="onFieldChange()">
-            <div class="modal-buttons">
-                <button style="background: #334155; color: white;" onclick="closeConfigModal()">Fechar</button>
+    <!-- Menu Lateral Categorizado -->
+    <div class="sidebar" id="sidebar">
+        <div class="search-box">
+            <input type="text" id="menuSearch" placeholder="🔍 Pesquisar sistema..." onkeyup="filterMenu()">
+        </div>
+
+        <div class="category-block">
+            <div class="category-title">⚙️ Geral</div>
+            <div class="menu-item" onclick="openSystem('system-geral')">
+                <span>Configurações Gerais</span>
+                <span>›</span>
+            </div>
+        </div>
+
+        <div class="category-block">
+            <div class="category-title">👋 Boas-Vindas</div>
+            <div class="menu-item" onclick="openSystem('system-welcome')">
+                <span>Sistema de Boas-Vindas</span>
+                <span>›</span>
+            </div>
+        </div>
+
+        <div class="category-block">
+            <div class="category-title">🛡️ Moderação & Logs</div>
+            <div class="menu-item" onclick="openSystem('system-logs')">
+                <span>Sistema de Logs do Servidor</span>
+                <span>›</span>
             </div>
         </div>
     </div>
 
-    <div class="header-section">
-        <img id="avatar" src="" class="avatar" alt="Avatar">
-        <h2 id="serverName" style="margin: 0;">Carregando...</h2>
-        <p id="serverId" style="color: #64748b; margin: 5px 0;">ID: ...</p>
+    <!-- Container Central -->
+    <div class="container" id="main-container">
+        <!-- Visão Geral -->
+        <div id="guild-view">
+            <div class="header">
+                <img id="guild-avatar" src="https://via.placeholder.com/90" alt="Avatar">
+                <h2 id="guild-name">Carregando...</h2>
+                <p id="guild-id" style="color: #6b7280; margin: 0;">ID: ...</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span>MEMBROS</span>
+                    <strong id="guild-members">---</strong>
+                </div>
+                <div class="stat-card">
+                    <span>CARGOS</span>
+                    <strong id="guild-roles">---</strong>
+                </div>
+            </div>
+
+            <div class="stats-grid" style="grid-template-columns: 1fr;">
+                <div class="stat-card">
+                    <span>CANAIS</span>
+                    <strong id="guild-channels">---</strong>
+                </div>
+            </div>
+
+            <div class="desc-card">
+                <h3>Descrição do Servidor</h3>
+                <p id="guild-desc" style="color: #9ca3af; margin: 0; font-size: 14px;">Carregando descrição...</p>
+            </div>
+        </div>
+
+        <!-- Sistema: Geral -->
+        <div id="system-geral" class="system-view" style="display: none;">
+            <button class="back-btn" onclick="showGuildView()">← Voltar ao Início</button>
+            <h2>⚙️ Configurações Gerais</h2>
+            <div class="input-group">
+                <label>Prefixo do Bot</label>
+                <input type="text" id="prefix" data-key="prefix" placeholder="Ex: !">
+            </div>
+        </div>
+
+        <!-- Sistema: Boas-Vindas -->
+        <div id="system-welcome" class="system-view" style="display: none;">
+            <button class="back-btn" onclick="showGuildView()">← Voltar ao Início</button>
+            <h2>👋 Sistema de Boas-Vindas</h2>
+            <div class="input-group">
+                <label>Canal de Boas-vindas (ID)</label>
+                <input type="text" id="welcomeChannel" data-key="welcomeChannel" placeholder="Ex: 123456789">
+            </div>
+            <div class="input-group">
+                <label>Mensagem de Boas-vindas</label>
+                <textarea id="welcomeMessage" data-key="welcomeMessage" rows="3" placeholder="Ex: Olá {user}!"></textarea>
+            </div>
+        </div>
+
+        <!-- Sistema: Logs (com Ativação e Categorias de Canais) -->
+	        <div id="system-logs" class="system-view" style="display: none;">
+            <button class="back-btn" onclick="showGuildView()">← Voltar ao Início</button>
+            <h2>🛡️ Sistema de Logs</h2>
+
+            <!-- Log 1: Edição e Exclusão de Mensagens -->
+            <div class="log-card">
+                <div class="log-header">
+                    <div>
+                        <div class="log-title">📝 Edição & Remoção de Mensagens</div>
+                        <div class="log-desc">Registra mensagens editadas e apagadas no servidor.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="msgLogEnabled" data-key="msgLogEnabled" onchange="toggleLogSection('msgLogEnabled', 'msgLogArea')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="msgLogArea" class="channel-selector-area" style="display: none;">
+                    <label>Canal de Registro de Mensagens</label>
+                    <select id="msgLogChannel" data-key="msgLogChannel" class="channel-select">
+                        <option value="">Selecione um canal...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Log 2: Moderação (Expulsar, Banir, Mute) -->
+            <div class="log-card">
+                <div class="log-header">
+                    <div>
+                        <div class="log-title">🔨 Moderação & Punições</div>
+                        <div class="log-desc">Registra expulsões, banimentos, mutes e advertências.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="modLogEnabled" data-key="modLogEnabled" onchange="toggleLogSection('modLogEnabled', 'modLogArea')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="modLogArea" class="channel-selector-area" style="display: none;">
+                    <label>Canal de Registro de Moderação</label>
+                    <select id="modLogChannel" data-key="modLogChannel" class="channel-select">
+                        <option value="">Selecione um canal...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Log 3: Entrada e Saída de Membros -->
+            <div class="log-card">
+                <div class="log-header">
+                    <div>
+                        <div class="log-title">👥 Entrada & Saída de Membros</div>
+                        <div class="log-desc">Registra quando membros entram ou saem do servidor.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="memberLogEnabled" data-key="memberLogEnabled" onchange="toggleLogSection('memberLogEnabled', 'memberLogArea')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="memberLogArea" class="channel-selector-area" style="display: none;">
+                    <label>Canal de Registro de Membros</label>
+                    <select id="memberLogChannel" data-key="memberLogChannel" class="channel-select">
+                        <option value="">Selecione um canal...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Log 4: Canais de Voz -->
+            <div class="log-card">
+                <div class="log-header">
+                    <div>
+                        <div class="log-title">🔊 Canais de Voz</div>
+                        <div class="log-desc">Registra entrada, saída e trocas de salas de voz.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="voiceLogEnabled" data-key="voiceLogEnabled" onchange="toggleLogSection('voiceLogEnabled', 'voiceLogArea')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="voiceLogArea" class="channel-selector-area" style="display: none;">
+                    <label>Canal de Registro de Voz</label>
+                    <select id="voiceLogChannel" data-key="voiceLogChannel" class="channel-select">
+                        <option value="">Selecione um canal...</option>
+                    </select>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Seletor de Servidor -->
+        <div id="server-selector">
+            <h3 style="color: #38bdf8; margin-top: 0;">Selecione um Servidor</h3>
+            <p style="color: #9ca3af; font-size: 13px;">Escolha abaixo qual servidor deseja gerenciar:</p>
+            <div id="servers-list">Carregando seus servidores...</div>
+        </div>
     </div>
 
-    <div class="info-container" id="infoContainer">
-        <div class="info-card">
-            <h4>Membros</h4>
-            <p id="serverMembers">---</p>
-        </div>
-        <div class="info-card">
-            <h4>Cargos</h4>
-            <p id="serverRoles">---</p>
-        </div>
-        <div class="info-card">
-            <h4>Canais</h4>
-            <p id="serverChannels">---</p>
+    <!-- Barra Flutuante de Salvar/Resetar -->
+    <div id="action-bar" class="action-bar">
+        <span>Alterações não salvas</span>
+        <div class="action-buttons">
+            <button class="btn-reset" onclick="resetCurrentSystem()">Resetar</button>
+            <button class="btn-save" onclick="saveCurrentSystem()">Salvar</button>
         </div>
     </div>
 
-    <div class="config-sections" id="configContainer">
-        <div class="config-card">
-            <h3 style="margin-top: 0; color: var(--crystal-blue);">Descrição do Servidor</h3>
-            <p id="serverDescription" style="color: var(--text-color); margin: 0; font-size: 14px; line-height: 1.5;">Carregando descrição...</p>
+    <!-- Modal Central de Bloqueio por Alterações Pendentes -->
+    <div id="unsaved-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>⚠️ Alterações não salvas!</h3>
+            <p>Você possui alterações pendentes neste sistema. Salve ou resete as alterações antes de navegar para outro local.</p>
+            <button onclick="closeUnsavedModal()">Entendido</button>
         </div>
     </div>
 
-    <div class="action-bar" id="actionBar">
-        <button class="btn-reset" onclick="resetSettings()">Resetar</button>
-        <button class="btn-confirm" onclick="saveSettings()">Confirmar</button>
-    </div>
-
-    <div class="notification" id="notification">Configurações salvas com sucesso! ✅</div>
+    <div id="toast">Configurações salvas com sucesso!</div>
 
     <script>
-        function toggleMenu() { 
-            document.getElementById('dropdownMenu').classList.toggle('active'); 
+        let originalSettings = {};
+        let activeSystemId = null;
+        let guildCategories = [];
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
         }
 
-        function openConfigModal() {
-            toggleMenu();
-            document.getElementById('configModal').classList.add('active');
+        function toggleLogSection(switchId, areaId) {
+            const isChecked = document.getElementById(switchId).checked;
+            document.getElementById(areaId).style.display = isChecked ? 'block' : 'none';
+            checkChanges();
         }
 
-        function closeConfigModal() {
-            document.getElementById('configModal').classList.remove('active');
-        }
+        // --- VERIFICA SE HÁ ALTERAÇÕES PENDENTES NO SISTEMA ATUAL ---
+        function hasUnsavedChanges() {
+            if (!activeSystemId) return false;
+            const activeView = document.getElementById(activeSystemId);
+            if (!activeView) return false;
 
-        let touchstartX = 0;
-        let touchendX = 0;
+            const inputs = activeView.querySelectorAll('input, textarea, select');
+            for (let input of inputs) {
+                const key = input.getAttribute('data-key');
+                let currentVal = input.type === 'checkbox' ? input.checked : input.value;
+                let origVal = originalSettings[key];
 
-        function handleGesture() {
-            const menu = document.getElementById('dropdownMenu');
-            const distance = touchendX - touchstartX;
-            if (distance > 70) {
-                menu.classList.add('active');
-            } else if (distance < -70) {
-                menu.classList.remove('active');
-            }
-        }
+                if (input.type === 'checkbox') {
+                    origVal = origVal === true || origVal === 'true';
+                } else {
+                    origVal = origVal || '';
+                }
 
-        document.addEventListener('touchstart', e => {
-            touchstartX = e.changedTouches[0].screenX;
-        });
-
-        document.addEventListener('touchend', e => {
-            touchendX = e.changedTouches[0].screenX;
-            handleGesture();
-        });
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const guildId = urlParams.get('guildId');
-
-        let originalData = { prefix: '!' };
-        let isDirty = false;
-
-        fetch('/api/servers').then(r => r.json()).then(servers => {
-            const server = servers.find(s => s.id === guildId);
-            if(server) {
-                document.getElementById('avatar').src = server.icon;
-                document.getElementById('serverName').innerText = server.name;
-                document.getElementById('serverId').innerText = "ID: " + server.id;
-                document.getElementById('serverMembers').innerText = server.memberCount;
-                document.getElementById('serverRoles').innerText = server.roleCount;
-                document.getElementById('serverChannels').innerText = server.channelCount;
-                document.getElementById('serverDescription').innerText = server.description;
-            }
-        });
-
-        fetch(`/api/prefix/${guildId}`).then(r => r.json()).then(data => {
-            if(data.prefix) {
-                originalData.prefix = data.prefix;
-                document.getElementById('prefixInput').value = data.prefix;
-            } else {
-                document.getElementById('prefixInput').value = '!';
-            }
-        });
-
-        function onFieldChange() {
-            const currentPrefix = document.getElementById('prefixInput').value;
-            isDirty = (currentPrefix !== originalData.prefix);
-            const actionBar = document.getElementById('actionBar');
-            if (isDirty) {
-                actionBar.classList.add('active');
-            } else {
-                actionBar.classList.remove('active');
-            }
-        }
-
-        async function saveSettings() {
-            const prefix = document.getElementById('prefixInput').value;
-            await fetch(`/api/prefix/${guildId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prefix })
-            });
-            originalData.prefix = prefix;
-            isDirty = false;
-            document.getElementById('actionBar').classList.remove('active');
-            closeConfigModal();
-            showNotification();
-        }
-
-        async function resetSettings() {
-            document.getElementById('prefixInput').value = originalData.prefix;
-            isDirty = false;
-            document.getElementById('actionBar').classList.remove('active');
-            
-            await fetch(`/api/prefix/${guildId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prefix: originalData.prefix })
-            });
-            closeConfigModal();
-            showNotification();
-        }
-
-        function showNotification() {
-            const notif = document.getElementById('notification');
-            notif.style.display = 'block';
-            setTimeout(() => {
-                notif.style.display = 'none';
-            }, 3000);
-        }
-
-        window.addEventListener('beforeunload', (e) => {
-            if (isDirty) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        });
-
-        function checkNav(e) {
-            if (isDirty) {
-                if (!confirm('Você tem configurações não salvas! Deseja sair mesmo assim?')) {
-                    e.preventDefault();
-                    return false;
+                if (currentVal !== origVal) {
+                    return true;
                 }
             }
-            return true;
+            return false;
         }
+
+        function showUnsavedModal() {
+            document.getElementById('unsaved-modal').style.display = 'flex';
+        }
+
+        function closeUnsavedModal() {
+            document.getElementById('unsaved-modal').style.display = 'none';
+        }
+
+        function openSystem(systemId) {
+            if (activeSystemId === systemId) {
+                document.getElementById('sidebar').classList.remove('open');
+                return;
+            }
+
+            if (hasUnsavedChanges()) {
+                document.getElementById('sidebar').classList.remove('open');
+                showUnsavedModal();
+                return;
+            }
+
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('guild-view').style.display = 'none';
+            document.querySelectorAll('.system-view').forEach(view => view.style.display = 'none');
+
+            const targetView = document.getElementById(systemId);
+            if (targetView) {
+                targetView.style.display = 'block';
+                activeSystemId = systemId;
+            }
+            checkChanges();
+        }
+
+        function showGuildView() {
+            if (hasUnsavedChanges()) {
+                showUnsavedModal();
+                return;
+            }
+
+            document.querySelectorAll('.system-view').forEach(view => view.style.display = 'none');
+            document.getElementById('guild-view').style.display = 'block';
+            activeSystemId = null;
+            checkChanges();
+        }
+
+        // --- MONITORAR ALTERAÇÕES NOS CAMPOS ---
+        document.querySelectorAll('.system-view input, .system-view textarea, .system-view select').forEach(input => {
+            input.addEventListener('input', checkChanges);
+            input.addEventListener('change', checkChanges);
+        });
+
+        function checkChanges() {
+            const hasChanges = hasUnsavedChanges();
+            document.getElementById('action-bar').style.display = hasChanges ? 'flex' : 'none';
+        }
+
+        function resetCurrentSystem() {
+            if (!activeSystemId) return;
+            const activeView = document.getElementById(activeSystemId);
+            const inputs = activeView.querySelectorAll('input, textarea, select');
+
+            inputs.forEach(input => {
+                const key = input.getAttribute('data-key');
+                let origVal = originalSettings[key];
+
+                if (input.type === 'checkbox') {
+                    input.checked = origVal === true || origVal === 'true';
+                } else {
+                    input.value = origVal || '';
+                }
+            });
+
+            // Atualizar visibilidade das áreas de canais
+            if (activeSystemId === 'system-logs') {
+                toggleLogSection('msgLogEnabled', 'msgLogArea');
+                toggleLogSection('modLogEnabled', 'modLogArea');
+                toggleLogSection('memberLogEnabled', 'memberLogArea');
+                toggleLogSection('voiceLogEnabled', 'voiceLogArea');
+            }
+
+            checkChanges();
+        }
+
+        async function saveCurrentSystem() {
+            if (!guildId || !activeSystemId) return;
+            const activeView = document.getElementById(activeSystemId);
+            const inputs = activeView.querySelectorAll('input, textarea, select');
+
+            try {
+                for (let input of inputs) {
+                    const key = input.getAttribute('data-key');
+                    const value = input.type === 'checkbox' ? input.checked : input.value;
+
+                    await fetch('/api/set-setting', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ guildId, key, value })
+                    });
+
+                    originalSettings[key] = value;
+                }
+
+                checkChanges();
+
+                const toast = document.getElementById('toast');
+                toast.style.display = 'block';
+                setTimeout(() => { toast.style.display = 'none'; }, 3000);
+            } catch (err) {
+                alert('Erro ao salvar as configurações!');
+            }
+        }
+
+        // --- POPULAR SELETORES DE CANAIS COM CATEGORIAS ---
+        function populateChannelSelects(categories) {
+            const selectElements = document.querySelectorAll('.channel-select');
+            
+            selectElements.forEach(select => {
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">Selecione um canal...</option>';
+
+                categories.forEach(cat => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = ` ${cat.name.toUpperCase()}`;
+
+                    cat.channels.forEach(ch => {
+                        const option = document.createElement('option');
+                        option.value = ch.id;
+                        option.textContent = `# ${ch.name}`;
+                        optgroup.appendChild(option);
+                    });
+
+                    select.appendChild(optgroup);
+                });
+
+                select.value = currentVal;
+            });
+        }
+
+        // --- GESTOS (SWIPE) ---
+        let touchStartX = 0, touchStartY = 0;
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, false);
+
+        document.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 60) {
+                if (deltaX > 0) {
+                    document.getElementById('sidebar').classList.add('open');
+                } else {
+                    document.getElementById('sidebar').classList.remove('open');
+                }
+            }
+        }, false);
+
+        // --- PESQUISA NO MENU ---
+        function filterMenu() {
+            const query = document.getElementById('menuSearch').value.toLowerCase();
+            const categoryBlocks = document.querySelectorAll('.category-block');
+
+            categoryBlocks.forEach(block => {
+                const titleText = block.querySelector('.category-title').innerText.toLowerCase();
+                const menuItems = block.querySelectorAll('.menu-item');
+                let blockHasMatch = titleText.includes(query);
+
+                menuItems.forEach(item => {
+                    const itemText = item.innerText.toLowerCase();
+                    if (itemText.includes(query) || titleText.includes(query)) {
+                        item.style.display = 'flex';
+                        blockHasMatch = true;
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+
+                block.style.display = blockHasMatch ? 'block' : 'none';
+            });
+        }
+
+        // --- CARREGAMENTO DE DADOS ---
+        const urlParams = new URLSearchParams(window.location.search);
+        let guildId = urlParams.get('guild');
+
+        if (!guildId) {
+            const pathSegments = window.location.pathname.split('/').filter(Boolean);
+            const lastSegment = pathSegments[pathSegments.length - 1];
+            if (lastSegment && lastSegment !== 'dashboard') {
+                guildId = lastSegment;
+            }
+        }
+
+        async function loadData() {
+            if (!guildId) {
+                document.getElementById('guild-view').style.display = 'none';
+                document.getElementById('server-selector').style.display = 'block';
+
+                try {
+                    const res = await fetch('/api/user/servers');
+                    const servers = await res.json();
+
+                    const listContainer = document.getElementById('servers-list');
+                    if (servers.error || !Array.isArray(servers) || servers.length === 0) {
+                        listContainer.innerHTML = '<p style="color: #ef4444;">Nenhum servidor encontrado ou faça <a href="/auth/discord" style="color:#38bdf8;">Login</a>.</p>';
+                        return;
+                    }
+
+                    listContainer.innerHTML = '';
+                    servers.forEach(server => {
+                        const iconUrl = server.icon 
+                            ? `https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png` 
+                            : 'https://via.placeholder.com/40';
+
+                        const a = document.createElement('a');
+                        a.className = 'server-item';
+                        a.href = `/dashboard/${server.id}`;
+                        a.innerHTML = `<img src="${iconUrl}" alt=""> <span><strong>${server.name}</strong></span>`;
+                        listContainer.appendChild(a);
+                    });
+                } catch (e) {
+                    document.getElementById('servers-list').innerHTML = '<p style="color: #ef4444;">Erro ao carregar servidores.</p>';
+                }
+                return;
+            }
+
+            try {
+                const resGuild = await fetch(`/api/guild-data/${guildId}`);
+                const guildData = await resGuild.json();
+
+                if(!guildData.error) {
+                    document.getElementById('guild-name').innerText = guildData.name;
+                    document.getElementById('guild-id').innerText = `ID: ${guildData.id}`;
+                    document.getElementById('guild-avatar').src = guildData.icon || 'https://via.placeholder.com/90';
+                    document.getElementById('guild-members').innerText = guildData.memberCount;
+                    document.getElementById('guild-roles').innerText = guildData.roleCount;
+                    document.getElementById('guild-channels').innerText = guildData.channelCount;
+                    document.getElementById('guild-desc').innerText = guildData.description;
+
+                    if (guildData.categories) {
+                        populateChannelSelects(guildData.categories);
+                    }
+                }
+
+                const resSettings = await fetch(`/api/settings/${guildId}`);
+                originalSettings = await resSettings.json();
+
+                document.querySelectorAll('.system-view input, .system-view textarea, .system-view select').forEach(input => {
+                    const key = input.getAttribute('data-key');
+                    if (originalSettings[key] !== undefined) {
+                        if (input.type === 'checkbox') {
+                            input.checked = originalSettings[key] === true || originalSettings[key] === 'true';
+                        } else {
+                            input.value = originalSettings[key];
+                        }
+                    }
+                });
+
+                toggleLogSection('msgLogEnabled', 'msgLogArea');
+                toggleLogSection('modLogEnabled', 'modLogArea');
+                toggleLogSection('memberLogEnabled', 'memberLogArea');
+                toggleLogSection('voiceLogEnabled', 'voiceLogArea');
+
+            } catch (err) {
+                console.error("Erro ao carregar painel:", err);
+            }
+        }
+
+        loadData();
     </script>
 </body>
 </html>
