@@ -1,22 +1,25 @@
 const { Events } = require('discord.js');
 const fs = require('fs');
+const path = require('path');
+
+function readSettings() {
+    const filePath = path.join(__dirname, '..', 'settings.json');
+    if (!fs.existsSync(filePath)) return {};
+    try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8') || '{}');
+    } catch {
+        return {};
+    }
+}
 
 module.exports = {
     name: Events.MessageCreate,
     async execute(message, client) {
         if (message.author.bot || !message.guild) return;
 
-        // Lê as configurações do arquivo
-        let settings = {};
-        try {
-            if (fs.existsSync('./settings.json')) {
-                settings = JSON.parse(fs.readFileSync('./settings.json', 'utf8'));
-            }
-        } catch (e) { console.error("Erro ao ler settings.json", e); }
-
-        // Pega o prefixo do servidor, se não existir, usa '!'
-        const guildSettings = settings[message.guild.id] || {};
-        const prefix = guildSettings.prefix || '!';
+        const all = readSettings();
+        const guildSettings = all[message.guild.id] || {};
+        const prefix = guildSettings.prefix || process.env.PREFIX || '!';
 
         if (!message.content.startsWith(prefix)) return;
 
@@ -27,9 +30,10 @@ module.exports = {
         if (!command) return;
 
         try {
-            await command.execute(message, args);
+            await command.execute(message, args, client);
         } catch (error) {
-            console.error(error);
+            console.error(`[CMD ${commandName}]`, error);
+            message.reply('Erro ao executar este comando.').catch(() => {});
         }
-    },
+    }
 };

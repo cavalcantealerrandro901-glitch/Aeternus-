@@ -1,12 +1,78 @@
 <div id="system-welcome" class="system-view" style="display: none;">
-            <button class="back-btn" onclick="showGuildView()">← Voltar ao Início</button>
-            <h2>👋 Sistema de Boas-Vindas</h2>
-            <div class="input-group">
-                <label>Canal de Boas-vindas (ID)</label>
-                <input type="text" id="welcomeChannel" data-key="welcomeChannel" placeholder="Ex: 123456789">
+    <button class="back-btn" type="button" onclick="showGuildView()">← Voltar ao Início</button>
+    <h2>👋 Sistema de Boas-Vindas</h2>
+    <p style="color:#9ca3af;font-size:13px;margin-top:0">
+        Variáveis: <code>{user}</code> <code>{username}</code> <code>{server}</code> <code>{memberCount}</code>
+    </p>
+
+    <div class="log-card">
+        <div class="log-header">
+            <div>
+                <div class="log-title">Ativar boas-vindas no canal</div>
+                <div class="log-desc">Envia embed quando alguém entrar.</div>
             </div>
-            <div class="input-group">
-                <label>Mensagem de Boas-vindas</label>
-                <textarea id="welcomeMessage" data-key="welcomeMessage" rows="3" placeholder="Ex: Olá {user}!"></textarea>
-            </div>
+            <label class="switch">
+                <input type="checkbox" id="welcomeEnabled" data-key="welcomeEnabled">
+                <span class="slider"></span>
+            </label>
         </div>
+    </div>
+
+    <div class="input-group">
+        <label>Canal de Boas-vindas</label>
+        <select id="welcomeChannel" data-key="welcomeChannel" class="channel-select">
+            <option value="">Selecione um canal...</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label>Título do embed</label>
+        <input type="text" id="welcomeTitle" data-key="welcomeTitle" placeholder="👋 Seja muito bem-vindo(a)!">
+    </div>
+
+    <div class="input-group">
+        <label>Mensagem</label>
+        <textarea id="welcomeMessage" data-key="welcomeMessage" rows="4" placeholder="Olá {user}, bem-vindo ao {server}!"></textarea>
+    </div>
+
+    <div class="input-group">
+        <label>Cor (hex)</label>
+        <input type="text" id="welcomeColor" data-key="welcomeColor" placeholder="#5865F2">
+    </div>
+
+    <div class="input-group">
+        <label>Rodapé</label>
+        <input type="text" id="welcomeFooter" data-key="welcomeFooter" placeholder="Membro #{memberCount}">
+    </div>
+
+    <div class="input-group">
+        <label>URL da imagem (opcional)</label>
+        <input type="text" id="welcomeImage" data-key="welcomeImage" placeholder="https://...">
+    </div>
+
+    <div class="log-card">
+        <div class="log-header">
+            <div>
+                <div class="log-title">Mencionar o membro</div>
+                <div class="log-desc">Ping @usuário junto com o embed</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="welcomePing" data-key="welcomePing">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="log-card">
+        <div class="log-header">
+            <div>
+                <div class="log-title">Card visual automático</div>
+                <div class="log-desc">Gera imagem de boas-vindas (se não houver URL)</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="welcomeCardEnabled" data-key="welcomeCardEnabled">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+</div>
