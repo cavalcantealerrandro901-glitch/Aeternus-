@@ -1,0 +1,85 @@
+<div id="system-logs" class="system-view" style="display: none;">
+            <button class="back-btn" onclick="showGuildView()">← Voltar ao Início</button>
+            <h2>🛡️ Sistema de Logs</h2>
+
+            <!-- Log 1: Edição e Exclusão de Mensagens -->
+            <div class="log-card">
+                <div class="log-header">
+                    <div>
+                        <div class="log-title">📝 Edição & Remoção de Mensagens</div>
+                        <div class="log-desc">Registra mensagens editadas e apagadas no servidor.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="msgLogEnabled" data-key="msgLogEnabled" onchange="toggleLogSection('msgLogEnabled', 'msgLogArea')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="msgLogArea" class="channel-selector-area" style="display: none;">
+                    <label>Canal de Registro de Mensagens</label>
+                    <select id="msgLogChannel" data-key="msgLogChannel" class="channel-select">
+                        <option value="">Selecione um canal...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Log 2: Moderação (Expulsar, Banir, Mute) -->
+            <div class="log-card">
+                <div class="log-header">
+                    <div>
+                        <div class="log-title">🔨 Moderação & Punições</div>
+                        <div class="log-desc">Registra expulsões, banimentos, mutes e advertências.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="modLogEnabled" data-key="modLogEnabled" onchange="toggleLogSection('modLogEnabled', 'modLogArea')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="modLogArea" class="channel-selector-area" style="display: none;">
+                    <label>Canal de Registro de Moderação</label>
+                    <select id="modLogChannel" data-key="modLogChannel" class="channel-select">
+                        <option value="">Selecione um canal...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Log 3: Entrada e Saída de Membros -->
+            <div class="log-card">
+                <div class="log-header">
+                    <div>
+                        <div class="log-title">👥 Entrada & Saída de Membros</div>
+                        <div class="log-desc">Registra quando membros entram ou saem do servidor.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="memberLogEnabled" data-key="memberLogEnabled" onchange="toggleLogSection('memberLogEnabled', 'memberLogArea')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="memberLogArea" class="channel-selector-area" style="display: none;">
+                    <label>Canal de Registro de Membros</label>
+                    <select id="memberLogChannel" data-key="memberLogChannel" class="channel-select">
+                        <option value="">Selecione um canal...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Log 4: Canais de Voz -->
+            <div class="log-card">
+                <div class="log-header">
+                    <div>
+                        <div class="log-title">🔊 Canais de Voz</div>
+                        <div class="log-desc">Registra entrada, saída e trocas de salas de voz.</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="voiceLogEnabled" data-key="voiceLogEnabled" onchange="toggleLogSection('voiceLogEnabled', 'voiceLogArea')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div id="voiceLogArea" class="channel-selector-area" style="display: none;">
+                    <label>Canal de Registro de Voz</label>
+                    <select id="voiceLogChannel" data-key="voiceLogChannel" class="channel-select">
+                        <option value="">Selecione um canal...</option>
+                    </select>
+                </div>
+            </div>
+
+        </div>
