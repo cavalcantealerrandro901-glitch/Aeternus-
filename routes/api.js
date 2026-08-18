@@ -1,66 +1,68 @@
-const express = require('express');
-
-function setApiRoutes(client) {
-    const router = express.Router();
-
-    // Info do bot (público)
-    router.get('/bot', (req, res) => {
+/**
+ * API geral do bot (público + user servers)
+ */
+function register(app, client) {
+    app.get('/api/bot', (req, res) => {
         res.json({
-            avatar: client.user
-                ? client.user.displayAvatarURL({ dynamic: true, size: 256 })
-                : null,
-            username: client.user ? client.user.username : 'Aeternus',
-            tag: client.user ? client.user.tag : null,
+            avatar: client.user?.displayAvatarURL({ dynamic: true, size: 256 }) || null,
+            username: client.user?.username || 'Aeternus',
+            tag: client.user?.tag || null,
             online: client.isReady(),
             guilds: client.guilds.cache.size
         });
     });
 
-    // Lista de comandos slash
-    router.get('/commands', (req, res) => {
-        if (!client.slashCommands) return res.json([]);
-        const commandList = client.slashCommands.map((cmd) => ({
-            name: cmd.data ? cmd.data.name : cmd.name || 'desconhecido',
-            description: cmd.data
-                ? cmd.data.description
-                : cmd.description || 'Sem descrição'
-        }));
-        res.json(commandList);
-    });
-
-    // Sessão do usuário logado
-    router.get('/me', (req, res) => {
-        if (!req.session || !req.session.isAuthenticated) {
-            return res.status(401).json({ authenticated: false });
-        }
+    app.get('/api/bot-info', (req, res) => {
         res.json({
-            authenticated: true,
-            user: req.session.user || null
+            name: client.user?.username || 'Aeternus',
+            avatar:
+                client.user?.displayAvatarURL({ dynamic: true, size: 256 }) ||
+                'https://cdn.discordapp.com/embed/avatars/0.png'
         });
     });
 
-    // Servidores onde o usuário é admin E o bot está presente
-    router.get('/user/servers', async (req, res) => {
-        if (!req.session || !req.session.accessToken) {
+    app.get('/api/commands', (req, res) => {
+        const list = [];
+        if (client.slashCommands) {
+            for (const cmd of client.slashCommands.values()) {
+                list.push({
+                    name: cmd.data?.name || cmd.name,
+                    description: cmd.data?.description || cmd.description || '',
+                    type: 'slash'
+                });
+            }
+        }
+        if (client.commands) {
+            for (const cmd of client.commands.values()) {
+                list.push({
+                    name: cmd.name,
+                    description: cmd.description || '',
+                    type: 'prefix'
+                });
+            }
+        }
+        res.json(list);
+    });
+
+    app.get('/api/me', (req, res) => {
+        if (!req.session?.isAuthenticated) {
+            return res.status(401).json({ authenticated: false });
+        }
+        res.json({ authenticated: true, user: req.session.user });
+    });
+
+    app.get('/api/user/servers', async (req, res) => {
+        if (!req.session?.accessToken) {
             return res.status(401).json({ error: 'Não autenticado' });
         }
-
         try {
             const response = await fetch('https://discord.com/api/users/@me/guilds', {
                 headers: { Authorization: `Bearer ${req.session.accessToken}` }
             });
-
-            if (!response.ok) {
-                return res.status(401).json({ error: 'Token inválido ou expirado. Faça login novamente.' });
-            }
-
+            if (!response.ok) return res.status(401).json({ error: 'Token inválido' });
             const guilds = await response.json();
-            const adminGuilds = guilds.filter(
-                (g) => (BigInt(g.permissions) & 8n) === 8n || g.owner
-            );
-
-            // Só servidores em que o bot está online
-            const withBot = adminGuilds
+            const admin = guilds.filter((g) => (BigInt(g.permissions) & 8n) === 8n || g.owner);
+            const withBot = admin
                 .filter((g) => client.guilds.cache.has(g.id))
                 .map((g) => ({
                     id: g.id,
@@ -70,15 +72,12 @@ function setApiRoutes(client) {
                         : null,
                     owner: !!g.owner
                 }));
-
             res.json(withBot);
-        } catch (error) {
-            console.error('user/servers:', error);
+        } catch (e) {
+            console.error(e);
             res.status(500).json({ error: 'Erro interno' });
         }
     });
-
-    return router;
 }
 
-module.exports = setApiRoutes;
+module.exports = register;
