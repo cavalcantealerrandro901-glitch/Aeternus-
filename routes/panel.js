@@ -2,36 +2,61 @@ const path = require('path');
 const fs = require('fs');
 const { ChannelType } = require('discord.js');
 
+function requireAuth(req, res, next) {
+    if (req.session && req.session.isAuthenticated && req.session.accessToken) {
+        return next();
+    }
+    // API → 401 JSON; página → login
+    if (String(req.path || '').startsWith('/api') || req.xhr || (req.headers.accept || '').includes('application/json')) {
+        return res.status(401).json({ error: 'Não autenticado. Faça login.' });
+    }
+    return res.redirect('/auth/discord');
+}
+
+function settingsPath() {
+    return path.join(__dirname, '..', 'settings.json');
+}
+
+function readAllSettings() {
+    const filePath = settingsPath();
+    if (!fs.existsSync(filePath)) return {};
+    try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8') || '{}');
+    } catch {
+        return {};
+    }
+}
+
+function writeAllSettings(data) {
+    fs.writeFileSync(settingsPath(), JSON.stringify(data, null, 2), 'utf8');
+}
+
 /**
- * Rotas do painel web (configurações e dados do servidor)
+ * Rotas do painel web (dashboard + configurações + dados do servidor)
  */
 function registerPanelRoutes(app, client) {
-    app.get(['/dashboard', '/dashboard/*splat'], (req, res) => {
+    // Página do dashboard (exige login)
+    app.get(['/dashboard', '/dashboard/*splat'], requireAuth, (req, res) => {
         res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
     });
 
-    app.post('/api/set-setting', (req, res) => {
+    // Página de servidores (exige login)
+    app.get('/servers', requireAuth, (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'servers.html'));
+    });
+
+    app.post('/api/set-setting', requireAuth, (req, res) => {
         try {
             const { guildId, key, value } = req.body;
             if (!guildId || !key) {
                 return res.status(400).json({ error: 'guildId e key são obrigatórios.' });
             }
 
-            const filePath = path.join(__dirname, '..', 'settings.json');
-            let allSettings = {};
-
-            if (fs.existsSync(filePath)) {
-                try {
-                    allSettings = JSON.parse(fs.readFileSync(filePath, 'utf8') || '{}');
-                } catch (e) {
-                    allSettings = {};
-                }
-            }
-
+            const allSettings = readAllSettings();
             if (!allSettings[guildId]) allSettings[guildId] = {};
             allSettings[guildId][key] = value;
+            writeAllSettings(allSettings);
 
-            fs.writeFileSync(filePath, JSON.stringify(allSettings, null, 2), 'utf8');
             return res.json({ success: true, settings: allSettings[guildId] });
         } catch (error) {
             console.error('Erro ao salvar configuração:', error);
@@ -39,21 +64,17 @@ function registerPanelRoutes(app, client) {
         }
     });
 
-    app.get('/api/settings/:guildId', (req, res) => {
+    app.get('/api/settings/:guildId', requireAuth, (req, res) => {
         try {
-            const { guildId } = req.params;
-            const filePath = path.join(__dirname, '..', 'settings.json');
-            if (!fs.existsSync(filePath)) return res.json({});
-
-            const allSettings = JSON.parse(fs.readFileSync(filePath, 'utf8') || '{}');
-            return res.json(allSettings[guildId] || {});
+            const allSettings = readAllSettings();
+            return res.json(allSettings[req.params.guildId] || {});
         } catch (error) {
             console.error('Erro ao ler configurações:', error);
             return res.status(500).json({ error: 'Erro ao ler configurações.' });
         }
     });
 
-    app.get('/api/guild-data/:guildId', async (req, res) => {
+    app.get('/api/guild-data/:guildId', requireAuth, async (req, res) => {
         try {
             const guild = client.guilds.cache.get(req.params.guildId);
             if (!guild) {
@@ -70,15 +91,15 @@ function registerPanelRoutes(app, client) {
             categoriesMap.set('uncategorized', { id: null, name: 'Sem categoria', channels: [] });
 
             guild.channels.cache
-                .filter(c => c.type === ChannelType.GuildCategory)
+                .filter((c) => c.type === ChannelType.GuildCategory)
                 .sort((a, b) => a.position - b.position)
-                .forEach(cat => {
+                .forEach((cat) => {
                     categoriesMap.set(cat.id, { id: cat.id, name: cat.name, channels: [] });
                 });
 
             const allChannels = [];
 
-            guild.channels.cache.forEach(ch => {
+            guild.channels.cache.forEach((ch) => {
                 if (ch.type === ChannelType.GuildCategory) return;
 
                 const channelInfo = {
@@ -101,7 +122,7 @@ function registerPanelRoutes(app, client) {
             });
 
             const roles = guild.roles.cache
-                .map(r => ({
+                .map((r) => ({
                     id: r.id,
                     name: r.name,
                     color: r.hexColor,
@@ -111,8 +132,12 @@ function registerPanelRoutes(app, client) {
                 }))
                 .sort((a, b) => b.position - a.position);
 
-            const emojis = guild.emojis.cache.map(e => ({ id: e.id, name: e.name, animated: e.animated }));
-            const stickers = guild.stickers.cache.map(s => ({ id: s.id, name: s.name }));
+            const emojis = guild.emojis.cache.map((e) => ({
+                id: e.id,
+                name: e.name,
+                animated: e.animated
+            }));
+            const stickers = guild.stickers.cache.map((s) => ({ id: s.id, name: s.name }));
 
             res.json({
                 id: guild.id,
@@ -129,7 +154,7 @@ function registerPanelRoutes(app, client) {
                 boostCount: guild.premiumSubscriptionCount || 0,
                 boostTier: guild.premiumTier,
                 features: guild.features,
-                categories: Array.from(categoriesMap.values()).filter(cat => cat.channels.length > 0),
+                categories: Array.from(categoriesMap.values()).filter((cat) => cat.channels.length > 0),
                 allChannels,
                 roles,
                 emojis,

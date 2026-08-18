@@ -1,95 +1,79 @@
 const express = require('express');
-const fs = require('fs');
 
 function setApiRoutes(client) {
     const router = express.Router();
 
-    // Rota Genérica para salvar qualquer configuração
-    router.post('/set-setting', (req, res) => {
-        const { guildId, key, value } = req.body;
-
-        if (!guildId || !key) {
-            return res.status(400).json({ error: 'Dados incompletos' });
-        }
-
-        try {
-            let settings = {};
-            if (fs.existsSync('./settings.json')) {
-                settings = JSON.parse(fs.readFileSync('./settings.json', 'utf8'));
-            }
-
-            if (!settings[guildId]) settings[guildId] = {};
-            settings[guildId][key] = value;
-
-            fs.writeFileSync('./settings.json', JSON.stringify(settings, null, 2));
-            res.json({ success: true, message: `Configuração ${key} salva com sucesso!` });
-        } catch (error) {
-            res.status(500).json({ error: 'Erro ao salvar configuração' });
-        }
-    });
-
-    // Rota para pegar configurações (útil para o painel carregar os inputs atuais)
-    router.get('/settings/:guildId', (req, res) => {
-        try {
-            const settings = JSON.parse(fs.readFileSync('./settings.json', 'utf8'));
-            res.json(settings[req.params.guildId] || {});
-        } catch (error) {
-            res.json({});
-        }
-    });
-
-    // Rota para carregar os dados gerais do servidor (Resolve o travamento "Carregando...")
-    router.get('/guild-data/:guildId', (req, res) => {
-        const guild = client.guilds.cache.get(req.params.guildId);
-        
-        if (!guild) {
-            return res.status(404).json({ error: 'Servidor não encontrado ou bot não está nele' });
-        }
-
-        res.json({
-            name: guild.name,
-            id: guild.id,
-            icon: guild.iconURL({ dynamic: true, size: 256 }),
-            memberCount: guild.memberCount,
-            roleCount: guild.roles.cache.size,
-            channelCount: guild.channels.cache.size,
-            description: guild.description || 'Sem descrição definida'
-        });
-    });
-
-    // Rotas existentes
+    // Info do bot (público)
     router.get('/bot', (req, res) => {
         res.json({
-            avatar: client.user ? client.user.displayAvatarURL({ dynamic: true, size: 256 }) : null,
-            username: client.user ? client.user.username : 'Aeternus'
+            avatar: client.user
+                ? client.user.displayAvatarURL({ dynamic: true, size: 256 })
+                : null,
+            username: client.user ? client.user.username : 'Aeternus',
+            tag: client.user ? client.user.tag : null,
+            online: client.isReady(),
+            guilds: client.guilds.cache.size
         });
     });
 
+    // Lista de comandos slash
     router.get('/commands', (req, res) => {
-        if (client.slashCommands) {
-            const commandList = client.slashCommands.map(cmd => ({
-                name: cmd.data ? cmd.data.name : (cmd.name || 'desconhecido'),
-                description: cmd.data ? cmd.data.description : (cmd.description || 'Sem descrição')
-            }));
-            res.json(commandList);
-        } else {
-            res.json([]);
-        }
+        if (!client.slashCommands) return res.json([]);
+        const commandList = client.slashCommands.map((cmd) => ({
+            name: cmd.data ? cmd.data.name : cmd.name || 'desconhecido',
+            description: cmd.data
+                ? cmd.data.description
+                : cmd.description || 'Sem descrição'
+        }));
+        res.json(commandList);
     });
 
+    // Sessão do usuário logado
+    router.get('/me', (req, res) => {
+        if (!req.session || !req.session.isAuthenticated) {
+            return res.status(401).json({ authenticated: false });
+        }
+        res.json({
+            authenticated: true,
+            user: req.session.user || null
+        });
+    });
+
+    // Servidores onde o usuário é admin E o bot está presente
     router.get('/user/servers', async (req, res) => {
         if (!req.session || !req.session.accessToken) {
             return res.status(401).json({ error: 'Não autenticado' });
         }
+
         try {
             const response = await fetch('https://discord.com/api/users/@me/guilds', {
                 headers: { Authorization: `Bearer ${req.session.accessToken}` }
             });
-            if (!response.ok) return res.status(401).json({ error: 'Token inválido' });
+
+            if (!response.ok) {
+                return res.status(401).json({ error: 'Token inválido ou expirado. Faça login novamente.' });
+            }
+
             const guilds = await response.json();
-            const adminGuilds = guilds.filter(g => (g.permissions & 0x8) === 0x8 || g.owner);
-            res.json(adminGuilds);
+            const adminGuilds = guilds.filter(
+                (g) => (BigInt(g.permissions) & 8n) === 8n || g.owner
+            );
+
+            // Só servidores em que o bot está online
+            const withBot = adminGuilds
+                .filter((g) => client.guilds.cache.has(g.id))
+                .map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                    icon: g.icon
+                        ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64`
+                        : null,
+                    owner: !!g.owner
+                }));
+
+            res.json(withBot);
         } catch (error) {
+            console.error('user/servers:', error);
             res.status(500).json({ error: 'Erro interno' });
         }
     });
