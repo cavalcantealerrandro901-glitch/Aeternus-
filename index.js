@@ -110,7 +110,10 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// Painel web + bot no mesmo processo
-startServer(client);
+// Evento Ready: Inicializa o servidor web após o bot estar conectado
+client.once('ready', () => {
+    console.log(`🤖 [BOT] Conectado com sucesso como ${client.user.tag}`);
+    startServer(client);
+});
 
 client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);

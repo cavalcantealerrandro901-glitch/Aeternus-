@@ -9,29 +9,41 @@
     <script src="/theme.js"></script>
     <script src="/i18n.js"></script>
     <style>
-        body { background-color: var(--bg-color, #f8fafc); color: var(--text-color, #0f172a); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; transition: 0.3s; }
-        
+        body { 
+            background-color: var(--bg-color, #f8fafc); 
+            color: var(--text-color, #0f172a); 
+            font-family: 'Segoe UI', sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
         .top-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; align-items: center; }
-        .top-btn { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .top-btn { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; }
         .btn-login-top { background: #38bdf8 !important; color: #ffffff !important; border: none !important; }
 
-        .dropdown-menu { display: none; position: absolute; top: 60px; right: 20px; width: 220px; background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); border-radius: 12px; z-index: 2001; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); text-align: left; }
+        .dropdown-menu { display: none; position: absolute; top: 60px; right: 20px; width: 220px; background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); border-radius: 12px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1001; }
         .dropdown-menu.active { display: block; }
-        .dropdown-item { padding: 8px 10px; color: var(--text-color, #0f172a); cursor: pointer; border: none; background: none; font-size: 14px; border-radius: 5px; display: block; width: 100%; text-align: left; text-decoration: none; transition: 0.2s; }
+        .dropdown-item { padding: 8px 10px; color: var(--text-color, #0f172a); cursor: pointer; border: none; background: none; font-size: 14px; border-radius: 5px; display: block; width: 100%; text-align: left; text-decoration: none; }
         .dropdown-item:hover { background: rgba(56, 189, 248, 0.1); color: #38bdf8; }
-        
+
         .lang-submenu { display: none; padding-left: 10px; margin-top: 4px; margin-bottom: 4px; border-left: 2px solid #38bdf8; }
         .lang-submenu.active { display: block; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; align-items: center; justify-content: center; }
-        .modal-content { background: var(--card-bg, #ffffff); padding: 20px; border-radius: 15px; width: 90%; max-width: 450px; max-height: 80vh; overflow-y: auto; text-align: left; border: 1px solid var(--border-color, #cbd5e1); box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-content { background: var(--card-bg, #ffffff); padding: 20px; border-radius: 15px; width: 90%; max-width: 450px; max-height: 80vh; overflow-y: auto; text-align: left; }
         .close-modal { float: right; cursor: pointer; font-size: 20px; color: var(--text-color); font-weight: bold; }
 
         .bot-avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid #38bdf8; margin-bottom: 15px; object-fit: cover; }
-        h1 { margin: 0 0 10px 0; font-size: 32px; }
-        p { color: #64748b; max-width: 450px; margin-bottom: 30px; }
+        h1 { margin: 0 0 10px 0; font-size: 32px; text-align: center; }
+        p { color: #64748b; max-width: 450px; margin-bottom: 30px; text-align: center; }
         .btn-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px; }
-        .btn { padding: 12px 20px; border-radius: 25px; font-weight: bold; text-decoration: none; border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); background: var(--card-bg, #ffffff); display: block; text-align: center; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .btn { padding: 12px 20px; border-radius: 25px; font-weight: bold; text-decoration: none; border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); text-align: center; display: block; }
         .btn:hover { border-color: #38bdf8; transform: translateY(-2px); }
         .btn-primary { background: #38bdf8; color: #ffffff; border: none; }
     </style>
@@ -47,7 +59,7 @@
         <div style="font-weight: bold; color: #38bdf8; padding: 5px 10px; font-size: 12px;">PAINEL</div>
         <button onclick="toggleTheme()" class="dropdown-item">🌓 Alternar Tema</button>
         <button onclick="showCommands()" class="dropdown-item">📜 Ver Comandos</button>
-        
+
         <div style="border-top: 1px solid var(--border-color, #cbd5e1); margin-top: 5px; margin-bottom: 5px;"></div>
         <button onclick="toggleLangMenu()" class="dropdown-item" style="font-weight: bold;">🌐 Idioma ▾</button>
         <div class="lang-submenu" id="langSubmenu">
@@ -70,12 +82,12 @@
         </div>
     </div>
 
-    <img id="botAvatar" src="" class="bot-avatar">
-    <h1>AETERNUS</h1>
+    <img id="botAvatar" src="" class="bot-avatar" alt="Avatar do Bot">
+    <h1 id="botName">AETERNUS</h1>
     <p>Uma nova era de experiências e conexões. Bem-vindo ao santuário oficial do bot.</p>
 
     <div class="btn-container">
-        <a href="https://discord.com/oauth2/authorize?client_id=1150821035056701550&scope=bot&permissions=8" target="_blank" class="btn btn-primary">Adicionar ao Servidor</a>
+        <a id="btnInvite" href="https://discord.com/oauth2/authorize?client_id=1150821035056701550&scope=bot&permissions=8" target="_blank" class="btn btn-primary">Adicionar ao Servidor</a>
         <a href="https://discord.gg/seu-link-de-suporte" target="_blank" class="btn">Suporte</a>
     </div>
 
@@ -83,10 +95,12 @@
     <script>
         function toggleMenu() { document.getElementById('dropdownMenu').classList.toggle('active'); }
         function toggleLangMenu() { document.getElementById('langSubmenu').classList.toggle('active'); }
-        
-        async function changeLang(lang) { 
-            await i18n.loadLanguage(lang); 
-            toggleMenu(); 
+
+        async function changeLang(lang) {
+            if (window.i18n && typeof i18n.loadLanguage === 'function') {
+                await i18n.loadLanguage(lang);
+            }
+            toggleMenu();
         }
 
         function showCommands() {
@@ -101,7 +115,7 @@
                 list.innerHTML = cmds.map(c => `
                     <div style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color, #cbd5e1); padding-bottom: 8px;">
                         <span style="font-family: monospace; background: rgba(56, 189, 248, 0.1); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">/${c.name}</span>
-                        <div style="margin-top: 4px; color: var(--text-color, #0f172a); font-size: 13px; opacity: 0.85;">${c.description}</div>
+                        <div style="margin-top: 4px; color: var(--text-color, #0f172a); font-size: 13px; opacity: 0.85;">${c.description || 'Sem descrição.'}</div>
                     </div>
                 `).join('');
             }).catch(() => {
@@ -110,10 +124,13 @@
         }
 
         function closeModal() { document.getElementById('cmdModal').style.display = 'none'; }
-        
-        fetch('/api/bot').then(r => r.json()).then(bot => {
+
+        // Carrega as informações dinâmicas do bot
+        fetch('/api/bot-info').then(r => r.json()).then(bot => {
             if (bot.avatar) document.getElementById('botAvatar').src = bot.avatar;
-        });
+            if (bot.username) document.getElementById('botName').textContent = bot.username.toUpperCase();
+            if (bot.inviteUrl) document.getElementById('btnInvite').href = bot.inviteUrl;
+        }).catch(err => console.error('Erro ao buscar dados do bot:', err));
     </script>
 </body>
 </html>

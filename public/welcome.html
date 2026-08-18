@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuração de Boas-Vindas</title>
+    <style>
+        :root { --bg: #0b101d; --card: #121929; --text: #f8fafc; --accent: #38bdf8; --border: #1e293b; --danger: #ef4444; --success: #22c55e; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; padding-bottom: 100px; }
+        .container { max-width: 850px; margin: 0 auto; }
+        .btn-back { display: inline-flex; align-items: center; gap: 6px; background: #1e293b; color: var(--accent); padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 13px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .section-box { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        h2 { font-size: 18px; color: var(--accent); margin-top: 0; }
+        input, textarea { width: 100%; padding: 10px; border-radius: 8px; background: #0f172a; border: 1px solid var(--border); color: #fff; margin-bottom: 10px; }
+
+        /* Painel Flutuante de Decisão */
+        #savePanel {
+            position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%);
+            background: #1e293b; padding: 16px 24px; border-radius: 12px;
+            display: flex; align-items: center; gap: 20px; border: 1px solid var(--border);
+            transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 1000;
+        }
+        #savePanel.show { bottom: 20px; }
+        .btn-panel { padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-reset { background: var(--danger); color: white; }
+        .btn-save { background: var(--success); color: white; }
+
+        /* Notificação de Status (Toast) */
+        #toast {
+            position: fixed; bottom: 20px; right: -300px;
+            background: rgba(15, 23, 42, 0.9); padding: 15px 25px;
+            border-radius: 10px; border: 1px solid var(--border);
+            color: #fff; transition: right 0.4s ease; z-index: 1001;
+        }
+        #toast.show { right: 20px; }
+        #toast.success { border-color: var(--success); color: var(--success); }
+        #toast.error { border-color: var(--danger); color: var(--danger); }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <a href="javascript:history.back()" class="btn-back">⬅️ Voltar</a>
+        <h1>🐢 Configurar Onboarding</h1>
+        
+        <form id="onboardingForm">
+            <div class="section-box">
+                <h2>⚙️ Canal & Recepção</h2>
+                <input type="text" id="channelId" placeholder="ID do Canal (ex: 12345)">
+                <input type="text" id="title" placeholder="Título da mensagem">
+                <input type="text" id="image" placeholder="URL da imagem">
+            </div>
+            <div class="section-box">
+                <h2>📜 Regras do Servidor</h2>
+                <textarea id="rules"></textarea>
+            </div>
+        </form>
+    </div>
+
+    <!-- Painel de Decisão -->
+    <div id="savePanel">
+        <span>Alterações não salvas. Deseja aplicar?</span>
+        <button class="btn-panel btn-reset" onclick="resetForm()">Resetar</button>
+        <button class="btn-panel btn-save" onclick="saveData()">Salvar Alterações</button>
+    </div>
+
+    <!-- Toast de Notificação -->
+    <div id="toast"></div>
+
+    <script src="/snow.js"></script>
+    <script>
+        let isDirty = false;
+        const form = document.getElementById('onboardingForm');
+        const savePanel = document.getElementById('savePanel');
+        const toast = document.getElementById('toast');
+
+        // Monitorar alterações
+        form.addEventListener('input', () => {
+            isDirty = true;
+            savePanel.classList.add('show');
+        });
+
+        // Previnir saída sem salvar
+        window.onbeforeunload = function() {
+            if (isDirty) return "Você tem alterações não salvas!";
+        };
+
+        async function saveData() {
+            const payload = {
+                channelId: document.getElementById('channelId').value,
+                title: document.getElementById('title').value,
+                image: document.getElementById('image').value,
+                rules: document.getElementById('rules').value
+            };
+
+            try {
+                const res = await fetch('/api/onboarding', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                if (res.ok) {
+                    showToast('Configurações salvas com sucesso!', 'success');
+                    isDirty = false;
+                    savePanel.classList.remove('show');
+                } else {
+                    throw new Error('Erro ao salvar');
+                }
+            } catch (e) {
+                showToast('Erro ao salvar alterações!', 'error');
+            }
+        }
+
+        function resetForm() {
+            if(confirm("Tem certeza? Isso apagará todas as edições atuais.")) {
+                form.reset();
+                isDirty = false;
+                savePanel.classList.remove('show');
+                showToast('Configurações resetadas.', 'error');
+            }
+        }
+
+        function showToast(msg, type) {
+            toast.textContent = msg;
+            toast.className = `show ${type}`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Carregar dados iniciais
+        fetch('/api/onboarding').then(res => res.json()).then(data => {
+            document.getElementById('channelId').value = data.channelId || '';
+            document.getElementById('title').value = data.title || '';
+            document.getElementById('image').value = data.image || '';
+            document.getElementById('rules').value = data.rules || '';
+        });
+    </script>
+</body>
+</html>

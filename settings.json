@@ -4,12 +4,21 @@
     "welcomeChannel": "",
     "welcomeMessage": "",
     "msgLogEnabled": false,
-    "msgLogChannel": "1535072497366605844",
+    "msgLogChannel": "",
     "modLogEnabled": false,
     "modLogChannel": "",
     "memberLogEnabled": false,
     "memberLogChannel": "",
     "voiceLogEnabled": false,
-    "voiceLogChannel": ""
+    "voiceLogChannel": "",
+    "welcomeEnabled": true,
+    "welcomeTitle": "",
+    "welcomeColor": "#3f05b3",
+    "welcomeFooter": "",
+    "welcomeImage": "",
+    "welcomePing": true,
+    "welcomeCardEnabled": true,
+    "welcomeDmEnabled": true,
+    "welcomeDmText": ""
   }
 }

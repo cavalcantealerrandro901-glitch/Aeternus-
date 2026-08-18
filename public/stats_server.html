@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Estatísticas do Servidor</title>
+    <link rel="stylesheet" href="/theme.css">
+    <style>
+        :root { --bg: #0b101d; --card: #121929; --accent: #38bdf8; }
+        body { background-color: var(--bg); color: #f8fafc; font-family: sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header-box { display: flex; align-items: center; gap: 20px; background: var(--card); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #1e293b; }
+        .icon-img { width: 80px; height: 80px; border-radius: 15px; border: 2px solid var(--accent); }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .info-card { background: var(--card); padding: 15px; border-radius: 10px; border: 1px solid #1e293b; }
+        .label { font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 5px; }
+        .value { font-size: 16px; font-weight: bold; color: var(--accent); }
+        .btn-back { display: inline-block; padding: 10px 20px; background: #1e293b; color: white; border-radius: 8px; text-decoration: none; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="javascript:history.back()" class="btn-back">← Voltar</a>
+        <div class="header-box">
+            <img id="srvIcon" class="icon-img" src="">
+            <div><h1 id="srvName">Carregando...</h1><small id="srvId"></small></div>
+        </div>
+        <div class="info-grid">
+            <div class="info-card"><div class="label">Membros</div><div class="value" id="srvMembers">--</div></div>
+            <div class="info-card"><div class="label">Canais</div><div class="value" id="srvChannels">--</div></div>
+            <div class="info-card"><div class="label">Cargos</div><div class="value" id="srvRoles">--</div></div>
+            <div class="info-card"><div class="label">Descrição</div><div class="value" id="srvDesc">--</div></div>
+        </div>
+    </div>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const guildId = urlParams.get('id');
+        fetch(`/api/guild-data/${guildId}`).then(res => res.json()).then(d => {
+            document.getElementById('srvIcon').src = d.icon;
+            document.getElementById('srvName').textContent = d.name;
+            document.getElementById('srvId').textContent = "ID: " + d.id;
+            document.getElementById('srvMembers').textContent = d.memberCount;
+            document.getElementById('srvChannels').textContent = d.channelCount;
+            document.getElementById('srvRoles').textContent = d.roleCount || 0;
+            document.getElementById('srvDesc').textContent = d.description || 'Sem descrição';
+        });
+    </script>
+</body>
+</html>

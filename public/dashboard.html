@@ -3,64 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeternus | Painel</title>
-    <link rel="stylesheet" href="/css/dashboard.css">
+    <title>Dashboard - Aeternus</title>
+    <link rel="stylesheet" href="/theme.css">
+    <script src="/theme.js"></script>
+    <style>
+        body {
+            background-color: var(--bg-color, #0b101d);
+            color: var(--text-color, #f8fafc);
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+
+        .header-bar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid #38bdf8;
+        }
+
+        .title {
+            font-size: 24px;
+            color: #38bdf8;
+            margin: 0 0 6px 0;
+            font-weight: bold;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin: 0 0 25px 0;
+            font-size: 14px;
+        }
+
+        .server-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .server-card {
+            background: #121929;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .server-card:hover {
+            transform: translateY(-3px);
+            border-color: #38bdf8;
+        }
+
+        .server-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            margin-bottom: 12px;
+            object-fit: cover;
+            background: #1e293b;
+        }
+
+        .server-name {
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 15px;
+            color: #ffffff;
+            word-break: break-word;
+        }
+
+        .btn-action {
+            width: 100%;
+            padding: 9px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            text-decoration: none;
+            font-size: 13px;
+            display: inline-block;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .btn-manage {
+            background: #38bdf8;
+            color: #ffffff;
+        }
+
+        .btn-add {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #334155;
+        }
+
+        .btn-add:hover {
+            color: #ffffff;
+            border-color: #38bdf8;
+        }
+    </style>
 </head>
 <body>
-    <button class="menu-btn" type="button" onclick="toggleSidebar()">☰ Menu</button>
 
-    <!-- Menu lateral (categorias / sistemas) -->
-    <aside class="sidebar" id="sidebar">
-        <div class="search-box">
-            <input type="text" id="menuSearch" placeholder="🔍 Pesquisar sistema..." onkeyup="filterMenu()" autocomplete="off">
-        </div>
-
-        <div class="category-block">
-            <div class="category-title">⚙️ Geral</div>
-            <div class="menu-item" onclick="openSystem('system-geral')">
-                <span>Configurações Gerais</span>
-                <span>›</span>
+    <div class="container">
+        <div class="header-bar">
+            <div class="user-profile" id="userProfile" style="display: none;">
+                <img id="userAvatar" class="user-avatar" src="" alt="User">
+                <span id="userName" style="font-weight: bold; font-size: 14px;"></span>
             </div>
         </div>
 
-        <div class="category-block">
-            <div class="category-title">👋 Boas-Vindas</div>
-            <div class="menu-item" onclick="openSystem('system-welcome')">
-                <span>Sistema de Boas-Vindas</span>
-                <span>›</span>
-            </div>
-        </div>
+        <h1 class="title">Selecione um servidor</h1>
+        <p class="subtitle">Escolha abaixo qual servidor deseja gerenciar:</p>
 
-        <div class="category-block">
-            <div class="category-title">🛡️ Moderação & Logs</div>
-            <div class="menu-item" onclick="openSystem('system-logs')">
-                <span>Sistema de Logs do Servidor</span>
-                <span>›</span>
-            </div>
-        </div>
-    </aside>
-
-    <!-- Área central: sistemas carregados de /systems/*.html -->
-    <main class="container" id="main-container"></main>
-
-<div id="action-bar" class="action-bar">
-        <span>Alterações não salvas</span>
-        <div class="action-buttons">
-            <button class="btn-reset" onclick="resetCurrentSystem()">Resetar</button>
-            <button class="btn-save" onclick="saveCurrentSystem()">Salvar</button>
+        <div class="server-grid" id="serverGrid">
+            <div style="color: #94a3b8; grid-column: 1 / -1;">Buscando servidores...</div>
         </div>
     </div>
 
-<div id="unsaved-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <h3>⚠️ Alterações não salvas!</h3>
-            <p>Você possui alterações pendentes neste sistema. Salve ou resete as alterações antes de navegar para outro local.</p>
-            <button onclick="closeUnsavedModal()">Entendido</button>
-        </div>
-    </div>
+    <script src="/snow.js"></script>
+    <script>
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('/api/user');
+                if (!response.ok) {
+                    window.location.href = '/auth/discord';
+                    return;
+                }
 
-<div id="toast">Configurações salvas com sucesso!</div>
+                const data = await response.json();
 
-    <script src="/js/dashboard.js"></script>
+                if (data.user) {
+                    document.getElementById('userName').textContent = data.user.username;
+                    if (data.user.avatar) {
+                        document.getElementById('userAvatar').src = data.user.avatar;
+                    }
+                    document.getElementById('userProfile').style.display = 'flex';
+                }
+
+                const grid = document.getElementById('serverGrid');
+
+                if (!data.guilds || data.guilds.length === 0) {
+                    grid.innerHTML = '<div style="color: #94a3b8; grid-column: 1 / -1;">Nenhum servidor com permissão de administrador encontrado.</div>';
+                    return;
+                }
+
+                grid.innerHTML = data.guilds.map(guild => {
+                    const iconUrl = guild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
+                    
+                    if (guild.botInGuild) {
+                        return `
+                            <div class="server-card">
+                                <img src="${iconUrl}" class="server-icon" alt="${guild.name}">
+                                <div class="server-name">${guild.name}</div>
+                                <a href="/server/${guild.id}" class="btn-action btn-manage">Configurar</a>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="server-card">
+                                <img src="${iconUrl}" class="server-icon" alt="${guild.name}">
+                                <div class="server-name">${guild.name}</div>
+                                <a href="https://discord.com/oauth2/authorize?client_id=${data.user.id}&permissions=8&scope=bot%20applications.commands&guild_id=${guild.id}" target="_blank" class="btn-action btn-add">Adicionar Bot</a>
+                            </div>
+                        `;
+                    }
+                }).join('');
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('serverGrid').innerHTML = '<div style="color: #ef4444; grid-column: 1 / -1;">Não foi possível carregar a lista de servidores.</div>';
+            }
+        }
+
+        fetchDashboardData();
+    </script>
 </body>
 </html>

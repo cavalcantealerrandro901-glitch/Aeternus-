@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Estatísticas do Bot</title>
+    <link rel="stylesheet" href="/theme.css">
+    <style>
+        body { background-color: #0b101d; color: #f8fafc; font-family: sans-serif; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header-box { display: flex; align-items: center; gap: 20px; background: #121929; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        .icon-img { width: 80px; height: 80px; border-radius: 50%; border: 2px solid #38bdf8; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .info-card { background: #121929; padding: 15px; border-radius: 10px; border: 1px solid #1e293b; }
+        .label { font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 5px; }
+        .value { font-size: 16px; font-weight: bold; color: #38bdf8; }
+        .btn-back { display: inline-block; padding: 10px 20px; background: #1e293b; color: white; border-radius: 8px; text-decoration: none; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="javascript:history.back()" class="btn-back">← Voltar</a>
+        <div class="header-box">
+            <img id="botIcon" class="icon-img" src="">
+            <div><h1 id="botName">Carregando...</h1><small id="botId"></small></div>
+        </div>
+        <div class="info-grid">
+            <div class="info-card"><div class="label">Tempo Online</div><div class="value" id="botUptime">--</div></div>
+            <div class="info-card"><div class="label">Ping</div><div class="value" id="botPing">-- ms</div></div>
+            <div class="info-card"><div class="label">Versão</div><div class="value" id="botVersion">--</div></div>
+            <div class="info-card"><div class="label">Prefixo</div><div class="value" id="botPrefix">--</div></div>
+        </div>
+    </div>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const guildId = urlParams.get('id');
+        fetch(`/api/guild-data/${guildId}`).then(res => res.json()).then(d => {
+            document.getElementById('botIcon').src = d.botIcon;
+            document.getElementById('botName').textContent = d.botName;
+            document.getElementById('botId').textContent = "ID: " + d.botId;
+            document.getElementById('botUptime').textContent = d.uptime;
+            document.getElementById('botPing').textContent = d.ping;
+            document.getElementById('botVersion').textContent = d.version;
+            document.getElementById('botPrefix').textContent = d.prefix;
+        });
+    </script>
+</body>
+</html>

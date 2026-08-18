@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Aeternus</title>
+    <style>
+        :root { 
+            --bg: #0b101d; 
+            --card: #121929; 
+            --text: #f8fafc; 
+            --accent: #38bdf8; 
+            --border: #1e293b;
+        }
+
+        body { 
+            background: var(--bg); 
+            color: var(--text); 
+            font-family: 'Segoe UI', sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; position: relative; z-index: 2; }
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Top Bar */
+        .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .btn-menu-trigger { 
+            background: #1e293b; 
+            border: 1px solid #334155; 
+            color: #f8fafc; 
+            padding: 10px 18px; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            font-size: 14px; 
+            cursor: pointer; 
+            transition: border-color 0.2s;
+        }
+        .btn-menu-trigger:hover { border-color: var(--accent); }
+
+        .btn-home {
+            background: transparent;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-home:hover { color: #ffffff; border-color: var(--accent); }
+
+        /* Menu Lateral Esquerdo */
+        .side-menu { 
+            position: fixed; 
+            top: 0; 
+            left: -260px; 
+            width: 250px; 
+            height: 100%; 
+            background: #0f172a; 
+            z-index: 100; 
+            transition: left 0.3s ease; 
+            padding: 16px; 
+            box-sizing: border-box; 
+            overflow-y: auto; 
+            border-right: 1px solid var(--border); 
+        }
+        .side-menu.open { left: 0; }
+
+        .menu-overlay { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.6); 
+            z-index: 99; 
+            display: none; 
+        }
+        .menu-overlay.active { display: block; }
+
+        /* Busca no Menu */
+        .menu-search { margin-bottom: 14px; }
+        .search-input { 
+            width: 100%; 
+            padding: 9px 12px; 
+            border-radius: 8px; 
+            background: #121929; 
+            border: 1px solid #334155; 
+            color: #ffffff; 
+            font-size: 13px; 
+            outline: none; 
+            box-sizing: border-box;
+        }
+        .search-input:focus { border-color: var(--accent); }
+
+        /* Botão Voltar */
+        .btn-back-menu { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: #1e293b; 
+            border: 1px solid #334155; 
+            color: var(--accent); 
+            padding: 9px; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-weight: bold; 
+            font-size: 13px; 
+            margin-bottom: 18px; 
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .btn-back-menu:hover { border-color: var(--accent); }
+
+        /* Categorias e Cores Destaque */
+        .menu-category { margin-bottom: 18px; }
+        
+        .menu-category-title { 
+            font-size: 11px; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            letter-spacing: 0.9px; 
+            margin-bottom: 8px; 
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .cat-visao .menu-category-title { color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+        .cat-geral .menu-category-title { color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
+        .cat-engajamento .menu-category-title { color: #a855f7; background: rgba(168, 85, 247, 0.1); }
+        .cat-automacao .menu-category-title { color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+
+        .menu-item { 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            padding: 9px 10px; 
+            color: #94a3b8; 
+            text-decoration: none; 
+            border-radius: 6px; 
+            font-size: 13px; 
+            cursor: pointer; 
+            margin-bottom: 4px; 
+            transition: background 0.2s, color 0.2s; 
+        }
+        .menu-item:hover, .menu-item.active { 
+            background: #1e293b; 
+            color: #ffffff; 
+        }
+
+        /* Cards & Layout */
+        .header-box { 
+            display: flex; 
+            align-items: center; 
+            gap: 20px; 
+            background: var(--card); 
+            padding: 24px; 
+            border-radius: 12px; 
+            margin-bottom: 20px; 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+        }
+        .icon-img { 
+            width: 80px; 
+            height: 80px; 
+            border-radius: 50%; 
+            border: 3px solid var(--accent); 
+            object-fit: cover; 
+        }
+        .title { font-size: 22px; font-weight: bold; margin: 0; color: #ffffff; }
+        .subtitle { color: #94a3b8; font-size: 13px; margin-top: 4px; }
+
+        .info-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
+            gap: 16px; 
+        }
+        .info-card { 
+            background: var(--card); 
+            padding: 18px; 
+            border-radius: 12px; 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+        }
+        .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .value { font-size: 18px; font-weight: bold; color: var(--accent); word-break: break-all; }
+    </style>
+</head>
+<body>
+
+    <div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
+
+    <!-- Menu Lateral Esquerdo -->
+    <div class="side-menu" id="sideMenu">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 12px; font-weight: bold; color: #94a3b8; text-transform: uppercase;">🧩 Navegação</span>
+            <button onclick="toggleMenu()" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer;">✕</button>
+        </div>
+
+        <div class="menu-search">
+            <input type="text" id="searchInput" class="search-input" placeholder="🔍 Pesquisar sistemas..." onkeyup="filterMenu()">
+        </div>
+
+        <a href="javascript:history.back()" class="btn-back-menu">⬅️ Voltar aos Servidores</a>
+
+        <!-- Categoria Visão Geral -->
+        <div class="menu-category cat-visao">
+            <div class="menu-category-title">📊 Visão Geral</div>
+            <a onclick="showView('bot')" class="menu-item" id="btn-bot">🤖 Estatísticas do Bot</a>
+        </div>
+
+        <!-- Categoria Geral & Avisos -->
+        <div class="menu-category cat-geral">
+            <div class="menu-category-title">⚙️ Geral & Avisos</div>
+            <a href="/welcome.html" class="menu-item">👋 Boas-Vindas</a>
+            <a href="#" class="menu-item">📜 Registro de Logs</a>
+        </div>
+
+        <!-- Categoria Engajamento -->
+        <div class="menu-category cat-engajamento">
+            <div class="menu-category-title">🎮 Engajamento</div>
+            <a href="#" class="menu-item">💰 Economia</a>
+            <a href="#" class="menu-item">🏆 XP & Níveis</a>
+        </div>
+
+        <!-- Categoria Automação -->
+        <div class="menu-category cat-automacao">
+            <div class="menu-category-title">🤖 Automação</div>
+            <a href="#" class="menu-item">⚡ Comandos Custom</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="top-bar">
+            <button class="btn-menu-trigger" onclick="toggleMenu()">≡ Menu</button>
+            <button class="btn-home" onclick="showView('server')">🏰 Servidor Principal</button>
+        </div>
+
+        <!-- TELA DO SERVIDOR -->
+        <div id="view-server" class="view active">
+            <div class="header-box">
+                <img id="srvIcon" class="icon-img" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Server Icon">
+                <div>
+                    <h1 id="srvName" class="title">Carregando...</h1>
+                    <div id="srvId" class="subtitle">ID: --</div>
+                </div>
+            </div>
+            <div class="info-grid">
+                <div class="info-card"><div class="label">👥 Total de Membros</div><div class="value" id="srvMembers">--</div></div>
+                <div class="info-card"><div class="label">💬 Total de Canais</div><div class="value" id="srvChannels">--</div></div>
+                <div class="info-card"><div class="label">🛡️ Cargos Registrados</div><div class="value" id="srvRoles">--</div></div>
+                <div class="info-card"><div class="label">📝 Descrição</div><div class="value" id="srvDesc">--</div></div>
+            </div>
+        </div>
+
+        <!-- TELA DO BOT -->
+        <div id="view-bot" class="view">
+            <div class="header-box">
+                <img id="botIcon" class="icon-img" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Bot Icon">
+                <div>
+                    <h1 id="botName" class="title">Carregando...</h1>
+                    <div id="botId" class="subtitle">ID: --</div>
+                </div>
+            </div>
+            <div class="info-grid">
+                <div class="info-card"><div class="label">⏱️ Tempo Online</div><div class="value" id="botUptime">--</div></div>
+                <div class="info-card"><div class="label">📡 Latência (Ping)</div><div class="value" id="botPing">-- ms</div></div>
+                <div class="info-card"><div class="label">🚀 Versão do Bot</div><div class="value" id="botVersion">--</div></div>
+                <div class="info-card"><div class="label">⚙️ Prefixo Padrão</div><div class="value" id="botPrefix">--</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de Neve -->
+    <script src="/snow.js"></script>
+
+    <script>
+        function toggleMenu() {
+            document.getElementById('sideMenu').classList.toggle('open');
+            document.getElementById('menuOverlay').classList.toggle('active');
+        }
+
+        function showView(view) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+            
+            const targetView = document.getElementById('view-' + view);
+            const targetBtn = document.getElementById('btn-' + view);
+
+            if (targetView) targetView.classList.add('active');
+            if (targetBtn) targetBtn.classList.add('active');
+            
+            const sideMenu = document.getElementById('sideMenu');
+            if (sideMenu.classList.contains('open')) {
+                toggleMenu();
+            }
+        }
+
+        function filterMenu() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const categories = document.querySelectorAll('.menu-category');
+
+            categories.forEach(category => {
+                const titleText = category.querySelector('.menu-category-title')?.textContent.toLowerCase() || '';
+                const items = category.querySelectorAll('.menu-item');
+                let hasVisibleItem = false;
+
+                items.forEach(item => {
+                    const itemText = item.textContent.toLowerCase();
+                    const matches = titleText.includes(query) || itemText.includes(query);
+                    item.style.display = matches ? 'flex' : 'none';
+                    if (matches) hasVisibleItem = true;
+                });
+
+                category.style.display = hasVisibleItem ? 'block' : 'none';
+            });
+        }
+
+        async function loadData() {
+            const guildId = window.location.pathname.split('/').pop();
+            try {
+                const res = await fetch(`/api/guild-data/${guildId}`);
+                if (!res.ok) throw new Error();
+                const d = await res.json();
+                
+                if (d.icon) document.getElementById('srvIcon').src = d.icon;
+                document.getElementById('srvName').textContent = d.name || 'Servidor Desconhecido';
+                document.getElementById('srvId').textContent = "ID: " + (d.id || guildId);
+                document.getElementById('srvMembers').textContent = d.memberCount || 0;
+                document.getElementById('srvChannels').textContent = d.channelCount || 0;
+                document.getElementById('srvRoles').textContent = d.roleCount || 0;
+                document.getElementById('srvDesc').textContent = d.description || 'Nenhuma descrição informada.';
+
+                if (d.botIcon) document.getElementById('botIcon').src = d.botIcon;
+                document.getElementById('botName').textContent = d.botName || 'Aeternus Bot';
+                document.getElementById('botId').textContent = "ID: " + (d.botId || '--');
+                document.getElementById('botUptime').textContent = d.uptime || 'Online';
+                document.getElementById('botPing').textContent = (d.ping || '0') + ' ms';
+                document.getElementById('botVersion').textContent = d.version || '1.0.0';
+                document.getElementById('botPrefix').textContent = d.prefix || '!';
+
+            } catch (e) { 
+                console.error("Erro ao obter dados:", e);
+                document.getElementById('srvName').textContent = 'Erro ao carregar';
+            }
+        }
+
+        /* Gestos Swipe */
+        let touchStartX = 0, touchStartY = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].clientX;
+            touchStartY = e.changedTouches[0].clientY;
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                const sideMenu = document.getElementById('sideMenu');
+                const isOpen = sideMenu.classList.contains('open');
+
+                if (diffX > 0 && !isOpen) toggleMenu();
+                else if (diffX < 0 && isOpen) toggleMenu();
+            }
+        }, { passive: true });
+
+        loadData();
+    </script>
+</body>
+</html>
