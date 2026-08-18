@@ -1,10 +1,21 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const session = require('express-session');
 
+function isExpressRouter(mod) {
+    return (
+        mod &&
+        typeof mod === 'function' &&
+        Array.isArray(mod.stack) &&
+        typeof mod.handle === 'function'
+    );
+}
+
 /**
- * Painel web — só monta Express e puxa as rotas.
- * Cada sistema de rota fica em /routes/*.js
+ * Painel web — Express + carrega routes/*.js
+ * Cada arquivo deve exportar: function register(app, client) { ... }
+ * Routers antigos (Express.Router) são ignorados com aviso.
  */
 function startServer(client) {
     const app = express();
@@ -30,7 +41,6 @@ function startServer(client) {
         })
     );
 
-    // Disponibiliza o client nas rotas
     app.use((req, res, next) => {
         req.client = client;
         next();
@@ -48,24 +58,31 @@ function startServer(client) {
         });
     });
 
-    // Carrega rotas automaticamente da pasta routes/
-    const fs = require('fs');
     const routesDir = path.join(__dirname, '..', 'routes');
     if (fs.existsSync(routesDir)) {
         for (const file of fs.readdirSync(routesDir).filter((f) => f.endsWith('.js'))) {
             try {
                 const mod = require(path.join(routesDir, file));
-                if (typeof mod === 'function') {
-                    // module.exports = (app, client) => {}
-                    mod(app, client);
-                    console.log(`🛣️  [ROTA] ${file}`);
-                } else if (mod && mod.router) {
-                    app.use(mod.base || '/', mod.router);
-                    console.log(`🛣️  [ROTA] ${file}`);
-                } else if (mod && typeof mod.register === 'function') {
+
+                if (mod && typeof mod.register === 'function') {
                     mod.register(app, client);
                     console.log(`🛣️  [ROTA] ${file}`);
+                    continue;
                 }
+
+                // function (app, client) — mas NÃO Express.Router
+                if (typeof mod === 'function' && !isExpressRouter(mod)) {
+                    mod(app, client);
+                    console.log(`🛣️  [ROTA] ${file}`);
+                    continue;
+                }
+
+                if (isExpressRouter(mod)) {
+                    console.log(`⏭️  [ROTA] ${file} ignorada (formato Router antigo)`);
+                    continue;
+                }
+
+                console.log(`⏭️  [ROTA] ${file} ignorada (export inválido)`);
             } catch (e) {
                 console.error(`Falha rota ${file}:`, e.message);
             }
@@ -76,7 +93,6 @@ function startServer(client) {
         console.log(`🌐 Painel na porta ${PORT}`);
     });
 
-    // Keep-alive Render
     const base =
         process.env.RENDER_EXTERNAL_URL ||
         (process.env.RENDER_EXTERNAL_HOSTNAME
