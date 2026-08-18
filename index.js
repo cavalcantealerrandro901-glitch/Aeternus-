@@ -12,7 +12,8 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildModeration
     ],
     partials: [
         Partials.Message,
@@ -109,7 +110,7 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// Inicializa o servidor web integrado
+// Painel web + bot no mesmo processo
 startServer(client);
 
 client.login(process.env.DISCORD_TOKEN || process.env.TOKEN);
