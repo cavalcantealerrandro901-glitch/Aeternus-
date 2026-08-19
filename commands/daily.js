@@ -1,34 +1,35 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, AttachmentBuilder } = require('discord.js');
-const { getRandomPhrase } = require('../utils/phrases');
-const { createDailyImage } = require('../utils/imageGenerator');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { getDailyCharmPhrase, getDailyTitle } = require('../utils/dailyPhrases');
+const { getDailyPageUrl } = require('../utils/panelUrl');
 
 module.exports = {
     name: 'daily',
-    async execute(message, args, client) {
-        const guildIcon = message.guild.iconURL({ extension: 'png', size: 512 });
-        const botAvatar = client.user.displayAvatarURL({ extension: 'png', size: 512 });
-        const imageBuffer = await createDailyImage(guildIcon, botAvatar);
-        const attachment = new AttachmentBuilder(imageBuffer, { name: 'daily-panel.png' });
-
+    description: 'Abre o link da recompensa diária no painel',
+    async execute(message) {
+        const url = getDailyPageUrl();
         const embed = new EmbedBuilder()
-            .setColor('#2b2d31')
-            .setTitle('💀 Painel de Recompensa Diária')
-            .setDescription(`✨ *"${getRandomPhrase()}"*\n\nClique no botão abaixo para coletar suas almas diárias!`)
-            .setImage('attachment://daily-panel.png')
-            .setFooter({ text: 'Sistema de Recompensas Aeternus' })
+            .setColor(0x7c3aed)
+            .setTitle(getDailyTitle())
+            .setDescription(getDailyCharmPhrase())
+            .addFields({
+                name: '🔗 Portal',
+                value: `[Abrir recompensa diária](${url})\n\`${url}\``
+            })
+            .setFooter({ text: 'Aeternus · 5.000 a 50.000 almas · 1x por dia' })
             .setTimestamp();
+
+        if (message.client.user) {
+            embed.setThumbnail(message.client.user.displayAvatarURL({ size: 256 }));
+        }
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('daily_claim')
-                .setLabel('🎁 Coletar Recompensa Diária')
-                .setStyle(ButtonStyle.Success)
+                .setLabel('Pegar recompensa diária')
+                .setStyle(ButtonStyle.Link)
+                .setURL(url)
+                .setEmoji('🎁')
         );
 
-        await message.reply({
-            embeds: [embed],
-            files: [attachment],
-            components: [row]
-        });
+        await message.reply({ embeds: [embed], components: [row] });
     }
 };
