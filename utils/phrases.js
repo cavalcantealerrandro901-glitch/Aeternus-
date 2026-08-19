@@ -1,64 +1,58 @@
-const subjects = [
-    "As sombras do abismo", 
-    "Os ecos esquecidos", 
-    "As almas perdidas", 
-    "O vento macabro", 
-    "O véu sombrio", 
-    "A escuridão eterna",
-    "Os espíritos errantes"
+const phrases = [
+    'Bom te ver por aqui.',
+    'Mais um dia, mais uma chance de evoluir.',
+    'Tudo certo por aí?',
+    'Que bom que você apareceu.',
+    'O servidor fica melhor com você online.',
+    'Pronto para mais um round?',
+    'Bem-vindo de volta.',
+    'Hora de cuidar do que importa.',
+    'Pequenos passos também contam.',
+    'Hoje pode ser um bom dia.',
+    'Sem pressa — no seu ritmo.',
+    'Você está no lugar certo.',
+    'Vamos com calma e foco.',
+    'Aproveita o momento.',
+    'Simples, direto e eficiente.'
 ];
 
-const actions = [
-    "revelam segredos sobre", 
-    "sussurram verdades acerca de", 
-    "profetizam o destino de", 
-    "consomem a essência de", 
-    "iluminam o caminho rumo a",
-    "guardam os mistérios de"
-];
+const emojis = ['✨', '👋', '🙂', '💙', '🌟', '👍', '🎯', '☕', '🌈', '💬'];
 
-const objects = [
-    "um futuro incerto.", 
-    "uma riqueza esquecida.", 
-    "uma maldição antiga.", 
-    "um poder oculto.", 
-    "a própria eternidade.",
-    "um tesouro sepultado."
-];
-
-// Sistema de Emojis e Paquera Sombria
-const emojis = ['🖤', '🦇', '🥀', '🕸️', '🔮', '🌙', '💀', '😏', '✨', '🍷'];
 const flirts = [
-    "Sua alma tem um brilho fascinante...",
-    "Até as sombras ficam com inveja da sua presença...",
-    "Você traz uma luz perigosa para o meu abismo...",
-    "Minhas trevas ficam mais interessantes quando você está por perto...",
-    "Que aura encantadora você tem hoje...",
-    "É impossível ignorar a sua essência neste servidor..."
+    'Você tem um jeito bacana de aparecer por aqui.',
+    'Sua presença deixa o chat mais leve.',
+    'É sempre bom te ver online.',
+    'Você chega e o clima melhora um pouco.',
+    'Que bom te encontrar por aqui hoje.',
+    'O servidor fica mais animado com você.'
 ];
+
+function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
 
 function getRandomPhrase() {
-    const sub = subjects[Math.floor(Math.random() * subjects.length)];
-    const act = actions[Math.floor(Math.random() * actions.length)];
-    const obj = objects[Math.floor(Math.random() * objects.length)];
-    return `${sub} ${act} ${obj}`;
+    return pick(phrases);
 }
 
 module.exports = {
     getRandomPhrase,
     generatePhrase(repliedText = null) {
         if (repliedText && repliedText.trim().length > 0) {
-            const act = actions[Math.floor(Math.random() * actions.length)];
-            const obj = objects[Math.floor(Math.random() * objects.length)];
-            return `Analisando "${repliedText}", as forças do submundo declaram que isso ${act} ${obj}`;
-        } else {
-            return getRandomPhrase();
+            const reactions = [
+                `Sobre "${repliedText}": faz sentido pensar nisso com calma.`,
+                `Interessante o que você disse: "${repliedText}".`,
+                `Anotei: "${repliedText}". Vale refletir um pouco.`,
+                `"${repliedText}" — ponto válido.`
+            ];
+            return pick(reactions);
         }
+        return getRandomPhrase();
     },
     getRandomEmoji() {
-        return emojis[Math.floor(Math.random() * emojis.length)];
+        return pick(emojis);
     },
     getFlirt() {
-        return flirts[Math.floor(Math.random() * flirts.length)];
+        return pick(flirts);
     }
 };
