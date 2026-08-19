@@ -10,11 +10,17 @@ function getBalance(userId) {
     } catch (e) { return 0; }
 }
 
+function formatNumber(num) {
+    return num.toLocaleString('en-US');
+}
+
 module.exports = {
     name: 'bal',
-    description: 'Mostra o seu saldo atual de moedas.',
+    description: 'Mostra o saldo de moedas.',
     async execute(message, args) {
-        const balance = getBalance(message.author.id);
-        await message.reply({ content: `💳 **${message.author.username}**, seu saldo atual é de **${balance} moedas**.` });
+        const targetUser = message.mentions.users.first() || message.author;
+        const balance = getBalance(targetUser.id);
+        const formattedBalance = formatNumber(balance);
+        await message.reply({ content: `💳 Saldo de **${targetUser.username}**: **${formattedBalance} moedas**.` });
     }
 };

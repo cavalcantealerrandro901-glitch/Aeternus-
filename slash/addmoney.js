@@ -3,6 +3,29 @@ const fs = require('fs');
 const path = require('path');
 const dbFile = path.join(__dirname, '..', 'database.json');
 
+function parseAmount(str) {
+    if (!str) return null;
+    str = str.trim().toLowerCase().replace(',', '.');
+    let multiplier = 1;
+    if (str.endsWith('k')) {
+        multiplier = 1000;
+        str = str.slice(0, -1);
+    } else if (str.endsWith('m')) {
+        multiplier = 1000000;
+        str = str.slice(0, -1);
+    } else if (str.endsWith('b')) {
+        multiplier = 1000000000;
+        str = str.slice(0, -1);
+    }
+    const num = parseFloat(str);
+    if (isNaN(num)) return null;
+    return Math.floor(num * multiplier);
+}
+
+function formatNumber(num) {
+    return num.toLocaleString('en-US');
+}
+
 function addBalance(userId, amount) {
     try {
         let data = {};
@@ -16,7 +39,6 @@ function addBalance(userId, amount) {
         fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
         return data[`user_${userId}`].balance;
     } catch (e) {
-        console.error(e);
         return null;
     }
 }
@@ -24,14 +46,14 @@ function addBalance(userId, amount) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('addmoney')
-        .setDescription('Adiciona moedas para um usuário (Apenas administradores)')
+        .setDescription('Adiciona moedas para um usuário (ex: 1.5k, 10k)')
         .addUserOption(option => 
             option.setName('usuario')
                 .setDescription('O usuário que receberá as moedas')
                 .setRequired(true))
-        .addIntegerOption(option => 
+        .addStringOption(option => 
             option.setName('quantidade')
-                .setDescription('A quantidade de moedas a adicionar')
+                .setDescription('Quantidade (ex: 500, 1.5k, 2m)')
                 .setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
@@ -39,16 +61,20 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
 
         const targetUser = interaction.options.getUser('usuario');
-        const amount = interaction.options.getInteger('quantidade');
+        const rawAmount = interaction.options.getString('quantidade');
+
+        const amount = parseAmount(rawAmount);
+        if (amount === null || amount <= 0) {
+            return interaction.editReply({ content: '❌ Quantidade inválida! Use valores como `500`, `1.5k`, `10k`, `2m`.' });
+        }
 
         const newBalance = addBalance(targetUser.id, amount);
-
         if (newBalance === null) {
             return interaction.editReply({ content: '❌ Erro ao atualizar o banco de dados.' });
         }
 
         await interaction.editReply({
-            content: `✅ Adicionado com sucesso **${amount} moedas** para **${targetUser.username}**. Novo saldo: **${newBalance} moedas**.`
+            content: `✅ Adicionado com sucesso **${formatNumber(amount)} moedas** para **${targetUser.username}**. Novo saldo: **${formatNumber(newBalance)} moedas**.`
         });
     }
 };

@@ -14,19 +14,31 @@ function getBalance(userId) {
     }
 }
 
+function formatNumber(num) {
+    return num.toLocaleString('en-US');
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('saldo')
-        .setDescription('Mostra o seu saldo atual de moedas.'),
+        .setDescription('Mostra o saldo de moedas de um usuário.')
+        .addUserOption(option => 
+            option.setName('usuario')
+                .setDescription('O usuário que você quer ver o saldo (opcional)')
+                .setRequired(false)),
     
     async execute(interaction) {
-        // Evita o erro 10062 (Unknown interaction)
         await interaction.deferReply();
         
-        const balance = getBalance(interaction.user.id);
+        const targetUser = interaction.options.getUser('usuario') || interaction.user;
+        const balance = getBalance(targetUser.id);
+        const formattedBalance = formatNumber(balance);
         
-        await interaction.editReply({
-            content: `💳 **${interaction.user.username}**, seu saldo atual é de **${balance} moedas**.`
-        });
+        const isSelf = targetUser.id === interaction.user.id;
+        const messageText = isSelf 
+            ? `💳 **${targetUser.username}**, seu saldo atual é de **${formattedBalance} moedas**.`
+            : `💳 O saldo atual de **${targetUser.username}** é de **${formattedBalance} moedas**.`;
+
+        await interaction.editReply({ content: messageText });
     }
 };
