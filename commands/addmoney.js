@@ -1,38 +1,49 @@
-const db = require('../utils/database');
-const { parseAmount } = require('../utils/parser');
+const fs = require('fs');
+const path = require('path');
+const dbFile = path.join(__dirname, '..', 'database.json');
+
+function addBalance(userId, amount) {
+    try {
+        let data = {};
+        if (fs.existsSync(dbFile)) {
+            data = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+        }
+        if (!data[`user_${userId}`]) {
+            data[`user_${userId}`] = { balance: 0 };
+        }
+        data[`user_${userId}`].balance += amount;
+        fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
+        return data[`user_${userId}`].balance;
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+}
 
 module.exports = {
     name: 'addmoney',
+    description: 'Adiciona moedas para um usuário (Apenas administradores).',
     async execute(message, args) {
-        const allowed = db.getPerms();
-        const isOwner = message.author.id === message.guild?.ownerId;
-        
-        // Verifica se quem executa é o dono, administrador ou possui permissão concedida via /perm
-        if (!isOwner && !allowed.includes(message.author.id) && !message.member.permissions.has('Administrator')) {
-            return message.reply('❌ Você não tem permissão para usar este comando.');
+        // Verifica se quem usou o comando é Administrador
+        if (!message.member.permissions.has('Administrator')) {
+            return message.reply({ content: '❌ Você não tem permissão para usar este comando!' });
         }
 
-        const targetInput = args[0];
-        const amountInput = args[1];
+        const targetUser = message.mentions.users.first();
+        const amount = parseInt(args[1]);
 
-        if (!targetInput || !amountInput) {
-            return message.reply('⚠️ Uso correto: `!addmoney @usuario/ID <quantidade>` (ex: `!addmoney @user 23393k`)');
+        if (!targetUser || isNaN(amount)) {
+            return message.reply({ content: '⚠️ Uso incorreto! Exemplo: `!addmoney @usuario 500`' });
         }
 
-        const targetId = targetInput.replace(/[<@!>]/g, '');
-        const targetUser = await message.client.users.fetch(targetId).catch(() => null);
+        const newBalance = addBalance(targetUser.id, amount);
 
-        if (!targetUser) {
-            return message.reply('❌ Usuário não encontrado.');
+        if (newBalance === null) {
+            return message.reply({ content: '❌ Erro ao atualizar o banco de dados.' });
         }
 
-        const amount = parseAmount(amountInput);
-        if (isNaN(amount) || amount <= 0) {
-            return message.reply('❌ Quantidade inválida! Exemplos aceitos: `1k`, `2.5m`, `23393k`, `12283877m`.');
-        }
-
-        const newTotal = db.addBal(targetUser.id, amount);
-
-        message.reply(`💀 Adicionado **${amountInput.toUpperCase()}** almas para **${targetUser.tag}**.\n💰 Saldo total: **${newTotal.toLocaleString()}** almas.`);
+        await message.reply({
+            content: `✅ Adicionado **${amount} moedas** para **${targetUser.username}**. Novo saldo: **${newBalance} moedas**.`
+        });
     }
 };

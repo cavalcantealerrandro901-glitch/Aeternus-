@@ -1,42 +1,54 @@
-const { SlashCommandBuilder } = require('discord.js');
-const db = require('../utils/database');
-const { parseAmount } = require('../utils/parser');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const dbFile = path.join(__dirname, '..', 'database.json');
+
+function addBalance(userId, amount) {
+    try {
+        let data = {};
+        if (fs.existsSync(dbFile)) {
+            data = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+        }
+        if (!data[`user_${userId}`]) {
+            data[`user_${userId}`] = { balance: 0 };
+        }
+        data[`user_${userId}`].balance += amount;
+        fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
+        return data[`user_${userId}`].balance;
+    } catch (e) {
+        console.error(e);
+        return null;
+    }
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('addmoney')
-        .setDescription('Adiciona almas a um usuário')
-        .addUserOption(opt => 
-            opt.setName('usuario')
-               .setDescription('O usuário que receberá as almas')
-               .setRequired(true)
-        )
-        .addStringOption(opt => 
-            opt.setName('quantidade')
-               .setDescription('Quantidade (ex: 500k, 2.5m, 23393k)')
-               .setRequired(true)
-        ),
+        .setDescription('Adiciona moedas para um usuário (Apenas administradores)')
+        .addUserOption(option => 
+            option.setName('usuario')
+                .setDescription('O usuário que receberá as moedas')
+                .setRequired(true))
+        .addIntegerOption(option => 
+            option.setName('quantidade')
+                .setDescription('A quantidade de moedas a adicionar')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
     async execute(interaction) {
-        const allowed = db.getPerms();
-        const isOwner = interaction.user.id === interaction.guild?.ownerId;
+        await interaction.deferReply({ ephemeral: true });
 
-        // Verifica se quem executa possui permissão
-        if (!isOwner && !allowed.includes(interaction.user.id) && !interaction.member.permissions.has('Administrator')) {
-            return interaction.reply({ content: '❌ Você não tem permissão para usar este comando.', ephemeral: true });
+        const targetUser = interaction.options.getUser('usuario');
+        const amount = interaction.options.getInteger('quantidade');
+
+        const newBalance = addBalance(targetUser.id, amount);
+
+        if (newBalance === null) {
+            return interaction.editReply({ content: '❌ Erro ao atualizar o banco de dados.' });
         }
 
-        const target = interaction.options.getUser('usuario');
-        const amountInput = interaction.options.getString('quantidade');
-        const amount = parseAmount(amountInput);
-
-        if (isNaN(amount) || amount <= 0) {
-            return interaction.reply({ content: '❌ Quantidade inválida! Exemplos aceitos: `1k`, `2.5m`, `23393k`.', ephemeral: true });
-        }
-
-        const newTotal = db.addBal(target.id, amount);
-
-        await interaction.reply({
-            content: `💀 Adicionado **${amountInput.toUpperCase()}** almas para **${target.tag}**.\n💰 Saldo total: **${newTotal.toLocaleString()}** almas.`
+        await interaction.editReply({
+            content: `✅ Adicionado com sucesso **${amount} moedas** para **${targetUser.username}**. Novo saldo: **${newBalance} moedas**.`
         });
     }
 };
