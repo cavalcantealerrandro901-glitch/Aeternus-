@@ -1,10 +1,8 @@
 const { claimDaily } = require('../src/systems/dailySystem');
 
 function register(app, client) {
-    // Rota POST para processar o resgate do Daily pelo painel web
     app.post('/api/daily/claim', async (req, res) => {
         try {
-            // Verifica se o usuário está autenticado na sessão do painel
             const sessionUser = req.session?.user || req.user;
 
             if (!sessionUser || !sessionUser.id) {

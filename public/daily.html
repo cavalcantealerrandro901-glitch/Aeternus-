@@ -56,7 +56,6 @@
         }
         .btn-login:hover { transform: translateY(-2px); background: #4752c4; }
 
-        /* Overlay do Vídeo cobrindo a tela inteira */
         .video-overlay {
             display: none; position: fixed; inset: 0; background: #000;
             z-index: 4000; align-items: center; justify-content: center;
@@ -95,20 +94,18 @@
         </div>
     </div>
 
-    <!-- Overlay com o vídeo em tela cheia -->
     <div id="videoOverlay" class="video-overlay">
         <video id="rewardVideo" class="reward-video" src="/videos/video_daily.mp4" playsinline></video>
     </div>
 
     <script src="/snow.js"></script>
     <script>
-        // Opcional: Verifica se já está logado ao carregar a página para ajustar o botão de login
         window.addEventListener('DOMContentLoaded', async () => {
             try {
                 const check = await fetch('/auth/me').then(r => r.json());
                 if (check && check.authenticated) {
                     const loginBtn = document.getElementById('btnLogin');
-                    if (loginBtn) loginBtn.style.display = 'none'; // Esconde o botão de login se já estiver logado
+                    if (loginBtn) loginBtn.style.display = 'none';
                 }
             } catch (e) {
                 console.error("Erro ao verificar sessão:", e);
@@ -132,7 +129,6 @@
                     return;
                 }
 
-                // Inicia o vídeo em tela cheia
                 const overlay = document.getElementById('videoOverlay');
                 const video = document.getElementById('rewardVideo');
                 
@@ -143,7 +139,6 @@
                     console.log("Erro ao reproduzir automaticamente:", err);
                 });
 
-                // Quando o vídeo terminar, fecha o overlay e mostra o saldo direto no card
                 video.onended = () => {
                     overlay.classList.remove('active');
                     document.getElementById('statusReward').innerHTML = `🎉 Resgatado com sucesso!<br><span style="font-size: 18px; color: #34d399;">+${res.amount} Moedas | Saldo: ${res.newBalance}</span>`;
