@@ -3,137 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily — Aeternus</title>
+    <title>Daily - Aeternus</title>
+    <link id="dynamicFavicon" rel="icon" href="">
     <link rel="stylesheet" href="/theme.css">
     <script src="/theme.js"></script>
     <style>
         body {
-            margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-            justify-content: center; font-family: system-ui, sans-serif;
-            background: var(--bg-color, #0f172a); color: var(--text-color, #f8fafc);
-            padding: 24px; box-sizing: border-box; text-align: center;
+            background: var(--bg-color, #0f172a);
+            color: var(--text-color, #f8fafc);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; box-sizing: border-box;
         }
-        a.back { color: #38bdf8; text-decoration: none; margin-bottom: 20px; display: inline-block; }
-        h1 { margin: 0 0 8px; color: #38bdf8; }
-        .sub { color: #94a3b8; margin-bottom: 24px; }
-        .daily-btn {
-            width: min(420px, 100%); border: none; cursor: pointer; border-radius: 16px; overflow: hidden;
-            background: linear-gradient(135deg, #1e1b4b, #0f172a);
-            border: 1px solid #4c1d95; padding: 0; position: relative;
-            box-shadow: 0 0 30px rgba(124, 58, 237, 0.35);
+        .top-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; }
+        .top-btn {
+            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
+            color: var(--text-color, #f8fafc); padding: 8px 16px; border-radius: 20px;
+            cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold;
         }
-        .daily-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-        .daily-btn img { width: 100%; height: 180px; object-fit: cover; display: block; filter: brightness(0.8); }
-        .daily-btn .label {
-            position: absolute; inset: 0; display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.2));
-            color: #fff; font-weight: 800; font-size: 1.2rem; text-shadow: 0 2px 8px #000; padding: 12px;
+        .container { text-align: center; margin-top: 90px; max-width: 640px; width: 100%; }
+        
+        .page-header-text {
+            font-size: 15px; color: #94a3b8; margin-bottom: 18px; line-height: 1.6; padding: 0 10px;
         }
-        .daily-btn .sub2 { font-size: 12px; font-weight: 600; margin-top: 6px; color: #c4b5fd; }
-        #dailyOverlay {
-            display: none; position: fixed; inset: 0; z-index: 9999;
-            background: #000; align-items: center; justify-content: center;
+        .page-footer-text {
+            font-size: 14px; color: #64748b; margin-top: 22px; line-height: 1.6; padding: 0 15px;
         }
-        #dailyOverlay.active { display: flex; }
-        #dailyOverlay video {
-            width: 100%; height: 100%; object-fit: contain; pointer-events: none; background: #000;
+
+        .card {
+            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
+            border-radius: 20px; padding: 30px; box-shadow: 0 8px 30px rgba(0,0,0,.35);
         }
-        #dailyResult {
-            display: none; position: absolute; inset: 0; flex-direction: column;
-            align-items: center; justify-content: center;
-            background: rgba(0,0,0,0.55); color: #fff; text-align: center; padding: 24px;
+        h1 { color: #38bdf8; margin-top: 0; }
+        p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
+        
+        .btn-group {
+            display: flex; flex-direction: column; gap: 12px; align-items: center; margin-top: 20px;
         }
-        #dailyResult.active { display: flex; }
-        #dailyResult h2 { margin: 0 0 8px; color: #fbbf24; }
-        #dailyResult .amt { font-size: 2.4rem; font-weight: 900; color: #86efac; margin: 8px 0 20px; }
-        #dailyResult button {
-            background: #38bdf8; color: #0f172a; border: none; border-radius: 999px;
-            padding: 12px 28px; font-weight: 800; cursor: pointer;
+        .btn-claim {
+            background: #38bdf8; color: #0f172a; border: none; padding: 14px 28px;
+            font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer;
+            width: 100%; max-width: 280px; transition: transform 0.2s;
+        }
+        .btn-claim:hover { transform: translateY(-2px); }
+
+        .btn-login {
+            background: #5865F2; color: #ffffff; border: none; padding: 12px 24px;
+            font-size: 15px; font-weight: bold; border-radius: 25px; cursor: pointer;
+            text-decoration: none; width: 100%; max-width: 280px; display: inline-block;
+            box-sizing: border-box; transition: transform 0.2s;
+        }
+        .btn-login:hover { transform: translateY(-2px); background: #4752c4; }
+
+        /* Overlay do Vídeo cobrindo a tela inteira */
+        .video-overlay {
+            display: none; position: fixed; inset: 0; background: #000;
+            z-index: 4000; align-items: center; justify-content: center;
+        }
+        .video-overlay.active { display: flex; }
+        .reward-video {
+            width: 100%; height: 100%; object-fit: cover; outline: none;
         }
     </style>
 </head>
 <body>
-    <a class="back" href="/">← Voltar</a>
-    <h1 data-i18n="reward">🎁 Recompensa diária</h1>
-    <p class="sub" data-i18n="daily_sub">5.000 — 50.000 almas · 1x por dia</p>
+    <div class="top-bar">
+        <a href="/" class="top-btn">Voltar ao Início</a>
+    </div>
 
-    <button type="button" class="daily-btn" id="dailyBtn" onclick="claimDaily()">
-        <img src="/videos/daily-poster.jpg" alt="" onerror="this.remove()">
-        <div class="label">
-            <span data-i18n="daily_title">Pegue sua recompensa diária</span>
-            <span class="sub2">Clique para abrir o baú</span>
+    <div class="container">
+        <div class="page-header-text">
+            ✨ Mantenha sua constância ativa e garanta bônus exclusivos diariamente! Participar do sistema de recompensas diárias é a melhor maneira de acumular recursos essenciais.
         </div>
-    </button>
 
-    <div id="dailyOverlay">
-        <video id="dailyVideo" src="/videos/daily-reward.mp4" playsinline preload="auto"></video>
-        <div id="dailyResult">
-            <h2 data-i18n="reward">✨ Recompensa diária</h2>
-            <div class="amt" id="dailyAmount">+0</div>
-            <p style="opacity:0.85;margin:0 0 16px;">Almas creditadas na sua conta</p>
-            <button type="button" onclick="closeDaily()" data-i18n="continue">Continuar</button>
+        <div class="card">
+            <h1>🎁 Recompensa Diária (Daily)</h1>
+            <p>Resgate suas recompensas diárias para acumular recursos, fortalecer sua jornada e desbloquear novas experiências com o bot Aeternus no seu servidor.</p>
+            <div style="margin: 25px 0; font-size: 24px; font-weight: bold; color: #38bdf8;" id="statusReward">
+                💎 Bônus Disponível
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn-claim" id="btnClaim" onclick="playRewardVideo()">Resgatar Recompensa</button>
+                <a href="/auth/discord" class="btn-login" id="btnLogin">Entrar com Discord</a>
+            </div>
+        </div>
+
+        <div class="page-footer-text">
+            💡 Dica importante: O ciclo completo para um novo resgate se renova rigorosamente a cada 24 horas.
         </div>
     </div>
 
-    <script src="/i18n.js"></script>
+    <!-- Overlay com o vídeo em tela cheia -->
+    <div id="videoOverlay" class="video-overlay">
+        <video id="rewardVideo" class="reward-video" src="/videos/video_daily.mp4" playsinline></video>
+    </div>
+
+    <script src="/snow.js"></script>
     <script>
-        let claiming = false;
-
-        async function claimDaily() {
-            if (claiming) return;
-            claiming = true;
-            const btn = document.getElementById('dailyBtn');
-            btn.disabled = true;
+        // Opcional: Verifica se já está logado ao carregar a página para ajustar o botão de login
+        window.addEventListener('DOMContentLoaded', async () => {
             try {
-                const res = await fetch('/api/daily-claim', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    credentials: 'include'
-                });
-                const data = await res.json().catch(() => ({}));
-                if (res.status === 401) {
-                    window.location.href = '/auth/discord';
-                    return;
+                const check = await fetch('/auth/me').then(r => r.json());
+                if (check && check.authenticated) {
+                    const loginBtn = document.getElementById('btnLogin');
+                    if (loginBtn) loginBtn.style.display = 'none'; // Esconde o botão de login se já estiver logado
                 }
-                if (!res.ok) {
-                    alert(data.error || 'Não foi possível resgatar agora.');
-                    btn.disabled = false;
-                    claiming = false;
-                    return;
-                }
-                playDailyVideo(data.amount || 0);
             } catch (e) {
-                alert('Erro de conexão.');
-                btn.disabled = false;
-                claiming = false;
+                console.error("Erro ao verificar sessão:", e);
             }
-        }
+        });
 
-        function playDailyVideo(amount) {
-            const overlay = document.getElementById('dailyOverlay');
-            const video = document.getElementById('dailyVideo');
-            const result = document.getElementById('dailyResult');
-            result.classList.remove('active');
-            document.getElementById('dailyAmount').textContent =
-                '+' + Number(amount).toLocaleString('pt-BR') + ' almas';
-            overlay.classList.add('active');
-            video.currentTime = 0;
-            video.controls = false;
-            video.oncontextmenu = (e) => e.preventDefault();
-            const p = video.play();
-            if (p && p.catch) p.catch(() => result.classList.add('active'));
-            video.onended = () => result.classList.add('active');
-        }
+        async function playRewardVideo() {
+            try {
+                const response = await fetch('/api/daily/claim', { method: 'POST' });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    alert(`Erro HTTP (${response.status}): ${errorText || response.statusText}`);
+                    return;
+                }
 
-        function closeDaily() {
-            const video = document.getElementById('dailyVideo');
-            video.pause();
-            video.currentTime = 0;
-            document.getElementById('dailyResult').classList.remove('active');
-            document.getElementById('dailyOverlay').classList.remove('active');
-            claiming = false;
-            document.getElementById('dailyBtn').disabled = false;
+                const res = await response.json();
+
+                if (!res.success) {
+                    alert('Erro do Servidor: ' + (res.message || 'Desconhecido'));
+                    return;
+                }
+
+                // Inicia o vídeo em tela cheia
+                const overlay = document.getElementById('videoOverlay');
+                const video = document.getElementById('rewardVideo');
+                
+                overlay.classList.add('active');
+                video.currentTime = 0;
+                
+                video.play().catch(err => {
+                    console.log("Erro ao reproduzir automaticamente:", err);
+                });
+
+                // Quando o vídeo terminar, fecha o overlay e mostra o saldo direto no card
+                video.onended = () => {
+                    overlay.classList.remove('active');
+                    document.getElementById('statusReward').innerHTML = `🎉 Resgatado com sucesso!<br><span style="font-size: 18px; color: #34d399;">+${res.amount} Moedas | Saldo: ${res.newBalance}</span>`;
+                    document.getElementById('btnClaim').style.display = 'none';
+                    const loginBtn = document.getElementById('btnLogin');
+                    if (loginBtn) loginBtn.style.display = 'none';
+                };
+
+            } catch (e) {
+                console.error(e);
+                alert('Erro de Conexão ou JavaScript: ' + e.message);
+            }
         }
     </script>
 </body>

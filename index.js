@@ -9,6 +9,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Partials, Collection, MessageFlags } = require('discord.js');
 const { loadCommands, loadSlash, loadEvents, loadSystems } = require('./bot/loaders');
 const { startServer } = require('./web/server');
+const dailySystem = require('./src/systems/dailySystem'); // Importação do sistema de Daily
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 if (!TOKEN) {
@@ -37,6 +38,23 @@ loadCommands(client);
 loadSlash(client);
 loadEvents(client);
 loadSystems(client);
+
+// Sistema de Daily via Comando de Texto (!daily)
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+
+    if (message.content.toLowerCase() === '!daily') {
+        const result = await dailySystem.claimDaily(message.author.id);
+        
+        if (result.success) {
+            message.reply(`🎉 Você resgatou sua recompensa diária de **${result.amount}** almas/moedas! Seu saldo atual é de **${result.newBalance}**.`);
+        } else {
+            const hours = Math.floor(result.timeLeft / (1000 * 60 * 60));
+            const minutes = Math.floor((result.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            message.reply(`⏳ Você já resgatou sua recompensa hoje! Tente novamente em **${hours}h ${minutes}m**.`);
+        }
+    }
+});
 
 // Slash runtime
 client.on('interactionCreate', async (interaction) => {

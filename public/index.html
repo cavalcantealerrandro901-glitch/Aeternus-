@@ -45,22 +45,13 @@
         }
         .hero h1 { margin: 0; font-size: 2.4rem; letter-spacing: 3px; color: #38bdf8; }
         .phrase {
-            margin: 18px auto 10px; max-width: 560px; font-size: 1.15rem; line-height: 1.55;
+            margin: 24px auto 14px; max-width: 560px; font-size: 1.15rem; line-height: 1.55;
             color: var(--text-color, #e2e8f0); font-style: italic; opacity: .95;
             padding: 16px 18px; border-radius: 14px;
             background: linear-gradient(135deg, rgba(56,189,248,.08), rgba(124,58,237,.12));
             border: 1px solid rgba(56,189,248,.25);
         }
-        .subtitle { color: #94a3b8; margin: 0 0 28px; font-size: 14px; }
-        .features {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px; width: 100%; max-width: 560px; margin: 0 auto 28px;
-        }
-        .feature-card {
-            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
-            border-radius: 12px; padding: 14px; text-align: center; font-size: 13px; color: #94a3b8;
-        }
-        .feature-card strong { display: block; color: var(--text-color, #f8fafc); margin-bottom: 4px; }
+        .subtitle { color: #94a3b8; margin: 0 0 35px; font-size: 14px; }
         .btn-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px; margin: 0 auto; }
         .btn {
             padding: 12px 20px; border-radius: 25px; font-weight: bold; text-decoration: none;
@@ -105,7 +96,7 @@
         <a href="/gaming.html" class="dropdown-item" data-i18n="gaming">🎮 Gaming</a>
         <a href="/wiki.html" class="dropdown-item" data-i18n="wiki">📖 Wiki</a>
         <a href="/api-premium.html" class="dropdown-item" data-i18n="api_premium">⚡ API Premium</a>
-        <a href="/daily.html" class="dropdown-item" data-i18n="daily">🎁 Recompensa diária</a>
+        <a href="/daily.html" class="dropdown-item" data-i18n="daily">🎁 Daily</a>
         <div class="dropdown-sep"></div>
         <button type="button" class="dropdown-item" onclick="openCommands()" data-i18n="commands">📜 Comandos</button>
         <a href="/dashboard" class="dropdown-item" data-i18n="panel">⚙️ Painel</a>
@@ -125,7 +116,7 @@
         </div>
     </div>
 
-    <!-- Modal idiomas (estilo dicionário + busca) -->
+    <!-- Modal idiomas -->
     <div id="langModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" onclick="closeModals()">✕</span>
@@ -138,15 +129,8 @@
     <div class="hero">
         <img id="botAvatar" class="bot-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Bot">
         <h1 id="botName">AETERNUS</h1>
-        <div class="phrase" id="botPhrase">Carregando as palavras do abismo...</div>
+        <div class="phrase" id="botPhrase">💬 Você está no lugar certo.</div>
         <p class="subtitle" id="botSubtitle" data-i18n="hero_sub">Uma nova era de experiências e conexões.</p>
-
-        <div class="features">
-            <div class="feature-card"><strong>Economia</strong>Almas &amp; daily</div>
-            <div class="feature-card"><strong>Moderação</strong>Ban, kick, logs</div>
-            <div class="feature-card"><strong>Painel</strong>Configure online</div>
-            <div class="feature-card"><strong>Jogos</strong>Em breve</div>
-        </div>
 
         <div class="btn-container">
             <a id="btnInvite" href="#" target="_blank" class="btn btn-primary" data-i18n="add_server">Adicionar ao Servidor</a>
@@ -175,7 +159,7 @@
             if (el) el.textContent = t === 'dark' ? '🌙 Escuro' : '☀️ Claro';
         })();
 
-        // Bot info + frase decorativa + avatar
+        // Bot info
         fetch('/api/bot-info').then(r => r.json()).then(bot => {
             if (bot.avatar) {
                 document.getElementById('botAvatar').src = bot.avatar;
@@ -185,12 +169,10 @@
             if (bot.name || bot.username) {
                 document.getElementById('botName').textContent = (bot.name || bot.username).toUpperCase();
             }
-            if (bot.phrase) document.getElementById('botPhrase').textContent = bot.phrase;
+            // Deixamos a frase fixa como solicitado, mas mantemos o subtítulo dinâmico se necessário
             if (bot.subtitle) document.getElementById('botSubtitle').textContent = bot.subtitle;
             if (bot.inviteUrl) document.getElementById('btnInvite').href = bot.inviteUrl;
-        }).catch(() => {
-            document.getElementById('botPhrase').textContent = 'As sombras do abismo sussurram o seu nome...';
-        });
+        }).catch(() => {});
 
         fetch('/auth/me').then(r => r.json()).then(d => {
             if (d && d.authenticated) {
@@ -265,7 +247,6 @@
             closeModals();
         }
 
-        // fecha modal clicando fora
         document.querySelectorAll('.modal').forEach(m => {
             m.addEventListener('click', (e) => { if (e.target === m) closeModals(); });
         });
