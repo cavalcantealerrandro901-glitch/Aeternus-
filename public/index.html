@@ -7,158 +7,139 @@
     <link id="dynamicFavicon" rel="icon" href="">
     <link rel="stylesheet" href="/theme.css">
     <script src="/theme.js"></script>
-    <script src="/i18n.js"></script>
     <style>
         body {
-            background-color: var(--bg-color, #0b0f19);
-            color: var(--text-color, #e5e7eb);
-            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg-color, #0f172a);
+            color: var(--text-color, #f8fafc);
+            font-family: 'Segoe UI', system-ui, sans-serif;
             margin: 0; padding: 20px;
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh; box-sizing: border-box;
         }
-        .top-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; align-items: center; }
+        .top-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; }
         .top-btn {
-            background: var(--card-bg, #111827);
-            border: 1px solid var(--border-color, #1f2937);
-            color: var(--text-color, #e5e7eb);
-            padding: 8px 16px; border-radius: 20px; cursor: pointer;
-            text-decoration: none; font-size: 14px; font-weight: bold;
+            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
+            color: var(--text-color, #f8fafc); padding: 8px 16px; border-radius: 20px;
+            cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold;
         }
-        .btn-login-top { background: #38bdf8 !important; color: #0b0f19 !important; border: none !important; }
+        .btn-login-top { background: #38bdf8 !important; color: #0f172a !important; border: none !important; }
         .dropdown-menu {
-            display: none; position: absolute; top: 60px; right: 20px; width: 240px;
-            background-color: var(--card-bg, #111827); border: 1px solid var(--border-color, #1f2937);
-            border-radius: 12px; padding: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.35); z-index: 1001;
+            display: none; position: absolute; top: 60px; right: 20px; width: 250px;
+            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
+            border-radius: 12px; padding: 10px; z-index: 1001; box-shadow: 0 8px 30px rgba(0,0,0,.35);
         }
         .dropdown-menu.active { display: block; }
         .dropdown-item {
-            padding: 10px 12px; color: var(--text-color, #e5e7eb); cursor: pointer; border: none;
+            padding: 10px 12px; color: var(--text-color, #f8fafc); cursor: pointer; border: none;
             background: none; font-size: 14px; border-radius: 8px; display: block; width: 100%;
             text-align: left; text-decoration: none; box-sizing: border-box;
         }
-        .dropdown-item:hover { background: rgba(56, 189, 248, 0.12); color: #38bdf8; }
-        .dropdown-sep { border-top: 1px solid #1f2937; margin: 8px 0; }
-        .lang-submenu { display: none; padding-left: 10px; margin: 4px 0; border-left: 2px solid #38bdf8; }
-        .lang-submenu.active { display: block; }
-        .hero { text-align: center; margin-top: 80px; max-width: 640px; width: 100%; }
-        .bot-avatar { width: 110px; height: 110px; border-radius: 50%; border: 3px solid #38bdf8; margin-bottom: 16px; object-fit: cover; }
-        .hero h1 { margin: 0 0 8px; font-size: 2rem; letter-spacing: 2px; color: #38bdf8; }
-        .hero p { color: #9ca3af; margin: 0 0 24px; }
+        .dropdown-item:hover { background: rgba(56,189,248,.12); color: #38bdf8; }
+        .dropdown-sep { border-top: 1px solid var(--border-color, #334155); margin: 8px 0; }
+
+        .hero { text-align: center; margin-top: 90px; max-width: 720px; width: 100%; }
+        .bot-avatar {
+            width: 128px; height: 128px; border-radius: 50%; border: 3px solid #38bdf8;
+            object-fit: cover; margin-bottom: 18px;
+            box-shadow: 0 0 40px rgba(56,189,248,.35);
+        }
+        .hero h1 { margin: 0; font-size: 2.4rem; letter-spacing: 3px; color: #38bdf8; }
+        .phrase {
+            margin: 18px auto 10px; max-width: 560px; font-size: 1.15rem; line-height: 1.55;
+            color: var(--text-color, #e2e8f0); font-style: italic; opacity: .95;
+            padding: 16px 18px; border-radius: 14px;
+            background: linear-gradient(135deg, rgba(56,189,248,.08), rgba(124,58,237,.12));
+            border: 1px solid rgba(56,189,248,.25);
+        }
+        .subtitle { color: #94a3b8; margin: 0 0 28px; font-size: 14px; }
         .features {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 12px; width: 100%; max-width: 560px; margin: 0 auto 28px;
         }
         .feature-card {
-            background: #111827; border: 1px solid #1f2937; border-radius: 12px;
-            padding: 14px; text-align: center; font-size: 13px; color: #9ca3af;
+            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
+            border-radius: 12px; padding: 14px; text-align: center; font-size: 13px; color: #94a3b8;
         }
-        .feature-card strong { display: block; color: #e5e7eb; margin-bottom: 4px; font-size: 14px; }
-        .daily-wrap { width: 100%; max-width: 420px; margin: 10px auto 28px; }
-        .daily-btn {
-            width: 100%; border: none; cursor: pointer; border-radius: 16px; overflow: hidden;
-            background: linear-gradient(135deg, #1e1b4b, #0f172a);
-            border: 1px solid #4c1d95; padding: 0; position: relative;
-            box-shadow: 0 0 30px rgba(124, 58, 237, 0.35);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        .daily-btn:hover { transform: translateY(-2px); box-shadow: 0 0 40px rgba(56, 189, 248, 0.4); }
-        .daily-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-        .daily-btn img {
-            width: 100%; height: 168px; object-fit: cover; display: block; filter: brightness(0.8);
-        }
-        .daily-btn .label {
-            position: absolute; inset: 0; display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.25));
-            color: #fff; font-weight: 800; font-size: 1.15rem; letter-spacing: 0.4px;
-            text-shadow: 0 2px 8px #000; padding: 12px;
-        }
-        .daily-btn .sub { font-size: 12px; font-weight: 600; opacity: 0.95; margin-top: 6px; color: #c4b5fd; }
+        .feature-card strong { display: block; color: var(--text-color, #f8fafc); margin-bottom: 4px; }
         .btn-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px; margin: 0 auto; }
         .btn {
             padding: 12px 20px; border-radius: 25px; font-weight: bold; text-decoration: none;
-            border: 1px solid var(--border-color, #1f2937); color: var(--text-color, #e5e7eb);
-            background: var(--card-bg, #111827); display: block; text-align: center;
+            border: 1px solid var(--border-color, #334155); color: var(--text-color, #f8fafc);
+            background: var(--card-bg, #1e293b); display: block; text-align: center;
         }
-        .btn-primary { background: #38bdf8; color: #0b0f19; border: none; }
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 3000; align-items: center; justify-content: center; }
+        .btn-primary { background: #38bdf8; color: #0f172a; border: none; }
+
+        .modal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55);
+            z-index: 3000; align-items: center; justify-content: center; padding: 16px;
+        }
+        .modal.open { display: flex; }
         .modal-content {
-            background: var(--card-bg, #111827); padding: 20px; border-radius: 15px;
-            width: 90%; max-width: 450px; max-height: 80vh; overflow-y: auto;
-            border: 1px solid #1f2937;
+            background: var(--card-bg, #1e293b); padding: 20px; border-radius: 15px;
+            width: 100%; max-width: 480px; max-height: 80vh; overflow: hidden;
+            border: 1px solid var(--border-color, #334155); display: flex; flex-direction: column;
         }
+        .modal-content h3 { margin: 0 0 12px; color: #38bdf8; }
+        .modal-search {
+            width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color, #334155);
+            background: var(--bg-color, #0f172a); color: var(--text-color, #f8fafc);
+            margin-bottom: 12px; box-sizing: border-box; font-size: 14px;
+        }
+        .modal-list { overflow-y: auto; flex: 1; max-height: 50vh; }
+        .modal-row {
+            padding: 10px 12px; border-radius: 8px; cursor: pointer; display: flex; gap: 10px; align-items: center;
+            border-bottom: 1px solid rgba(51,65,85,.5);
+        }
+        .modal-row:hover { background: rgba(56,189,248,.1); }
         .close-modal { float: right; cursor: pointer; font-size: 18px; }
-        #dailyOverlay {
-            display: none; position: fixed; inset: 0; z-index: 9999;
-            background: #000; align-items: center; justify-content: center;
-        }
-        #dailyOverlay.active { display: flex; }
-        #dailyOverlay video {
-            width: 100%; height: 100%; object-fit: contain;
-            pointer-events: none; background: #000;
-        }
-        #dailyResult {
-            display: none; position: absolute; inset: 0;
-            flex-direction: column; align-items: center; justify-content: center;
-            background: rgba(0,0,0,0.55); color: #fff; text-align: center; padding: 24px;
-        }
-        #dailyResult.active { display: flex; }
-        #dailyResult h2 { margin: 0 0 8px; font-size: 1.6rem; color: #fbbf24; }
-        #dailyResult .amt { font-size: 2.4rem; font-weight: 900; color: #86efac; margin: 8px 0 20px; }
-        #dailyResult button {
-            background: #38bdf8; color: #0b0f19; border: none; border-radius: 999px;
-            padding: 12px 28px; font-weight: 800; cursor: pointer; font-size: 15px;
-        }
     </style>
 </head>
 <body>
     <div class="top-bar">
-        <a href="/auth/discord" class="top-btn btn-login-top" id="btnLogin">Login</a>
-        <button class="top-btn" type="button" onclick="toggleMenu()">Menu ☰</button>
+        <a href="/auth/discord" class="top-btn btn-login-top" id="btnLogin" data-i18n="login">Login</a>
+        <button class="top-btn" type="button" onclick="toggleMenu()" data-i18n="menu">Menu</button>
     </div>
 
     <div id="dropdownMenu" class="dropdown-menu">
-        <a href="/loja.html" class="dropdown-item">🛒 Loja</a>
-        <a href="/gaming.html" class="dropdown-item">🎮 Gaming</a>
-        <a href="/wiki.html" class="dropdown-item">📖 Wiki</a>
-        <a href="/api-premium.html" class="dropdown-item">⚡ API Premium</a>
+        <a href="/loja.html" class="dropdown-item" data-i18n="store">🛒 Loja</a>
+        <a href="/gaming.html" class="dropdown-item" data-i18n="gaming">🎮 Gaming</a>
+        <a href="/wiki.html" class="dropdown-item" data-i18n="wiki">📖 Wiki</a>
+        <a href="/api-premium.html" class="dropdown-item" data-i18n="api_premium">⚡ API Premium</a>
+        <a href="/daily.html" class="dropdown-item" data-i18n="daily">🎁 Recompensa diária</a>
         <div class="dropdown-sep"></div>
-        <button type="button" class="dropdown-item" onclick="showCommands()">📜 Comandos</button>
-        <a href="/dashboard" class="dropdown-item">⚙️ Painel</a>
-        <button type="button" class="dropdown-item" onclick="toggleLangMenu()">🌐 Idioma</button>
-        <div id="langSubmenu" class="lang-submenu">
-            <button type="button" onclick="changeLang('pt')" class="dropdown-item">🇧🇷 Português</button>
-            <button type="button" onclick="changeLang('en')" class="dropdown-item">🇺🇸 English</button>
-            <button type="button" onclick="changeLang('es')" class="dropdown-item">🇪🇸 Español</button>
-            <button type="button" onclick="changeLang('fr')" class="dropdown-item">🇫🇷 Français</button>
-        </div>
+        <button type="button" class="dropdown-item" onclick="openCommands()" data-i18n="commands">📜 Comandos</button>
+        <a href="/dashboard" class="dropdown-item" data-i18n="panel">⚙️ Painel</a>
+        <button type="button" class="dropdown-item" onclick="openLanguages()" data-i18n="language">🌐 Idioma</button>
+        <button type="button" class="dropdown-item" onclick="toggleTheme()" id="themeLabel">🌙 Escuro</button>
         <div class="dropdown-sep"></div>
-        <a href="/auth/logout" class="dropdown-item" style="color:#ef4444;">🚪 Sair</a>
+        <a href="/auth/logout" class="dropdown-item" style="color:#ef4444" data-i18n="logout">🚪 Sair</a>
     </div>
 
+    <!-- Modal comandos -->
     <div id="cmdModal" class="modal">
         <div class="modal-content">
-            <span class="close-modal" onclick="closeModal()">✕</span>
-            <h3 style="color:#38bdf8;margin-top:0;">📜 Comandos do Bot</h3>
-            <div id="cmdList" style="margin-top:15px;">Carregando...</div>
+            <span class="close-modal" onclick="closeModals()">✕</span>
+            <h3 data-i18n="commands">📜 Comandos</h3>
+            <input class="modal-search" id="cmdSearch" data-i18n-placeholder="search_cmd" placeholder="Pesquisar comando..." oninput="filterCommands()">
+            <div class="modal-list" id="cmdList">Carregando...</div>
         </div>
     </div>
 
-    <div id="dailyOverlay">
-        <video id="dailyVideo" src="/videos/daily-reward.mp4" playsinline preload="auto"></video>
-        <div id="dailyResult">
-            <h2>✨ Recompensa diária</h2>
-            <div class="amt" id="dailyAmount">+0</div>
-            <p style="opacity:0.85;margin:0 0 16px;">Almas creditadas na sua conta</p>
-            <button type="button" onclick="closeDaily()">Continuar</button>
+    <!-- Modal idiomas (estilo dicionário + busca) -->
+    <div id="langModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModals()">✕</span>
+            <h3 data-i18n="language">🌐 Idioma</h3>
+            <input class="modal-search" id="langSearch" data-i18n-placeholder="search_lang" placeholder="Pesquisar idioma..." oninput="filterLanguages()">
+            <div class="modal-list" id="langList">Carregando...</div>
         </div>
     </div>
 
     <div class="hero">
         <img id="botAvatar" class="bot-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Bot">
         <h1 id="botName">AETERNUS</h1>
-        <p>Uma nova era de experiências e conexões. Bem-vindo ao santuário oficial do bot.</p>
+        <div class="phrase" id="botPhrase">Carregando as palavras do abismo...</div>
+        <p class="subtitle" id="botSubtitle" data-i18n="hero_sub">Uma nova era de experiências e conexões.</p>
 
         <div class="features">
             <div class="feature-card"><strong>Economia</strong>Almas &amp; daily</div>
@@ -167,132 +148,126 @@
             <div class="feature-card"><strong>Jogos</strong>Em breve</div>
         </div>
 
-        <div class="daily-wrap">
-            <button type="button" class="daily-btn" id="dailyBtn" onclick="claimDaily()">
-                <img src="/videos/daily-poster.jpg" alt="Baú da recompensa" onerror="this.remove()">
-                <div class="label">
-                    🎁 Pegue sua recompensa diária
-                    <span class="sub">5.000 — 50.000 almas · 1x por dia</span>
-                </div>
-            </button>
-        </div>
-
         <div class="btn-container">
-            <a id="btnInvite" href="https://discord.com/oauth2/authorize?client_id=1150821035056701550&scope=bot%20applications.commands&permissions=8" target="_blank" class="btn btn-primary">Adicionar ao Servidor</a>
-            <a href="https://discord.gg/seu-link-de-suporte" target="_blank" class="btn">Suporte</a>
+            <a id="btnInvite" href="#" target="_blank" class="btn btn-primary" data-i18n="add_server">Adicionar ao Servidor</a>
+            <a href="https://discord.gg/seu-link-de-suporte" target="_blank" class="btn" data-i18n="support">Suporte</a>
         </div>
     </div>
 
+    <script src="/i18n.js"></script>
     <script src="/snow.js"></script>
     <script>
-        function toggleMenu() { document.getElementById('dropdownMenu').classList.toggle('active'); }
-        function toggleLangMenu() { document.getElementById('langSubmenu').classList.toggle('active'); }
-        async function changeLang(lang) {
-            if (window.i18n && typeof i18n.loadLanguage === 'function') await i18n.loadLanguage(lang);
-            toggleMenu();
-        }
-        function showCommands() {
-            toggleMenu();
-            document.getElementById('cmdModal').style.display = 'flex';
-            fetch('/api/commands').then(r => r.json()).then(cmds => {
-                const list = document.getElementById('cmdList');
-                if (!cmds || !cmds.length) {
-                    list.innerHTML = '<div style="color:#64748b;">Nenhum comando encontrado.</div>';
-                    return;
-                }
-                list.innerHTML = cmds.map(c => `
-                    <div style="margin-bottom:12px;border-bottom:1px solid #1f2937;padding-bottom:8px;">
-                        <span style="font-family:monospace;background:rgba(56,189,248,0.1);color:#38bdf8;padding:2px 6px;border-radius:4px;font-weight:bold;">/${c.name}</span>
-                        <div style="margin-top:4px;font-size:13px;opacity:0.85;">${c.description || 'Sem descrição.'}</div>
-                    </div>`).join('');
-            }).catch(() => {
-                document.getElementById('cmdList').innerHTML = '<div style="color:#ef4444;">Erro ao carregar comandos.</div>';
-            });
-        }
-        function closeModal() { document.getElementById('cmdModal').style.display = 'none'; }
+        let allCommands = [];
+        let allLanguages = [];
 
+        function toggleMenu() {
+            document.getElementById('dropdownMenu').classList.toggle('active');
+        }
+        function closeModals() {
+            document.getElementById('cmdModal').classList.remove('open');
+            document.getElementById('langModal').classList.remove('open');
+        }
+
+        // Tema
+        (function syncThemeLabel() {
+            const t = localStorage.getItem('theme') || 'dark';
+            const el = document.getElementById('themeLabel');
+            if (el) el.textContent = t === 'dark' ? '🌙 Escuro' : '☀️ Claro';
+        })();
+
+        // Bot info + frase decorativa + avatar
         fetch('/api/bot-info').then(r => r.json()).then(bot => {
             if (bot.avatar) {
                 document.getElementById('botAvatar').src = bot.avatar;
                 const fav = document.getElementById('dynamicFavicon');
                 if (fav) fav.href = bot.avatar;
             }
-            if (bot.username) document.getElementById('botName').textContent = bot.username.toUpperCase();
+            if (bot.name || bot.username) {
+                document.getElementById('botName').textContent = (bot.name || bot.username).toUpperCase();
+            }
+            if (bot.phrase) document.getElementById('botPhrase').textContent = bot.phrase;
+            if (bot.subtitle) document.getElementById('botSubtitle').textContent = bot.subtitle;
             if (bot.inviteUrl) document.getElementById('btnInvite').href = bot.inviteUrl;
-        }).catch(() => {});
+        }).catch(() => {
+            document.getElementById('botPhrase').textContent = 'As sombras do abismo sussurram o seu nome...';
+        });
 
         fetch('/auth/me').then(r => r.json()).then(d => {
             if (d && d.authenticated) {
                 const b = document.getElementById('btnLogin');
-                b.textContent = (d.user && d.user.username) ? d.user.username : 'Conta';
+                b.textContent = (d.user && d.user.username) || 'Conta';
                 b.href = '/dashboard';
             }
         }).catch(() => {});
 
-        let claiming = false;
-
-        async function claimDaily() {
-            if (claiming) return;
-            claiming = true;
-            const btn = document.getElementById('dailyBtn');
-            btn.disabled = true;
-            try {
-                const res = await fetch('/api/daily-claim', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    credentials: 'include'
-                });
-                const data = await res.json().catch(() => ({}));
-                if (res.status === 401) {
-                    window.location.href = '/auth/discord';
-                    return;
-                }
-                if (!res.ok) {
-                    alert(data.error || 'Não foi possível resgatar agora.');
-                    btn.disabled = false;
-                    claiming = false;
-                    return;
-                }
-                playDailyVideo(data.amount || 0);
-            } catch (e) {
-                alert('Erro de conexão ao resgatar.');
-                btn.disabled = false;
-                claiming = false;
+        function openCommands() {
+            toggleMenu();
+            document.getElementById('cmdModal').classList.add('open');
+            fetch('/api/commands').then(r => r.json()).then(cmds => {
+                allCommands = cmds || [];
+                renderCommands(allCommands);
+            }).catch(() => {
+                document.getElementById('cmdList').innerHTML = '<div style="color:#ef4444">Erro ao carregar.</div>';
+            });
+        }
+        function renderCommands(list) {
+            const box = document.getElementById('cmdList');
+            if (!list.length) {
+                box.innerHTML = '<div style="opacity:.7">Nenhum comando.</div>';
+                return;
             }
+            box.innerHTML = list.map(c => `
+                <div class="modal-row" style="flex-direction:column;align-items:flex-start">
+                    <span style="font-family:monospace;color:#38bdf8;font-weight:bold">/${c.name}</span>
+                    <span style="font-size:13px;opacity:.85">${c.description || ''}</span>
+                </div>`).join('');
+        }
+        function filterCommands() {
+            const q = (document.getElementById('cmdSearch').value || '').toLowerCase();
+            renderCommands(allCommands.filter(c =>
+                (c.name || '').toLowerCase().includes(q) ||
+                (c.description || '').toLowerCase().includes(q)
+            ));
         }
 
-        function playDailyVideo(amount) {
-            const overlay = document.getElementById('dailyOverlay');
-            const video = document.getElementById('dailyVideo');
-            const result = document.getElementById('dailyResult');
-            result.classList.remove('active');
-            document.getElementById('dailyAmount').textContent =
-                '+' + Number(amount).toLocaleString('pt-BR') + ' almas';
-            overlay.classList.add('active');
-            video.currentTime = 0;
-            video.controls = false;
-            video.oncontextmenu = (e) => e.preventDefault();
-            const p = video.play();
-            if (p && p.catch) p.catch(() => result.classList.add('active'));
-            video.onended = () => result.classList.add('active');
+        function openLanguages() {
+            toggleMenu();
+            document.getElementById('langModal').classList.add('open');
+            fetch('/api/languages').then(r => r.json()).then(list => {
+                allLanguages = list || [];
+                renderLanguages(allLanguages);
+            }).catch(() => {
+                document.getElementById('langList').innerHTML = '<div style="color:#ef4444">Erro ao carregar idiomas.</div>';
+            });
+        }
+        function renderLanguages(list) {
+            const box = document.getElementById('langList');
+            const cur = localStorage.getItem('lang') || 'pt';
+            box.innerHTML = list.map(l => `
+                <div class="modal-row" onclick="selectLanguage('${l.code}')">
+                    <span style="font-size:20px">${l.flag || '🏳️'}</span>
+                    <div>
+                        <div style="font-weight:700">${l.native || l.name}</div>
+                        <div style="font-size:12px;opacity:.7">${l.name} · ${l.code}${cur === l.code ? ' · ✓' : ''}</div>
+                    </div>
+                </div>`).join('');
+        }
+        function filterLanguages() {
+            const q = (document.getElementById('langSearch').value || '').toLowerCase();
+            renderLanguages(allLanguages.filter(l =>
+                (l.name || '').toLowerCase().includes(q) ||
+                (l.native || '').toLowerCase().includes(q) ||
+                (l.code || '').toLowerCase().includes(q)
+            ));
+        }
+        async function selectLanguage(code) {
+            if (window.i18n) await i18n.loadLanguage(code);
+            closeModals();
         }
 
-        function closeDaily() {
-            const overlay = document.getElementById('dailyOverlay');
-            const video = document.getElementById('dailyVideo');
-            const result = document.getElementById('dailyResult');
-            video.pause();
-            video.currentTime = 0;
-            result.classList.remove('active');
-            overlay.classList.remove('active');
-            claiming = false;
-            document.getElementById('dailyBtn').disabled = false;
-        }
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.getElementById('dailyResult').classList.contains('active')) {
-                closeDaily();
-            }
+        // fecha modal clicando fora
+        document.querySelectorAll('.modal').forEach(m => {
+            m.addEventListener('click', (e) => { if (e.target === m) closeModals(); });
         });
     </script>
 </body>
