@@ -1,12 +1,21 @@
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
+function getTheme() {
+    return localStorage.getItem('theme') || 'dark';
 }
 
-// Aplicar o tema salvo assim que o script carregar
-(function() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
+function applyTheme(theme) {
+    const t = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('theme', t);
+    const label = document.getElementById('themeLabel');
+    if (label) {
+        label.textContent = t === 'dark' ? '🌙 Escuro' : '☀️ Claro';
+    }
+}
+
+function toggleTheme() {
+    applyTheme(getTheme() === 'dark' ? 'light' : 'dark');
+}
+
+(function () {
+    applyTheme(getTheme());
 })();
