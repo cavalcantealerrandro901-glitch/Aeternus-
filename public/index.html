@@ -9,128 +9,291 @@
     <script src="/theme.js"></script>
     <script src="/i18n.js"></script>
     <style>
-        body { 
-            background-color: var(--bg-color, #f8fafc); 
-            color: var(--text-color, #0f172a); 
-            font-family: 'Segoe UI', sans-serif; 
-            margin: 0; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            min-height: 100vh;
-            box-sizing: border-box;
+        body {
+            background-color: var(--bg-color, #0b0f19);
+            color: var(--text-color, #e5e7eb);
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; box-sizing: border-box;
         }
-
         .top-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; align-items: center; }
-        .top-btn { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; }
-        .btn-login-top { background: #38bdf8 !important; color: #ffffff !important; border: none !important; }
-
-        .dropdown-menu { display: none; position: absolute; top: 60px; right: 20px; width: 220px; background-color: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); border-radius: 12px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1001; }
+        .top-btn {
+            background: var(--card-bg, #111827);
+            border: 1px solid var(--border-color, #1f2937);
+            color: var(--text-color, #e5e7eb);
+            padding: 8px 16px; border-radius: 20px; cursor: pointer;
+            text-decoration: none; font-size: 14px; font-weight: bold;
+        }
+        .btn-login-top { background: #38bdf8 !important; color: #0b0f19 !important; border: none !important; }
+        .dropdown-menu {
+            display: none; position: absolute; top: 60px; right: 20px; width: 240px;
+            background-color: var(--card-bg, #111827); border: 1px solid var(--border-color, #1f2937);
+            border-radius: 12px; padding: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.35); z-index: 1001;
+        }
         .dropdown-menu.active { display: block; }
-        .dropdown-item { padding: 8px 10px; color: var(--text-color, #0f172a); cursor: pointer; border: none; background: none; font-size: 14px; border-radius: 5px; display: block; width: 100%; text-align: left; text-decoration: none; }
-        .dropdown-item:hover { background: rgba(56, 189, 248, 0.1); color: #38bdf8; }
-
-        .lang-submenu { display: none; padding-left: 10px; margin-top: 4px; margin-bottom: 4px; border-left: 2px solid #38bdf8; }
+        .dropdown-item {
+            padding: 10px 12px; color: var(--text-color, #e5e7eb); cursor: pointer; border: none;
+            background: none; font-size: 14px; border-radius: 8px; display: block; width: 100%;
+            text-align: left; text-decoration: none; box-sizing: border-box;
+        }
+        .dropdown-item:hover { background: rgba(56, 189, 248, 0.12); color: #38bdf8; }
+        .dropdown-sep { border-top: 1px solid #1f2937; margin: 8px 0; }
+        .lang-submenu { display: none; padding-left: 10px; margin: 4px 0; border-left: 2px solid #38bdf8; }
         .lang-submenu.active { display: block; }
-
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; align-items: center; justify-content: center; }
-        .modal-content { background: var(--card-bg, #ffffff); padding: 20px; border-radius: 15px; width: 90%; max-width: 450px; max-height: 80vh; overflow-y: auto; text-align: left; }
-        .close-modal { float: right; cursor: pointer; font-size: 20px; color: var(--text-color); font-weight: bold; }
-
-        .bot-avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid #38bdf8; margin-bottom: 15px; object-fit: cover; }
-        h1 { margin: 0 0 10px 0; font-size: 32px; text-align: center; }
-        p { color: #64748b; max-width: 450px; margin-bottom: 30px; text-align: center; }
-        .btn-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px; }
-        .btn { padding: 12px 20px; border-radius: 25px; font-weight: bold; text-decoration: none; border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); text-align: center; display: block; }
-        .btn:hover { border-color: #38bdf8; transform: translateY(-2px); }
-        .btn-primary { background: #38bdf8; color: #ffffff; border: none; }
+        .hero { text-align: center; margin-top: 80px; max-width: 640px; width: 100%; }
+        .bot-avatar { width: 110px; height: 110px; border-radius: 50%; border: 3px solid #38bdf8; margin-bottom: 16px; object-fit: cover; }
+        .hero h1 { margin: 0 0 8px; font-size: 2rem; letter-spacing: 2px; color: #38bdf8; }
+        .hero p { color: #9ca3af; margin: 0 0 24px; }
+        .features {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px; width: 100%; max-width: 560px; margin: 0 auto 28px;
+        }
+        .feature-card {
+            background: #111827; border: 1px solid #1f2937; border-radius: 12px;
+            padding: 14px; text-align: center; font-size: 13px; color: #9ca3af;
+        }
+        .feature-card strong { display: block; color: #e5e7eb; margin-bottom: 4px; font-size: 14px; }
+        .daily-wrap { width: 100%; max-width: 420px; margin: 10px auto 28px; }
+        .daily-btn {
+            width: 100%; border: none; cursor: pointer; border-radius: 16px; overflow: hidden;
+            background: linear-gradient(135deg, #1e1b4b, #0f172a);
+            border: 1px solid #4c1d95; padding: 0; position: relative;
+            box-shadow: 0 0 30px rgba(124, 58, 237, 0.35);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .daily-btn:hover { transform: translateY(-2px); box-shadow: 0 0 40px rgba(56, 189, 248, 0.4); }
+        .daily-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+        .daily-btn img {
+            width: 100%; height: 168px; object-fit: cover; display: block; filter: brightness(0.8);
+        }
+        .daily-btn .label {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.25));
+            color: #fff; font-weight: 800; font-size: 1.15rem; letter-spacing: 0.4px;
+            text-shadow: 0 2px 8px #000; padding: 12px;
+        }
+        .daily-btn .sub { font-size: 12px; font-weight: 600; opacity: 0.95; margin-top: 6px; color: #c4b5fd; }
+        .btn-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px; margin: 0 auto; }
+        .btn {
+            padding: 12px 20px; border-radius: 25px; font-weight: bold; text-decoration: none;
+            border: 1px solid var(--border-color, #1f2937); color: var(--text-color, #e5e7eb);
+            background: var(--card-bg, #111827); display: block; text-align: center;
+        }
+        .btn-primary { background: #38bdf8; color: #0b0f19; border: none; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 3000; align-items: center; justify-content: center; }
+        .modal-content {
+            background: var(--card-bg, #111827); padding: 20px; border-radius: 15px;
+            width: 90%; max-width: 450px; max-height: 80vh; overflow-y: auto;
+            border: 1px solid #1f2937;
+        }
+        .close-modal { float: right; cursor: pointer; font-size: 18px; }
+        #dailyOverlay {
+            display: none; position: fixed; inset: 0; z-index: 9999;
+            background: #000; align-items: center; justify-content: center;
+        }
+        #dailyOverlay.active { display: flex; }
+        #dailyOverlay video {
+            width: 100%; height: 100%; object-fit: contain;
+            pointer-events: none; background: #000;
+        }
+        #dailyResult {
+            display: none; position: absolute; inset: 0;
+            flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.55); color: #fff; text-align: center; padding: 24px;
+        }
+        #dailyResult.active { display: flex; }
+        #dailyResult h2 { margin: 0 0 8px; font-size: 1.6rem; color: #fbbf24; }
+        #dailyResult .amt { font-size: 2.4rem; font-weight: 900; color: #86efac; margin: 8px 0 20px; }
+        #dailyResult button {
+            background: #38bdf8; color: #0b0f19; border: none; border-radius: 999px;
+            padding: 12px 28px; font-weight: 800; cursor: pointer; font-size: 15px;
+        }
     </style>
 </head>
 <body>
-
     <div class="top-bar">
-        <a href="/auth/discord" class="top-btn btn-login-top">Login</a>
-        <button class="top-btn" onclick="toggleMenu()">Menu ☰</button>
+        <a href="/auth/discord" class="top-btn btn-login-top" id="btnLogin">Login</a>
+        <button class="top-btn" type="button" onclick="toggleMenu()">Menu ☰</button>
     </div>
 
-    <div class="dropdown-menu" id="dropdownMenu">
-        <div style="font-weight: bold; color: #38bdf8; padding: 5px 10px; font-size: 12px;">PAINEL</div>
-        <button onclick="toggleTheme()" class="dropdown-item">🌓 Alternar Tema</button>
-        <button onclick="showCommands()" class="dropdown-item">📜 Ver Comandos</button>
-
-        <div style="border-top: 1px solid var(--border-color, #cbd5e1); margin-top: 5px; margin-bottom: 5px;"></div>
-        <button onclick="toggleLangMenu()" class="dropdown-item" style="font-weight: bold;">🌐 Idioma ▾</button>
-        <div class="lang-submenu" id="langSubmenu">
-            <button onclick="changeLang('pt')" class="dropdown-item">🇧🇷 Português</button>
-            <button onclick="changeLang('en')" class="dropdown-item">🇺🇸 English</button>
-            <button onclick="changeLang('es')" class="dropdown-item">🇪🇸 Español</button>
-            <button onclick="changeLang('fr')" class="dropdown-item">🇫🇷 Français</button>
+    <div id="dropdownMenu" class="dropdown-menu">
+        <a href="/loja.html" class="dropdown-item">🛒 Loja</a>
+        <a href="/gaming.html" class="dropdown-item">🎮 Gaming</a>
+        <a href="/wiki.html" class="dropdown-item">📖 Wiki</a>
+        <a href="/api-premium.html" class="dropdown-item">⚡ API Premium</a>
+        <div class="dropdown-sep"></div>
+        <button type="button" class="dropdown-item" onclick="showCommands()">📜 Comandos</button>
+        <a href="/dashboard" class="dropdown-item">⚙️ Painel</a>
+        <button type="button" class="dropdown-item" onclick="toggleLangMenu()">🌐 Idioma</button>
+        <div id="langSubmenu" class="lang-submenu">
+            <button type="button" onclick="changeLang('pt')" class="dropdown-item">🇧🇷 Português</button>
+            <button type="button" onclick="changeLang('en')" class="dropdown-item">🇺🇸 English</button>
+            <button type="button" onclick="changeLang('es')" class="dropdown-item">🇪🇸 Español</button>
+            <button type="button" onclick="changeLang('fr')" class="dropdown-item">🇫🇷 Français</button>
         </div>
-
-        <div style="border-top: 1px solid var(--border-color, #cbd5e1); margin-top: 5px;"></div>
-        <a href="/auth/logout" class="dropdown-item" style="color: #ef4444;">🚪 Sair / Deslogar</a>
+        <div class="dropdown-sep"></div>
+        <a href="/auth/logout" class="dropdown-item" style="color:#ef4444;">🚪 Sair</a>
     </div>
 
-    <!-- Modal de Comandos -->
     <div id="cmdModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" onclick="closeModal()">✕</span>
-            <h3 style="color: #38bdf8; margin-top: 0;">📜 Comandos do Bot</h3>
-            <div id="cmdList" style="margin-top: 15px;">Carregando...</div>
+            <h3 style="color:#38bdf8;margin-top:0;">📜 Comandos do Bot</h3>
+            <div id="cmdList" style="margin-top:15px;">Carregando...</div>
         </div>
     </div>
 
-    <img id="botAvatar" src="" class="bot-avatar" alt="Avatar do Bot">
-    <h1 id="botName">AETERNUS</h1>
-    <p>Uma nova era de experiências e conexões. Bem-vindo ao santuário oficial do bot.</p>
+    <div id="dailyOverlay">
+        <video id="dailyVideo" src="/videos/daily-reward.mp4" playsinline preload="auto"></video>
+        <div id="dailyResult">
+            <h2>✨ Recompensa diária</h2>
+            <div class="amt" id="dailyAmount">+0</div>
+            <p style="opacity:0.85;margin:0 0 16px;">Almas creditadas na sua conta</p>
+            <button type="button" onclick="closeDaily()">Continuar</button>
+        </div>
+    </div>
 
-    <div class="btn-container">
-        <a id="btnInvite" href="https://discord.com/oauth2/authorize?client_id=1150821035056701550&scope=bot&permissions=8" target="_blank" class="btn btn-primary">Adicionar ao Servidor</a>
-        <a href="https://discord.gg/seu-link-de-suporte" target="_blank" class="btn">Suporte</a>
+    <div class="hero">
+        <img id="botAvatar" class="bot-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Bot">
+        <h1 id="botName">AETERNUS</h1>
+        <p>Uma nova era de experiências e conexões. Bem-vindo ao santuário oficial do bot.</p>
+
+        <div class="features">
+            <div class="feature-card"><strong>Economia</strong>Almas &amp; daily</div>
+            <div class="feature-card"><strong>Moderação</strong>Ban, kick, logs</div>
+            <div class="feature-card"><strong>Painel</strong>Configure online</div>
+            <div class="feature-card"><strong>Jogos</strong>Em breve</div>
+        </div>
+
+        <div class="daily-wrap">
+            <button type="button" class="daily-btn" id="dailyBtn" onclick="claimDaily()">
+                <img src="/videos/daily-poster.jpg" alt="Baú da recompensa" onerror="this.remove()">
+                <div class="label">
+                    🎁 Pegue sua recompensa diária
+                    <span class="sub">5.000 — 50.000 almas · 1x por dia</span>
+                </div>
+            </button>
+        </div>
+
+        <div class="btn-container">
+            <a id="btnInvite" href="https://discord.com/oauth2/authorize?client_id=1150821035056701550&scope=bot%20applications.commands&permissions=8" target="_blank" class="btn btn-primary">Adicionar ao Servidor</a>
+            <a href="https://discord.gg/seu-link-de-suporte" target="_blank" class="btn">Suporte</a>
+        </div>
     </div>
 
     <script src="/snow.js"></script>
     <script>
         function toggleMenu() { document.getElementById('dropdownMenu').classList.toggle('active'); }
         function toggleLangMenu() { document.getElementById('langSubmenu').classList.toggle('active'); }
-
         async function changeLang(lang) {
-            if (window.i18n && typeof i18n.loadLanguage === 'function') {
-                await i18n.loadLanguage(lang);
-            }
+            if (window.i18n && typeof i18n.loadLanguage === 'function') await i18n.loadLanguage(lang);
             toggleMenu();
         }
-
         function showCommands() {
             toggleMenu();
             document.getElementById('cmdModal').style.display = 'flex';
             fetch('/api/commands').then(r => r.json()).then(cmds => {
                 const list = document.getElementById('cmdList');
-                if (!cmds || cmds.length === 0) {
-                    list.innerHTML = '<div style="color: #64748b;">Nenhum comando encontrado.</div>';
+                if (!cmds || !cmds.length) {
+                    list.innerHTML = '<div style="color:#64748b;">Nenhum comando encontrado.</div>';
                     return;
                 }
                 list.innerHTML = cmds.map(c => `
-                    <div style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color, #cbd5e1); padding-bottom: 8px;">
-                        <span style="font-family: monospace; background: rgba(56, 189, 248, 0.1); color: #38bdf8; padding: 2px 6px; border-radius: 4px; font-weight: bold;">/${c.name}</span>
-                        <div style="margin-top: 4px; color: var(--text-color, #0f172a); font-size: 13px; opacity: 0.85;">${c.description || 'Sem descrição.'}</div>
-                    </div>
-                `).join('');
+                    <div style="margin-bottom:12px;border-bottom:1px solid #1f2937;padding-bottom:8px;">
+                        <span style="font-family:monospace;background:rgba(56,189,248,0.1);color:#38bdf8;padding:2px 6px;border-radius:4px;font-weight:bold;">/${c.name}</span>
+                        <div style="margin-top:4px;font-size:13px;opacity:0.85;">${c.description || 'Sem descrição.'}</div>
+                    </div>`).join('');
             }).catch(() => {
-                document.getElementById('cmdList').innerHTML = '<div style="color: #ef4444;">Erro ao carregar comandos.</div>';
+                document.getElementById('cmdList').innerHTML = '<div style="color:#ef4444;">Erro ao carregar comandos.</div>';
             });
         }
-
         function closeModal() { document.getElementById('cmdModal').style.display = 'none'; }
 
-        // Carrega as informações dinâmicas do bot
         fetch('/api/bot-info').then(r => r.json()).then(bot => {
-            if (bot.avatar) document.getElementById('botAvatar').src = bot.avatar;
+            if (bot.avatar) {
+                document.getElementById('botAvatar').src = bot.avatar;
+                const fav = document.getElementById('dynamicFavicon');
+                if (fav) fav.href = bot.avatar;
+            }
             if (bot.username) document.getElementById('botName').textContent = bot.username.toUpperCase();
             if (bot.inviteUrl) document.getElementById('btnInvite').href = bot.inviteUrl;
-        }).catch(err => console.error('Erro ao buscar dados do bot:', err));
+        }).catch(() => {});
+
+        fetch('/auth/me').then(r => r.json()).then(d => {
+            if (d && d.authenticated) {
+                const b = document.getElementById('btnLogin');
+                b.textContent = (d.user && d.user.username) ? d.user.username : 'Conta';
+                b.href = '/dashboard';
+            }
+        }).catch(() => {});
+
+        let claiming = false;
+
+        async function claimDaily() {
+            if (claiming) return;
+            claiming = true;
+            const btn = document.getElementById('dailyBtn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/daily-claim', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    credentials: 'include'
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.status === 401) {
+                    window.location.href = '/auth/discord';
+                    return;
+                }
+                if (!res.ok) {
+                    alert(data.error || 'Não foi possível resgatar agora.');
+                    btn.disabled = false;
+                    claiming = false;
+                    return;
+                }
+                playDailyVideo(data.amount || 0);
+            } catch (e) {
+                alert('Erro de conexão ao resgatar.');
+                btn.disabled = false;
+                claiming = false;
+            }
+        }
+
+        function playDailyVideo(amount) {
+            const overlay = document.getElementById('dailyOverlay');
+            const video = document.getElementById('dailyVideo');
+            const result = document.getElementById('dailyResult');
+            result.classList.remove('active');
+            document.getElementById('dailyAmount').textContent =
+                '+' + Number(amount).toLocaleString('pt-BR') + ' almas';
+            overlay.classList.add('active');
+            video.currentTime = 0;
+            video.controls = false;
+            video.oncontextmenu = (e) => e.preventDefault();
+            const p = video.play();
+            if (p && p.catch) p.catch(() => result.classList.add('active'));
+            video.onended = () => result.classList.add('active');
+        }
+
+        function closeDaily() {
+            const overlay = document.getElementById('dailyOverlay');
+            const video = document.getElementById('dailyVideo');
+            const result = document.getElementById('dailyResult');
+            video.pause();
+            video.currentTime = 0;
+            result.classList.remove('active');
+            overlay.classList.remove('active');
+            claiming = false;
+            document.getElementById('dailyBtn').disabled = false;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('dailyResult').classList.contains('active')) {
+                closeDaily();
+            }
+        });
     </script>
 </body>
 </html>
