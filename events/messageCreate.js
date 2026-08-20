@@ -18,7 +18,6 @@ module.exports = {
 
         if (!client.afk) client.afk = new Map();
 
-        // Voltou de AFK
         if (client.afk.has(message.author.id)) {
             const data = client.afk.get(message.author.id);
             if (data.skipOnce) {
@@ -34,7 +33,6 @@ module.exports = {
             }
         }
 
-        // Menção a alguém AFK
         if (message.mentions.users.size > 0) {
             for (const user of message.mentions.users.values()) {
                 if (!client.afk.has(user.id) || user.id === message.author.id) continue;
@@ -48,13 +46,7 @@ module.exports = {
             }
         }
 
-        // Comandos prefixo
-        let prefix = '!';
-        try {
-            prefix = getPrefix(message.guild.id) || '!';
-        } catch {
-            prefix = process.env.PREFIX || '!';
-        }
+        const prefix = getPrefix(message.guild.id); // padrão O.
 
         if (!message.content.startsWith(prefix)) return;
 

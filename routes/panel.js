@@ -1,10 +1,11 @@
 const path = require('path');
 const { ChannelType } = require('discord.js');
 const settings = require('../utils/settings');
+const { getPrefix, setPrefix, DEFAULT_PREFIX } = require('../utils/prefixManager');
 
 function requireAuth(req, res, next) {
     if (req.session?.isAuthenticated && req.session?.accessToken) return next();
-    if ((req.headers.accept || '').includes('application/json') || req.path.startsWith('/api')) {
+    if ((req.headers.accept || '').includes('application/json') || String(req.path || '').startsWith('/api')) {
         return res.status(401).json({ error: 'Não autenticado' });
     }
     return res.redirect('/auth/discord');
@@ -22,12 +23,23 @@ function register(app, client) {
     app.post('/api/set-setting', requireAuth, (req, res) => {
         const { guildId, key, value } = req.body || {};
         if (!guildId || !key) return res.status(400).json({ error: 'Dados incompletos' });
+
+        // Prefixo: valida e usa o manager (padrão O.)
+        if (key === 'prefix') {
+            const prefix = setPrefix(guildId, value);
+            return res.json({ success: true, settings: settings.getGuild(guildId), prefix });
+        }
+
         const updated = settings.setKey(guildId, key, value);
         res.json({ success: true, settings: updated });
     });
 
     app.get('/api/settings/:guildId', requireAuth, (req, res) => {
-        res.json(settings.getGuild(req.params.guildId));
+        const g = settings.getGuild(req.params.guildId);
+        res.json({
+            ...g,
+            prefix: g.prefix || getPrefix(req.params.guildId) || DEFAULT_PREFIX
+        });
     });
 
     app.get('/api/guild-data/:guildId', requireAuth, async (req, res) => {
@@ -69,6 +81,7 @@ function register(app, client) {
             memberCount: guild.memberCount,
             roleCount: guild.roles.cache.size,
             channelCount: guild.channels.cache.size,
+            prefix: getPrefix(guild.id),
             categories: [...categoriesMap.values()].filter((c) => c.channels.length),
             allChannels
         });

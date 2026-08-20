@@ -1,28 +1,34 @@
-const fs = require('fs');
-const path = require('path');
+const settings = require('./settings');
 
-const prefixesPath = path.join(__dirname, '..', 'prefixes.json');
+/** Prefixo padrão do Aeternus */
+const DEFAULT_PREFIX = 'O.';
 
-function getPrefixes() {
-    if (!fs.existsSync(prefixesPath)) return {};
-    try {
-        return JSON.parse(fs.readFileSync(prefixesPath, 'utf8'));
-    } catch (e) {
-        return {};
-    }
-}
-
+/**
+ * Prefixo do servidor.
+ * Prioridade: settings.json (painel) → padrão O.
+ */
 function getPrefix(guildId) {
-    if (!guildId) return '!';
-    const prefixes = getPrefixes();
-    return prefixes[guildId] || '!';
+    if (!guildId) return DEFAULT_PREFIX;
+    try {
+        const g = settings.getGuild(guildId);
+        if (g && typeof g.prefix === 'string' && g.prefix.length > 0) {
+            return g.prefix;
+        }
+    } catch (_) {}
+    return DEFAULT_PREFIX;
 }
 
+/**
+ * Salva o prefixo (usado pela API do painel e comandos).
+ * Aceita qualquer string de 1 a 10 caracteres.
+ */
 function setPrefix(guildId, newPrefix) {
-    const prefixes = getPrefixes();
-    prefixes[guildId] = newPrefix;
-    fs.writeFileSync(prefixesPath, JSON.stringify(prefixes, null, 2));
-    return newPrefix;
+    if (!guildId) return DEFAULT_PREFIX;
+    let p = String(newPrefix ?? DEFAULT_PREFIX).trim();
+    if (!p) p = DEFAULT_PREFIX;
+    p = p.slice(0, 10);
+    settings.setKey(guildId, 'prefix', p);
+    return p;
 }
 
-module.exports = { getPrefix, setPrefix };
+module.exports = { getPrefix, setPrefix, DEFAULT_PREFIX };
