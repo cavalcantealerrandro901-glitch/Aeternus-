@@ -7,84 +7,116 @@
     <link id="dynamicFavicon" rel="icon" href="">
     <link rel="stylesheet" href="/theme.css">
     <script src="/theme.js"></script>
-    <script src="/i18n.js"></script>
     <style>
-        body { background-color: var(--bg-color, #f8fafc); color: var(--text-color, #0f172a); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; text-align: center; transition: 0.3s; box-sizing: border-box; }
-
+        body {
+            background: var(--bg-color, #0f172a);
+            color: var(--text-color, #f8fafc);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; box-sizing: border-box;
+        }
         .top-bar { position: fixed; top: 20px; right: 20px; z-index: 1000; }
-        .top-btn { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .top-btn:hover { border-color: #38bdf8; transform: translateY(-2px); }
-
-        .content-wrapper { margin-top: 90px; display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 450px; }
-        .bot-avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid #38bdf8; margin-bottom: 15px; object-fit: cover; background: var(--card-bg, #fff); }
-        h1 { margin: 0 0 8px 0; font-size: 28px; }
-        p { color: #64748b; margin-bottom: 25px; font-size: 14px; }
-
-        .servers-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-height: 55vh; overflow-y: auto; padding-right: 4px; }
-        .server-card { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); padding: 12px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: var(--text-color); transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .top-btn {
+            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
+            color: var(--text-color); padding: 8px 16px; border-radius: 20px;
+            text-decoration: none; font-size: 14px; font-weight: bold;
+        }
+        .content-wrapper { margin-top: 80px; width: 100%; max-width: 480px; }
+        h1 { font-size: 1.6rem; margin: 0 0 8px; color: #38bdf8; text-align: center; }
+        .sub { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 22px; }
+        .servers-container { display: flex; flex-direction: column; gap: 12px; max-height: 65vh; overflow-y: auto; }
+        .server-card {
+            background: var(--card-bg, #1e293b);
+            border: 1px solid var(--border-color, #334155);
+            padding: 14px 16px; border-radius: 16px;
+            display: flex; align-items: center; justify-content: space-between;
+            text-decoration: none; color: inherit;
+            transition: 0.2s;
+        }
         .server-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
-        .server-info { display: flex; align-items: center; gap: 12px; text-align: left; overflow: hidden; }
-        .server-icon { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--border-color, #cbd5e1); }
-        .server-details { display: flex; flex-direction: column; overflow: hidden; }
-        .server-name { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .server-id { font-size: 11px; color: #94a3b8; font-family: monospace; }
+        .server-info { display: flex; align-items: center; gap: 14px; overflow: hidden; }
+        .server-icon-wrap {
+            width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
+            overflow: hidden; background: #0f172a;
+            border: 2px solid #334155;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .server-icon { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .server-icon-fallback {
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+            font-size: 22px; font-weight: 800; color: #38bdf8; background: #0f172a;
+        }
+        .server-details { text-align: left; overflow: hidden; }
+        .server-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .server-meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+        .go { color: #38bdf8; font-weight: bold; font-size: 18px; }
     </style>
 </head>
 <body>
-
     <div class="top-bar">
-        <a href="/" class="top-btn">Voltar ao Início</a>
+        <a class="top-btn" href="/">🏠 Início</a>
     </div>
-
     <div class="content-wrapper">
-        <img id="botAvatar" src="" class="bot-avatar">
-        <h1>Aeternus</h1>
-        <p id="statusText">Selecione um servidor abaixo para gerenciar:</p>
-
-        <div id="serversList" class="servers-container">
-            <div style="color: #64748b;">Carregando servidores...</div>
-        </div>
+        <h1>🛡️ Seus servidores</h1>
+        <p class="sub">Escolha um servidor em que você é administrador e o bot está presente.</p>
+        <div id="serversList" class="servers-container">Carregando…</div>
     </div>
-
-    <script src="/snow.js"></script>
     <script>
-        fetch('/api/bot').then(r => r.json()).then(bot => {
-            if (bot.avatar) document.getElementById('botAvatar').src = bot.avatar;
-        }).catch(() => {});
+        function guildIconUrl(s) {
+            if (!s.icon) return null;
+            const ext = String(s.icon).startsWith('a_') ? 'gif' : 'png';
+            return `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.${ext}?size=128`;
+        }
 
-        fetch('/api/user/servers').then(async res => {
-            if (!res.ok) throw new Error('Não autenticado');
-            return res.json();
-        }).then(servers => {
+        function letterFallback(name) {
+            const ch = (name || '?').trim().charAt(0).toUpperCase() || '?';
+            return `<div class="server-icon-fallback">${ch}</div>`;
+        }
+
+        async function load() {
             const list = document.getElementById('serversList');
-            if (!servers || servers.length === 0) {
-                list.innerHTML = '<div style="color: #64748b;">Nenhum servidor encontrado ou sem permissão.</div>';
-                return;
-            }
-            list.innerHTML = servers.map(s => {
-                const iconUrl = s.icon 
-                    ? `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.png?size=128` 
-                    : 'https://cdn.discordapp.com/embed/avatars/0.png';
-
-                return `
-                    <a href="/dashboard?server=${s.id}" class="server-card">
+            try {
+                const me = await fetch('/auth/me').then(r => r.json());
+                if (!me.authenticated) {
+                    location.href = '/auth/discord';
+                    return;
+                }
+                const res = await fetch('/api/servers');
+                const servers = await res.json();
+                if (!Array.isArray(servers) || !servers.length) {
+                    list.innerHTML = '<div style="color:#94a3b8;text-align:center">Nenhum servidor encontrado.</div>';
+                    return;
+                }
+                list.innerHTML = servers.map(s => {
+                    const url = guildIconUrl(s);
+                    const iconHtml = url
+                        ? `<img class="server-icon" src="${url}" alt="" onerror="this.parentNode.innerHTML=letterFallback(this.dataset.name)" data-name="${(s.name || '').replace(/"/g, '')}">`
+                        : letterFallback(s.name);
+                    return `
+                    <a class="server-card" href="/dashboard?guild=${s.id}">
                         <div class="server-info">
-                            <img src="${iconUrl}" class="server-icon" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                            <div class="server-icon-wrap">${iconHtml}</div>
                             <div class="server-details">
-                                <span class="server-name">${s.name}</span>
-                                <span class="server-id">ID: ${s.id}</span>
+                                <div class="server-name">${s.name || 'Servidor'}</div>
+                                <div class="server-meta">ID ${s.id}</div>
                             </div>
                         </div>
-                        <span style="font-size: 16px; padding-left: 8px;">⚙️</span>
-                    </a>
-                `;
-            }).join('');
-        }).catch(() => {
-            document.getElementById('statusText').innerText = "Você precisa fazer login para gerenciar os servidores.";
-            document.getElementById('serversList').innerHTML = `
-                <a href="/auth/discord" class="top-btn" style="display: block; text-align: center; padding: 12px; border-radius: 25px; text-decoration: none; width: 100%; box-sizing: border-box; background: #38bdf8; color: #fff;">Fazer Login com o Discord</a>
-            `;
-        });
+                        <span class="go">→</span>
+                    </a>`;
+                }).join('');
+            } catch (e) {
+                list.innerHTML = '<div style="color:#ef4444">Erro ao carregar servidores.</div>';
+            }
+        }
+
+        // helper used by onerror (global)
+        window.letterFallback = function (name) {
+            const ch = (name || '?').trim().charAt(0).toUpperCase() || '?';
+            return `<div class="server-icon-fallback">${ch}</div>`;
+        };
+
+        load();
     </script>
 </body>
 </html>

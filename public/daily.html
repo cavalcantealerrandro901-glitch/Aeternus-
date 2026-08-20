@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily - Aeternus</title>
-    <link id="dynamicFavicon" rel="icon" href="">
+    <title>Daily · Aeternus</title>
     <link rel="stylesheet" href="/theme.css">
     <script src="/theme.js"></script>
     <style>
@@ -19,139 +18,162 @@
         .top-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000; }
         .top-btn {
             background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
-            color: var(--text-color, #f8fafc); padding: 8px 16px; border-radius: 20px;
-            cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold;
+            color: var(--text-color); padding: 8px 16px; border-radius: 20px;
+            text-decoration: none; font-size: 14px; font-weight: bold;
         }
-        .container { text-align: center; margin-top: 90px; max-width: 640px; width: 100%; }
-        
+        .container { text-align: center; margin-top: 70px; max-width: 640px; width: 100%; }
+
         .page-header-text {
-            font-size: 15px; color: #94a3b8; margin-bottom: 18px; line-height: 1.6; padding: 0 10px;
+            font-size: clamp(1.35rem, 4vw, 1.85rem);
+            font-weight: 800;
+            line-height: 1.35;
+            color: #e2e8f0;
+            margin: 0 0 28px;
+            letter-spacing: 0.02em;
         }
         .page-footer-text {
-            font-size: 14px; color: #64748b; margin-top: 22px; line-height: 1.6; padding: 0 15px;
+            font-size: clamp(1.2rem, 3.5vw, 1.65rem);
+            font-weight: 700;
+            line-height: 1.4;
+            color: #94a3b8;
+            margin: 28px 0 0;
         }
 
         .card {
-            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
-            border-radius: 20px; padding: 30px; box-shadow: 0 8px 30px rgba(0,0,0,.35);
+            background: var(--card-bg, #1e293b);
+            border: 1px solid var(--border-color, #334155);
+            border-radius: 20px; padding: 28px;
+            box-shadow: 0 8px 30px rgba(0,0,0,.35);
         }
-        h1 { color: #38bdf8; margin-top: 0; }
-        p { color: #94a3b8; font-size: 15px; line-height: 1.6; }
-        
-        .btn-group {
-            display: flex; flex-direction: column; gap: 12px; align-items: center; margin-top: 20px;
+        h1 { color: #38bdf8; margin: 0 0 12px; font-size: 1.8rem; }
+        .mult-box {
+            background: #0f172a; border-radius: 14px; padding: 14px;
+            margin: 16px 0; border: 1px solid #334155;
+            font-size: 14px; color: #cbd5e1;
         }
+        .mult-box strong { color: #67e8f9; }
         .btn-claim {
-            background: #38bdf8; color: #0f172a; border: none; padding: 14px 28px;
-            font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer;
-            width: 100%; max-width: 280px; transition: transform 0.2s;
+            background: #38bdf8; color: #0f172a; border: none;
+            padding: 14px 28px; font-size: 16px; font-weight: bold;
+            border-radius: 25px; cursor: pointer; width: 100%; max-width: 300px;
         }
-        .btn-claim:hover { transform: translateY(-2px); }
-
         .btn-login {
-            background: #5865F2; color: #ffffff; border: none; padding: 12px 24px;
-            font-size: 15px; font-weight: bold; border-radius: 25px; cursor: pointer;
-            text-decoration: none; width: 100%; max-width: 280px; display: inline-block;
-            box-sizing: border-box; transition: transform 0.2s;
+            background: #5865F2; color: #fff; border: none;
+            padding: 12px 24px; font-size: 15px; font-weight: bold;
+            border-radius: 25px; text-decoration: none; display: inline-block;
+            margin-top: 10px;
         }
-        .btn-login:hover { transform: translateY(-2px); background: #4752c4; }
-
+        #statusReward { margin-top: 16px; font-size: 15px; color: #94a3b8; min-height: 48px; }
         .video-overlay {
             display: none; position: fixed; inset: 0; background: #000;
-            z-index: 4000; align-items: center; justify-content: center;
+            z-index: 9999; align-items: center; justify-content: center;
         }
         .video-overlay.active { display: flex; }
-        .reward-video {
-            width: 100%; height: 100%; object-fit: cover; outline: none;
-        }
+        .reward-video { width: 100%; height: 100%; object-fit: contain; }
     </style>
 </head>
 <body>
     <div class="top-bar">
-        <a href="/" class="top-btn">Voltar ao Início</a>
+        <a class="top-btn" href="/">🏠 Início</a>
+        <a class="top-btn" href="/dashboard">⚙️ Painel</a>
     </div>
 
     <div class="container">
-        <div class="page-header-text">
-            ✨ Mantenha sua constância ativa e garanta bônus exclusivos diariamente! Participar do sistema de recompensas diárias é a melhor maneira de acumular recursos essenciais.
-        </div>
+        <p class="page-header-text" id="headerPhrase">
+            Sua recompensa diária está pronta.<br>Resgate ❄️ flocos com o multiplicador dos seus 🧊 cristais de gelo.
+        </p>
 
         <div class="card">
-            <h1>🎁 Recompensa Diária (Daily)</h1>
-            <p>Resgate suas recompensas diárias para acumular recursos, fortalecer sua jornada e desbloquear novas experiências com o bot Aeternus no seu servidor.</p>
-            <div style="margin: 25px 0; font-size: 24px; font-weight: bold; color: #38bdf8;" id="statusReward">
-                💎 Bônus Disponível
+            <h1>🎁 Daily</h1>
+            <p style="color:#94a3b8;margin:0 0 8px">Uma vez por dia · 5.000 a 50.000 ❄️ × multiplicador</p>
+
+            <div class="mult-box" id="multBox">
+                Carregando multiplicador…
             </div>
-            
+
             <div class="btn-group">
-                <button class="btn-claim" id="btnClaim" onclick="playRewardVideo()">Resgatar Recompensa</button>
-                <a href="/auth/discord" class="btn-login" id="btnLogin">Entrar com Discord</a>
+                <button class="btn-claim" id="btnClaim" type="button" onclick="playRewardVideo()">Pegar recompensa diária</button>
+                <a class="btn-login" id="btnLogin" href="/auth/discord">Entrar com Discord</a>
             </div>
+            <div id="statusReward"></div>
         </div>
 
-        <div class="page-footer-text">
-            💡 Dica importante: O ciclo completo para um novo resgate se renova rigorosamente a cada 24 horas.
-        </div>
+        <p class="page-footer-text" id="footerPhrase">
+            Volte amanhã à meia-noite.<br>O bot pode avisar você no privado quando o daily liberar de novo.
+        </p>
     </div>
 
     <div id="videoOverlay" class="video-overlay">
-        <video id="rewardVideo" class="reward-video" src="/videos/video_daily.mp4" playsinline></video>
+        <video id="rewardVideo" class="reward-video" src="/videos/daily-reward.mp4" playsinline></video>
     </div>
 
-    <script src="/snow.js"></script>
     <script>
-        window.addEventListener('DOMContentLoaded', async () => {
+        async function loadInfo() {
             try {
-                const check = await fetch('/auth/me').then(r => r.json());
-                if (check && check.authenticated) {
-                    const loginBtn = document.getElementById('btnLogin');
-                    if (loginBtn) loginBtn.style.display = 'none';
+                const me = await fetch('/auth/me').then(r => r.json());
+                if (me && me.authenticated) {
+                    document.getElementById('btnLogin').style.display = 'none';
+                    const info = await fetch('/api/daily-info').then(r => r.json()).catch(() => null);
+                    if (info && info.ok) {
+                        document.getElementById('multBox').innerHTML =
+                            `🧊 Cristais nível <strong>${info.cristalLevel}</strong><br>` +
+                            `Multiplicador do daily: <strong>×${Number(info.multiplier).toFixed(2)}</strong><br>` +
+                            `Sequência: <strong>${info.streak || 0}</strong> dia(s)` +
+                            (info.alreadyClaimed ? `<br><span style="color:#fbbf24">Já resgatado hoje</span>` : '');
+                        if (info.alreadyClaimed) {
+                            document.getElementById('btnClaim').style.display = 'none';
+                            document.getElementById('statusReward').textContent = 'Você já pegou o daily de hoje.';
+                        }
+                    } else {
+                        document.getElementById('multBox').innerHTML =
+                            'Multiplicador base <strong>×1.00</strong> · suba 🧊 cristais para aumentar.';
+                    }
+                } else {
+                    document.getElementById('btnClaim').style.display = 'none';
+                    document.getElementById('multBox').innerHTML = 'Faça login para ver seu multiplicador e resgatar.';
                 }
             } catch (e) {
-                console.error("Erro ao verificar sessão:", e);
+                console.error(e);
             }
-        });
+        }
 
         async function playRewardVideo() {
             try {
-                const response = await fetch('/api/daily/claim', { method: 'POST' });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    alert(`Erro HTTP (${response.status}): ${errorText || response.statusText}`);
-                    return;
-                }
+                const response = await fetch('/api/daily-claim', { method: 'POST', credentials: 'same-origin' });
+                const res = await response.json().catch(() => ({}));
 
-                const res = await response.json();
-
-                if (!res.success) {
-                    alert('Erro do Servidor: ' + (res.message || 'Desconhecido'));
+                if (!response.ok || !res.success) {
+                    alert(res.error || res.message || 'Não foi possível resgatar.');
                     return;
                 }
 
                 const overlay = document.getElementById('videoOverlay');
                 const video = document.getElementById('rewardVideo');
-                
                 overlay.classList.add('active');
                 video.currentTime = 0;
-                
-                video.play().catch(err => {
-                    console.log("Erro ao reproduzir automaticamente:", err);
-                });
+                video.play().catch(() => {});
 
-                video.onended = () => {
+                const showResult = () => {
                     overlay.classList.remove('active');
-                    document.getElementById('statusReward').innerHTML = `🎉 Resgatado com sucesso!<br><span style="font-size: 18px; color: #34d399;">+${res.amount} Moedas | Saldo: ${res.newBalance}</span>`;
                     document.getElementById('btnClaim').style.display = 'none';
-                    const loginBtn = document.getElementById('btnLogin');
-                    if (loginBtn) loginBtn.style.display = 'none';
+                    document.getElementById('statusReward').innerHTML =
+                        `🎉 +<b>${Number(res.amount).toLocaleString('pt-BR')}</b> ❄️ flocos<br>` +
+                        `Base ${Number(res.base || res.amount).toLocaleString('pt-BR')} × <b>${Number(res.multiplier || 1).toFixed(2)}</b><br>` +
+                        `Saldo: <b>${Number(res.balance).toLocaleString('pt-BR')}</b> ❄️ · Sequência <b>${res.streak || 1}</b>` +
+                        (res.leveledUp ? `<br>🧊 Subiu de nível de cristais!` : '');
+                    loadInfo();
                 };
 
+                video.onended = showResult;
+                setTimeout(() => {
+                    if (overlay.classList.contains('active')) showResult();
+                }, 20000);
             } catch (e) {
-                console.error(e);
-                alert('Erro de Conexão ou JavaScript: ' + e.message);
+                alert('Erro: ' + e.message);
             }
         }
+
+        loadInfo();
     </script>
 </body>
 </html>

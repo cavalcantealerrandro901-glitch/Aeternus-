@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aeternus</title>
-    <link id="dynamicFavicon" rel="icon" href="">
     <link rel="stylesheet" href="/theme.css">
     <script src="/theme.js"></script>
     <style>
@@ -24,239 +23,103 @@
         }
         .btn-login-top { background: #38bdf8 !important; color: #0f172a !important; border: none !important; }
         .dropdown-menu {
-            display: none; position: absolute; top: 60px; right: 20px; width: 250px;
+            display: none; position: absolute; top: 60px; right: 20px; width: 260px;
             background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
             border-radius: 12px; padding: 10px; z-index: 1001; box-shadow: 0 8px 30px rgba(0,0,0,.35);
         }
         .dropdown-menu.active { display: block; }
         .dropdown-item {
-            padding: 10px 12px; color: var(--text-color, #f8fafc); cursor: pointer; border: none;
-            background: none; font-size: 14px; border-radius: 8px; display: block; width: 100%;
-            text-align: left; text-decoration: none; box-sizing: border-box;
+            padding: 11px 12px; color: var(--text-color, #f8fafc); cursor: pointer; border: none;
+            background: none; font-size: 14px; border-radius: 8px; display: flex; align-items: center; gap: 10px;
+            width: 100%; text-align: left; text-decoration: none; box-sizing: border-box;
         }
         .dropdown-item:hover { background: rgba(56,189,248,.12); color: #38bdf8; }
+        .dropdown-item .e { width: 22px; text-align: center; }
         .dropdown-sep { border-top: 1px solid var(--border-color, #334155); margin: 8px 0; }
-
         .hero { text-align: center; margin-top: 90px; max-width: 720px; width: 100%; }
         .bot-avatar {
             width: 128px; height: 128px; border-radius: 50%; border: 3px solid #38bdf8;
             object-fit: cover; margin-bottom: 18px;
-            box-shadow: 0 0 40px rgba(56,189,248,.35);
         }
         .hero h1 { margin: 0; font-size: 2.4rem; letter-spacing: 3px; color: #38bdf8; }
-        .phrase {
-            margin: 24px auto 14px; max-width: 560px; font-size: 1.15rem; line-height: 1.55;
-            color: var(--text-color, #e2e8f0); font-style: italic; opacity: .95;
-            padding: 16px 18px; border-radius: 14px;
-            background: linear-gradient(135deg, rgba(56,189,248,.08), rgba(124,58,237,.12));
-            border: 1px solid rgba(56,189,248,.25);
+        .phrase { margin: 24px auto; max-width: 560px; color: #94a3b8; font-size: 1.05rem; line-height: 1.6; }
+        .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 20px; }
+        .cta a {
+            background: #38bdf8; color: #0f172a; padding: 12px 22px; border-radius: 24px;
+            text-decoration: none; font-weight: bold;
         }
-        .subtitle { color: #94a3b8; margin: 0 0 35px; font-size: 14px; }
-        .btn-container { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px; margin: 0 auto; }
-        .btn {
-            padding: 12px 20px; border-radius: 25px; font-weight: bold; text-decoration: none;
-            border: 1px solid var(--border-color, #334155); color: var(--text-color, #f8fafc);
-            background: var(--card-bg, #1e293b); display: block; text-align: center; cursor: pointer;
-        }
-        .btn-primary { background: #38bdf8; color: #0f172a; border: none; }
-
-        .modal {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55);
-            z-index: 3000; align-items: center; justify-content: center; padding: 16px;
-        }
-        .modal.open { display: flex; }
-        .modal-content {
-            background: var(--card-bg, #1e293b); padding: 20px; border-radius: 15px;
-            width: 100%; max-width: 480px; max-height: 80vh; overflow: hidden;
-            border: 1px solid var(--border-color, #334155); display: flex; flex-direction: column;
-        }
-        .modal-content h3 { margin: 0 0 12px; color: #38bdf8; }
-        .modal-search {
-            width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color, #334155);
-            background: var(--bg-color, #0f172a); color: var(--text-color, #f8fafc);
-            margin-bottom: 12px; box-sizing: border-box; font-size: 14px;
-        }
-        .modal-list { overflow-y: auto; flex: 1; max-height: 50vh; }
-        .modal-row {
-            padding: 10px 12px; border-radius: 8px; cursor: pointer; display: flex; gap: 10px; align-items: center;
-            border-bottom: 1px solid rgba(51,65,85,.5);
-        }
-        .modal-row:hover { background: rgba(56,189,248,.1); }
-        .close-modal { float: right; cursor: pointer; font-size: 18px; }
+        .cta a.secondary { background: transparent; border: 1px solid #334155; color: #f8fafc; }
     </style>
 </head>
 <body>
     <div class="top-bar">
-        <a href="/auth/discord" class="top-btn btn-login-top" id="btnLogin" data-i18n="login">Login</a>
-        <button class="top-btn" type="button" onclick="toggleMenu()" data-i18n="menu">Menu</button>
+        <a id="loginTop" class="top-btn btn-login-top" href="/auth/discord">🔐 Login</a>
+        <button class="top-btn" type="button" onclick="toggleMenu()">☰ Menu</button>
     </div>
 
     <div id="dropdownMenu" class="dropdown-menu">
-        <a href="/loja.html" class="dropdown-item" data-i18n="store">🛒 Loja</a>
-        <a href="/gaming.html" class="dropdown-item" data-i18n="gaming">🎮 Gaming</a>
-        <a href="/wiki.html" class="dropdown-item" data-i18n="wiki">📖 Wiki</a>
-        <a href="/api-premium.html" class="dropdown-item" data-i18n="api_premium">⚡ API Premium</a>
-        <a href="/daily.html" class="dropdown-item" data-i18n="daily">🎁 Daily</a>
+        <a href="/loja.html" class="dropdown-item"><span class="e">🛒</span> Loja</a>
+        <a href="/gaming.html" class="dropdown-item"><span class="e">🎮</span> Gaming</a>
+        <a href="/wiki.html" class="dropdown-item"><span class="e">📖</span> Wiki</a>
+        <a href="/api-premium.html" class="dropdown-item"><span class="e">⚡</span> API Premium</a>
+        <a href="/daily.html" class="dropdown-item"><span class="e">🎁</span> Daily</a>
         <div class="dropdown-sep"></div>
-        <button type="button" class="dropdown-item" onclick="openCommands()" data-i18n="commands">📜 Comandos</button>
-        <a href="/dashboard" class="dropdown-item" data-i18n="panel">⚙️ Painel</a>
-        <button type="button" class="dropdown-item" onclick="openLanguages()" data-i18n="language">🌐 Idioma</button>
-        <button type="button" class="dropdown-item" onclick="toggleTheme()" id="themeLabel">🌙 Escuro</button>
+        <button type="button" class="dropdown-item" onclick="location.href='/commands.html'"><span class="e">📜</span> Comandos</button>
+        <a href="/dashboard" class="dropdown-item"><span class="e">⚙️</span> Painel</a>
+        <a href="/servers" class="dropdown-item"><span class="e">🛡️</span> Servidores</a>
+        <button type="button" class="dropdown-item" onclick="openLanguages()"><span class="e">🌐</span> Idioma</button>
+        <button type="button" class="dropdown-item" onclick="toggleTheme()" id="themeLabel"><span class="e">🌙</span> Tema</button>
         <div class="dropdown-sep"></div>
-        <a href="/auth/logout" class="dropdown-item" style="color:#ef4444" data-i18n="logout">🚪 Sair</a>
-    </div>
-
-    <!-- Modal comandos -->
-    <div id="cmdModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeModals()">✕</span>
-            <h3 data-i18n="commands">📜 Comandos</h3>
-            <input class="modal-search" id="cmdSearch" data-i18n-placeholder="search_cmd" placeholder="Pesquisar comando..." oninput="filterCommands()">
-            <div class="modal-list" id="cmdList">Carregando...</div>
-        </div>
-    </div>
-
-    <!-- Modal idiomas -->
-    <div id="langModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeModals()">✕</span>
-            <h3 data-i18n="language">🌐 Idioma</h3>
-            <input class="modal-search" id="langSearch" data-i18n-placeholder="search_lang" placeholder="Pesquisar idioma..." oninput="filterLanguages()">
-            <div class="modal-list" id="langList">Carregando...</div>
-        </div>
+        <a href="/auth/logout" class="dropdown-item" style="color:#ef4444"><span class="e">🚪</span> Sair</a>
     </div>
 
     <div class="hero">
-        <img id="botAvatar" class="bot-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Bot">
-        <h1 id="botName">AETERNUS</h1>
-        <div class="phrase" id="botPhrase">💬 Você está no lugar certo.</div>
-        <p class="subtitle" id="botSubtitle" data-i18n="hero_sub">Uma nova era de experiências e conexões.</p>
-
-        <div class="btn-container">
-            <a id="btnInvite" href="#" target="_blank" class="btn btn-primary" data-i18n="add_server">Adicionar ao Servidor</a>
-            <button type="button" class="btn" onclick="loginAndRedirect('/dashboard')">Confirmar</button>
-            <a href="https://discord.gg/seu-link-de-suporte" target="_blank" class="btn" data-i18n="support">Suporte</a>
+        <img id="botAvatar" class="bot-avatar" src="" alt="Bot">
+        <h1 id="botName">Aeternus</h1>
+        <p class="phrase" id="homePhrase">Bot de economia com ❄️ flocos, jogos e painel web.</p>
+        <div class="cta">
+            <a id="inviteBtn" href="#">➕ Adicionar ao servidor</a>
+            <a class="secondary" href="/daily.html">🎁 Daily</a>
+            <a class="secondary" href="https://discord.gg/" id="supportBtn" target="_blank" rel="noopener">💬 Suporte</a>
         </div>
     </div>
 
-    <script src="/i18n.js"></script>
-    <script src="/snow.js"></script>
     <script>
-        let allCommands = [];
-        let allLanguages = [];
-
         function toggleMenu() {
             document.getElementById('dropdownMenu').classList.toggle('active');
         }
-        function closeModals() {
-            document.getElementById('cmdModal').classList.remove('open');
-            document.getElementById('langModal').classList.remove('open');
-        }
-
-        function loginAndRedirect(targetUrl) {
-            // Salva a página de destino no localStorage para o bot/servidor saber para onde ir após o login
-            localStorage.setItem('redirect_after_login', targetUrl);
-            // Redireciona para o fluxo de autenticação do Discord
-            window.location.href = '/auth/discord';
-        }
-
-        // Tema
-        (function syncThemeLabel() {
-            const t = localStorage.getItem('theme') || 'dark';
-            const el = document.getElementById('themeLabel');
-            if (el) el.textContent = t === 'dark' ? '🌙 Escuro' : '☀️ Claro';
-        })();
-
-        // Bot info
-        fetch('/api/bot-info').then(r => r.json()).then(bot => {
-            if (bot.avatar) {
-                document.getElementById('botAvatar').src = bot.avatar;
-                const fav = document.getElementById('dynamicFavicon');
-                if (fav) fav.href = bot.avatar;
-            }
-            if (bot.name || bot.username) {
-                document.getElementById('botName').textContent = (bot.name || bot.username).toUpperCase();
-            }
-            if (bot.subtitle) document.getElementById('botSubtitle').textContent = bot.subtitle;
-            if (bot.inviteUrl) document.getElementById('btnInvite').href = bot.inviteUrl;
-        }).catch(() => {});
-
-        fetch('/auth/me').then(r => r.json()).then(d => {
-            if (d && d.authenticated) {
-                const b = document.getElementById('btnLogin');
-                b.textContent = (d.user && d.user.username) || 'Conta';
-                b.href = '/dashboard';
-            }
-        }).catch(() => {});
-
-        function openCommands() {
-            toggleMenu();
-            document.getElementById('cmdModal').classList.add('open');
-            fetch('/api/commands').then(r => r.json()).then(cmds => {
-                allCommands = cmds || [];
-                renderCommands(allCommands);
-            }).catch(() => {
-                document.getElementById('cmdList').innerHTML = '<div style="color:#ef4444">Erro ao carregar.</div>';
-            });
-        }
-        function renderCommands(list) {
-            const box = document.getElementById('cmdList');
-            if (!list.length) {
-                box.innerHTML = '<div style="opacity:.7">Nenhum comando.</div>';
-                return;
-            }
-            box.innerHTML = list.map(c => `
-                <div class="modal-row" style="flex-direction:column;align-items:flex-start">
-                    <span style="font-family:monospace;color:#38bdf8;font-weight:bold">/${c.name}</span>
-                    <span style="font-size:13px;opacity:.85">${c.description || ''}</span>
-                </div>`).join('');
-        }
-        function filterCommands() {
-            const q = (document.getElementById('cmdSearch').value || '').toLowerCase();
-            renderCommands(allCommands.filter(c =>
-                (c.name || '').toLowerCase().includes(q) ||
-                (c.description || '').toLowerCase().includes(q)
-            ));
-        }
-
-        function openLanguages() {
-            toggleMenu();
-            document.getElementById('langModal').classList.add('open');
-            fetch('/api/languages').then(r => r.json()).then(list => {
-                allLanguages = list || [];
-                renderLanguages(allLanguages);
-            }).catch(() => {
-                document.getElementById('langList').innerHTML = '<div style="color:#ef4444">Erro ao carregar idiomas.</div>';
-            });
-        }
-        function renderLanguages(list) {
-            const box = document.getElementById('langList');
-            const cur = localStorage.getItem('lang') || 'pt';
-            box.innerHTML = list.map(l => `
-                <div class="modal-row" onclick="selectLanguage('${l.code}')">
-                    <span style="font-size:20px">${l.flag || '🏳️'}</span>
-                    <div>
-                        <div style="font-weight:700">${l.native || l.name}</div>
-                        <div style="font-size:12px;opacity:.7">${l.name} · ${l.code}${cur === l.code ? ' · ✓' : ''}</div>
-                    </div>
-                </div>`).join('');
-        }
-        function filterLanguages() {
-            const q = (document.getElementById('langSearch').value || '').toLowerCase();
-            renderLanguages(allLanguages.filter(l =>
-                (l.name || '').toLowerCase().includes(q) ||
-                (l.native || '').toLowerCase().includes(q) ||
-                (l.code || '').toLowerCase().includes(q)
-            ));
-        }
-        async function selectLanguage(code) {
-            if (window.i18n) await i18n.loadLanguage(code);
-            closeModals();
-        }
-
-        document.querySelectorAll('.modal').forEach(m => {
-            m.addEventListener('click', (e) => { if (e.target === m) closeModals(); });
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('dropdownMenu');
+            if (!menu.contains(e.target) && !e.target.closest('.top-bar')) menu.classList.remove('active');
         });
+        function toggleTheme() {
+            if (typeof window.__toggleTheme === 'function') window.__toggleTheme();
+            const dark = document.documentElement.dataset.theme !== 'light';
+            document.getElementById('themeLabel').innerHTML = dark
+                ? '<span class="e">🌙</span> Escuro'
+                : '<span class="e">☀️</span> Claro';
+        }
+        function openLanguages() {
+            alert('Idiomas: use o seletor quando disponível no painel.');
+        }
+        (async () => {
+            try {
+                const me = await fetch('/auth/me').then(r => r.json());
+                if (me.authenticated) {
+                    const btn = document.getElementById('loginTop');
+                    btn.textContent = '👤 Conta';
+                    btn.href = '/servers';
+                    btn.classList.remove('btn-login-top');
+                }
+            } catch (_) {}
+            try {
+                const info = await fetch('/api/bot-info').then(r => r.json());
+                if (info.avatar) document.getElementById('botAvatar').src = info.avatar;
+                if (info.name) document.getElementById('botName').textContent = info.name;
+                if (info.phrase) document.getElementById('homePhrase').textContent = info.phrase;
+                if (info.inviteUrl) document.getElementById('inviteBtn').href = info.inviteUrl;
+            } catch (_) {}
+        })();
     </script>
 </body>
 </html>

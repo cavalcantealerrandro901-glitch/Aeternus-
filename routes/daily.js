@@ -8,8 +8,44 @@ function dayKey(d = new Date()) {
     return d.toISOString().slice(0, 10);
 }
 
-/** POST /api/daily-claim — ❄️ flocos (5k–50k) × multiplicador dos cristais de gelo */
+function readDailyFile() {
+    const file = path.join(__dirname, '..', 'data', 'daily.json');
+    if (!fs.existsSync(file)) return {};
+    try {
+        return JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
+    } catch {
+        return {};
+    }
+}
+
+function writeDailyFile(data) {
+    const file = path.join(__dirname, '..', 'data', 'daily.json');
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
 function register(app) {
+    /** Info do multi / streak (logado) */
+    app.get('/api/daily-info', (req, res) => {
+        if (!req.session?.isAuthenticated || !req.session?.user?.id) {
+            return res.status(401).json({ ok: false });
+        }
+        const userId = String(req.session.user.id);
+        const today = dayKey();
+        const data = readDailyFile()[userId] || {};
+        const lastDay = data.lastDay || null;
+        const mult = cristais.dailyMultiplier(userId);
+        const level = cristais.levelFromTotal(cristais.get(userId));
+
+        res.json({
+            ok: true,
+            multiplier: mult,
+            cristalLevel: level,
+            streak: data.streak || 0,
+            alreadyClaimed: lastDay === today,
+            balance: db.getBal(userId)
+        });
+    });
+
     app.post('/api/daily-claim', (req, res) => {
         if (!req.session?.isAuthenticated || !req.session?.user?.id) {
             return res.status(401).json({ error: 'Faça login para resgatar.' });
@@ -17,7 +53,8 @@ function register(app) {
 
         const userId = String(req.session.user.id);
         const today = dayKey();
-        const daily = db.getDaily(userId) || { streak: 0, lastClaimed: 0, lastDay: null };
+        const all = readDailyFile();
+        const daily = all[userId] || { streak: 0, lastClaimed: 0, lastDay: null };
 
         let lastDay = daily.lastDay || null;
         if (!lastDay && daily.lastClaimed) {
@@ -35,8 +72,6 @@ function register(app) {
         const amount = Math.floor(base * mult);
 
         const balance = db.addBal(userId, amount);
-
-        // Recompensas de progresso
         const xpGain = 25 + Math.floor(Math.random() * 26);
         const cristalGain = 5 + Math.floor(Math.random() * 11);
         xp.add(userId, xpGain);
@@ -47,30 +82,17 @@ function register(app) {
                 ? (daily.streak || 0) + 1
                 : 1;
 
+        all[userId] = {
+            streak,
+            lastClaimed: Date.now(),
+            lastDay: today,
+            lastAmount: amount,
+            base,
+            mult,
+            notify: daily.notify !== false
+        };
+        writeDailyFile(all);
         db.setDaily(userId, streak, Date.now());
-
-        try {
-            const file = path.join(__dirname, '..', 'data', 'daily.json');
-            let data = {};
-            if (fs.existsSync(file)) {
-                try {
-                    data = JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
-                } catch {
-                    data = {};
-                }
-            }
-            data[userId] = {
-                streak,
-                lastClaimed: Date.now(),
-                lastDay: today,
-                lastAmount: amount,
-                base,
-                mult
-            };
-            fs.writeFileSync(file, JSON.stringify(data, null, 2));
-        } catch (e) {
-            console.error('daily save:', e.message);
-        }
 
         res.json({
             success: true,

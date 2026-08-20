@@ -1,30 +1,40 @@
-<div id="guild-view">
-            <div class="header">
-                <img id="guild-avatar" src="https://via.placeholder.com/90" alt="Avatar">
-                <h2 id="guild-name">Carregando...</h2>
-                <p id="guild-id" style="color: #6b7280; margin: 0;">ID: ...</p>
-            </div>
+<div id="guild-view" class="system-view home-only" style="display:block;">
+    <div class="header" style="text-align:center;margin-bottom:20px;">
+        <img id="guild-avatar" src="" alt="" style="width:96px;height:96px;border-radius:20px;object-fit:cover;border:2px solid #38bdf8;background:#0f172a;">
+        <h2 id="guild-name">Carregando...</h2>
+        <p id="guild-id" style="color:#6b7280;margin:0;">ID: ...</p>
+    </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <span>MEMBROS</span>
-                    <strong id="guild-members">---</strong>
-                </div>
-                <div class="stat-card">
-                    <span>CARGOS</span>
-                    <strong id="guild-roles">---</strong>
-                </div>
-            </div>
-
-            <div class="stats-grid" style="grid-template-columns: 1fr;">
-                <div class="stat-card">
-                    <span>CANAIS</span>
-                    <strong id="guild-channels">---</strong>
-                </div>
-            </div>
-
-            <div class="desc-card">
-                <h3>Descrição do Servidor</h3>
-                <p id="guild-desc" style="color: #9ca3af; margin: 0; font-size: 14px;">Carregando descrição...</p>
-            </div>
+    <div class="stats-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div class="stat-card" style="background:#1e293b;padding:14px;border-radius:12px;text-align:center;">
+            <span>👥 MEMBROS</span>
+            <strong id="guild-members" style="display:block;font-size:1.4rem;">---</strong>
         </div>
+        <div class="stat-card" style="background:#1e293b;padding:14px;border-radius:12px;text-align:center;">
+            <span>🛡️ CARGOS</span>
+            <strong id="guild-roles" style="display:block;font-size:1.4rem;">---</strong>
+        </div>
+        <div class="stat-card" style="background:#1e293b;padding:14px;border-radius:12px;text-align:center;grid-column:1/-1;">
+            <span>💬 CANAIS</span>
+            <strong id="guild-channels" style="display:block;font-size:1.4rem;">---</strong>
+        </div>
+    </div>
+
+    <div class="desc-card" style="background:#1e293b;padding:16px;border-radius:12px;margin-bottom:20px;">
+        <h3 style="margin-top:0;">📝 Descrição</h3>
+        <p id="guild-desc" style="color:#9ca3af;margin:0;font-size:14px;">—</p>
+    </div>
+
+    <h3 style="margin:8px 0 12px;">⚙️ Configurar sistemas</h3>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+        <button type="button" class="menu-item" onclick="openSystem('system-geral')" style="width:100%;border:1px solid #334155;background:#1e293b;">
+            <span class="emoji">🔧</span> Geral · Prefixo
+        </button>
+        <button type="button" class="menu-item" onclick="openSystem('system-welcome')" style="width:100%;border:1px solid #334155;background:#1e293b;">
+            <span class="emoji">👋</span> Boas-vindas
+        </button>
+        <button type="button" class="menu-item" onclick="openSystem('system-logs')" style="width:100%;border:1px solid #334155;background:#1e293b;">
+            <span class="emoji">📋</span> Logs de auditoria
+        </button>
+    </div>
+</div>
