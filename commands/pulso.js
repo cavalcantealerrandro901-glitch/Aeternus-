@@ -6,33 +6,34 @@ const {
     ComponentType
 } = require('discord.js');
 const flocos = require('../utils/flocos');
+const xp = require('../utils/xp');
+const cristais = require('../utils/cristais');
+const { againRow } = require('../utils/gameAgain');
 
-/** PULSO — reação: um botão vira ⚡; clique em até 1,2s (3x) */
 module.exports = {
     name: 'pulso',
     aliases: ['reacao', 'reflexo'],
-    description: 'Jogo de reação: clique no pulso ⚡ no instante certo',
+    description: 'Reação com ❄️ flocos — clique no ⚡ a tempo',
     async execute(message, args) {
-        const stake = flocos.parseBet(args[0], flocos.get(message.author.id)) || 100;
+        const stakeRaw = args[0] || '100';
+        const stake = flocos.parseBet(stakeRaw, flocos.get(message.author.id)) || 100;
         const check = flocos.canBet(message.author.id, stake);
         if (!check.ok) return message.reply(check.error);
 
         flocos.add(message.author.id, -stake);
+        const againArgs = [String(stakeRaw)];
 
         const embed = new EmbedBuilder()
             .setColor(0x38bdf8)
             .setTitle('⚡ PULSO')
             .setDescription(
-                `Taxa: ${flocos.format(stake)}\n` +
-                    `Em instantes **um** botão vira ⚡.\n` +
-                    `Clique **somente nele** em até **1,2s**.\n` +
-                    `Acerte = **3x**. Erre ou demore = perde a taxa.`
+                `Taxa: ${flocos.format(stake)}\nAguarde… um botão vira ⚡. Clique em **1,2s** → **3x**.`
             );
 
         const idleRow = new ActionRowBuilder().addComponents(
             [0, 1, 2].map((i) =>
                 new ButtonBuilder()
-                    .setCustomId(`pulso_idle_${message.id}_${i}`)
+                    .setCustomId(`pulso_idle_${message.author.id}_${i}`)
                     .setLabel('●')
                     .setStyle(ButtonStyle.Secondary)
                     .setDisabled(true)
@@ -46,7 +47,7 @@ module.exports = {
         const active = new ActionRowBuilder().addComponents(
             [0, 1, 2].map((i) =>
                 new ButtonBuilder()
-                    .setCustomId(`pulso_go_${message.id}_${i}`)
+                    .setCustomId(`pulso_go_${message.author.id}_${i}`)
                     .setLabel(i === correct ? '⚡' : '●')
                     .setStyle(i === correct ? ButtonStyle.Success : ButtonStyle.Secondary)
             )
@@ -54,11 +55,7 @@ module.exports = {
 
         try {
             await sent.edit({
-                embeds: [
-                    EmbedBuilder.from(embed).setDescription(
-                        `⚡ **AGORA!** Clique no botão com o raio!\nTaxa: ${flocos.format(stake)}`
-                    )
-                ],
+                embeds: [EmbedBuilder.from(embed).setDescription(`⚡ **AGORA!** Taxa: ${flocos.format(stake)}`)],
                 components: [active]
             });
         } catch {
@@ -72,7 +69,7 @@ module.exports = {
         const collector = sent.createMessageComponentCollector({
             componentType: ComponentType.Button,
             time: 1200,
-            filter: (i) => i.user.id === message.author.id
+            filter: (i) => i.user.id === message.author.id && i.customId.includes('pulso_go_')
         });
 
         collector.on('collect', async (i) => {
@@ -85,16 +82,18 @@ module.exports = {
             if (ok) {
                 const win = stake * 3;
                 flocos.add(message.author.id, win);
+                xp.add(message.author.id, 12);
+                cristais.add(message.author.id, 2);
                 await i.update({
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x22c55e)
                             .setTitle('⚡ Reflexo perfeito')
                             .setDescription(
-                                `Tempo: **${ms}ms**\nGanhou ${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
+                                `**${ms}ms** · ${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
                             )
                     ],
-                    components: []
+                    components: [againRow('pulso', message.author.id, againArgs)]
                 });
             } else {
                 await i.update({
@@ -102,11 +101,9 @@ module.exports = {
                         new EmbedBuilder()
                             .setColor(0xef4444)
                             .setTitle('💨 Errou o pulso')
-                            .setDescription(
-                                `Certo: **#${correct + 1}** · seu: **#${pick + 1}** (${ms}ms)\nPerdeu ${flocos.format(stake)}`
-                            )
+                            .setDescription(`Perdeu ${flocos.format(stake)}.\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`)
                     ],
-                    components: []
+                    components: [againRow('pulso', message.author.id, againArgs)]
                 });
             }
             collector.stop('done');
@@ -119,10 +116,10 @@ module.exports = {
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x64748b)
-                            .setTitle('⏰ Lento demais')
-                            .setDescription(`O pulso passou. Perdeu ${flocos.format(stake)}.`)
+                            .setTitle('⏰ Lento')
+                            .setDescription(`Perdeu ${flocos.format(stake)}.`)
                     ],
-                    components: []
+                    components: [againRow('pulso', message.author.id, againArgs)]
                 });
             } catch (_) {}
         });

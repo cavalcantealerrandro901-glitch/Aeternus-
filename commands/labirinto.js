@@ -6,34 +6,32 @@ const {
     ComponentType
 } = require('discord.js');
 const flocos = require('../utils/flocos');
+const xp = require('../utils/xp');
+const cristais = require('../utils/cristais');
+const { againRow } = require('../utils/gameAgain');
 
-/** LABIRINTO — grade 3x3 invisível; encontre a saída em N movimentos com dicas de calor */
 module.exports = {
     name: 'labirinto',
     aliases: ['maze', 'saida'],
-    description: 'Encontre a saída do labirinto às cegas com dicas de proximidade',
+    description: 'Labirinto 3×3 com ❄️ flocos',
     async execute(message, args) {
-        const stake = flocos.parseBet(args[0], flocos.get(message.author.id)) || 120;
+        const stakeRaw = args[0] || '120';
+        const stake = flocos.parseBet(stakeRaw, flocos.get(message.author.id)) || 120;
         const check = flocos.canBet(message.author.id, stake);
         if (!check.ok) return message.reply(check.error);
 
         flocos.add(message.author.id, -stake);
+        const againArgs = [String(stakeRaw)];
 
-        // posições 0-8
-        let pos = 4; // centro
+        let pos = 4;
         let exit = Math.floor(Math.random() * 9);
         while (exit === pos) exit = Math.floor(Math.random() * 9);
-
         let moves = 6;
 
         const heat = () => {
-            const px = pos % 3;
-            const py = Math.floor(pos / 3);
-            const ex = exit % 3;
-            const ey = Math.floor(exit / 3);
-            const d = Math.abs(px - ex) + Math.abs(py - ey);
-            if (d === 0) return '🏆';
-            if (d === 1) return '🔥 Muito quente';
+            const d =
+                Math.abs((pos % 3) - (exit % 3)) + Math.abs(Math.floor(pos / 3) - Math.floor(exit / 3));
+            if (d <= 1) return '🔥 Muito quente';
             if (d === 2) return '🟠 Quente';
             if (d === 3) return '🟡 Morno';
             return '🔵 Frio';
@@ -42,8 +40,7 @@ module.exports = {
         const grid = () => {
             let s = '';
             for (let i = 0; i < 9; i++) {
-                if (i === pos) s += '🧑';
-                else s += '⬛';
+                s += i === pos ? '🧑' : '⬛';
                 if (i % 3 === 2) s += '\n';
             }
             return s;
@@ -54,15 +51,15 @@ module.exports = {
                 .setColor(0x14b8a6)
                 .setTitle('🧭 LABIRINTO')
                 .setDescription(
-                    `${grid()}\n${heat()}\nMovimentos: **${moves}**\nAposta: ${flocos.format(stake)} → saída **3x**`
+                    `${grid()}\n${heat()}\nMovimentos: **${moves}**\n${flocos.format(stake)} → saída **3x**`
                 );
 
         const controls = () =>
             new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`lab_n_${message.id}`).setLabel('⬆️').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId(`lab_w_${message.id}`).setLabel('⬅️').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId(`lab_e_${message.id}`).setLabel('➡️').setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder().setCustomId(`lab_s_${message.id}`).setLabel('⬇️').setStyle(ButtonStyle.Secondary)
+                new ButtonBuilder().setCustomId(`lab_n_${message.author.id}`).setLabel('⬆️').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`lab_w_${message.author.id}`).setLabel('⬅️').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`lab_e_${message.author.id}`).setLabel('➡️').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`lab_s_${message.author.id}`).setLabel('⬇️').setStyle(ButtonStyle.Secondary)
             );
 
         const sent = await message.reply({ embeds: [embed()], components: [controls()] });
@@ -70,41 +67,39 @@ module.exports = {
         const collector = sent.createMessageComponentCollector({
             componentType: ComponentType.Button,
             time: 40000,
-            filter: (i) => i.user.id === message.author.id
+            filter: (i) => i.user.id === message.author.id && i.customId.startsWith('lab_')
         });
 
         collector.on('collect', async (i) => {
             const dir = i.customId.split('_')[1];
-            const x = pos % 3;
-            const y = Math.floor(pos / 3);
-            let nx = x;
-            let ny = y;
-            if (dir === 'n') ny -= 1;
-            if (dir === 's') ny += 1;
-            if (dir === 'w') nx -= 1;
-            if (dir === 'e') nx += 1;
-
-            if (nx < 0 || nx > 2 || ny < 0 || ny > 2) {
-                await i.reply({ content: 'Parede! Tente outra direção.', ephemeral: true });
+            let x = pos % 3;
+            let y = Math.floor(pos / 3);
+            if (dir === 'n') y -= 1;
+            if (dir === 's') y += 1;
+            if (dir === 'w') x -= 1;
+            if (dir === 'e') x += 1;
+            if (x < 0 || x > 2 || y < 0 || y > 2) {
+                await i.reply({ content: 'Parede!', ephemeral: true });
                 return;
             }
-
-            pos = ny * 3 + nx;
+            pos = y * 3 + x;
             moves -= 1;
 
             if (pos === exit) {
                 const win = stake * 3;
                 flocos.add(message.author.id, win);
+                xp.add(message.author.id, 15);
+                cristais.add(message.author.id, 2);
                 await i.update({
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x22c55e)
-                            .setTitle('🧭 Saída encontrada!')
+                            .setTitle('🧭 Saída!')
                             .setDescription(
-                                `Você escapou com **${moves}** movimentos sobrando.\n${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
+                                `${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
                             )
                     ],
-                    components: []
+                    components: [againRow('labirinto', message.author.id, againArgs)]
                 });
                 collector.stop('win');
                 return;
@@ -116,9 +111,9 @@ module.exports = {
                         new EmbedBuilder()
                             .setColor(0xef4444)
                             .setTitle('🧭 Sem movimentos')
-                            .setDescription(`A saída era a casa **#${exit + 1}**. Perdeu ${flocos.format(stake)}.`)
+                            .setDescription(`Perdeu ${flocos.format(stake)}.`)
                     ],
-                    components: []
+                    components: [againRow('labirinto', message.author.id, againArgs)]
                 });
                 collector.stop('lose');
                 return;
@@ -130,7 +125,7 @@ module.exports = {
         collector.on('end', async (_, reason) => {
             if (['win', 'lose'].includes(reason)) return;
             try {
-                await sent.edit({ components: [] });
+                await sent.edit({ components: [againRow('labirinto', message.author.id, againArgs)] });
             } catch (_) {}
         });
     }

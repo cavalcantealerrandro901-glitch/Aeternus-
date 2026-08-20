@@ -6,38 +6,35 @@ const {
     ComponentType
 } = require('discord.js');
 const flocos = require('../utils/flocos');
+const xp = require('../utils/xp');
+const cristais = require('../utils/cristais');
+const { againRow } = require('../utils/gameAgain');
 
-/**
- * SINCRONIA — dois números visíveis; a regra secreta muda a cada rodada
- * (soma, diferença absoluta, produto dos dígitos, máx, mín…). Ache o resultado certo.
- */
 module.exports = {
     name: 'sincronia',
     aliases: ['sync', 'regra'],
-    description: 'Descubra o resultado da regra secreta entre dois números',
+    description: 'Regra secreta com ❄️ flocos',
     async execute(message, args) {
-        const stake = flocos.parseBet(args[0], flocos.get(message.author.id)) || 100;
+        const stakeRaw = args[0] || '100';
+        const stake = flocos.parseBet(stakeRaw, flocos.get(message.author.id)) || 100;
         const check = flocos.canBet(message.author.id, stake);
         if (!check.ok) return message.reply(check.error);
 
         flocos.add(message.author.id, -stake);
+        const againArgs = [String(stakeRaw)];
 
         const a = 2 + Math.floor(Math.random() * 20);
         const b = 2 + Math.floor(Math.random() * 20);
-
         const rules = [
             { name: 'soma', fn: (x, y) => x + y },
             { name: 'diferença', fn: (x, y) => Math.abs(x - y) },
             { name: 'produto', fn: (x, y) => x * y },
             { name: 'máximo', fn: (x, y) => Math.max(x, y) },
-            { name: 'mínimo', fn: (x, y) => Math.min(x, y) },
-            { name: 'soma dos dígitos do produto', fn: (x, y) => String(x * y).split('').reduce((s, d) => s + Number(d), 0) }
+            { name: 'mínimo', fn: (x, y) => Math.min(x, y) }
         ];
-
         const rule = rules[Math.floor(Math.random() * rules.length)];
         const answer = rule.fn(a, b);
 
-        // 4 opções
         const opts = new Set([answer]);
         while (opts.size < 4) {
             const noise = answer + Math.floor(Math.random() * 17) - 8;
@@ -45,31 +42,31 @@ module.exports = {
         }
         const options = [...opts].sort(() => Math.random() - 0.5);
 
-        const embed = new EmbedBuilder()
-            .setColor(0xd946ef)
-            .setTitle('🔗 SINCRONIA')
-            .setDescription(
-                `Números: **${a}** e **${b}**\n` +
-                    `Uma **regra secreta** liga os dois.\n` +
-                    `Qual é o resultado?\n` +
-                    `Aposta: ${flocos.format(stake)} → acerto **2,5x**`
-            );
-
         const row = new ActionRowBuilder().addComponents(
-            options.map((v, i) =>
+            options.map((v) =>
                 new ButtonBuilder()
-                    .setCustomId(`sync_${message.id}_${v}`)
+                    .setCustomId(`sync_${message.author.id}_${v}`)
                     .setLabel(String(v))
                     .setStyle(ButtonStyle.Secondary)
             )
         );
 
-        const sent = await message.reply({ embeds: [embed], components: [row] });
+        const sent = await message.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0xd946ef)
+                    .setTitle('🔗 SINCRONIA')
+                    .setDescription(
+                        `Números **${a}** e **${b}**. Qual o resultado da regra secreta?\n${flocos.format(stake)} → **2,5x**`
+                    )
+            ],
+            components: [row]
+        });
 
         const collector = sent.createMessageComponentCollector({
             componentType: ComponentType.Button,
             time: 20000,
-            filter: (i) => i.user.id === message.author.id,
+            filter: (i) => i.user.id === message.author.id && i.customId.startsWith('sync_'),
             max: 1
         });
 
@@ -79,28 +76,30 @@ module.exports = {
             if (ok) {
                 const win = Math.floor(stake * 2.5);
                 flocos.add(message.author.id, win);
+                xp.add(message.author.id, 12);
+                cristais.add(message.author.id, 2);
                 await i.update({
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x22c55e)
-                            .setTitle('🔗 Sincronizado')
+                            .setTitle('🔗 Certo')
                             .setDescription(
-                                `Regra: **${rule.name}** → **${answer}**\n${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
+                                `Regra: **${rule.name}** = **${answer}**\n${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
                             )
                     ],
-                    components: []
+                    components: [againRow('sincronia', message.author.id, againArgs)]
                 });
             } else {
                 await i.update({
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0xef4444)
-                            .setTitle('🔗 Dessincronizado')
+                            .setTitle('🔗 Errado')
                             .setDescription(
-                                `Você: **${pick}** · Certo: **${answer}** (${rule.name})\nPerdeu ${flocos.format(stake)}`
+                                `Certo: **${answer}** (${rule.name}). Perdeu ${flocos.format(stake)}.`
                             )
                     ],
-                    components: []
+                    components: [againRow('sincronia', message.author.id, againArgs)]
                 });
             }
         });
@@ -109,13 +108,7 @@ module.exports = {
             if (c.size > 0) return;
             try {
                 await sent.edit({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor(0x64748b)
-                            .setTitle('⏰ Tempo')
-                            .setDescription(`Resposta: **${answer}** (${rule.name})`)
-                    ],
-                    components: []
+                    components: [againRow('sincronia', message.author.id, againArgs)]
                 });
             } catch (_) {}
         });
