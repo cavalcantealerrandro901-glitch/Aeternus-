@@ -1,56 +1,67 @@
 const { Events, MessageFlags } = require('discord.js');
-const { decodePayload, messageFromInteraction } = require('../utils/gameAgain');
+const { decodePayload } = require('../utils/gameAgain');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
-        // Botão Novamente nos jogos de aposta
+        // Botão Novamente
         if (interaction.isButton() && interaction.customId.startsWith('again:')) {
             const parts = interaction.customId.split(':');
-            // again:game:userId:payload
             if (parts.length < 4) {
-                return interaction.reply({
-                    content: 'Dados da rodada inválidos.',
-                    flags: [MessageFlags.Ephemeral]
-                }).catch(() => {});
+                return interaction
+                    .reply({ content: 'Dados da rodada inválidos.', flags: [MessageFlags.Ephemeral] })
+                    .catch(() => {});
             }
+
             const game = parts[1];
             const ownerId = parts[2];
             const payloadB64 = parts.slice(3).join(':');
 
             if (interaction.user.id !== ownerId) {
-                return interaction.reply({
-                    content: 'Só quem jogou pode usar **Novamente**.',
-                    flags: [MessageFlags.Ephemeral]
-                }).catch(() => {});
+                return interaction
+                    .reply({
+                        content: 'Só quem jogou pode usar **Novamente**.',
+                        flags: [MessageFlags.Ephemeral]
+                    })
+                    .catch(() => {});
             }
 
             const payload = decodePayload(payloadB64);
             const args = payload?.a || [];
             const command = client.commands.get(game);
             if (!command) {
-                return interaction.reply({
-                    content: 'Jogo não encontrado.',
-                    flags: [MessageFlags.Ephemeral]
-                }).catch(() => {});
+                return interaction
+                    .reply({ content: 'Jogo não encontrado.', flags: [MessageFlags.Ephemeral] })
+                    .catch(() => {});
             }
 
             try {
-                await interaction.deferUpdate().catch(() => {});
-                const fakeMessage = messageFromInteraction(interaction);
-                // followUp precisa de interação reconhecida
-                fakeMessage.reply = async (p) => {
-                    if (interaction.deferred || interaction.replied) {
-                        return interaction.followUp(p);
-                    }
-                    return interaction.reply(p);
+                // Só atualiza o botão (não “consome” reply para o novo jogo)
+                await interaction.update({
+                    components: interaction.message.components
+                }).catch(async () => {
+                    await interaction.deferUpdate().catch(() => {});
+                });
+
+                // Novo jogo no canal (evita 40060 Interaction acknowledged)
+                const fakeMessage = {
+                    id: `${interaction.id}_again`,
+                    author: interaction.user,
+                    member: interaction.member,
+                    channel: interaction.channel,
+                    guild: interaction.guild,
+                    client: interaction.client,
+                    content: '',
+                    mentions: { users: { first: () => null, size: 0, values: () => [] } },
+                    reply: (payload) => interaction.channel.send(payload)
                 };
+
                 await command.execute(fakeMessage, args, client);
             } catch (err) {
                 console.error('again button:', err);
                 try {
                     await interaction.followUp({
-                        content: 'Não foi possível repetir o jogo.',
+                        content: 'Não foi possível repetir o jogo. Tente o comando de novo.',
                         flags: [MessageFlags.Ephemeral]
                     });
                 } catch (_) {}
