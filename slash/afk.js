@@ -3,20 +3,22 @@ const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('afk')
-        .setDescription('Define seu status como AFK')
-        .addStringOption(opt => 
-            opt.setName('motivo')
-               .setDescription('O motivo de ficar ausente')
-               .setRequired(false)
+        .setDescription('Define seu status como ausente no servidor.')
+        .addStringOption(option =>
+            option.setName('motivo')
+                .setDescription('Motivo da sua ausência')
+                .setRequired(false)
         ),
-    async execute(interaction, client) {
-        const reason = interaction.options.getString('motivo') || 'Sem motivo';
+    async execute(interaction) {
+        const reason = interaction.options.getString('motivo') || 'Ausente';
         
-        client.afk.set(interaction.user.id, {
-            reason: reason,
-            time: Date.now()
+        interaction.client.afk.set(interaction.user.id, {
+            reason,
+            timestamp: Date.now()
         });
 
-        await interaction.reply({ content: `✅ Você está agora AFK. Motivo: ${reason}`, ephemeral: true });
+        await interaction.reply({
+            content: `💤 **${interaction.user.username}**, seu status foi definido como **AFK**: \`${reason}\``
+        });
     }
 };

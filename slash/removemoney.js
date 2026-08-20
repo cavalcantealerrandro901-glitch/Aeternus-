@@ -1,33 +1,68 @@
-const { SlashCommandBuilder } = require('discord.js');
-const db = require('../utils/database');
-const { parseAmount } = require('../utils/parser');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const dbFile = path.join(__dirname, '..', 'database.json');
+
+function parseAmount(str) {
+    if (!str) return null;
+    str = str.trim().toLowerCase().replace(',', '.');
+    let multiplier = 1;
+    if (str.endsWith('k')) { multiplier = 1000; str = str.slice(0, -1); }
+    else if (str.endsWith('m')) { multiplier = 1000000; str = str.slice(0, -1); }
+    else if (str.endsWith('b')) { multiplier = 1000000000; str = str.slice(0, -1); }
+    const num = parseFloat(str);
+    if (isNaN(num)) return null;
+    return Math.floor(num * multiplier);
+}
+
+function formatNumber(num) {
+    return num.toLocaleString('en-US');
+}
+
+function removeBalance(userId, amount) {
+    try {
+        let data = {};
+        if (fs.existsSync(dbFile)) {
+            data = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+        }
+        if (!data[`user_${userId}`]) data[`user_${userId}`] = { balance: 0 };
+        
+        // Remove, garantindo que não fique negativo
+        data[`user_${userId}`].balance = Math.max(0, data[`user_${userId}`].balance - amount);
+        
+        fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
+        return data[`user_${userId}`].balance;
+    } catch (e) { return null; }
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('removemoney')
-        .setDescription('Remove almas de um usuário')
-        .addUserOption(opt => opt.setName('usuario').setDescription('O usuário').setRequired(true))
-        .addStringOption(opt => opt.setName('quantidade').setDescription('Quantidade (ex: 500k, 1.5m)').setRequired(true)),
+        .setDescription('Remove cristais de um usuário (Apenas Administradores)')
+        .addUserOption(option => 
+            option.setName('usuario').setDescription('O usuário').setRequired(true))
+        .addStringOption(option => 
+            option.setName('quantidade').setDescription('Quantidade (ex: 500, 1.5k, 2m)').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
     async execute(interaction) {
-        const allowed = db.getPerms();
-        const isOwner = interaction.user.id === interaction.guild?.ownerId;
+        await interaction.deferReply({ ephemeral: false }).catch(() => {});
 
-        if (!isOwner && !allowed.includes(interaction.user.id) && !interaction.member.permissions.has('Administrator')) {
-            return interaction.reply({ content: '❌ Você não tem permissão para usar este comando.', ephemeral: true });
+        const targetUser = interaction.options.getUser('usuario');
+        const rawAmount = interaction.options.getString('quantidade');
+        const amount = parseAmount(rawAmount);
+
+        if (amount === null || amount <= 0) {
+            return interaction.editReply({ content: '❌ Quantidade inválida!' });
         }
 
-        const target = interaction.options.getUser('usuario');
-        const amountInput = interaction.options.getString('quantidade');
-        const amount = parseAmount(amountInput);
-
-        if (isNaN(amount) || amount <= 0) {
-            return interaction.reply({ content: '❌ Quantidade inválida! Exemplos aceitos: `1k`, `2.5m`, `23393k`.', ephemeral: true });
+        const newBalance = removeBalance(targetUser.id, amount);
+        if (newBalance === null) {
+            return interaction.editReply({ content: '❌ Erro ao acessar o cofre.' });
         }
 
-        const currentBal = db.getBal(target.id);
-        const removeAmount = amount > currentBal ? currentBal : amount;
-        const newTotal = db.addBal(target.id, -removeAmount);
-
-        await interaction.reply(`💀 Removido **${amountInput.toUpperCase()}** almas de **${target.tag}**.\n💰 Saldo restante: **${newTotal.toLocaleString()}** almas.`);
+        await interaction.editReply({
+            content: `❄️ Removido **${formatNumber(amount)} cristais** de **${targetUser.username}**. Novo saldo: **${formatNumber(newBalance)} cristais**.`
+        });
     }
 };

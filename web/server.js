@@ -14,8 +14,7 @@ function isExpressRouter(mod) {
 
 /**
  * Painel web — Express + carrega routes/*.js
- * Cada arquivo deve exportar: function register(app, client) { ... }
- * Routers antigos (Express.Router) são ignorados com aviso.
+ * Cada arquivo deve exportar: function register(app, client) { ... } ou module.exports = function(app, client) { ... }
  */
 function startServer(client) {
     const app = express();
@@ -58,6 +57,7 @@ function startServer(client) {
         });
     });
 
+    // Carregamento automático das rotas da pasta /routes da raiz
     const routesDir = path.join(__dirname, '..', 'routes');
     if (fs.existsSync(routesDir)) {
         for (const file of fs.readdirSync(routesDir).filter((f) => f.endsWith('.js'))) {
@@ -70,7 +70,6 @@ function startServer(client) {
                     continue;
                 }
 
-                // function (app, client) — mas NÃO Express.Router
                 if (typeof mod === 'function' && !isExpressRouter(mod)) {
                     mod(app, client);
                     console.log(`🛣️  [ROTA] ${file}`);

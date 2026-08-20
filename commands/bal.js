@@ -16,11 +16,11 @@ function formatNumber(num) {
 
 module.exports = {
     name: 'bal',
-    description: 'Mostra o saldo de moedas.',
+    description: 'Mostra o saldo de cristais.',
     async execute(message, args) {
         const targetUser = message.mentions.users.first() || message.author;
         const balance = getBalance(targetUser.id);
         const formattedBalance = formatNumber(balance);
-        await message.reply({ content: `💳 Saldo de **${targetUser.username}**: **${formattedBalance} moedas**.` });
+        await message.reply({ content: `❄️ Cofre de **${targetUser.username}**: **${formattedBalance} cristais**.` });
     }
 };

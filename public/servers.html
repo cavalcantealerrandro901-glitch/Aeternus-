@@ -10,7 +10,7 @@
     <script src="/i18n.js"></script>
     <style>
         body { background-color: var(--bg-color, #f8fafc); color: var(--text-color, #0f172a); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; text-align: center; transition: 0.3s; box-sizing: border-box; }
-        
+
         .top-bar { position: fixed; top: 20px; right: 20px; z-index: 1000; }
         .top-btn { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .top-btn:hover { border-color: #38bdf8; transform: translateY(-2px); }
@@ -19,12 +19,15 @@
         .bot-avatar { width: 90px; height: 90px; border-radius: 50%; border: 3px solid #38bdf8; margin-bottom: 15px; object-fit: cover; background: var(--card-bg, #fff); }
         h1 { margin: 0 0 8px 0; font-size: 28px; }
         p { color: #64748b; margin-bottom: 25px; font-size: 14px; }
-        
+
         .servers-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-height: 55vh; overflow-y: auto; padding-right: 4px; }
         .server-card { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); padding: 12px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: var(--text-color); transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .server-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
-        .server-info { display: flex; align-items: center; gap: 12px; }
-        .server-icon { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .server-info { display: flex; align-items: center; gap: 12px; text-align: left; overflow: hidden; }
+        .server-icon { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--border-color, #cbd5e1); }
+        .server-details { display: flex; flex-direction: column; overflow: hidden; }
+        .server-name { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .server-id { font-size: 11px; color: #94a3b8; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -58,15 +61,24 @@
                 list.innerHTML = '<div style="color: #64748b;">Nenhum servidor encontrado ou sem permissão.</div>';
                 return;
             }
-            list.innerHTML = servers.map(s => `
-                <a href="/dashboard?server=${s.id}" class="server-card">
-                    <div class="server-info">
-                        <img src="${s.icon ? `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.png` : 'https://cdn.discordapp.com/embed/avatars/0.png'}" class="server-icon">
-                        <span style="font-weight: bold;">${s.name}</span>
-                    </div>
-                    <span>⚙️</span>
-                </a>
-            `).join('');
+            list.innerHTML = servers.map(s => {
+                const iconUrl = s.icon 
+                    ? `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.png?size=128` 
+                    : 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+                return `
+                    <a href="/dashboard?server=${s.id}" class="server-card">
+                        <div class="server-info">
+                            <img src="${iconUrl}" class="server-icon" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                            <div class="server-details">
+                                <span class="server-name">${s.name}</span>
+                                <span class="server-id">ID: ${s.id}</span>
+                            </div>
+                        </div>
+                        <span style="font-size: 16px; padding-left: 8px;">⚙️</span>
+                    </a>
+                `;
+            }).join('');
         }).catch(() => {
             document.getElementById('statusText').innerText = "Você precisa fazer login para gerenciar os servidores.";
             document.getElementById('serversList').innerHTML = `

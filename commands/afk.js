@@ -1,15 +1,15 @@
 module.exports = {
     name: 'afk',
-    execute(message, args) {
-        const reason = args.join(' ') || 'Sem motivo';
+    aliases: ['ausente'],
+    description: 'Define seu status como ausente no servidor.',
+    async execute(message, args, client) {
+        const reason = args.join(' ') || 'Ausente';
         
-        // Salvamos no cache do bot (client.afk)
-        // Isso estará disponível em qualquer lugar pois o client é passado
-        message.client.afk.set(message.author.id, {
-            reason: reason,
-            time: Date.now()
+        client.afk.set(message.author.id, {
+            reason,
+            timestamp: Date.now()
         });
 
-        message.reply(`✅ Você está agora AFK. Motivo: ${reason}`);
+        await message.reply(`💤 **${message.author.username}**, seu status foi definido como **AFK**: \`${reason}\``);
     }
 };

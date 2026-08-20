@@ -56,7 +56,7 @@
         .btn {
             padding: 12px 20px; border-radius: 25px; font-weight: bold; text-decoration: none;
             border: 1px solid var(--border-color, #334155); color: var(--text-color, #f8fafc);
-            background: var(--card-bg, #1e293b); display: block; text-align: center;
+            background: var(--card-bg, #1e293b); display: block; text-align: center; cursor: pointer;
         }
         .btn-primary { background: #38bdf8; color: #0f172a; border: none; }
 
@@ -134,6 +134,7 @@
 
         <div class="btn-container">
             <a id="btnInvite" href="#" target="_blank" class="btn btn-primary" data-i18n="add_server">Adicionar ao Servidor</a>
+            <button type="button" class="btn" onclick="loginAndRedirect('/dashboard')">Confirmar</button>
             <a href="https://discord.gg/seu-link-de-suporte" target="_blank" class="btn" data-i18n="support">Suporte</a>
         </div>
     </div>
@@ -150,6 +151,13 @@
         function closeModals() {
             document.getElementById('cmdModal').classList.remove('open');
             document.getElementById('langModal').classList.remove('open');
+        }
+
+        function loginAndRedirect(targetUrl) {
+            // Salva a página de destino no localStorage para o bot/servidor saber para onde ir após o login
+            localStorage.setItem('redirect_after_login', targetUrl);
+            // Redireciona para o fluxo de autenticação do Discord
+            window.location.href = '/auth/discord';
         }
 
         // Tema
@@ -169,7 +177,6 @@
             if (bot.name || bot.username) {
                 document.getElementById('botName').textContent = (bot.name || bot.username).toUpperCase();
             }
-            // Deixamos a frase fixa como solicitado, mas mantemos o subtítulo dinâmico se necessário
             if (bot.subtitle) document.getElementById('botSubtitle').textContent = bot.subtitle;
             if (bot.inviteUrl) document.getElementById('btnInvite').href = bot.inviteUrl;
         }).catch(() => {});

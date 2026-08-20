@@ -1,41 +1,58 @@
-const db = require('../utils/database');
-const { parseAmount } = require('../utils/parser');
+const fs = require('fs');
+const path = require('path');
+const dbFile = path.join(__dirname, '..', 'database.json');
+
+function parseAmount(str) {
+    if (!str) return null;
+    str = str.trim().toLowerCase().replace(',', '.');
+    let multiplier = 1;
+    if (str.endsWith('k')) { multiplier = 1000; str = str.slice(0, -1); }
+    else if (str.endsWith('m')) { multiplier = 1000000; str = str.slice(0, -1); }
+    else if (str.endsWith('b')) { multiplier = 1000000000; str = str.slice(0, -1); }
+    const num = parseFloat(str);
+    if (isNaN(num)) return null;
+    return Math.floor(num * multiplier);
+}
+
+function formatNumber(num) {
+    return num.toLocaleString('en-US');
+}
+
+function removeBalance(userId, amount) {
+    try {
+        let data = {};
+        if (fs.existsSync(dbFile)) {
+            data = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
+        }
+        if (!data[`user_${userId}`]) data[`user_${userId}`] = { balance: 0 };
+        
+        data[`user_${userId}`].balance = Math.max(0, data[`user_${userId}`].balance - amount);
+        
+        fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
+        return data[`user_${userId}`].balance;
+    } catch (e) { return null; }
+}
 
 module.exports = {
     name: 'removemoney',
+    description: 'Remove cristais de um usuário.',
     async execute(message, args) {
-        const allowed = db.getPerms();
-        const isOwner = message.author.id === message.guild?.ownerId;
-        
-        // Verifica se quem executa possui permissão
-        if (!isOwner && !allowed.includes(message.author.id) && !message.member.permissions.has('Administrator')) {
-            return message.reply('❌ Você não tem permissão para usar este comando.');
+        if (!message.member.permissions.has('Administrator')) {
+            return message.reply({ content: '❌ Apenas administradores podem fazer isso.' });
         }
 
-        const targetInput = args[0];
-        const amountInput = args[1];
+        const targetUser = message.mentions.users.first();
+        const rawAmount = args[1];
 
-        if (!targetInput || !amountInput) {
-            return message.reply('⚠️ Uso correto: `!removemoney @usuario/ID <quantidade>` (ex: `!removemoney @user 500k`)');
+        if (!targetUser || !rawAmount) {
+            return message.reply({ content: '⚠️ Uso: `!removemoney @usuario 500`' });
         }
 
-        const targetId = targetInput.replace(/[<@!>]/g, '');
-        const targetUser = await message.client.users.fetch(targetId).catch(() => null);
+        const amount = parseAmount(rawAmount);
+        const newBalance = removeBalance(targetUser.id, amount);
 
-        if (!targetUser) {
-            return message.reply('❌ Usuário não encontrado.');
-        }
-
-        const amount = parseAmount(amountInput);
-        if (isNaN(amount) || amount <= 0) {
-            return message.reply('❌ Quantidade inválida! Exemplos aceitos: `1k`, `2.5m`, `23393k`, `12283877m`.');
-        }
-
-        const currentBal = db.getBal(targetUser.id);
-        // Impede que o saldo fique negativo (remove no máximo o que o usuário possui)
-        const removeAmount = amount > currentBal ? currentBal : amount;
-        const newTotal = db.addBal(targetUser.id, -removeAmount);
-
-        message.reply(`💀 Removido **${amountInput.toUpperCase()}** almas de **${targetUser.tag}**.\n💰 Saldo restante: **${newTotal.toLocaleString()}** almas.`);
+        await message.reply({
+            content: `❄️ Removido **${formatNumber(amount)} cristais** de **${targetUser.username}**. Novo saldo: **${formatNumber(newBalance)} cristais**.`
+        });
     }
 };

@@ -3,203 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Aeternus</title>
+    <title>Aeternus - Painel do Servidor</title>
+    <link id="dynamicFavicon" rel="icon" href="">
     <link rel="stylesheet" href="/theme.css">
     <script src="/theme.js"></script>
+    <script src="/i18n.js"></script>
     <style>
-        body {
-            background-color: var(--bg-color, #0b101d);
-            color: var(--text-color, #f8fafc);
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-            box-sizing: border-box;
-        }
+        body { background-color: var(--bg-color, #f8fafc); color: var(--text-color, #0f172a); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; touch-action: pan-y; }
+        
+        .top-bar { position: fixed; top: 20px; left: 20px; z-index: 1000; display: flex; gap: 10px; }
+        .top-btn { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 6px; }
+        .top-btn:hover { border-color: #38bdf8; transform: translateY(-2px); }
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            position: relative;
-            z-index: 2;
-        }
+        .container { margin-top: 70px; width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 20px; position: relative; z-index: 10; }
+        .card { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; }
+        .bot-avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #38bdf8; object-fit: cover; }
+        
+        .grid-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .stat-box { background: var(--bg-color, #f1f5f9); border-radius: 10px; padding: 10px; text-align: center; }
+        .stat-value { font-size: 16px; font-weight: bold; color: #38bdf8; }
+        .stat-label { font-size: 11px; color: #64748b; margin-top: 2px; }
 
-        .header-bar {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            margin-bottom: 25px;
-        }
+        /* Menu Lateral (Esquerda) */
+        .drawer { position: fixed; top: 0; left: -320px; width: 300px; height: 100%; background: var(--card-bg, #ffffff); border-right: 1px solid var(--border-color, #cbd5e1); z-index: 2000; transition: 0.3s ease; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px; }
+        .drawer.active { left: 0; }
+        .drawer-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1500; display: none; }
+        .drawer-overlay.active { display: block; }
 
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .user-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: 2px solid #38bdf8;
-        }
-
-        .title {
-            font-size: 24px;
-            color: #38bdf8;
-            margin: 0 0 6px 0;
-            font-weight: bold;
-        }
-
-        .subtitle {
-            color: #94a3b8;
-            margin: 0 0 25px 0;
-            font-size: 14px;
-        }
-
-        .server-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 16px;
-        }
-
-        .server-card {
-            background: #121929;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            transition: transform 0.2s, border-color 0.2s;
-        }
-
-        .server-card:hover {
-            transform: translateY(-3px);
-            border-color: #38bdf8;
-        }
-
-        .server-icon {
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            margin-bottom: 12px;
-            object-fit: cover;
-            background: #1e293b;
-        }
-
-        .server-name {
-            font-weight: bold;
-            font-size: 15px;
-            margin-bottom: 15px;
-            color: #ffffff;
-            word-break: break-word;
-        }
-
-        .btn-action {
-            width: 100%;
-            padding: 9px 0;
-            border-radius: 8px;
-            font-weight: bold;
-            text-decoration: none;
-            font-size: 13px;
-            display: inline-block;
-            box-sizing: border-box;
-            text-align: center;
-        }
-
-        .btn-manage {
-            background: #38bdf8;
-            color: #ffffff;
-        }
-
-        .btn-add {
-            background: #1e293b;
-            color: #94a3b8;
-            border: 1px solid #334155;
-        }
-
-        .btn-add:hover {
-            color: #ffffff;
-            border-color: #38bdf8;
-        }
+        .search-box { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-color, #f8fafc); color: var(--text-color); box-sizing: border-box; font-size: 14px; }
+        .category-title { font-weight: bold; font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-top: 15px; text-align: left; display: flex; align-items: center; gap: 5px; }
+        
+        .system-item { background: var(--bg-color, #f1f5f9); padding: 12px; border-radius: 10px; text-align: left; margin-top: 8px; border: 1px solid var(--border-color, #cbd5e1); cursor: pointer; transition: 0.2s; }
+        .system-item:hover { border-color: #38bdf8; background: var(--card-bg, #ffffff); }
+        
+        .prefix-input-group { display: flex; gap: 8px; margin-top: 10px; }
+        .prefix-input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color, #cbd5e1); text-align: center; font-weight: bold; font-size: 16px; background: var(--bg-color, #f8fafc); color: var(--text-color); }
+        .btn-save { background: #38bdf8; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 6px; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div class="header-bar">
-            <div class="user-profile" id="userProfile" style="display: none;">
-                <img id="userAvatar" class="user-avatar" src="" alt="User">
-                <span id="userName" style="font-weight: bold; font-size: 14px;"></span>
-            </div>
+    <div class="top-bar">
+        <button class="top-btn" onclick="toggleMenu()">☰ Menu</button>
+        <a href="/servers.html" class="top-btn">⬅️ Servidores</a>
+    </div>
+
+    <!-- Background escuro do Menu -->
+    <div id="overlay" class="drawer-overlay" onclick="toggleMenu()"></div>
+
+    <!-- Menu Lateral -->
+    <div id="drawer" class="drawer">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">⚙️ Sistemas</h3>
+            <button onclick="toggleMenu()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-color);">✕</button>
         </div>
 
-        <h1 class="title">Selecione um servidor</h1>
-        <p class="subtitle">Escolha abaixo qual servidor deseja gerenciar:</p>
+        <input type="text" id="searchInput" class="search-box" placeholder="🔍 Pesquisar categoria ou sistema..." oninput="filterSystems()">
 
-        <div class="server-grid" id="serverGrid">
-            <div style="color: #94a3b8; grid-column: 1 / -1;">Buscando servidores...</div>
+        <div id="systemsContainer" style="overflow-y: auto;">
+            <!-- Categoria: Geral -->
+            <div class="category-block" data-category="geral">
+                <div class="category-title">📌 Geral</div>
+                
+                <div class="system-item" data-system="prefixo do bot" onclick="openSystem('prefixCard')">
+                    <label style="font-size: 13px; font-weight: bold; display: block; cursor: pointer;">✏️ Prefixo do Bot</label>
+                    <span style="font-size: 11px; color: #64748b;">Clique para alterar o prefixo dos comandos.</span>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- Conteúdo Principal -->
+    <div class="container">
+        <!-- Card de Configuração do Prefixo -->
+        <div class="card" id="prefixCard" style="display: none; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 16px;">✏️ Prefixo do Bot</h3>
+                <button onclick="closeSystem('prefixCard')" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #64748b;">✕</button>
+            </div>
+            <p style="font-size: 12px; color: #64748b; margin: 0 0 10px 0;">Defina o caractere que será utilizado para invocar os comandos no servidor.</p>
+            <div class="prefix-input-group">
+                <input type="text" id="prefixInput" class="prefix-input" maxlength="5" placeholder="Ex: !">
+                <button class="btn-save" onclick="savePrefix()">💾 Salvar</button>
+            </div>
+        </div>
+
+        <!-- Card do Bot -->
+        <div class="card">
+            <img id="botAvatar" src="" class="bot-avatar">
+            <h2 id="botName" style="margin: 5px 0 0 0;">Carregando...</h2>
+            <span id="botTag" style="font-size: 12px; color: #64748b;"></span>
+            <div class="grid-stats">
+                <div class="stat-box"><div id="botPing" class="stat-value">-- ms</div><div class="stat-label">📡 Ping</div></div>
+                <div class="stat-box"><div id="botUptime" class="stat-value">--</div><div class="stat-label">⏱️ Uptime</div></div>
+            </div>
+        </div>
+
+        <!-- Card do Servidor -->
+        <div class="card" id="serverCard">
+            <div style="display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 15px;">
+                <img id="serverIcon" src="" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+                <div>
+                    <h3 id="serverName" style="margin: 0; font-size: 16px;">--</h3>
+                    <span id="serverId" style="font-size: 11px; color: #94a3b8; font-family: monospace;"></span>
+                </div>
+            </div>
+
+            <div class="grid-stats">
+                <div class="stat-box"><div id="serverMembers" class="stat-value">--</div><div class="stat-label">👥 Membros</div></div>
+                <div class="stat-box"><div id="serverChannels" class="stat-value">--</div><div class="stat-label">💬 Canais</div></div>
+                <div class="stat-box"><div id="serverRoles" class="stat-value">--</div><div class="stat-label">🛡️ Cargos</div></div>
+                <div class="stat-box"><div id="serverJoined" class="stat-value" style="font-size: 12px; padding-top: 3px;">--</div><div class="stat-label">📅 Bot Adicionado</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script do efeito de neve -->
     <script src="/snow.js"></script>
+
     <script>
-        async function fetchDashboardData() {
-            try {
-                const response = await fetch('/api/user');
-                if (!response.ok) {
-                    window.location.href = '/auth/discord';
-                    return;
-                }
+        const urlParams = new URLSearchParams(window.location.search);
+        const serverId = urlParams.get('server');
 
-                const data = await response.json();
+        function toggleMenu() {
+            document.getElementById('drawer').classList.toggle('active');
+            document.getElementById('overlay').classList.toggle('active');
+        }
 
-                if (data.user) {
-                    document.getElementById('userName').textContent = data.user.username;
-                    if (data.user.avatar) {
-                        document.getElementById('userAvatar').src = data.user.avatar;
-                    }
-                    document.getElementById('userProfile').style.display = 'flex';
-                }
+        /* Detecção de gesto de deslizar (Swipe) */
+        let touchstartX = 0;
+        let touchendX = 0;
 
-                const grid = document.getElementById('serverGrid');
+        document.addEventListener('touchstart', e => {
+            touchstartX = e.changedTouches[0].screenX;
+        });
 
-                if (!data.guilds || data.guilds.length === 0) {
-                    grid.innerHTML = '<div style="color: #94a3b8; grid-column: 1 / -1;">Nenhum servidor com permissão de administrador encontrado.</div>';
-                    return;
-                }
+        document.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            handleGesture();
+        });
 
-                grid.innerHTML = data.guilds.map(guild => {
-                    const iconUrl = guild.icon || 'https://cdn.discordapp.com/embed/avatars/0.png';
-                    
-                    if (guild.botInGuild) {
-                        return `
-                            <div class="server-card">
-                                <img src="${iconUrl}" class="server-icon" alt="${guild.name}">
-                                <div class="server-name">${guild.name}</div>
-                                <a href="/server/${guild.id}" class="btn-action btn-manage">Configurar</a>
-                            </div>
-                        `;
-                    } else {
-                        return `
-                            <div class="server-card">
-                                <img src="${iconUrl}" class="server-icon" alt="${guild.name}">
-                                <div class="server-name">${guild.name}</div>
-                                <a href="https://discord.com/oauth2/authorize?client_id=${data.user.id}&permissions=8&scope=bot%20applications.commands&guild_id=${guild.id}" target="_blank" class="btn-action btn-add">Adicionar Bot</a>
-                            </div>
-                        `;
-                    }
-                }).join('');
-
-            } catch (err) {
-                console.error(err);
-                document.getElementById('serverGrid').innerHTML = '<div style="color: #ef4444; grid-column: 1 / -1;">Não foi possível carregar a lista de servidores.</div>';
+        function handleGesture() {
+            const drawer = document.getElementById('drawer');
+            const overlay = document.getElementById('overlay');
+            if (touchendX - touchstartX > 60) {
+                drawer.classList.add('active');
+                overlay.classList.add('active');
+            }
+            if (touchstartX - touchendX > 60) {
+                drawer.classList.remove('active');
+                overlay.classList.remove('active');
             }
         }
 
-        fetchDashboardData();
+        function openSystem(cardId) {
+            document.getElementById('drawer').classList.remove('active');
+            document.getElementById('overlay').classList.remove('active');
+            const card = document.getElementById(cardId);
+            card.style.display = 'block';
+            card.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function closeSystem(cardId) {
+            document.getElementById(cardId).style.display = 'none';
+        }
+
+        function filterSystems() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const categories = document.querySelectorAll('.category-block');
+
+            categories.forEach(cat => {
+                const catName = cat.getAttribute('data-category');
+                const systems = cat.querySelectorAll('.system-item');
+                let catMatch = catName.includes(query);
+                let hasVisibleSystem = false;
+
+                systems.forEach(sys => {
+                    const sysName = sys.getAttribute('data-system');
+                    if (catMatch || sysName.includes(query)) {
+                        sys.style.display = 'block';
+                        hasVisibleSystem = true;
+                    } else {
+                        sys.style.display = 'none';
+                    }
+                });
+
+                cat.style.display = hasVisibleSystem ? 'block' : 'none';
+            });
+        }
+
+        if (serverId) {
+            fetch(`/api/guild-details/${serverId}`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('botAvatar').src = data.bot.avatar;
+                    document.getElementById('botName').innerText = data.bot.name;
+                    document.getElementById('botTag').innerText = `@${data.bot.tag}`;
+                    document.getElementById('botPing').innerText = `${data.bot.ping} ms`;
+                    document.getElementById('botUptime').innerText = data.bot.uptime;
+
+                    if (data.guild) {
+                        document.getElementById('serverIcon').src = data.guild.icon;
+                        document.getElementById('serverName').innerText = data.guild.name;
+                        document.getElementById('serverId').innerText = `ID: ${data.guild.id}`;
+                        document.getElementById('serverMembers').innerText = data.guild.memberCount;
+                        document.getElementById('serverChannels').innerText = data.guild.channelsCount;
+                        document.getElementById('serverRoles').innerText = data.guild.rolesCount;
+                        document.getElementById('serverJoined').innerText = data.guild.joinedAt;
+                        document.getElementById('prefixInput').value = data.guild.prefix;
+                    } else {
+                        document.getElementById('serverCard').innerHTML = '<p style="color: #ef4444;">❌ O bot não está instalado neste servidor.</p>';
+                    }
+                });
+        }
+
+        function savePrefix() {
+            const newPrefix = document.getElementById('prefixInput').value;
+            fetch(`/api/guild-prefix/${serverId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prefix: newPrefix })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    alert(`✅ Prefixo alterado para: ${res.prefix}`);
+                } else {
+                    alert(res.error || '❌ Erro ao alterar prefixo.');
+                }
+            });
+        }
     </script>
 </body>
 </html>

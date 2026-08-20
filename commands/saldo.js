@@ -16,7 +16,7 @@ function formatNumber(num) {
 
 module.exports = {
     name: 'saldo',
-    description: 'Mostra o saldo de moedas.',
+    description: 'Mostra o saldo de cristais.',
     async execute(message, args) {
         const targetUser = message.mentions.users.first() || message.author;
         const balance = getBalance(targetUser.id);
@@ -24,8 +24,8 @@ module.exports = {
 
         const isSelf = targetUser.id === message.author.id;
         const text = isSelf 
-            ? `💳 **${targetUser.username}**, seu saldo atual é de **${formattedBalance} moedas**.`
-            : `💳 O saldo atual de **${targetUser.username}** é de **${formattedBalance} moedas**.`;
+            ? `❄️ **${targetUser.username}**, seu cofre gélido possui **${formattedBalance} cristais**.`
+            : `❄️ O cofre de **${targetUser.username}** possui **${formattedBalance} cristais**.`;
 
         await message.reply({ content: text });
     }

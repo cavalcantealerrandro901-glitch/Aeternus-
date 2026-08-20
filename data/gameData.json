@@ -1,0 +1,22 @@
+{
+  "users": {
+    "1533034328928555141": {
+      "level": 1,
+      "xp": 15,
+      "riftsOpened": 1,
+      "relics": []
+    },
+    "1490724989458976791": {
+      "level": 2,
+      "xp": 90,
+      "riftsOpened": 6,
+      "relics": [
+        "⌛ Ampulheta do Vazio",
+        "🗡️ Lâmina Aeterna",
+        "🌀 Núcleo de Paradoxo",
+        "🗡️ Lâmina Aeterna",
+        "⌛ Ampulheta do Vazio"
+      ]
+    }
+  }
+}
