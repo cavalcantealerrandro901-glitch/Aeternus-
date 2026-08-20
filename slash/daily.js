@@ -1,24 +1,35 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { getDailyCharmPhrase, getDailyTitle } = require('../utils/dailyPhrases');
+const { getDailyPageUrl } = require('../utils/panelUrl');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('daily')
-        .setDescription('Redireciona para a coleta da recompensa diária no painel web.'),
+        .setDescription('Abre a página do painel para resgatar a recompensa diária'),
     async execute(interaction) {
-        const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000/dashboard';
+        const url = getDailyPageUrl();
 
         const embed = new EmbedBuilder()
-            .setColor('#38bdf8')
-            .setTitle('🎁 Recompensa Diária (Daily)')
-            .setDescription('As recompensas diárias agora são resgatadas diretamente pelo nosso **Painel Web**!\n\nClique no botão abaixo para ir ao painel e garantir seus Cristais.')
-            .setFooter({ text: 'Aeternus Economy • Painel Web' });
+            .setColor(0x38bdf8)
+            .setTitle(getDailyTitle())
+            .setDescription(getDailyCharmPhrase())
+            .addFields({
+                name: 'Painel',
+                value: `[Abrir página do daily](${url})`
+            })
+            .setFooter({ text: 'Resgate apenas no painel · 5.000 a 50.000 almas · 1x por dia' })
+            .setTimestamp();
+
+        if (interaction.client.user) {
+            embed.setThumbnail(interaction.client.user.displayAvatarURL({ size: 256 }));
+        }
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel('Coletar no Painel')
+                .setLabel('Resgatar no painel')
                 .setStyle(ButtonStyle.Link)
-                .setURL(dashboardUrl)
-                .setEmoji('🌐')
+                .setURL(url)
+                .setEmoji('🎁')
         );
 
         await interaction.reply({ embeds: [embed], components: [row] });

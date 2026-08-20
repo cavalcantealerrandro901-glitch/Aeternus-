@@ -1,9 +1,11 @@
+/**
+ * Aeternus — ponto de entrada
+ */
 require('dotenv').config();
 
-const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, MessageFlags } = require('discord.js');
 const { loadCommands, loadSlash, loadEvents, loadSystems } = require('./bot/loaders');
 const { startServer } = require('./web/server');
-const { getPrefix } = require('./utils/prefixManager');
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 if (!TOKEN) {
@@ -20,7 +22,7 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildModeration
     ],
-    partials: [Partials.Message, Partials.Reaction]
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
 client.afk = new Map();
@@ -32,50 +34,33 @@ loadSlash(client);
 loadEvents(client);
 loadSystems(client);
 
-client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.guild) return;
-
-    // 🟢 LÓGICA AFK 1: Se o usuário que enviou a mensagem estava AFK, remove o status
-    if (client.afk.has(message.author.id)) {
-        client.afk.delete(message.author.id);
-        message.reply(`👋 Bem-vindo de volta, **${message.author.username}**! Removi seu status de AFK.`).then(msg => {
-            setTimeout(() => msg.delete().catch(() => {}), 5000);
-        });
-    }
-
-    // 🟢 LÓGICA AFK 2: Avisa se alguém marcou um usuário que está AFK
-    if (message.mentions.users.size > 0) {
-        message.mentions.users.forEach(user => {
-            if (client.afk.has(user.id)) {
-                const data = client.afk.get(user.id);
-                const timeAgo = Math.floor((Date.now() - data.timestamp) / 1000 / 60);
-                message.reply(`💤 **${user.username}** está AFK há ${timeAgo} minuto(s): \`${data.reason}\``);
-            }
-        });
-    }
-
-    const prefix = getPrefix(message.guild.id);
-
-    if (!message.content.startsWith(prefix)) return;
-
-    const args = message.content.slice(prefix.length).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
-
-    const command = client.commands.get(commandName) || 
-                    client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
-
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+    const command = client.slashCommands.get(interaction.commandName);
     if (!command) return;
-
     try {
-        await command.execute(message, args, client);
+        await command.execute(interaction, client);
     } catch (error) {
-        console.error(`Erro ao executar o comando ${commandName}:`, error);
-        message.reply('❌ Ocorreu um erro ao executar este comando.');
+        console.error('Slash error:', error);
+        const payload = {
+            content: 'Erro ao executar este comando.',
+            flags: [MessageFlags.Ephemeral]
+        };
+        try {
+            if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
+            else await interaction.reply(payload);
+        } catch (_) {}
     }
 });
 
 client.once('clientReady', () => {
     console.log(`🤖 Bot online: ${client.user.tag}`);
+});
+
+// Fallback se a versão do discord.js ainda emitir "ready"
+client.once('ready', () => {
+    if (!client.user) return;
+    console.log(`🤖 Bot online (ready): ${client.user.tag}`);
 });
 
 startServer(client);
