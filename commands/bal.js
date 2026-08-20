@@ -1,26 +1,14 @@
-const fs = require('fs');
-const path = require('path');
-const dbFile = path.join(__dirname, '..', 'database.json');
-
-function getBalance(userId) {
-    try {
-        if (!fs.existsSync(dbFile)) return 0;
-        const data = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-        return data[`user_${userId}`]?.balance || 0;
-    } catch (e) { return 0; }
-}
-
-function formatNumber(num) {
-    return num.toLocaleString('en-US');
-}
+const flocos = require('../utils/flocos');
 
 module.exports = {
     name: 'bal',
-    description: 'Mostra o saldo de cristais.',
-    async execute(message, args) {
-        const targetUser = message.mentions.users.first() || message.author;
-        const balance = getBalance(targetUser.id);
-        const formattedBalance = formatNumber(balance);
-        await message.reply({ content: `❄️ Cofre de **${targetUser.username}**: **${formattedBalance} cristais**.` });
+    aliases: ['saldo', 'atm', 'flocos', 'balance'],
+    description: 'Mostra seu saldo de flocos ❄️',
+    async execute(message) {
+        const target = message.mentions.users.first() || message.author;
+        const bal = flocos.get(target.id);
+        await message.reply(
+            `❄️ Cofre de **${target.username}**: **${bal.toLocaleString('pt-BR')}** flocos.`
+        );
     }
 };
