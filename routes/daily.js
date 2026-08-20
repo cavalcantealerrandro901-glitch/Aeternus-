@@ -1,13 +1,14 @@
 const db = require('../utils/database');
+const cristais = require('../utils/cristais');
+const xp = require('../utils/xp');
+const fs = require('fs');
+const path = require('path');
 
 function dayKey(d = new Date()) {
-    return d.toISOString().slice(0, 10); // YYYY-MM-DD UTC
+    return d.toISOString().slice(0, 10);
 }
 
-/**
- * POST /api/daily-claim — recompensa web 5.000 a 50.000 almas (1x/dia)
- * Requer login (sessão Discord)
- */
+/** POST /api/daily-claim — ❄️ flocos (5k–50k) × multiplicador dos cristais de gelo */
 function register(app) {
     app.post('/api/daily-claim', (req, res) => {
         if (!req.session?.isAuthenticated || !req.session?.user?.id) {
@@ -18,7 +19,6 @@ function register(app) {
         const today = dayKey();
         const daily = db.getDaily(userId) || { streak: 0, lastClaimed: 0, lastDay: null };
 
-        // lastDay (string) ou lastClaimed (timestamp)
         let lastDay = daily.lastDay || null;
         if (!lastDay && daily.lastClaimed) {
             lastDay = dayKey(new Date(Number(daily.lastClaimed)));
@@ -30,22 +30,26 @@ function register(app) {
             });
         }
 
-        // 5.000 a 50.000 inclusive
-        const amount = Math.floor(Math.random() * (50000 - 5000 + 1)) + 5000;
+        const base = Math.floor(Math.random() * (50000 - 5000 + 1)) + 5000;
+        const mult = cristais.dailyMultiplier(userId);
+        const amount = Math.floor(base * mult);
 
         const balance = db.addBal(userId, amount);
+
+        // Recompensas de progresso
+        const xpGain = 25 + Math.floor(Math.random() * 26);
+        const cristalGain = 5 + Math.floor(Math.random() * 11);
+        xp.add(userId, xpGain);
+        const cResult = cristais.add(userId, cristalGain);
+
         const streak =
-            lastDay &&
-            dayKey(new Date(Date.now() - 86400000)) === lastDay
+            lastDay && dayKey(new Date(Date.now() - 86400000)) === lastDay
                 ? (daily.streak || 0) + 1
                 : 1;
 
         db.setDaily(userId, streak, Date.now());
-        // grava lastDay se o helper permitir só streak/time — reforço em daily.json via setDaily
 
         try {
-            const fs = require('fs');
-            const path = require('path');
             const file = path.join(__dirname, '..', 'data', 'daily.json');
             let data = {};
             if (fs.existsSync(file)) {
@@ -59,7 +63,9 @@ function register(app) {
                 streak,
                 lastClaimed: Date.now(),
                 lastDay: today,
-                lastAmount: amount
+                lastAmount: amount,
+                base,
+                mult
             };
             fs.writeFileSync(file, JSON.stringify(data, null, 2));
         } catch (e) {
@@ -69,8 +75,16 @@ function register(app) {
         res.json({
             success: true,
             amount,
+            base,
+            multiplier: mult,
             balance,
-            streak
+            streak,
+            currency: 'flocos',
+            emoji: '❄️',
+            xpGain,
+            cristalGain,
+            cristalLevel: cResult.levelAfter,
+            leveledUp: cResult.leveledUp
         });
     });
 }

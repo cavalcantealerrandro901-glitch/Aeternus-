@@ -6,10 +6,12 @@ const cristais = require('../utils/cristais');
 module.exports = {
     name: 'perfil',
     aliases: ['profile', 'eu'],
-    description: 'Mostra flocos, XP e cristais de gelo',
+    description: 'Flocos, XP e cristais de gelo',
     async execute(message) {
         const target = message.mentions.users.first() || message.author;
         const p = xp.progress(xp.get(target.id));
+        const c = cristais.progress(cristais.get(target.id));
+        const mult = cristais.dailyMultiplier(target.id);
 
         const embed = new EmbedBuilder()
             .setColor(0x38bdf8)
@@ -17,10 +19,14 @@ module.exports = {
             .setThumbnail(target.displayAvatarURL({ size: 256 }))
             .addFields(
                 { name: '❄️ Flocos', value: flocos.formatPlain(flocos.get(target.id)), inline: true },
-                { name: '🧊 Cristais', value: cristais.formatPlain(cristais.get(target.id)), inline: true },
+                {
+                    name: '🧊 Cristais',
+                    value: `Nível **${c.level}** · ${cristais.formatPlain(c.total)}\nDaily **×${mult.toFixed(2)}**`,
+                    inline: true
+                },
                 {
                     name: '⭐ XP',
-                    value: `Nível **${p.level}** · ${xp.formatPlain(p.total)}\n(${p.xpInLevel}/${p.xpNeed} neste nível)`,
+                    value: `Nível **${p.level}** · ${xp.formatPlain(p.total)}`,
                     inline: false
                 }
             )
