@@ -7,11 +7,7 @@ const {
 } = require('discord.js');
 const flocos = require('../utils/flocos');
 
-/**
- * PULSO — teste de reação único:
- * 3 botões mudam de cor; só um fica ⚡ por poucos ms.
- * Clique no certo a tempo = prêmio. Errar ou atrasar = perde a taxa.
- */
+/** PULSO — reação: um botão vira ⚡; clique em até 1,2s (3x) */
 module.exports = {
     name: 'pulso',
     aliases: ['reacao', 'reflexo'],
@@ -33,21 +29,18 @@ module.exports = {
                     `Acerte = **3x**. Erre ou demore = perde a taxa.`
             );
 
-        const idle = () =>
-            new ActionRowBuilder().addComponents(
-                [0, 1, 2].map((i) =>
-                    new ButtonBuilder()
-                        .setCustomId(`pulso_idle_${message.id}_${i}`)
-                        .setLabel('●')
-                        .setStyle(ButtonStyle.Secondary)
-                        .setDisabled(true)
-                )
-            );
+        const idleRow = new ActionRowBuilder().addComponents(
+            [0, 1, 2].map((i) =>
+                new ButtonBuilder()
+                    .setCustomId(`pulso_idle_${message.id}_${i}`)
+                    .setLabel('●')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(true)
+            )
+        );
 
-        const sent = await message.reply({ embeds: [embed], components: [idle()] });
-
-        const delay = 1500 + Math.floor(Math.random() * 2500);
-        await new Promise((r) => setTimeout(r, delay));
+        const sent = await message.reply({ embeds: [embed], components: [idleRow] });
+        await new Promise((r) => setTimeout(r, 1500 + Math.floor(Math.random() * 2500)));
 
         const correct = Math.floor(Math.random() * 3);
         const active = new ActionRowBuilder().addComponents(
@@ -87,7 +80,7 @@ module.exports = {
             done = true;
             const pick = parseInt(i.customId.split('_').pop(), 10);
             const ms = Date.now() - started;
-            const ok = pick === correct && ms <= 1200;
+            const ok = pick === correct;
 
             if (ok) {
                 const win = stake * 3;
@@ -110,7 +103,7 @@ module.exports = {
                             .setColor(0xef4444)
                             .setTitle('💨 Errou o pulso')
                             .setDescription(
-                                `Botão certo: **#${correct + 1}** · seu: **#${pick + 1}** (${ms}ms)\nPerdeu ${flocos.format(stake)}`
+                                `Certo: **#${correct + 1}** · seu: **#${pick + 1}** (${ms}ms)\nPerdeu ${flocos.format(stake)}`
                             )
                     ],
                     components: []
@@ -119,7 +112,7 @@ module.exports = {
             collector.stop('done');
         });
 
-        collector.on('end', async (c, reason) => {
+        collector.on('end', async (_, reason) => {
             if (reason === 'done' || done) return;
             try {
                 await sent.edit({
@@ -127,7 +120,7 @@ module.exports = {
                         new EmbedBuilder()
                             .setColor(0x64748b)
                             .setTitle('⏰ Lento demais')
-                            .setDescription(`O pulso passou. Perdeu ${flocos.format(stake)}.`)\
+                            .setDescription(`O pulso passou. Perdeu ${flocos.format(stake)}.`)
                     ],
                     components: []
                 });
