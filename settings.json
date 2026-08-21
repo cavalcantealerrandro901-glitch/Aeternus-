@@ -19,6 +19,8 @@
     "welcomePing": true,
     "welcomeCardEnabled": true,
     "welcomeDmEnabled": true,
-    "welcomeDmText": ""
+    "welcomeDmText": "",
+    "musicVoiceChannel": "1506715012163436685",
+    "musicMaxQueue": "50"
   }
 }

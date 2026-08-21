@@ -17,8 +17,9 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "libsodium-wrappers": "^0.7.15",
+    "libsodium-wrappers": "^0.7.16",
     "opusscript": "^0.0.8",
-    "play-dl": "^1.9.7"
+    "play-dl": "^1.9.7",
+    "tweetnacl": "^1.0.3"
   }
 }
