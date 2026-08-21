@@ -37,6 +37,21 @@ function maxQueue(guildId) {
     return Math.min(n, 100);
 }
 
+/** Destroi conexão só se ainda existir e não estiver Destroyed */
+function safeDestroy(connection) {
+    if (!connection) return;
+    try {
+        const status = connection.state?.status;
+        if (status === VoiceConnectionStatus.Destroyed) return;
+        connection.destroy();
+    } catch (err) {
+        const msg = String(err?.message || err);
+        if (!/already been destroyed/i.test(msg)) {
+            console.warn('[voice] safeDestroy:', msg);
+        }
+    }
+}
+
 function getState(guildId) {
     if (!guilds.has(guildId)) {
         const player = createAudioPlayer();
@@ -83,16 +98,21 @@ function isVoiceChannel(channel) {
 
 async function ensureConnection(guild, voiceChannelId) {
     const existing = getVoiceConnection(guild.id);
-    if (existing && existing.joinConfig.channelId === voiceChannelId) {
-        if (existing.state.status === VoiceConnectionStatus.Ready) return existing;
-        try {
-            await entersState(existing, VoiceConnectionStatus.Ready, 20_000);
-            return existing;
-        } catch {
-            existing.destroy();
+    if (existing) {
+        const status = existing.state?.status;
+        if (status === VoiceConnectionStatus.Destroyed) {
+            // ignora referência morta
+        } else if (existing.joinConfig.channelId === voiceChannelId) {
+            if (status === VoiceConnectionStatus.Ready) return existing;
+            try {
+                await entersState(existing, VoiceConnectionStatus.Ready, 20_000);
+                return existing;
+            } catch {
+                safeDestroy(existing);
+            }
+        } else {
+            safeDestroy(existing);
         }
-    } else if (existing) {
-        existing.destroy();
     }
 
     const channel = await guild.channels.fetch(voiceChannelId).catch(() => null);
@@ -127,17 +147,22 @@ async function ensureConnection(guild, voiceChannelId) {
         }
     });
 
+    connection.on('error', (err) => {
+        const msg = String(err?.message || err);
+        if (!/already been destroyed/i.test(msg)) {
+            console.error('[voice error]', guild.id, msg);
+        }
+    });
+
     try {
         await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
-    } catch (err) {
-        try {
-            connection.destroy();
-        } catch (_) {}
+    } catch {
+        safeDestroy(connection);
         throw new Error(
             'Não consegui conectar na **voz** (UDP).\n' +
                 'No **Termux/Android** isso costuma falhar.\n' +
                 'Hospede o bot no **Render/VPS** para tocar áudio.\n' +
-                'A **busca** por API continua funcionando com `O.buscar`.'
+                'A **busca** continua com `O.play <nome>`.'
         );
     }
 
@@ -240,9 +265,10 @@ function stop(guildId) {
     st.now = null;
     st.playing = false;
     st.loop = false;
-    st.player.stop(true);
-    const conn = getVoiceConnection(guildId);
-    if (conn) conn.destroy();
+    try {
+        st.player.stop(true);
+    } catch (_) {}
+    safeDestroy(getVoiceConnection(guildId));
     return true;
 }
 
@@ -280,9 +306,8 @@ function getQueue(guildId) {
 function buildQueueEmbed(guildId) {
     const data = getQueue(guildId);
     const lines = [];
-    if (data.now) {
-        lines.push(`**▶** [${data.now.title}](${data.now.url})`);
-    } else lines.push('**▶** _Nada tocando_');
+    if (data.now) lines.push(`**▶** [${data.now.title}](${data.now.url})`);
+    else lines.push('**▶** _Nada tocando_');
     if (data.queue.length) {
         lines.push('', `**Fila (${data.queue.length})**`);
         data.queue.slice(0, 12).forEach((t, i) => {
@@ -306,5 +331,6 @@ module.exports = {
     buildQueueEmbed,
     formatDuration,
     resolveTrack,
+    safeDestroy,
     RANDOM_POOL
 };
