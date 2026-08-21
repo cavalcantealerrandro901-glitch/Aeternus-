@@ -1,0 +1,73 @@
+<div id="system-music" class="system-view" style="display: none;">
+    <button class="back-btn" type="button" onclick="showGuildView()">← Voltar ao Início</button>
+    <h2>🎵 Música</h2>
+    <p style="color:#9ca3af;font-size:13px;margin-top:0">
+        Escolha o <strong>canal de voz</strong> em que o bot vai entrar para tocar músicas.<br>
+        Comando: <code>O.play &lt;música&gt;</code> — se não informar a música, o bot escolhe uma.
+    </p>
+
+    <div class="input-group">
+        <label>🔊 Canal de voz</label>
+        <select id="musicVoiceChannel" data-key="musicVoiceChannel">
+            <option value="">Carregando canais…</option>
+        </select>
+        <p style="font-size:12px;color:#94a3b8;margin:8px 0 0">
+            O bot precisa das permissões <strong>Conectar</strong> e <strong>Falar</strong> nesse canal.
+        </p>
+    </div>
+
+    <div class="input-group" style="margin-top:16px;">
+        <label>ℹ️ Como usar</label>
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px;font-size:13px;color:#cbd5e1;line-height:1.55">
+            <code>O.play nome da música</code> — busca e toca<br>
+            <code>O.play</code> — o bot escolhe sozinho<br>
+            <code>O.skip</code> — pula<br>
+            <code>O.stop</code> — para e sai do canal
+        </div>
+    </div>
+
+    <button type="button" class="back-btn" style="margin-top:12px;border-color:#38bdf8;color:#38bdf8" onclick="saveCurrentSystem()">
+        💾 Salvar música
+    </button>
+</div>
+
+<script>
+(function loadMusicChannels() {
+    async function run() {
+        const sel = document.getElementById('musicVoiceChannel');
+        if (!sel) return;
+        const params = new URLSearchParams(window.location.search);
+        const guildId = params.get('guild') || params.get('server');
+        if (!guildId) {
+            sel.innerHTML = '<option value="">Selecione um servidor</option>';
+            return;
+        }
+        try {
+            const res = await fetch('/api/guild/' + guildId + '/voice-channels');
+            const data = await res.json();
+            const channels = data.channels || data || [];
+            const current = (window.originalSettings && window.originalSettings.musicVoiceChannel) || '';
+            sel.innerHTML =
+                '<option value="">— Não configurado —</option>' +
+                channels
+                    .map(
+                        (c) =>
+                            `<option value="${c.id}" ${c.id === current ? 'selected' : ''}>${c.name}</option>`
+                    )
+                    .join('');
+            if (current) sel.value = current;
+            sel.addEventListener('change', () => typeof checkChanges === 'function' && checkChanges());
+        } catch (e) {
+            sel.innerHTML = '<option value="">Erro ao carregar canais</option>';
+        }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+    else run();
+    // recarrega ao abrir o sistema
+    const prev = window.openSystem;
+    window.openSystem = function (id) {
+        if (typeof prev === 'function') prev(id);
+        if (id === 'system-music') setTimeout(run, 50);
+    };
+})();
+</script>

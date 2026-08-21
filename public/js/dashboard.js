@@ -6,6 +6,7 @@ const SYSTEM_PARTIALS = [
   { id: 'system-geral', url: '/systems/geral.html' },
   { id: 'system-welcome', url: '/systems/welcome.html' },
   { id: 'system-logs', url: '/systems/logs.html' },
+  { id: 'system-music', url: '/systems/music.html' },
   { id: 'server-selector', url: '/systems/server-selector.html' }
 ];
 
@@ -27,7 +28,7 @@ async function loadSystemPartials() {
 
 let originalSettings = {};
 let activeSystemId = null;
-let guildCategories = [];
+window.originalSettings = originalSettings;
 
 function toggleSidebar() {
   document.getElementById('sidebar')?.classList.toggle('open');
@@ -53,7 +54,7 @@ function hasUnsavedChanges() {
     let origVal = originalSettings[key];
     if (input.type === 'checkbox') origVal = origVal === true || origVal === 'true';
     else origVal = origVal || '';
-    if (currentVal !== origVal) return true;
+    if (String(currentVal) !== String(origVal)) return true;
   }
   return false;
 }
@@ -67,7 +68,6 @@ function closeUnsavedModal() {
   if (m) m.style.display = 'none';
 }
 
-/** Abre sistema como página dedicada (esconde resto) */
 function openSystem(systemId) {
   if (hasUnsavedChanges() && activeSystemId && activeSystemId !== systemId) {
     showUnsavedModal();
@@ -79,7 +79,6 @@ function openSystem(systemId) {
   const gv = document.getElementById('guild-view');
   if (gv) gv.style.display = 'none';
 
-  // esconde cards extras da home se existirem fora de system-view
   document.querySelectorAll('.home-only, #bot-stats-card, #serverCard, .grid-stats').forEach((el) => {
     el.style.display = 'none';
   });
@@ -92,10 +91,7 @@ function openSystem(systemId) {
   }
 
   document.getElementById('sidebar')?.classList.remove('open');
-  const bar = document.getElementById('action-bar');
-  if (bar) bar.classList.remove('show');
-
-  // scroll topo
+  document.getElementById('action-bar')?.classList.remove('show');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -154,16 +150,18 @@ async function saveCurrentSystem() {
     });
     originalSettings[key] = value;
   }
+  window.originalSettings = originalSettings;
 
   document.getElementById('action-bar')?.classList.remove('show');
   const toast = document.getElementById('toast');
   if (toast) {
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 2500);
+  } else {
+    alert('Salvo!');
   }
 }
 
-// export globals
 window.openSystem = openSystem;
 window.showGuildView = showGuildView;
 window.toggleSidebar = toggleSidebar;
