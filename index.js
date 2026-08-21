@@ -55,7 +55,7 @@ client.on('interactionCreate', async (interaction) => {
         console.error('Slash error:', error);
         const payload = {
             content: 'Erro ao executar este comando.',
-            flags: [MessageFlags.Ephemeral]
+            flags: MessageFlags.Ephemeral
         };
         try {
             if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
@@ -65,13 +65,9 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.once('clientReady', () => {
+    if (!client.user) return;
     console.log(`🤖 Bot online: ${client.user.tag}`);
     printVoiceReport();
-});
-
-client.once('ready', () => {
-    if (!client.user) return;
-    console.log(`🤖 Bot online (ready): ${client.user.tag}`);
 });
 
 startServer(client);
