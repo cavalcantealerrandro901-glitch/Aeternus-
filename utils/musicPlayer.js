@@ -22,7 +22,8 @@ const { resolvePlayable } = require('./musicSearch');
 /** @type {Map<string, any>} */
 const guilds = new Map();
 
-const IDLE_MS = 5 * 60 * 1000; // 5 min sem música
+const IDLE_MS = 5 * 60 * 1000;
+const PLAY_DELAY_MS = 5 * 1000; // 5s após conectar
 
 const RANDOM_POOL = [
     'lofi hip hop',
@@ -63,6 +64,10 @@ function safeDestroy(connection) {
     }
 }
 
+function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+}
+
 function getState(guildId) {
     if (!guilds.has(guildId)) {
         const player = createAudioPlayer();
@@ -78,7 +83,8 @@ function getState(guildId) {
             privateChannelId: null,
             ownerId: null,
             idleTimer: null,
-            client: null
+            client: null,
+            joining: false // evita apagar sala enquanto conecta
         });
 
         player.on(AudioPlayerStatus.Idle, () => {
@@ -98,7 +104,6 @@ function getState(guildId) {
             if (st.queue.length) {
                 playNext(guildId).catch(() => {});
             } else {
-                // nada na fila → inicia contagem de inatividade
                 armIdleTimer(guildId);
             }
         });
@@ -130,8 +135,7 @@ function armIdleTimer(guildId) {
     clearIdleTimer(guildId);
     st.idleTimer = setTimeout(() => {
         const s = getState(guildId);
-        // ainda sem música?
-        if (s.now || s.playing || s.queue.length) return;
+        if (s.now || s.playing || s.queue.length || s.joining) return;
         console.log(`[music] inatividade 5min — encerrando sala ${guildId}`);
         stop(guildId, s.client).catch(() => {});
     }, IDLE_MS);
@@ -168,8 +172,8 @@ function nowEmbed(guildId) {
     const t = st.now;
     const embed = new EmbedBuilder()
         .setColor(0x1db954)
-        .setTitle(st.paused ? '⏸️ Pausado' : '🎶 Tocando agora')
-        .setDescription(t ? `**[${t.title}](${t.url})**` : '_Nada tocando — sala fecha em 5 min_')
+        .setTitle(st.paused ? '⏸️ Pausado' : st.joining ? '⏳ Conectando…' : '🎶 Tocando agora')
+        .setDescription(t ? `**[${t.title}](${t.url})**` : '_Preparando…_')
         .addFields(
             { name: 'Fila', value: String(st.queue.length), inline: true },
             { name: 'Loop', value: st.loop ? 'Ligado' : 'Desligado', inline: true },
@@ -189,7 +193,6 @@ async function createPrivateVoice(guild, member) {
     const everyone = guild.roles.everyone;
     const parentId = getMusicCategoryId(guild.id);
 
-    // valida categoria
     let parent = null;
     if (parentId) {
         parent = await guild.channels.fetch(parentId).catch(() => null);
@@ -198,6 +201,7 @@ async function createPrivateVoice(guild, member) {
         }
     }
 
+    // Permissões explícitas para o bot entrar mesmo em canal “privado”
     const channel = await guild.channels.create({
         name: `🎵 · ${member.displayName || member.user.username}`.slice(0, 90),
         type: ChannelType.GuildVoice,
@@ -206,7 +210,11 @@ async function createPrivateVoice(guild, member) {
         permissionOverwrites: [
             {
                 id: everyone.id,
-                deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect]
+                deny: [
+                    PermissionFlagsBits.ViewChannel,
+                    PermissionFlagsBits.Connect,
+                    PermissionFlagsBits.Speak
+                ]
             },
             {
                 id: member.id,
@@ -214,7 +222,8 @@ async function createPrivateVoice(guild, member) {
                     PermissionFlagsBits.ViewChannel,
                     PermissionFlagsBits.Connect,
                     PermissionFlagsBits.Speak,
-                    PermissionFlagsBits.Stream
+                    PermissionFlagsBits.Stream,
+                    PermissionFlagsBits.UseVAD
                 ]
             },
             {
@@ -223,15 +232,32 @@ async function createPrivateVoice(guild, member) {
                     PermissionFlagsBits.ViewChannel,
                     PermissionFlagsBits.Connect,
                     PermissionFlagsBits.Speak,
+                    PermissionFlagsBits.Stream,
+                    PermissionFlagsBits.UseVAD,
                     PermissionFlagsBits.MoveMembers,
-                    PermissionFlagsBits.ManageChannels
+                    PermissionFlagsBits.ManageChannels,
+                    PermissionFlagsBits.MuteMembers,
+                    PermissionFlagsBits.DeafenMembers
                 ]
             }
         ]
     });
 
+    // Garante overwrites do bot (às vezes o create atrasa)
+    await channel.permissionOverwrites.edit(me.id, {
+        ViewChannel: true,
+        Connect: true,
+        Speak: true,
+        Stream: true,
+        MoveMembers: true,
+        ManageChannels: true
+    }).catch(() => {});
+
+    // Move o membro
     try {
-        await member.voice.setChannel(channel.id);
+        if (member.voice?.channelId) {
+            await member.voice.setChannel(channel.id);
+        }
     } catch (e) {
         console.warn('[music] move member:', e.message);
     }
@@ -269,9 +295,27 @@ async function ensureConnection(guild, voiceChannelId) {
         }
     }
 
+    // re-fetch canal e confirma permissão do bot
     const channel = await guild.channels.fetch(voiceChannelId).catch(() => null);
     if (!channel || (channel.type !== ChannelType.GuildVoice && channel.type !== 2)) {
         throw new Error('Canal de voz inválido.');
+    }
+
+    const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+    if (me) {
+        await channel.permissionOverwrites.edit(me.id, {
+            ViewChannel: true,
+            Connect: true,
+            Speak: true
+        }).catch(() => {});
+
+        const perms = channel.permissionsFor(me);
+        if (perms && !perms.has(PermissionFlagsBits.Connect)) {
+            throw new Error('Bot sem permissão de **Conectar** na sala privada.');
+        }
+        if (perms && !perms.has(PermissionFlagsBits.Speak)) {
+            throw new Error('Bot sem permissão de **Falar** na sala privada.');
+        }
     }
 
     const connection = joinVoiceChannel({
@@ -283,18 +327,22 @@ async function ensureConnection(guild, voiceChannelId) {
     });
 
     connection.on('stateChange', (o, n) => {
-        if (o.status !== n.status) console.log(`[voice ${guild.id}] ${o.status} → ${n.status}`);
+        if (o.status !== n.status) {
+            console.log(`[voice ${guild.id}] ${o.status} → ${n.status}`);
+        }
     });
 
     try {
         await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
     } catch {
         safeDestroy(connection);
-        throw new Error('Não consegui conectar na voz. Verifique permissões e a rede do host (Render).');
+        throw new Error(
+            'Não consegui conectar na call privada. Confira se o bot tem Conectar/Falar e se está no Render.'
+        );
     }
 
-    getState(guild.id).player;
     connection.subscribe(getState(guild.id).player);
+    console.log(`[voice ${guild.id}] conectado em ${voiceChannelId}`);
     return connection;
 }
 
@@ -333,6 +381,7 @@ async function playNext(guildId) {
         const stream = await play.stream(next.url, { discordPlayerCompatibility: true });
         const resource = createAudioResource(stream.stream, { inputType: stream.type });
         st.player.play(resource);
+        console.log(`[music] tocando: ${next.title}`);
     } catch (err) {
         console.error('[music] stream', err.message);
         st.playing = false;
@@ -341,12 +390,18 @@ async function playNext(guildId) {
     }
 }
 
+/**
+ * Cria sala privada → bot entra na hora → espera 5s → toca
+ */
 async function startPrivateSession(guild, member, textChannel, query, client) {
     const st = getState(guild.id);
     st.client = client;
+    st.joining = true;
     clearIdleTimer(guild.id);
 
     let voiceChannelId = st.privateChannelId;
+    let createdNew = false;
+
     if (voiceChannelId) {
         const ch = await guild.channels.fetch(voiceChannelId).catch(() => null);
         if (!ch) {
@@ -360,42 +415,58 @@ async function startPrivateSession(guild, member, textChannel, query, client) {
         st.privateChannelId = priv.id;
         st.ownerId = member.id;
         voiceChannelId = priv.id;
+        createdNew = true;
+        console.log(`[music] sala privada criada: ${voiceChannelId}`);
     } else {
         await member.voice.setChannel(voiceChannelId).catch(() => {});
     }
+
+    // Bot conecta IMEDIATAMENTE na call privada
+    await ensureConnection(guild, voiceChannelId);
 
     const track = await resolveTrack(query);
     track.requestedBy = member.id;
     track.client = client;
 
-    await ensureConnection(guild, voiceChannelId);
     st.textChannelId = textChannel.id;
 
     const limit = maxQueue(guild.id);
     const total = (st.now ? 1 : 0) + st.queue.length;
-    if (total >= limit) throw new Error(`Fila cheia (máx. ${limit}).`);
+    if (total >= limit) {
+        st.joining = false;
+        throw new Error(`Fila cheia (máx. ${limit}).`);
+    }
 
-    const wasIdle = !st.playing && !st.now && st.queue.length === 0;
+    const shouldStart = !st.playing && !st.now;
     st.queue.push(track);
 
-    if (wasIdle || !st.playing) {
+    // Aguarda 5 segundos depois de conectar, então toca
+    if (shouldStart) {
+        console.log(`[music] aguardando ${PLAY_DELAY_MS / 1000}s para tocar…`);
+        await sleep(PLAY_DELAY_MS);
+        st.joining = false;
         await playNext(guild.id);
+    } else {
+        st.joining = false;
     }
 
     return {
         track,
         voiceChannelId,
-        started: wasIdle || !!st.now,
+        createdNew,
+        started: shouldStart,
         embed: nowEmbed(guild.id),
         components: [controlRow(guild.id)]
     };
 }
 
-/** Se o dono sair da sala privada → encerra */
 async function onVoiceStateUpdate(oldState, newState) {
     const guildId = oldState.guild.id;
     const st = getState(guildId);
     if (!st.privateChannelId || !st.ownerId) return;
+
+    // Enquanto está conectando, não apaga
+    if (st.joining) return;
 
     const leftPriv =
         oldState.channelId === st.privateChannelId &&
@@ -408,7 +479,6 @@ async function onVoiceStateUpdate(oldState, newState) {
         return;
     }
 
-    // sala vazia (só bot ou ninguém)
     if (oldState.channelId === st.privateChannelId || newState.channelId === st.privateChannelId) {
         const ch = await oldState.guild.channels.fetch(st.privateChannelId).catch(() => null);
         if (ch && ch.members) {
@@ -478,7 +548,7 @@ async function handleControl(interaction) {
         } else {
             st.player.pause();
             st.paused = true;
-            armIdleTimer(guildId); // pausado conta como inativo para o timer? user said without playing music - paused is not playing
+            armIdleTimer(guildId);
         }
     } else if (action === 'loop') {
         st.loop = !st.loop;
@@ -515,6 +585,7 @@ async function stop(guildId, client) {
     st.paused = false;
     st.loop = false;
     st.ownerId = null;
+    st.joining = false;
     try {
         st.player.stop(true);
     } catch (_) {}

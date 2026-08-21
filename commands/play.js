@@ -18,7 +18,7 @@ function friendlyError(err) {
 module.exports = {
     name: 'play',
     aliases: ['p', 'tocar', 'music'],
-    description: 'Busca música na API, cria sala privada e toca com controles',
+    description: 'Busca música, cria sala privada, bot entra e toca após 5s',
     async execute(message, args) {
         if (!message.guild) return message.reply('Use em um servidor.');
 
@@ -26,7 +26,7 @@ module.exports = {
         if (!q) {
             return message.reply(
                 'Uso: `O.play <música>`\n' +
-                    'Busca na API → você escolhe → crio uma **sala de voz privada** e toco lá.'
+                    'Busca → escolhe → sala privada → bot entra → toca em **5s**.'
             );
         }
 
@@ -39,7 +39,7 @@ module.exports = {
         ];
         if (me && !me.permissions.has(need)) {
             return message.reply(
-                'Preciso das permissões **Gerenciar Canais**, **Mover Membros**, **Conectar** e **Falar**.'
+                'Preciso de **Gerenciar Canais**, **Mover Membros**, **Conectar** e **Falar**.'
             );
         }
 
@@ -68,7 +68,7 @@ module.exports = {
                     .join('\n\n')
                     .slice(0, 4000)
             )
-            .setFooter({ text: 'Ao escolher, crio uma sala privada e te coloco nela com o bot.' });
+            .setFooter({ text: 'Bot entra na sala na hora e toca após 5 segundos.' });
 
         if (list[0]?.artwork) embed.setThumbnail(list[0].artwork);
 
@@ -96,18 +96,15 @@ module.exports = {
         collector.on('collect', async (i) => {
             const idx = parseInt(i.customId.split('_').pop(), 10);
             const item = list[idx];
-            if (!item) {
-                return i.reply({ content: 'Inválido.', ephemeral: true });
-            }
+            if (!item) return i.reply({ content: 'Inválido.', ephemeral: true });
 
             await i.deferUpdate().catch(() => {});
 
-            // Usuário precisa estar em algum VC para o Discord permitir mover
             if (!message.member.voice?.channelId) {
                 await loading.edit({
                     content:
-                        '⚠️ Entre em **qualquer canal de voz** do servidor e clique de novo em **▶️**.\n' +
-                        '(O Discord só deixa mover quem já está em um canal de voz.)',
+                        '⚠️ Entre em **qualquer canal de voz** e clique de novo em **▶️**.\n' +
+                        '(O Discord só move quem já está em um VC.)',
                     embeds: [embed],
                     components: [row]
                 }).catch(() => {});
@@ -118,7 +115,10 @@ module.exports = {
 
             try {
                 await loading.edit({
-                    content: '🔒 Criando sala privada e conectando…',
+                    content:
+                        '🔒 Criando sala privada…\n' +
+                        '🤖 Bot entrando na call…\n' +
+                        '⏳ Música em **5 segundos**…',
                     embeds: [],
                     components: []
                 });
@@ -133,8 +133,8 @@ module.exports = {
 
                 await loading.edit({
                     content:
-                        `🔒 Sala privada: <#${result.voiceChannelId}>\n` +
-                        `Você e o bot foram colocados lá automaticamente.`,
+                        `🔒 Sala: <#${result.voiceChannelId}>\n` +
+                        `🤖 Bot conectado · música liberada após 5s`,
                     embeds: [result.embed],
                     components: result.components
                 });
