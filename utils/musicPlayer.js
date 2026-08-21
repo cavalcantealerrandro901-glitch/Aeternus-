@@ -10,23 +10,20 @@ const {
 const play = require('play-dl');
 const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const settings = require('./settings');
+const { resolvePlayable } = require('./musicSearch');
 
 /** @type {Map<string, any>} */
 const guilds = new Map();
 
 const RANDOM_POOL = [
-    'lofi hip hop radio',
+    'lofi hip hop',
     'the weeknd blinding lights',
     'coldplay yellow',
     'ed sheeran perfect',
     'imagine dragons bones',
-    'harry styles as it was',
     'billie eilish birds of a feather',
-    'arctic monkeys do i wanna know',
     'queen bohemian rhapsody',
-    'post malone circles',
     'dua lipa levitating',
-    'bruno mars locked out of heaven',
     'adele easy on me',
     'linkin park numb'
 ];
@@ -100,7 +97,7 @@ async function ensureConnection(guild, voiceChannelId) {
 
     const channel = await guild.channels.fetch(voiceChannelId).catch(() => null);
     if (!isVoiceChannel(channel)) {
-        throw new Error('Canal de voz inválido. Configure no painel (🎵 Música) ou entre em um canal de voz.');
+        throw new Error('Canal de voz inválido. Configure no painel (🎵 Música) ou entre em um canal.');
     }
 
     const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
@@ -108,24 +105,12 @@ async function ensureConnection(guild, voiceChannelId) {
         const perms = channel.permissionsFor(me);
         if (perms) {
             if (!perms.has(PermissionFlagsBits.Connect)) {
-                throw new Error(
-                    `Sem permissão **Conectar** em <#${channel.id}>. Ajuste o cargo do bot nesse canal.`
-                );
+                throw new Error(`Sem permissão **Conectar** em <#${channel.id}>.`);
             }
             if (!perms.has(PermissionFlagsBits.Speak)) {
-                throw new Error(
-                    `Sem permissão **Falar** em <#${channel.id}>. Ajuste o cargo do bot nesse canal.`
-                );
-            }
-            if (!perms.has(PermissionFlagsBits.ViewChannel)) {
-                throw new Error(`Sem permissão para **ver** o canal <#${channel.id}>.`);
+                throw new Error(`Sem permissão **Falar** em <#${channel.id}>.`);
             }
         }
-    }
-
-    // limite de usuários
-    if (channel.userLimit > 0 && channel.members.size >= channel.userLimit && !channel.members.has(me?.id)) {
-        throw new Error(`O canal <#${channel.id}> está cheio.`);
     }
 
     const connection = joinVoiceChannel({
@@ -140,33 +125,20 @@ async function ensureConnection(guild, voiceChannelId) {
         if (oldState.status !== newState.status) {
             console.log(`[voice ${guild.id}] ${oldState.status} → ${newState.status}`);
         }
-        if (newState.status === VoiceConnectionStatus.Disconnected) {
-            try {
-                connection.destroy();
-            } catch (_) {}
-        }
-    });
-
-    connection.on('error', (err) => {
-        console.error('[voice error]', guild.id, err);
     });
 
     try {
         await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
     } catch (err) {
-        console.error('[voice ready timeout]', guild.id, err?.message || err);
         try {
             connection.destroy();
         } catch (_) {}
-
-        // dicas específicas
-        const tip =
-            'Não consegui ficar **Ready** no canal de voz.\n' +
-            '• Permissões: Conectar + Falar + Ver canal\n' +
-            '• Intent **Guild Voice States** no portal do bot\n' +
-            '• No Termux rode: `npm i libsodium-wrappers @discordjs/voice`\n' +
-            '• Rede móvel às vezes bloqueia UDP de voz — teste em Wi‑Fi';
-        throw new Error(tip);
+        throw new Error(
+            'Não consegui conectar na **voz** (UDP).\n' +
+                'No **Termux/Android** isso costuma falhar.\n' +
+                'Hospede o bot no **Render/VPS** para tocar áudio.\n' +
+                'A **busca** por API continua funcionando com `O.buscar`.'
+        );
     }
 
     const st = getState(guild.id);
@@ -176,34 +148,7 @@ async function ensureConnection(guild, voiceChannelId) {
 
 async function resolveTrack(query) {
     const q = (query || '').trim() || RANDOM_POOL[Math.floor(Math.random() * RANDOM_POOL.length)];
-
-    if (play.yt_validate(q) === 'video' || /^https?:\/\//i.test(q)) {
-        try {
-            const info = await play.video_info(q);
-            const v = info.video_details;
-            return {
-                title: v.title || 'Música',
-                url: v.url,
-                duration: v.durationInSec || 0,
-                thumbnail: v.thumbnails?.[0]?.url || null,
-                channel: v.channel?.name || 'YouTube'
-            };
-        } catch {
-            /* busca */
-        }
-    }
-
-    const results = await play.search(q, { limit: 1, source: { youtube: 'video' } });
-    if (!results?.length) throw new Error('Nenhum resultado encontrado.');
-
-    const v = results[0];
-    return {
-        title: v.title || q,
-        url: v.url,
-        duration: v.durationInSec || 0,
-        thumbnail: v.thumbnails?.[0]?.url || null,
-        channel: v.channel?.name || 'YouTube'
-    };
+    return resolvePlayable(q);
 }
 
 function formatDuration(sec) {
@@ -239,7 +184,7 @@ async function playNext(guildId) {
                     .setDescription(`**[${next.title}](${next.url})**`)
                     .addFields(
                         { name: 'Duração', value: formatDuration(next.duration), inline: true },
-                        { name: 'Na fila', value: String(st.queue.length), inline: true },
+                        { name: 'Fonte', value: next.source || 'API', inline: true },
                         {
                             name: 'Pedido por',
                             value: next.requestedBy ? `<@${next.requestedBy}>` : 'Bot',
@@ -263,13 +208,12 @@ async function enqueue(guild, voiceChannelId, textChannelId, query, userId, clie
     const st = getState(guild.id);
     const total = (st.now ? 1 : 0) + st.queue.length;
     if (total >= limit) {
-        throw new Error(`Fila cheia (máx. **${limit}**). Use \`O.skip\` ou \`O.clear\`.`);
+        throw new Error(`Fila cheia (máx. **${limit}**).`);
     }
 
     const track = await resolveTrack(query);
     track.requestedBy = userId;
     track.client = client;
-    track.id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     await ensureConnection(guild, voiceChannelId);
     st.textChannelId = textChannelId;
@@ -304,9 +248,9 @@ function stop(guildId) {
 
 function clearQueue(guildId) {
     const st = getState(guildId);
-    const removed = st.queue.length;
+    const n = st.queue.length;
     st.queue = [];
-    return removed;
+    return n;
 }
 
 function removeAt(guildId, index1) {
@@ -327,13 +271,7 @@ function getQueue(guildId) {
     const st = getState(guildId);
     return {
         now: st.now,
-        queue: st.queue.map((t) => ({
-            title: t.title,
-            url: t.url,
-            duration: t.duration,
-            requestedBy: t.requestedBy,
-            channel: t.channel
-        })),
+        queue: [...st.queue],
         loop: st.loop,
         max: maxQueue(guildId)
     };
@@ -342,39 +280,19 @@ function getQueue(guildId) {
 function buildQueueEmbed(guildId) {
     const data = getQueue(guildId);
     const lines = [];
-
     if (data.now) {
-        lines.push(
-            `**▶ Tocando**\n[${data.now.title}](${data.now.url}) · ${formatDuration(data.now.duration)}` +
-                (data.now.requestedBy ? ` · <@${data.now.requestedBy}>` : '')
-        );
-    } else {
-        lines.push('**▶ Tocando**\n_Nada no momento._');
-    }
-
+        lines.push(`**▶** [${data.now.title}](${data.now.url})`);
+    } else lines.push('**▶** _Nada tocando_');
     if (data.queue.length) {
-        lines.push('');
-        lines.push(`**📋 Fila (${data.queue.length}/${data.max})**`);
-        data.queue.slice(0, 15).forEach((t, i) => {
-            lines.push(
-                `**${i + 1}.** [${t.title}](${t.url}) · ${formatDuration(t.duration)}` +
-                    (t.requestedBy ? ` · <@${t.requestedBy}>` : '')
-            );
+        lines.push('', `**Fila (${data.queue.length})**`);
+        data.queue.slice(0, 12).forEach((t, i) => {
+            lines.push(`**${i + 1}.** [${t.title}](${t.url})`);
         });
-        if (data.queue.length > 15) lines.push(`_…e mais ${data.queue.length - 15}_`);
-    } else {
-        lines.push('');
-        lines.push('**📋 Fila**\n_Vazia — use `O.play <música>`_');
     }
-
-    lines.push('');
-    lines.push(`Loop: **${data.loop ? 'ligado' : 'desligado'}**`);
-
     return new EmbedBuilder()
         .setColor(0x1db954)
-        .setTitle('🎶 Fila de músicas')
-        .setDescription(lines.join('\n').slice(0, 4000))
-        .setFooter({ text: 'O.play · O.skip · O.remove · O.clear · O.stop' });
+        .setTitle('🎶 Fila')
+        .setDescription(lines.join('\n').slice(0, 4000));
 }
 
 module.exports = {
@@ -387,6 +305,6 @@ module.exports = {
     getQueue,
     buildQueueEmbed,
     formatDuration,
-    ensureConnection,
+    resolveTrack,
     RANDOM_POOL
 };
