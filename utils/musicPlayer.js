@@ -8,7 +8,14 @@ const {
     getVoiceConnection
 } = require('@discordjs/voice');
 const play = require('play-dl');
-const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
+const {
+    EmbedBuilder,
+    PermissionFlagsBits,
+    ChannelType,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} = require('discord.js');
 const settings = require('./settings');
 const { resolvePlayable } = require('./musicSearch');
 
@@ -37,17 +44,14 @@ function maxQueue(guildId) {
     return Math.min(n, 100);
 }
 
-/** Destroi conexão só se ainda existir e não estiver Destroyed */
 function safeDestroy(connection) {
     if (!connection) return;
     try {
-        const status = connection.state?.status;
-        if (status === VoiceConnectionStatus.Destroyed) return;
+        if (connection.state?.status === VoiceConnectionStatus.Destroyed) return;
         connection.destroy();
     } catch (err) {
-        const msg = String(err?.message || err);
-        if (!/already been destroyed/i.test(msg)) {
-            console.warn('[voice] safeDestroy:', msg);
+        if (!/already been destroyed/i.test(String(err?.message || err))) {
+            console.warn('[voice] safeDestroy:', err.message);
         }
     }
 }
@@ -58,18 +62,31 @@ function getState(guildId) {
         guilds.set(guildId, {
             player,
             queue: [],
+            history: [], // faixas já tocadas (para Voltar)
             textChannelId: null,
             now: null,
             playing: false,
-            loop: false
+            paused: false,
+            loop: false,
+            privateChannelId: null,
+            ownerId: null,
+            controlMessageId: null
         });
 
         player.on(AudioPlayerStatus.Idle, () => {
             const st = guilds.get(guildId);
             if (!st) return;
-            if (st.loop && st.now) st.queue.unshift({ ...st.now });
+            if (st.paused) return; // pause não é idle real do fim da faixa em alguns casos
+
+            if (st.loop && st.now) {
+                st.queue.unshift({ ...st.now });
+            } else if (st.now) {
+                st.history.push(st.now);
+                if (st.history.length > 30) st.history.shift();
+            }
             st.now = null;
             st.playing = false;
+            st.paused = false;
             playNext(guildId).catch(() => {});
         });
 
@@ -79,6 +96,7 @@ function getState(guildId) {
             if (st) {
                 st.now = null;
                 st.playing = false;
+                st.paused = false;
             }
             playNext(guildId).catch(() => {});
         });
@@ -86,51 +104,146 @@ function getState(guildId) {
     return guilds.get(guildId);
 }
 
-function isVoiceChannel(channel) {
-    if (!channel) return false;
-    return (
-        channel.type === ChannelType.GuildVoice ||
-        channel.type === ChannelType.GuildStageVoice ||
-        channel.type === 2 ||
-        channel.type === 13
+function controlRow(guildId) {
+    const st = getState(guildId);
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`mctl_prev_${guildId}`)
+            .setLabel('Voltar')
+            .setEmoji('⏮️')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`mctl_pause_${guildId}`)
+            .setLabel(st.paused ? 'Continuar' : 'Pausa')
+            .setEmoji(st.paused ? '▶️' : '⏸️')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`mctl_skip_${guildId}`)
+            .setLabel('Passar')
+            .setEmoji('⏭️')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`mctl_loop_${guildId}`)
+            .setLabel('Repetir')
+            .setEmoji('🔁')
+            .setStyle(st.loop ? ButtonStyle.Success : ButtonStyle.Secondary)
     );
+}
+
+function nowEmbed(guildId) {
+    const st = getState(guildId);
+    const t = st.now;
+    const embed = new EmbedBuilder()
+        .setColor(0x1db954)
+        .setTitle(st.paused ? '⏸️ Pausado' : '🎶 Tocando agora')
+        .setDescription(t ? `**[${t.title}](${t.url})**` : '_Nada_')
+        .addFields(
+            {
+                name: 'Fila',
+                value: String(st.queue.length),
+                inline: true
+            },
+            {
+                name: 'Loop',
+                value: st.loop ? 'Ligado' : 'Desligado',
+                inline: true
+            },
+            {
+                name: 'Canal privado',
+                value: st.privateChannelId ? `<#${st.privateChannelId}>` : '—',
+                inline: true
+            }
+        )
+        .setFooter({ text: '⏮️ Voltar · ⏸️ Pausa · ⏭️ Passar · 🔁 Repetir' });
+    if (t?.thumbnail) embed.setThumbnail(t.thumbnail);
+    return embed;
+}
+
+/**
+ * Cria canal de voz privado (só o membro + bot veem/entram) e move o membro.
+ */
+async function createPrivateVoice(guild, member) {
+    const me = guild.members.me || (await guild.members.fetchMe());
+    const everyone = guild.roles.everyone;
+
+    const channel = await guild.channels.create({
+        name: `🎵 · ${member.displayName || member.user.username}`.slice(0, 90),
+        type: ChannelType.GuildVoice,
+        reason: `Sala privada de música para ${member.user.tag}`,
+        permissionOverwrites: [
+            {
+                id: everyone.id,
+                deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect]
+            },
+            {
+                id: member.id,
+                allow: [
+                    PermissionFlagsBits.ViewChannel,
+                    PermissionFlagsBits.Connect,
+                    PermissionFlagsBits.Speak,
+                    PermissionFlagsBits.Stream
+                ]
+            },
+            {
+                id: me.id,
+                allow: [
+                    PermissionFlagsBits.ViewChannel,
+                    PermissionFlagsBits.Connect,
+                    PermissionFlagsBits.Speak,
+                    PermissionFlagsBits.MoveMembers,
+                    PermissionFlagsBits.ManageChannels
+                ]
+            }
+        ]
+    });
+
+    // Move o membro para a sala
+    try {
+        if (member.voice?.channelId) {
+            await member.voice.setChannel(channel.id);
+        } else {
+            // não está em VC — tenta mesmo assim (falha se não estiver em voz)
+            await member.voice.setChannel(channel.id).catch(() => {});
+        }
+    } catch (e) {
+        console.warn('[music] move member:', e.message);
+    }
+
+    return channel;
+}
+
+async function deletePrivateChannel(guildId, client) {
+    const st = getState(guildId);
+    if (!st.privateChannelId) return;
+    try {
+        const ch = await client.channels.fetch(st.privateChannelId).catch(() => null);
+        if (ch) await ch.delete('Sessão de música encerrada').catch(() => {});
+    } catch (_) {}
+    st.privateChannelId = null;
 }
 
 async function ensureConnection(guild, voiceChannelId) {
     const existing = getVoiceConnection(guild.id);
     if (existing) {
         const status = existing.state?.status;
-        if (status === VoiceConnectionStatus.Destroyed) {
-            // ignora referência morta
-        } else if (existing.joinConfig.channelId === voiceChannelId) {
-            if (status === VoiceConnectionStatus.Ready) return existing;
-            try {
-                await entersState(existing, VoiceConnectionStatus.Ready, 20_000);
-                return existing;
-            } catch {
+        if (status !== VoiceConnectionStatus.Destroyed) {
+            if (existing.joinConfig.channelId === voiceChannelId) {
+                if (status === VoiceConnectionStatus.Ready) return existing;
+                try {
+                    await entersState(existing, VoiceConnectionStatus.Ready, 20_000);
+                    return existing;
+                } catch {
+                    safeDestroy(existing);
+                }
+            } else {
                 safeDestroy(existing);
             }
-        } else {
-            safeDestroy(existing);
         }
     }
 
     const channel = await guild.channels.fetch(voiceChannelId).catch(() => null);
-    if (!isVoiceChannel(channel)) {
-        throw new Error('Canal de voz inválido. Configure no painel (🎵 Música) ou entre em um canal.');
-    }
-
-    const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
-    if (me) {
-        const perms = channel.permissionsFor(me);
-        if (perms) {
-            if (!perms.has(PermissionFlagsBits.Connect)) {
-                throw new Error(`Sem permissão **Conectar** em <#${channel.id}>.`);
-            }
-            if (!perms.has(PermissionFlagsBits.Speak)) {
-                throw new Error(`Sem permissão **Falar** em <#${channel.id}>.`);
-            }
-        }
+    if (!channel || (channel.type !== ChannelType.GuildVoice && channel.type !== 2)) {
+        throw new Error('Canal de voz inválido.');
     }
 
     const connection = joinVoiceChannel({
@@ -141,17 +254,8 @@ async function ensureConnection(guild, voiceChannelId) {
         selfMute: false
     });
 
-    connection.on('stateChange', (oldState, newState) => {
-        if (oldState.status !== newState.status) {
-            console.log(`[voice ${guild.id}] ${oldState.status} → ${newState.status}`);
-        }
-    });
-
-    connection.on('error', (err) => {
-        const msg = String(err?.message || err);
-        if (!/already been destroyed/i.test(msg)) {
-            console.error('[voice error]', guild.id, msg);
-        }
+    connection.on('stateChange', (o, n) => {
+        if (o.status !== n.status) console.log(`[voice ${guild.id}] ${o.status} → ${n.status}`);
     });
 
     try {
@@ -159,10 +263,7 @@ async function ensureConnection(guild, voiceChannelId) {
     } catch {
         safeDestroy(connection);
         throw new Error(
-            'Não consegui conectar na **voz** (UDP).\n' +
-                'No **Termux/Android** isso costuma falhar.\n' +
-                'Hospede o bot no **Render/VPS** para tocar áudio.\n' +
-                'A **busca** continua com `O.play <nome>`.'
+            'Não consegui conectar na voz (UDP). No Termux costuma falhar — use Render/VPS.'
         );
     }
 
@@ -185,41 +286,25 @@ function formatDuration(sec) {
 
 async function playNext(guildId) {
     const st = getState(guildId);
-    if (st.playing) return;
+    if (st.playing && !st.paused) return;
+
     const next = st.queue.shift();
     if (!next) {
         st.now = null;
+        st.playing = false;
+        st.paused = false;
+        // sem fila: encerra sala privada depois de um tempo curto
         return;
     }
 
     st.playing = true;
+    st.paused = false;
     st.now = next;
 
     try {
         const stream = await play.stream(next.url, { discordPlayerCompatibility: true });
         const resource = createAudioResource(stream.stream, { inputType: stream.type });
         st.player.play(resource);
-
-        if (next.client && st.textChannelId) {
-            const ch = await next.client.channels.fetch(st.textChannelId).catch(() => null);
-            if (ch?.isTextBased()) {
-                const embed = new EmbedBuilder()
-                    .setColor(0x1db954)
-                    .setTitle('🎶 Tocando agora')
-                    .setDescription(`**[${next.title}](${next.url})**`)
-                    .addFields(
-                        { name: 'Duração', value: formatDuration(next.duration), inline: true },
-                        { name: 'Fonte', value: next.source || 'API', inline: true },
-                        {
-                            name: 'Pedido por',
-                            value: next.requestedBy ? `<@${next.requestedBy}>` : 'Bot',
-                            inline: true
-                        }
-                    );
-                if (next.thumbnail) embed.setThumbnail(next.thumbnail);
-                await ch.send({ embeds: [embed] }).catch(() => {});
-            }
-        }
     } catch (err) {
         console.error('[music] stream', err.message);
         st.playing = false;
@@ -228,47 +313,154 @@ async function playNext(guildId) {
     }
 }
 
-async function enqueue(guild, voiceChannelId, textChannelId, query, userId, client) {
-    const limit = maxQueue(guild.id);
+/**
+ * Sessão completa: cria VC privada, conecta, enfileira e toca.
+ */
+async function startPrivateSession(guild, member, textChannel, query, client) {
     const st = getState(guild.id);
-    const total = (st.now ? 1 : 0) + st.queue.length;
-    if (total >= limit) {
-        throw new Error(`Fila cheia (máx. **${limit}**).`);
+
+    // Se já tem sala privada do mesmo dono, reutiliza
+    let voiceChannelId = st.privateChannelId;
+    if (voiceChannelId) {
+        const ch = await guild.channels.fetch(voiceChannelId).catch(() => null);
+        if (!ch) {
+            st.privateChannelId = null;
+            voiceChannelId = null;
+        }
+    }
+
+    if (!voiceChannelId) {
+        const priv = await createPrivateVoice(guild, member);
+        st.privateChannelId = priv.id;
+        st.ownerId = member.id;
+        voiceChannelId = priv.id;
+    } else {
+        // garante membro na sala
+        await member.voice.setChannel(voiceChannelId).catch(() => {});
     }
 
     const track = await resolveTrack(query);
-    track.requestedBy = userId;
+    track.requestedBy = member.id;
     track.client = client;
 
     await ensureConnection(guild, voiceChannelId);
-    st.textChannelId = textChannelId;
+    st.textChannelId = textChannel.id;
+
+    const limit = maxQueue(guild.id);
+    const total = (st.now ? 1 : 0) + st.queue.length;
+    if (total >= limit) throw new Error(`Fila cheia (máx. ${limit}).`);
 
     const wasIdle = !st.playing && !st.now && st.queue.length === 0;
     st.queue.push(track);
 
     if (wasIdle || !st.playing) {
         await playNext(guild.id);
-        return { track, position: 0, started: true, queueSize: st.queue.length };
     }
 
-    return { track, position: st.queue.length, started: false, queueSize: st.queue.length };
+    return {
+        track,
+        voiceChannelId,
+        started: wasIdle || !!st.now,
+        embed: nowEmbed(guild.id),
+        components: [controlRow(guild.id)]
+    };
 }
 
-function skip(guildId) {
-    getState(guildId).player.stop(true);
+async function handleControl(interaction) {
+    const id = interaction.customId;
+    // mctl_skip_GUILDID
+    const m = id.match(/^mctl_(skip|prev|pause|loop)_(\d+)$/);
+    if (!m) return false;
+
+    const action = m[1];
+    const guildId = m[2];
+    if (interaction.guildId !== guildId) {
+        await interaction.reply({ content: 'Sessão de outro servidor.', ephemeral: true });
+        return true;
+    }
+
+    const st = getState(guildId);
+    if (st.ownerId && interaction.user.id !== st.ownerId) {
+        // permite quem está no mesmo canal privado
+        const member = interaction.member;
+        const inPriv =
+            st.privateChannelId && member?.voice?.channelId === st.privateChannelId;
+        if (!inPriv) {
+            await interaction.reply({
+                content: 'Só quem pediu a música (ou está na sala) controla.',
+                ephemeral: true
+            });
+            return true;
+        }
+    }
+
+    if (action === 'skip') {
+        if (st.now) {
+            st.history.push(st.now);
+            if (st.history.length > 30) st.history.shift();
+        }
+        st.player.stop(true);
+        st.playing = false;
+        st.paused = false;
+        st.now = null;
+        await playNext(guildId);
+    } else if (action === 'prev') {
+        const prev = st.history.pop();
+        if (!prev) {
+            await interaction.reply({ content: 'Não há música anterior.', ephemeral: true });
+            return true;
+        }
+        if (st.now) st.queue.unshift(st.now);
+        st.queue.unshift(prev);
+        st.player.stop(true);
+        st.playing = false;
+        st.paused = false;
+        st.now = null;
+        await playNext(guildId);
+    } else if (action === 'pause') {
+        if (st.paused) {
+            st.player.unpause();
+            st.paused = false;
+        } else {
+            st.player.pause();
+            st.paused = true;
+        }
+    } else if (action === 'loop') {
+        st.loop = !st.loop;
+    }
+
+    await interaction.update({
+        embeds: [nowEmbed(guildId)],
+        components: [controlRow(guildId)]
+    }).catch(async () => {
+        await interaction.deferUpdate().catch(() => {});
+    });
     return true;
 }
 
-function stop(guildId) {
+function skip(guildId) {
+    const st = getState(guildId);
+    if (st.now) {
+        st.history.push(st.now);
+        if (st.history.length > 30) st.history.shift();
+    }
+    st.player.stop(true);
+    return true;
+}
+
+async function stop(guildId, client) {
     const st = getState(guildId);
     st.queue = [];
+    st.history = [];
     st.now = null;
     st.playing = false;
+    st.paused = false;
     st.loop = false;
     try {
         st.player.stop(true);
     } catch (_) {}
     safeDestroy(getVoiceConnection(guildId));
+    if (client) await deletePrivateChannel(guildId, client);
     return true;
 }
 
@@ -299,7 +491,8 @@ function getQueue(guildId) {
         now: st.now,
         queue: [...st.queue],
         loop: st.loop,
-        max: maxQueue(guildId)
+        max: maxQueue(guildId),
+        privateChannelId: st.privateChannelId
     };
 }
 
@@ -307,20 +500,25 @@ function buildQueueEmbed(guildId) {
     const data = getQueue(guildId);
     const lines = [];
     if (data.now) lines.push(`**▶** [${data.now.title}](${data.now.url})`);
-    else lines.push('**▶** _Nada tocando_');
+    else lines.push('**▶** _Nada_');
     if (data.queue.length) {
-        lines.push('', `**Fila (${data.queue.length})**`);
-        data.queue.slice(0, 12).forEach((t, i) => {
-            lines.push(`**${i + 1}.** [${t.title}](${t.url})`);
-        });
+        lines.push('', `**Fila**`);
+        data.queue.slice(0, 10).forEach((t, i) => lines.push(`**${i + 1}.** ${t.title}`));
     }
-    return new EmbedBuilder()
-        .setColor(0x1db954)
-        .setTitle('🎶 Fila')
-        .setDescription(lines.join('\n').slice(0, 4000));
+    return new EmbedBuilder().setColor(0x1db954).setTitle('🎶 Fila').setDescription(lines.join('\n'));
+}
+
+// compat enqueue antigo
+async function enqueue(guild, voiceChannelId, textChannelId, query, userId, client) {
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member) throw new Error('Membro não encontrado.');
+    const textChannel = await client.channels.fetch(textChannelId);
+    return startPrivateSession(guild, member, textChannel, query, client);
 }
 
 module.exports = {
+    startPrivateSession,
+    handleControl,
     enqueue,
     skip,
     stop,
@@ -330,7 +528,7 @@ module.exports = {
     getQueue,
     buildQueueEmbed,
     formatDuration,
-    resolveTrack,
-    safeDestroy,
+    controlRow,
+    nowEmbed,
     RANDOM_POOL
 };

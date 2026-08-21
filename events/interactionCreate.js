@@ -1,15 +1,40 @@
 const { Events, MessageFlags } = require('discord.js');
 const { decodePayload } = require('../utils/gameAgain');
+const music = require('../utils/musicPlayer');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
-        // Botão Novamente
+        // Controles de música (passar / voltar / pausa / repetir)
+        if (interaction.isButton() && interaction.customId.startsWith('mctl_')) {
+            try {
+                const handled = await music.handleControl(interaction);
+                if (handled) return;
+            } catch (err) {
+                console.error('[music control]', err);
+                try {
+                    if (interaction.replied || interaction.deferred) {
+                        await interaction.followUp({
+                            content: 'Erro no controle de música.',
+                            flags: [MessageFlags.Ephemeral]
+                        });
+                    } else {
+                        await interaction.reply({
+                            content: 'Erro no controle de música.',
+                            flags: [MessageFlags.Ephemeral]
+                        });
+                    }
+                } catch (_) {}
+            }
+            return;
+        }
+
+        // Botão Novamente (jogos)
         if (interaction.isButton() && interaction.customId.startsWith('again:')) {
             const parts = interaction.customId.split(':');
             if (parts.length < 4) {
                 return interaction
-                    .reply({ content: 'Dados da rodada inválidos.', flags: [MessageFlags.Ephemeral] })
+                    .reply({ content: 'Dados inválidos.', flags: [MessageFlags.Ephemeral] })
                     .catch(() => {});
             }
 
@@ -36,14 +61,10 @@ module.exports = {
             }
 
             try {
-                // Só atualiza o botão (não “consome” reply para o novo jogo)
-                await interaction.update({
-                    components: interaction.message.components
-                }).catch(async () => {
+                await interaction.update({ components: interaction.message.components }).catch(async () => {
                     await interaction.deferUpdate().catch(() => {});
                 });
 
-                // Novo jogo no canal (evita 40060 Interaction acknowledged)
                 const fakeMessage = {
                     id: `${interaction.id}_again`,
                     author: interaction.user,
@@ -59,12 +80,6 @@ module.exports = {
                 await command.execute(fakeMessage, args, client);
             } catch (err) {
                 console.error('again button:', err);
-                try {
-                    await interaction.followUp({
-                        content: 'Não foi possível repetir o jogo. Tente o comando de novo.',
-                        flags: [MessageFlags.Ephemeral]
-                    });
-                } catch (_) {}
             }
             return;
         }
