@@ -5,66 +5,125 @@ const { getPanelBase, getDailyPageUrl } = require('../utils/panelUrl');
 module.exports = {
     name: 'addmoney',
     aliases: ['addflocos', 'giveflocos', 'addbal'],
-    description: 'Adiciona ❄️ flocos a um usuário (economia + painel)',
+    description: 'Adiciona ❄️ flocos a um ou vários usuários',
     async execute(message, args) {
         if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
             return message.reply('❌ Apenas **administradores** podem usar este comando.');
         }
 
-        const target =
-            message.mentions.users.first() ||
-            (args[0] && !isNaN(args[0]) ? await message.client.users.fetch(args[0]).catch(() => null) : null);
-
-        // args: @user 5k  OU  5k @user  OU  id 5k
-        let rawAmount = args[1] || args[0];
-        if (message.mentions.users.first()) {
-            rawAmount = args.find((a) => !a.startsWith('<@') && a !== target?.id) || args[1];
-        } else if (target && args[0] === target.id) {
-            rawAmount = args[1];
-        }
-
-        if (!target || !rawAmount) {
+        if (!args.length) {
             return message.reply(
-                '⚠️ Uso: `O.addmoney @usuário <valor>`\n' +
-                    'Exemplos: `O.addmoney @user 5k` · `O.addmoney @user 1,5m` · `O.addmoney @user 500`'
+                '⚠️ Uso:\n' +
+                    '`O.addmoney @user1 @user2 @user3 5k`\n' +
+                    '`O.addmoney @user 500`\n' +
+                    'Vários usuários + **um valor** no final (ou no início).'
             );
         }
 
-        if (target.bot) {
-            return message.reply('❌ Não dá para adicionar flocos a bots.');
+        // Valor: primeiro ou último arg que pareça quantia (não menção / não só ID)
+        const isMention = (a) => /^<@!?\d+>$/.test(a);
+        const isSnowflake = (a) => /^\d{16,20}$/.test(a);
+
+        let amountArg = null;
+        let amountIndex = -1;
+
+        // prioriza o último token que parseia como valor
+        for (let i = args.length - 1; i >= 0; i--) {
+            if (isMention(args[i]) || isSnowflake(args[i])) continue;
+            const parsed = flocos.parseBet(args[i], Number.MAX_SAFE_INTEGER);
+            if (parsed != null && parsed > 0) {
+                amountArg = args[i];
+                amountIndex = i;
+                break;
+            }
         }
 
-        const amount = flocos.parseBet(rawAmount, Number.MAX_SAFE_INTEGER);
+        // fallback: primeiro token numérico
+        if (amountArg == null) {
+            for (let i = 0; i < args.length; i++) {
+                if (isMention(args[i]) || isSnowflake(args[i])) continue;
+                const parsed = flocos.parseBet(args[i], Number.MAX_SAFE_INTEGER);
+                if (parsed != null && parsed > 0) {
+                    amountArg = args[i];
+                    amountIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (amountArg == null) {
+            return message.reply(
+                '❌ Informe o **valor**. Exemplos: `500`, `5k`, `1,5m`\n' +
+                    '`O.addmoney @a @b 5k`'
+            );
+        }
+
+        const amount = flocos.parseBet(amountArg, Number.MAX_SAFE_INTEGER);
         if (amount == null || amount <= 0) {
+            return message.reply('❌ Valor inválido. Use `100`, `1,5k`, `2.5m`, etc.');
+        }
+
+        // Alvos: menções + IDs nos args (exceto o do valor)
+        const targets = new Map();
+
+        for (const u of message.mentions.users.values()) {
+            if (!u.bot) targets.set(u.id, u);
+        }
+
+        for (let i = 0; i < args.length; i++) {
+            if (i === amountIndex) continue;
+            const a = args[i];
+            if (isMention(a)) continue; // já pego em mentions
+            if (isSnowflake(a)) {
+                if (targets.has(a)) continue;
+                const u = await message.client.users.fetch(a).catch(() => null);
+                if (u && !u.bot) targets.set(u.id, u);
+            }
+        }
+
+        if (!targets.size) {
             return message.reply(
-                '❌ Valor inválido. Use `100`, `1,5k`, `2.5m`, etc.'
+                '❌ Mencione **pelo menos um usuário**.\n' +
+                    '`O.addmoney @user1 @user2 10k`'
             );
         }
 
-        const before = flocos.get(target.id);
-        const after = flocos.add(target.id, amount);
+        const results = [];
+        for (const user of targets.values()) {
+            const before = flocos.get(user.id);
+            const after = flocos.add(user.id, amount);
+            results.push({ user, before, after });
+        }
 
         const panel = getPanelBase();
         const daily = getDailyPageUrl();
 
+        const lines = results
+            .slice(0, 20)
+            .map(
+                (r, i) =>
+                    `**${i + 1}.** ${r.user} → ${flocos.formatPlain(r.before)} → **${r.after.toLocaleString('pt-BR')}** ❄️`
+            )
+            .join('\n');
+
+        const extra =
+            results.length > 20 ? `\n_…e mais ${results.length - 20} usuários._` : '';
+
         const embed = new EmbedBuilder()
             .setColor(0x22c55e)
-            .setTitle('❄️ Flocos adicionados')
-            .setThumbnail(target.displayAvatarURL({ size: 128 }))
+            .setTitle(`❄️ Flocos adicionados · ${results.length} usuário(s)`)
             .setDescription(
-                `Administrador **${message.author.username}** creditou flocos na economia do **Aeternus**.`
+                `**+${amount.toLocaleString('pt-BR')}** flocos para cada um.\n` +
+                    `Por **${message.author.username}**`
             )
             .addFields(
-                { name: '👤 Usuário', value: `${target} (\"${target.username}\")`, inline: true },
-                { name: '➕ Valor', value: flocos.format(amount), inline: true },
-                { name: '📊 Antes', value: flocos.formatPlain(before), inline: true },
-                { name: '🏦 Saldo atual', value: flocos.format(after), inline: true },
+                { name: '📋 Resultado', value: (lines + extra).slice(0, 1024) || '—' },
                 {
                     name: '🌐 Painel',
-                    value: `[Abrir painel](${panel}) · [Daily](${daily}) · Veja no Discord com \`O.atm\` / \`O.bal\``
+                    value: `[Painel](${panel}) · [Daily](${daily}) · \`O.atm\` / \`O.bal\``
                 }
             )
-            .setFooter({ text: 'Economia unificada · data/economy.json · painel /api/user/balance' })
+            .setFooter({ text: 'Economia unificada · data/economy.json' })
             .setTimestamp();
 
         const row = new ActionRowBuilder().addComponents(
@@ -72,13 +131,7 @@ module.exports = {
                 .setLabel('Painel')
                 .setStyle(ButtonStyle.Link)
                 .setURL(panel)
-                .setEmoji('⚙️'),
-            new ButtonBuilder()
-                .setLabel('ATM')
-                .setStyle(ButtonStyle.Secondary)
-                .setCustomId(`atm_hint_${target.id}`)
-                .setEmoji('🏦')
-                .setDisabled(true)
+                .setEmoji('⚙️')
         );
 
         await message.reply({ embeds: [embed], components: [row] });
