@@ -5,7 +5,7 @@ const music = require('../utils/musicPlayer');
 module.exports = {
     name: 'play',
     aliases: ['p', 'tocar', 'music'],
-    description: 'Toca música no canal de voz configurado no painel',
+    description: 'Adiciona música na fila e toca no canal do painel',
     async execute(message, args) {
         if (!message.guild) {
             return message.reply('Use este comando em um servidor.');
@@ -16,8 +16,8 @@ module.exports = {
 
         if (!voiceChannelId) {
             return message.reply(
-                'Nenhum **canal de voz** configurado para música.\n' +
-                    'Abra o **painel → Música** e escolha o canal onde o bot deve tocar.'
+                'Nenhum **canal de voz** configurado.\n' +
+                    'Painel → **🎵 Música** → escolha o canal e salve.'
             );
         }
 
@@ -25,9 +25,7 @@ module.exports = {
         const auto = !query;
 
         const loading = await message.reply(
-            auto
-                ? '🎲 Sem música escolhida — o bot vai escolher uma…'
-                : `🔎 Buscando **${query.slice(0, 80)}**…`
+            auto ? '🎲 Escolhendo uma música…' : `🔎 Buscando **${query.slice(0, 80)}**…`
         );
 
         try {
@@ -42,34 +40,34 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setColor(0x1db954)
-                .setTitle(result.started ? '🎶 Tocando' : '➕ Na fila')
+                .setTitle(result.started ? '🎶 Tocando agora' : '➕ Adicionada à fila')
                 .setDescription(`**[${result.track.title}](${result.track.url})**`)
                 .addFields(
+                    { name: 'Canal de voz', value: `<#${voiceChannelId}>`, inline: true },
                     {
-                        name: 'Canal de voz',
-                        value: `<#${voiceChannelId}>`,
+                        name: 'Duração',
+                        value: music.formatDuration(result.track.duration),
                         inline: true
                     },
                     {
-                        name: auto ? 'Escolha' : 'Pedido',
-                        value: auto ? 'Aleatória do bot' : `<@${message.author.id}>`,
+                        name: result.started ? 'Status' : 'Posição na fila',
+                        value: result.started ? 'Reproduzindo' : `#${result.position}`,
+                        inline: true
+                    },
+                    {
+                        name: 'Fila',
+                        value: `${result.queueSize} aguardando · \`O.queue\``,
                         inline: true
                     }
                 )
-                .setFooter({ text: 'O.stop · O.skip · Painel → Música' });
+                .setFooter({ text: auto ? 'Escolha automática do bot' : `Pedido por ${message.author.username}` });
 
             if (result.track.thumbnail) embed.setThumbnail(result.track.thumbnail);
-            if (!result.started) {
-                embed.addFields({ name: 'Posição na fila', value: String(result.position), inline: true });
-            }
 
             await loading.edit({ content: null, embeds: [embed] });
         } catch (err) {
             console.error('[play]', err);
-            await loading.edit(
-                `❌ ${err.message || 'Não foi possível tocar a música.'}\n` +
-                    'Confira: canal de voz no painel, permissões **Conectar/Falar** e se o `npm install` instalou `@discordjs/voice` e `play-dl`.'
-            );
+            await loading.edit(`❌ ${err.message || 'Falha ao tocar.'}`);
         }
     }
 };
