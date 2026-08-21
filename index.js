@@ -3,6 +3,17 @@
  */
 require('dotenv').config();
 
+// Criptografia de voz (obrigatório para @discordjs/voice)
+try {
+    require('libsodium-wrappers');
+} catch (_) {
+    try {
+        require('tweetnacl');
+    } catch (__) {
+        console.warn('⚠️ Instale: npm i libsodium-wrappers');
+    }
+}
+
 const { Client, GatewayIntentBits, Partials, Collection, MessageFlags } = require('discord.js');
 const { loadCommands, loadSlash, loadEvents, loadSystems } = require('./bot/loaders');
 const { startServer } = require('./web/server');
@@ -19,7 +30,7 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildVoiceStates, // obrigatório para voz
         GatewayIntentBits.GuildModeration
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
@@ -57,7 +68,6 @@ client.once('clientReady', () => {
     console.log(`🤖 Bot online: ${client.user.tag}`);
 });
 
-// Fallback se a versão do discord.js ainda emitir "ready"
 client.once('ready', () => {
     if (!client.user) return;
     console.log(`🤖 Bot online (ready): ${client.user.tag}`);

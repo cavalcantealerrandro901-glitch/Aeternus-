@@ -1,26 +1,30 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ChannelType } = require('discord.js');
 const settings = require('../utils/settings');
 const music = require('../utils/musicPlayer');
 
 module.exports = {
     name: 'play',
     aliases: ['p', 'tocar', 'music'],
-    description: 'Adiciona música na fila e toca no canal do painel',
+    description: 'Adiciona música na fila e toca no canal de voz',
     async execute(message, args) {
         if (!message.guild) {
             return message.reply('Use este comando em um servidor.');
         }
 
         const cfg = settings.getGuild(message.guild.id);
-        const voiceChannelId = cfg.musicVoiceChannel || cfg.musicChannel || null;
+        const configured = cfg.musicVoiceChannel || cfg.musicChannel || null;
+        const userVc = message.member?.voice?.channelId || null;
+
+        // Prioridade: painel → canal do usuário
+        let voiceChannelId = configured || userVc;
 
         if (!voiceChannelId) {
             return message.reply(
-                'Nenhum **canal de voz** configurado.\n' +
-                    'Painel → **🎵 Música** → escolha o canal e salve.'
+                'Entre em um **canal de voz** ou configure um no **painel → 🎵 Música**.'
             );
         }
 
+        // Se o configurado falhar, tenta o do usuário
         const query = args.join(' ').trim();
         const auto = !query;
 
@@ -29,14 +33,33 @@ module.exports = {
         );
 
         try {
-            const result = await music.enqueue(
-                message.guild,
-                voiceChannelId,
-                message.channel.id,
-                query,
-                message.author.id,
-                message.client
-            );
+            let result;
+            try {
+                result = await music.enqueue(
+                    message.guild,
+                    voiceChannelId,
+                    message.channel.id,
+                    query,
+                    message.author.id,
+                    message.client
+                );
+            } catch (err) {
+                // fallback: canal do usuário se painel falhou
+                if (configured && userVc && userVc !== configured) {
+                    console.warn('[play] fallback para VC do usuário:', err.message);
+                    result = await music.enqueue(
+                        message.guild,
+                        userVc,
+                        message.channel.id,
+                        query,
+                        message.author.id,
+                        message.client
+                    );
+                    voiceChannelId = userVc;
+                } else {
+                    throw err;
+                }
+            }
 
             const embed = new EmbedBuilder()
                 .setColor(0x1db954)
@@ -50,20 +73,14 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: result.started ? 'Status' : 'Posição na fila',
+                        name: result.started ? 'Status' : 'Posição',
                         value: result.started ? 'Reproduzindo' : `#${result.position}`,
-                        inline: true
-                    },
-                    {
-                        name: 'Fila',
-                        value: `${result.queueSize} aguardando · \`O.queue\``,
                         inline: true
                     }
                 )
-                .setFooter({ text: auto ? 'Escolha automática do bot' : `Pedido por ${message.author.username}` });
+                .setFooter({ text: auto ? 'Escolha automática' : `Pedido por ${message.author.username}` });
 
             if (result.track.thumbnail) embed.setThumbnail(result.track.thumbnail);
-
             await loading.edit({ content: null, embeds: [embed] });
         } catch (err) {
             console.error('[play]', err);

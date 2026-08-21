@@ -8,7 +8,7 @@ const {
     getVoiceConnection
 } = require('@discordjs/voice');
 const play = require('play-dl');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const settings = require('./settings');
 
 /** @type {Map<string, any>} */
@@ -28,8 +28,7 @@ const RANDOM_POOL = [
     'dua lipa levitating',
     'bruno mars locked out of heaven',
     'adele easy on me',
-    'linkin park numb',
-    'taylorswift shake it off'
+    'linkin park numb'
 ];
 
 const DEFAULT_MAX_QUEUE = 50;
@@ -50,17 +49,13 @@ function getState(guildId) {
             textChannelId: null,
             now: null,
             playing: false,
-            loop: false // loop da faixa atual
+            loop: false
         });
 
         player.on(AudioPlayerStatus.Idle, () => {
             const st = guilds.get(guildId);
             if (!st) return;
-
-            if (st.loop && st.now) {
-                // recoloca a atual no início e toca de novo
-                st.queue.unshift({ ...st.now });
-            }
+            if (st.loop && st.now) st.queue.unshift({ ...st.now });
             st.now = null;
             st.playing = false;
             playNext(guildId).catch(() => {});
@@ -79,11 +74,22 @@ function getState(guildId) {
     return guilds.get(guildId);
 }
 
+function isVoiceChannel(channel) {
+    if (!channel) return false;
+    return (
+        channel.type === ChannelType.GuildVoice ||
+        channel.type === ChannelType.GuildStageVoice ||
+        channel.type === 2 ||
+        channel.type === 13
+    );
+}
+
 async function ensureConnection(guild, voiceChannelId) {
     const existing = getVoiceConnection(guild.id);
     if (existing && existing.joinConfig.channelId === voiceChannelId) {
+        if (existing.state.status === VoiceConnectionStatus.Ready) return existing;
         try {
-            await entersState(existing, VoiceConnectionStatus.Ready, 15_000);
+            await entersState(existing, VoiceConnectionStatus.Ready, 20_000);
             return existing;
         } catch {
             existing.destroy();
@@ -93,22 +99,74 @@ async function ensureConnection(guild, voiceChannelId) {
     }
 
     const channel = await guild.channels.fetch(voiceChannelId).catch(() => null);
-    if (!channel || channel.type !== 2) {
-        throw new Error('Canal de voz inválido. Configure no painel (Música).');
+    if (!isVoiceChannel(channel)) {
+        throw new Error('Canal de voz inválido. Configure no painel (🎵 Música) ou entre em um canal de voz.');
+    }
+
+    const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+    if (me) {
+        const perms = channel.permissionsFor(me);
+        if (perms) {
+            if (!perms.has(PermissionFlagsBits.Connect)) {
+                throw new Error(
+                    `Sem permissão **Conectar** em <#${channel.id}>. Ajuste o cargo do bot nesse canal.`
+                );
+            }
+            if (!perms.has(PermissionFlagsBits.Speak)) {
+                throw new Error(
+                    `Sem permissão **Falar** em <#${channel.id}>. Ajuste o cargo do bot nesse canal.`
+                );
+            }
+            if (!perms.has(PermissionFlagsBits.ViewChannel)) {
+                throw new Error(`Sem permissão para **ver** o canal <#${channel.id}>.`);
+            }
+        }
+    }
+
+    // limite de usuários
+    if (channel.userLimit > 0 && channel.members.size >= channel.userLimit && !channel.members.has(me?.id)) {
+        throw new Error(`O canal <#${channel.id}> está cheio.`);
     }
 
     const connection = joinVoiceChannel({
         channelId: channel.id,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
-        selfDeaf: true
+        selfDeaf: true,
+        selfMute: false
+    });
+
+    connection.on('stateChange', (oldState, newState) => {
+        if (oldState.status !== newState.status) {
+            console.log(`[voice ${guild.id}] ${oldState.status} → ${newState.status}`);
+        }
+        if (newState.status === VoiceConnectionStatus.Disconnected) {
+            try {
+                connection.destroy();
+            } catch (_) {}
+        }
+    });
+
+    connection.on('error', (err) => {
+        console.error('[voice error]', guild.id, err);
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
-    } catch {
-        connection.destroy();
-        throw new Error('Não consegui conectar no canal de voz. Verifique permissões (Conectar / Falar).');
+        await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
+    } catch (err) {
+        console.error('[voice ready timeout]', guild.id, err?.message || err);
+        try {
+            connection.destroy();
+        } catch (_) {}
+
+        // dicas específicas
+        const tip =
+            'Não consegui ficar **Ready** no canal de voz.\n' +
+            '• Permissões: Conectar + Falar + Ver canal\n' +
+            '• Intent **Guild Voice States** no portal do bot\n' +
+            '• No Termux rode: `npm i libsodium-wrappers @discordjs/voice`\n' +
+            '• Rede móvel às vezes bloqueia UDP de voz — teste em Wi‑Fi';
+        throw new Error(tip);
     }
 
     const st = getState(guild.id);
@@ -205,7 +263,7 @@ async function enqueue(guild, voiceChannelId, textChannelId, query, userId, clie
     const st = getState(guild.id);
     const total = (st.now ? 1 : 0) + st.queue.length;
     if (total >= limit) {
-        throw new Error(`Fila cheia (máx. **${limit}**). Use \`O.skip\` ou \`O.clear\`.`)
+        throw new Error(`Fila cheia (máx. **${limit}**). Use \`O.skip\` ou \`O.clear\`.`);
     }
 
     const track = await resolveTrack(query);
@@ -228,8 +286,7 @@ async function enqueue(guild, voiceChannelId, textChannelId, query, userId, clie
 }
 
 function skip(guildId) {
-    const st = getState(guildId);
-    st.player.stop(true);
+    getState(guildId).player.stop(true);
     return true;
 }
 
@@ -245,7 +302,6 @@ function stop(guildId) {
     return true;
 }
 
-/** Limpa só a fila (mantém a atual tocando) */
 function clearQueue(guildId) {
     const st = getState(guildId);
     const removed = st.queue.length;
@@ -253,7 +309,6 @@ function clearQueue(guildId) {
     return removed;
 }
 
-/** Remove item da fila pelo índice 1-based */
 function removeAt(guildId, index1) {
     const st = getState(guildId);
     const i = index1 - 1;
@@ -313,13 +368,13 @@ function buildQueueEmbed(guildId) {
     }
 
     lines.push('');
-    lines.push(`Loop da faixa: **${data.loop ? 'ligado' : 'desligado'}** · \`O.loop\``);
+    lines.push(`Loop: **${data.loop ? 'ligado' : 'desligado'}**`);
 
     return new EmbedBuilder()
         .setColor(0x1db954)
         .setTitle('🎶 Fila de músicas')
         .setDescription(lines.join('\n').slice(0, 4000))
-        .setFooter({ text: 'O.play · O.skip · O.remove <n> · O.clear · O.stop' });
+        .setFooter({ text: 'O.play · O.skip · O.remove · O.clear · O.stop' });
 }
 
 module.exports = {
@@ -332,5 +387,6 @@ module.exports = {
     getQueue,
     buildQueueEmbed,
     formatDuration,
+    ensureConnection,
     RANDOM_POOL
 };
