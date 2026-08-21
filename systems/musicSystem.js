@@ -1,12 +1,45 @@
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
 const play = require('play-dl');
+const { spawn, exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 
 const queues = new Map();
 
+async function getAudioStream(url) {
+    // 1. Obtém o link direto da faixa via yt-dlp
+    const { stdout } = await execPromise(`yt-dlp -g -f "ba/ba*" "${url}"`);
+    const directUrl = stdout.trim().split('\n')[0];
+
+    if (!directUrl || !directUrl.startsWith('http')) {
+        throw new Error('Não foi possível obter a URL do fluxo de áudio.');
+    }
+
+    // 2. Converte o áudio em tempo real para PCM 48kHz (StreamType.Raw) via FFmpeg nativo
+    const ffmpegProcess = spawn('ffmpeg', [
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
+        '-i', directUrl,
+        '-f', 's16le',
+        '-ar', '48000',
+        '-ac', '2',
+        'pipe:1'
+    ], { stdio: ['ignore', 'pipe', 'ignore'] });
+
+    return ffmpegProcess.stdout;
+}
+
 async function playMusic(guildId, song) {
     const serverQueue = queues.get(guildId);
-    if (!song) {
+    
+    if (!song || typeof song.url !== 'string' || !song.url.startsWith('http')) {
         if (serverQueue) {
+            serverQueue.textChannel.send('❌ URL inválida. Pulando...');
+            serverQueue.songs.shift();
+            if (serverQueue.songs.length > 0) {
+                return playMusic(guildId, serverQueue.songs[0]);
+            }
             serverQueue.connection.destroy();
             queues.delete(guildId);
         }
@@ -14,64 +47,82 @@ async function playMusic(guildId, song) {
     }
 
     try {
-        const stream = await play.stream(song.url);
-        const resource = createAudioResource(stream.stream, { inputType: stream.type });
-        
+        const stream = await getAudioStream(song.url);
+        const resource = createAudioResource(stream, {
+            inputType: StreamType.Raw
+        });
+
         serverQueue.player.play(resource);
         serverQueue.textChannel.send(`🎶 Tocando agora: **${song.title}** (\`${song.duration}\`)`);
     } catch (error) {
-        console.error('Erro no stream de áudio:', error);
-        serverQueue.textChannel.send('❌ Ocorreu um erro ao tentar reproduzir esta música.');
+        console.error('Erro ao processar áudio:', error.message || error);
+        serverQueue.textChannel.send('❌ Não foi possível reproduzir esta música.');
         serverQueue.songs.shift();
-        playMusic(guildId, serverQueue.songs[0]);
+        if (serverQueue.songs.length > 0) {
+            playMusic(guildId, serverQueue.songs[0]);
+        } else {
+            serverQueue.connection.destroy();
+            queues.delete(guildId);
+        }
     }
 }
 
-async function addSong(messageOrInteraction, query) {
-    const isInteraction = !messageOrInteraction.author;
-    const user = isInteraction ? messageOrInteraction.user : messageOrInteraction.author;
-    const member = messageOrInteraction.member;
-    const channel = messageOrInteraction.channel;
+async function addSong(ctx, query) {
+    const isInteraction = !ctx.author;
+    const user = isInteraction ? ctx.user : ctx.author;
+    const member = ctx.member;
+    const channel = ctx.channel;
 
-    const voiceChannel = member.voice.channel;
+    if (isInteraction && !ctx.deferred && !ctx.replied) {
+        await ctx.deferReply().catch(() => {});
+    }
+
+    const voiceChannel = member?.voice?.channel;
     if (!voiceChannel) {
-        const text = '❌ Você precisa estar em um canal de voz para tocar música!';
-        return isInteraction ? messageOrInteraction.reply({ content: text, flags: 64 }) : messageOrInteraction.reply(text);
+        const text = '❌ Você precisa estar em um canal de voz!';
+        return isInteraction ? ctx.editReply(text) : ctx.reply(text);
     }
 
-    if (isInteraction) await messageOrInteraction.deferReply();
+    let songInfo = null;
 
-    let searchResult;
     try {
-        searchResult = await play.search(query, { limit: 1 });
+        const searchResults = await play.search(query, { limit: 1, source: { youtube: 'video' } });
+        if (searchResults && searchResults.length > 0 && searchResults[0].url) {
+            songInfo = {
+                title: searchResults[0].title,
+                url: searchResults[0].url,
+                duration: searchResults[0].durationRaw
+            };
+        }
     } catch (e) {
-        const errText = '❌ Erro ao pesquisar a música.';
-        return isInteraction ? messageOrInteraction.editReply(errText) : messageOrInteraction.reply(errText);
+        console.error('Erro na pesquisa do play-dl:', e);
     }
 
-    if (!searchResult || searchResult.length === 0) {
-        const notFound = '🔍 Nenhuma música encontrada com esse nome/link.';
-        return isInteraction ? messageOrInteraction.editReply(notFound) : messageOrInteraction.reply(notFound);
+    if (!songInfo || !songInfo.url) {
+        const notFound = '🔍 Nenhuma música encontrada ou link inválido.';
+        return isInteraction ? ctx.editReply(notFound) : ctx.reply(notFound);
     }
 
     const song = {
-        title: searchResult[0].title,
-        url: searchResult[0].url,
-        duration: searchResult[0].durationRaw,
+        ...songInfo,
         requestedBy: user.username
     };
 
-    let serverQueue = queues.get(messageOrInteraction.guild.id);
+    let serverQueue = queues.get(ctx.guild.id);
 
     if (!serverQueue) {
         const connection = joinVoiceChannel({
             channelId: voiceChannel.id,
-            guildId: messageOrInteraction.guild.id,
-            adapterCreator: messageOrInteraction.guild.voiceAdapterCreator,
+            guildId: ctx.guild.id,
+            adapterCreator: ctx.guild.voiceAdapterCreator,
         });
 
         const player = createAudioPlayer();
         connection.subscribe(player);
+
+        player.on('error', err => {
+            console.error('Erro de reprodução no Player:', err.message);
+        });
 
         serverQueue = {
             textChannel: channel,
@@ -81,22 +132,27 @@ async function addSong(messageOrInteraction, query) {
             songs: []
         };
 
-        queues.set(messageOrInteraction.guild.id, serverQueue);
+        queues.set(ctx.guild.id, serverQueue);
         serverQueue.songs.push(song);
 
         player.on(AudioPlayerStatus.Idle, () => {
             serverQueue.songs.shift();
-            playMusic(messageOrInteraction.guild.id, serverQueue.songs[0]);
+            if (serverQueue.songs.length > 0) {
+                playMusic(ctx.guild.id, serverQueue.songs[0]);
+            } else {
+                serverQueue.connection.destroy();
+                queues.delete(ctx.guild.id);
+            }
         });
 
-        playMusic(messageOrInteraction.guild.id, serverQueue.songs[0]);
+        playMusic(ctx.guild.id, serverQueue.songs[0]);
 
         const startMsg = `✅ Conectado em **${voiceChannel.name}**! Adicionado à fila: **${song.title}**`;
-        return isInteraction ? messageOrInteraction.editReply(startMsg) : messageOrInteraction.reply(startMsg);
+        return isInteraction ? ctx.editReply(startMsg) : ctx.reply(startMsg);
     } else {
         serverQueue.songs.push(song);
-        const addMsg = `➕ **${song.title}** foi adicionado à fila por **${song.requestedBy}**!`;
-        return isInteraction ? messageOrInteraction.editReply(addMsg) : messageOrInteraction.reply(addMsg);
+        const addMsg = `➕ **${song.title}** adicionado à fila por **${song.requestedBy}**!`;
+        return isInteraction ? ctx.editReply(addMsg) : ctx.reply(addMsg);
     }
 }
 
