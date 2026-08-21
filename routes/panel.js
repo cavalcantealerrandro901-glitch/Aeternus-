@@ -24,7 +24,6 @@ function register(app, client) {
         const { guildId, key, value } = req.body || {};
         if (!guildId || !key) return res.status(400).json({ error: 'Dados incompletos' });
 
-        // Prefixo: valida e usa o manager (padrão O.)
         if (key === 'prefix') {
             const prefix = setPrefix(guildId, value);
             return res.json({ success: true, settings: settings.getGuild(guildId), prefix });
@@ -48,30 +47,11 @@ function register(app, client) {
 
         await Promise.all([
             guild.channels.fetch().catch(() => {}),
-            guild.roles.fetch().catch(() => {})
+            guild.roles.fetch().catch(() => {}),
+            guild.fetch().catch(() => {})
         ]);
 
-        const categoriesMap = new Map();
-        categoriesMap.set('uncategorized', { id: null, name: 'Sem categoria', channels: [] });
-        guild.channels.cache
-            .filter((c) => c.type === ChannelType.GuildCategory)
-            .forEach((cat) => categoriesMap.set(cat.id, { id: cat.id, name: cat.name, channels: [] }));
-
-        const allChannels = [];
-        guild.channels.cache.forEach((ch) => {
-            if (ch.type === ChannelType.GuildCategory) return;
-            const info = {
-                id: ch.id,
-                name: ch.name,
-                type: ch.type,
-                typeLabel: ChannelType[ch.type] || 'Outro',
-                parentId: ch.parentId || null
-            };
-            allChannels.push(info);
-            const parent = ch.parentId || 'uncategorized';
-            if (categoriesMap.has(parent)) categoriesMap.get(parent).channels.push(info);
-            else categoriesMap.get('uncategorized').channels.push(info);
-        });
+        const joinedAt = guild.members.me?.joinedAt || guild.joinedAt || null;
 
         res.json({
             id: guild.id,
@@ -81,11 +61,13 @@ function register(app, client) {
             memberCount: guild.memberCount,
             roleCount: guild.roles.cache.size,
             channelCount: guild.channels.cache.size,
-            prefix: getPrefix(guild.id),
-            categories: [...categoriesMap.values()].filter((c) => c.channels.length),
-            allChannels
+            joinedAt: joinedAt
+                ? new Date(joinedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+                : '—',
+            prefix: getPrefix(guild.id)
         });
     });
 }
 
 module.exports = register;
+module.exports.register = register;

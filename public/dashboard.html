@@ -6,233 +6,182 @@
     <title>Aeternus - Painel do Servidor</title>
     <link id="dynamicFavicon" rel="icon" href="">
     <link rel="stylesheet" href="/theme.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
     <script src="/theme.js"></script>
-    <script src="/i18n.js"></script>
     <style>
-        body { background-color: var(--bg-color, #f8fafc); color: var(--text-color, #0f172a); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; touch-action: pan-y; }
-        
-        .top-bar { position: fixed; top: 20px; left: 20px; z-index: 1000; display: flex; gap: 10px; }
-        .top-btn { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); color: var(--text-color, #0f172a); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 6px; }
-        .top-btn:hover { border-color: #38bdf8; transform: translateY(-2px); }
-
-        .container { margin-top: 70px; width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 20px; position: relative; z-index: 10; }
-        .card { background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #cbd5e1); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; }
-        .bot-avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #38bdf8; object-fit: cover; }
-        
-        .grid-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .stat-box { background: var(--bg-color, #f1f5f9); border-radius: 10px; padding: 10px; text-align: center; }
-        .stat-value { font-size: 16px; font-weight: bold; color: #38bdf8; }
-        .stat-label { font-size: 11px; color: #64748b; margin-top: 2px; }
-
-        /* Menu Lateral (Esquerda) */
-        .drawer { position: fixed; top: 0; left: -320px; width: 300px; height: 100%; background: var(--card-bg, #ffffff); border-right: 1px solid var(--border-color, #cbd5e1); z-index: 2000; transition: 0.3s ease; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px; }
-        .drawer.active { left: 0; }
-        .drawer-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1500; display: none; }
-        .drawer-overlay.active { display: block; }
-
-        .search-box { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-color, #f8fafc); color: var(--text-color); box-sizing: border-box; font-size: 14px; }
-        .category-title { font-weight: bold; font-size: 12px; color: #94a3b8; text-transform: uppercase; margin-top: 15px; text-align: left; display: flex; align-items: center; gap: 5px; }
-        
-        .system-item { background: var(--bg-color, #f1f5f9); padding: 12px; border-radius: 10px; text-align: left; margin-top: 8px; border: 1px solid var(--border-color, #cbd5e1); cursor: pointer; transition: 0.2s; }
-        .system-item:hover { border-color: #38bdf8; background: var(--card-bg, #ffffff); }
-        
-        .prefix-input-group { display: flex; gap: 8px; margin-top: 10px; }
-        .prefix-input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color, #cbd5e1); text-align: center; font-weight: bold; font-size: 16px; background: var(--bg-color, #f8fafc); color: var(--text-color); }
-        .btn-save { background: #38bdf8; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+        body { background-color: var(--bg-color, #0f172a); color: var(--text-color, #f8fafc); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
+        .top-bar { position: fixed; top: 20px; left: 20px; right: 20px; z-index: 1000; display: flex; justify-content: space-between; }
+        .top-btn { background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155); color: var(--text-color); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; }
+        .content { margin-top: 80px; width: 100%; max-width: 520px; }
+        .card { background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+        .bot-avatar, #serverIcon, #guild-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; background: #0f172a; }
+        .grid-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+        .stat-box { background: #0f172a; border-radius: 12px; padding: 12px; text-align: center; }
+        .stat-value { font-size: 1.25rem; font-weight: 700; color: #38bdf8; }
+        .stat-label { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; margin-bottom: 8px; border-radius: 12px; border: 1px solid #334155; background: #1e293b; color: inherit; cursor: pointer; font-size: 14px; text-align: left; }
+        .menu-item:hover { border-color: #38bdf8; }
+        .system-view { display: none; }
+        .system-view.system-page { display: block; }
+        .prefix-input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #f8fafc; }
+        .btn-save { margin-top: 10px; background: #38bdf8; color: #0f172a; border: none; padding: 10px 16px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        h2, h3 { margin: 0 0 8px; }
+        .muted { color: #94a3b8; font-size: 13px; }
     </style>
 </head>
 <body>
-
     <div class="top-bar">
-        <button class="top-btn" onclick="toggleMenu()">☰ Menu</button>
-        <a href="/servers.html" class="top-btn">⬅️ Servidores</a>
+        <a class="top-btn" href="/servers">← Servidores</a>
+        <a class="top-btn" href="/">🏠 Início</a>
     </div>
 
-    <!-- Background escuro do Menu -->
-    <div id="overlay" class="drawer-overlay" onclick="toggleMenu()"></div>
-
-    <!-- Menu Lateral -->
-    <div id="drawer" class="drawer">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">⚙️ Sistemas</h3>
-            <button onclick="toggleMenu()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-color);">✕</button>
-        </div>
-
-        <input type="text" id="searchInput" class="search-box" placeholder="🔍 Pesquisar categoria ou sistema..." oninput="filterSystems()">
-
-        <div id="systemsContainer" style="overflow-y: auto;">
-            <!-- Categoria: Geral -->
-            <div class="category-block" data-category="geral">
-                <div class="category-title">📌 Geral</div>
-                
-                <div class="system-item" data-system="prefixo do bot" onclick="openSystem('prefixCard')">
-                    <label style="font-size: 13px; font-weight: bold; display: block; cursor: pointer;">✏️ Prefixo do Bot</label>
-                    <span style="font-size: 11px; color: #64748b;">Clique para alterar o prefixo dos comandos.</span>
+    <div class="content" id="main-container">
+        <!-- Home do servidor -->
+        <div id="guild-view" class="system-view home-only" style="display:block;">
+            <div class="card" style="text-align:center;">
+                <img id="guild-avatar" src="" alt="">
+                <h2 id="guild-name" style="margin-top:12px;">Carregando…</h2>
+                <p id="guild-id" class="muted">ID: …</p>
+                <div class="grid-stats">
+                    <div class="stat-box"><div id="guild-members" class="stat-value">—</div><div class="stat-label">👥 Membros</div></div>
+                    <div class="stat-box"><div id="guild-roles" class="stat-value">—</div><div class="stat-label">🛡️ Cargos</div></div>
+                    <div class="stat-box"><div id="guild-channels" class="stat-value">—</div><div class="stat-label">💬 Canais</div></div>
+                    <div class="stat-box"><div id="serverJoined" class="stat-value" style="font-size:13px;">—</div><div class="stat-label">📅 Bot entrou</div></div>
                 </div>
+                <p id="guild-desc" class="muted" style="margin-top:14px;"></p>
             </div>
-        </div>
-    </div>
 
-    <!-- Conteúdo Principal -->
-    <div class="container">
-        <!-- Card de Configuração do Prefixo -->
-        <div class="card" id="prefixCard" style="display: none; text-align: left;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 style="margin: 0; font-size: 16px;">✏️ Prefixo do Bot</h3>
-                <button onclick="closeSystem('prefixCard')" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #64748b;">✕</button>
-            </div>
-            <p style="font-size: 12px; color: #64748b; margin: 0 0 10px 0;">Defina o caractere que será utilizado para invocar os comandos no servidor.</p>
-            <div class="prefix-input-group">
-                <input type="text" id="prefixInput" class="prefix-input" maxlength="5" placeholder="Ex: !">
-                <button class="btn-save" onclick="savePrefix()">💾 Salvar</button>
-            </div>
-        </div>
-
-        <!-- Card do Bot -->
-        <div class="card">
-            <img id="botAvatar" src="" class="bot-avatar">
-            <h2 id="botName" style="margin: 5px 0 0 0;">Carregando...</h2>
-            <span id="botTag" style="font-size: 12px; color: #64748b;"></span>
-            <div class="grid-stats">
-                <div class="stat-box"><div id="botPing" class="stat-value">-- ms</div><div class="stat-label">📡 Ping</div></div>
-                <div class="stat-box"><div id="botUptime" class="stat-value">--</div><div class="stat-label">⏱️ Uptime</div></div>
-            </div>
-        </div>
-
-        <!-- Card do Servidor -->
-        <div class="card" id="serverCard">
-            <div style="display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 15px;">
-                <img id="serverIcon" src="" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
-                <div>
-                    <h3 id="serverName" style="margin: 0; font-size: 16px;">--</h3>
-                    <span id="serverId" style="font-size: 11px; color: #94a3b8; font-family: monospace;"></span>
+            <div class="card" id="serverCard">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <img id="serverIcon" src="" alt="">
+                    <div style="text-align:left;">
+                        <h3 id="serverName">—</h3>
+                        <span id="serverId" class="muted" style="font-family:monospace;font-size:12px;"></span>
+                    </div>
+                </div>
+                <div class="grid-stats">
+                    <div class="stat-box"><div id="serverMembers" class="stat-value">—</div><div class="stat-label">👥 Membros</div></div>
+                    <div class="stat-box"><div id="serverChannels" class="stat-value">—</div><div class="stat-label">💬 Canais</div></div>
+                    <div class="stat-box"><div id="serverRoles" class="stat-value">—</div><div class="stat-label">🛡️ Cargos</div></div>
+                    <div class="stat-box"><div id="botPing" class="stat-value">—</div><div class="stat-label">📡 Ping</div></div>
                 </div>
             </div>
 
-            <div class="grid-stats">
-                <div class="stat-box"><div id="serverMembers" class="stat-value">--</div><div class="stat-label">👥 Membros</div></div>
-                <div class="stat-box"><div id="serverChannels" class="stat-value">--</div><div class="stat-label">💬 Canais</div></div>
-                <div class="stat-box"><div id="serverRoles" class="stat-value">--</div><div class="stat-label">🛡️ Cargos</div></div>
-                <div class="stat-box"><div id="serverJoined" class="stat-value" style="font-size: 12px; padding-top: 3px;">--</div><div class="stat-label">📅 Bot Adicionado</div></div>
+            <div class="card" style="text-align:center;">
+                <img id="botAvatar" class="bot-avatar" src="" alt="">
+                <h3 id="botName">Bot</h3>
+                <span id="botTag" class="muted"></span>
+                <div class="grid-stats">
+                    <div class="stat-box"><div id="botUptime" class="stat-value" style="font-size:14px;">—</div><div class="stat-label">⏱️ Uptime</div></div>
+                </div>
             </div>
+
+            <div class="card">
+                <h3>⚙️ Sistemas</h3>
+                <button type="button" class="menu-item" onclick="openSystem('system-geral')"><span>🔧</span> Geral · Prefixo</button>
+                <button type="button" class="menu-item" onclick="openSystem('system-welcome')"><span>👋</span> Boas-vindas</button>
+                <button type="button" class="menu-item" onclick="openSystem('system-logs')"><span>📋</span> Logs</button>
+                <button type="button" class="menu-item" onclick="openSystem('system-music')"><span>🎵</span> Música · Fila</button>
+            </div>
+        </div>
+
+        <!-- Prefixo rápido -->
+        <div id="prefixCard" class="system-view card">
+            <button type="button" class="top-btn" onclick="showGuildView()" style="margin-bottom:12px;">← Voltar</button>
+            <h3>✏️ Prefixo do Bot</h3>
+            <input type="text" id="prefixInput" class="prefix-input" maxlength="10" placeholder="O.">
+            <button class="btn-save" type="button" onclick="savePrefix()">💾 Salvar prefixo</button>
         </div>
     </div>
 
-    <!-- Script do efeito de neve -->
-    <script src="/snow.js"></script>
-
+    <script src="/js/dashboard.js"></script>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const serverId = urlParams.get('server');
+        // Aceita ?guild= e ?server=
+        const serverId = urlParams.get('guild') || urlParams.get('server');
 
-        function toggleMenu() {
-            document.getElementById('drawer').classList.toggle('active');
-            document.getElementById('overlay').classList.toggle('active');
+        function safeText(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val ?? '—';
+        }
+        function safeSrc(id, val) {
+            const el = document.getElementById(id);
+            if (el && val) el.src = val;
         }
 
-        /* Detecção de gesto de deslizar (Swipe) */
-        let touchstartX = 0;
-        let touchendX = 0;
-
-        document.addEventListener('touchstart', e => {
-            touchstartX = e.changedTouches[0].screenX;
-        });
-
-        document.addEventListener('touchend', e => {
-            touchendX = e.changedTouches[0].screenX;
-            handleGesture();
-        });
-
-        function handleGesture() {
-            const drawer = document.getElementById('drawer');
-            const overlay = document.getElementById('overlay');
-            if (touchendX - touchstartX > 60) {
-                drawer.classList.add('active');
-                overlay.classList.add('active');
+        async function loadGuild() {
+            if (!serverId) {
+                safeText('guild-name', 'Nenhum servidor selecionado');
+                return;
             }
-            if (touchstartX - touchendX > 60) {
-                drawer.classList.remove('active');
-                overlay.classList.remove('active');
+
+            try {
+                const res = await fetch('/api/guild-details/' + encodeURIComponent(serverId), {
+                    credentials: 'same-origin'
+                });
+                const data = await res.json();
+
+                if (data.settings) {
+                    window.originalSettings = { ...data.settings };
+                }
+
+                if (data.bot) {
+                    safeSrc('botAvatar', data.bot.avatar);
+                    safeText('botName', data.bot.name || data.bot.username);
+                    safeText('botTag', data.bot.tag ? '@' + data.bot.tag : '');
+                    safeText('botPing', (data.bot.ping ?? '—') + ' ms');
+                    safeText('botUptime', data.bot.uptime || '—');
+                }
+
+                if (data.guild) {
+                    const g = data.guild;
+                    safeSrc('guild-avatar', g.icon);
+                    safeSrc('serverIcon', g.icon);
+                    safeText('guild-name', g.name);
+                    safeText('serverName', g.name);
+                    safeText('guild-id', 'ID: ' + g.id);
+                    safeText('serverId', 'ID: ' + g.id);
+                    safeText('guild-members', g.memberCount);
+                    safeText('serverMembers', g.memberCount);
+                    safeText('guild-channels', g.channelsCount);
+                    safeText('serverChannels', g.channelsCount);
+                    safeText('guild-roles', g.rolesCount);
+                    safeText('serverRoles', g.rolesCount);
+                    safeText('serverJoined', g.joinedAt || '—');
+                    safeText('guild-desc', g.description || '');
+                    const pi = document.getElementById('prefixInput');
+                    if (pi) pi.value = g.prefix || 'O.';
+                } else {
+                    safeText('guild-name', 'Bot não está neste servidor');
+                    const card = document.getElementById('serverCard');
+                    if (card) card.innerHTML = '<p style="color:#ef4444">❌ O bot não está instalado neste servidor.</p>';
+                }
+            } catch (e) {
+                console.error(e);
+                safeText('guild-name', 'Erro ao carregar');
             }
         }
 
-        function openSystem(cardId) {
-            document.getElementById('drawer').classList.remove('active');
-            document.getElementById('overlay').classList.remove('active');
-            const card = document.getElementById(cardId);
-            card.style.display = 'block';
-            card.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function closeSystem(cardId) {
-            document.getElementById(cardId).style.display = 'none';
-        }
-
-        function filterSystems() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const categories = document.querySelectorAll('.category-block');
-
-            categories.forEach(cat => {
-                const catName = cat.getAttribute('data-category');
-                const systems = cat.querySelectorAll('.system-item');
-                let catMatch = catName.includes(query);
-                let hasVisibleSystem = false;
-
-                systems.forEach(sys => {
-                    const sysName = sys.getAttribute('data-system');
-                    if (catMatch || sysName.includes(query)) {
-                        sys.style.display = 'block';
-                        hasVisibleSystem = true;
-                    } else {
-                        sys.style.display = 'none';
-                    }
-                });
-
-                cat.style.display = hasVisibleSystem ? 'block' : 'none';
-            });
-        }
-
-        if (serverId) {
-            fetch(`/api/guild-details/${serverId}`)
-                .then(r => r.json())
-                .then(data => {
-                    document.getElementById('botAvatar').src = data.bot.avatar;
-                    document.getElementById('botName').innerText = data.bot.name;
-                    document.getElementById('botTag').innerText = `@${data.bot.tag}`;
-                    document.getElementById('botPing').innerText = `${data.bot.ping} ms`;
-                    document.getElementById('botUptime').innerText = data.bot.uptime;
-
-                    if (data.guild) {
-                        document.getElementById('serverIcon').src = data.guild.icon;
-                        document.getElementById('serverName').innerText = data.guild.name;
-                        document.getElementById('serverId').innerText = `ID: ${data.guild.id}`;
-                        document.getElementById('serverMembers').innerText = data.guild.memberCount;
-                        document.getElementById('serverChannels').innerText = data.guild.channelsCount;
-                        document.getElementById('serverRoles').innerText = data.guild.rolesCount;
-                        document.getElementById('serverJoined').innerText = data.guild.joinedAt;
-                        document.getElementById('prefixInput').value = data.guild.prefix;
-                    } else {
-                        document.getElementById('serverCard').innerHTML = '<p style="color: #ef4444;">❌ O bot não está instalado neste servidor.</p>';
-                    }
-                });
-        }
-
-        function savePrefix() {
+        async function savePrefix() {
             const newPrefix = document.getElementById('prefixInput').value;
-            fetch(`/api/guild-prefix/${serverId}`, {
+            const res = await fetch('/api/set-setting', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prefix: newPrefix })
-            })
-            .then(r => r.json())
-            .then(res => {
-                if (res.success) {
-                    alert(`✅ Prefixo alterado para: ${res.prefix}`);
-                } else {
-                    alert(res.error || '❌ Erro ao alterar prefixo.');
-                }
+                credentials: 'same-origin',
+                body: JSON.stringify({ guildId: serverId, key: 'prefix', value: newPrefix })
             });
+            const data = await res.json();
+            if (data.success) alert('✅ Prefixo salvo: ' + (data.prefix || newPrefix));
+            else alert(data.error || 'Erro ao salvar');
         }
+
+        // Carrega partials dos sistemas e depois os dados
+        (async () => {
+            if (typeof loadSystemPartials === 'function') {
+                await loadSystemPartials();
+            }
+            await loadGuild();
+        })();
     </script>
 </body>
 </html>
