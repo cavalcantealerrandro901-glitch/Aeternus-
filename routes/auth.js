@@ -1,7 +1,3 @@
-/**
- * Login Discord OAuth2 (sessão)
- * Montado automaticamente por web/server.js
- */
 function register(app) {
     const CLIENT_ID = process.env.CLIENT_ID;
     const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -13,7 +9,7 @@ function register(app) {
 
     app.get('/auth/discord', (req, res) => {
         if (!CLIENT_ID) {
-            return res.status(500).send('Defina CLIENT_ID no Render.');
+            return res.status(500).send('CLIENT_ID não configurado');
         }
         const params = new URLSearchParams({
             client_id: CLIENT_ID,
@@ -26,23 +22,27 @@ function register(app) {
 
     app.get('/auth/discord/callback', async (req, res) => {
         const code = req.query.code;
-        if (!code) return res.redirect('/?error=no_code');
-        if (!CLIENT_ID || !CLIENT_SECRET) return res.redirect('/?error=oauth_env');
+        if (!code) return res.redirect('/');
 
         try {
+            const body = new URLSearchParams({
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: String(code),
+                redirect_uri: REDIRECT_URI
+            });
+
             const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    client_id: CLIENT_ID,
-                    client_secret: CLIENT_SECRET,
-                    grant_type: 'authorization_code',
-                    code: String(code),
-                    redirect_uri: REDIRECT_URI
-                })
+                body
             });
             const tokenData = await tokenRes.json();
-            if (!tokenData.access_token) return res.redirect('/?error=token');
+            if (!tokenData.access_token) {
+                console.error('OAuth token error', tokenData);
+                return res.status(400).send('Falha no login Discord');
+            }
 
             const userRes = await fetch('https://discord.com/api/users/@me', {
                 headers: { Authorization: `Bearer ${tokenData.access_token}` }
@@ -50,36 +50,40 @@ function register(app) {
             const user = await userRes.json();
 
             req.session.accessToken = tokenData.access_token;
+            req.session.refreshToken = tokenData.refresh_token;
             req.session.isAuthenticated = true;
             req.session.user = {
                 id: user.id,
                 username: user.username,
-                globalName: user.global_name || user.username,
+                global_name: user.global_name,
                 avatar: user.avatar
                     ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
                     : null
             };
 
-            req.session.save(() => res.redirect('/servers.html'));
+            req.session.save(() => res.redirect('/servers'));
         } catch (e) {
-            console.error('OAuth:', e);
-            res.redirect('/?error=server');
+            console.error('OAuth callback', e);
+            res.status(500).send('Erro no login');
         }
     });
 
     app.get('/auth/logout', (req, res) => {
-        req.session.destroy(() => {
-            res.clearCookie('aeternus.sid');
-            res.redirect('/');
-        });
+        req.session.destroy(() => res.redirect('/'));
     });
 
     app.get('/auth/me', (req, res) => {
         if (!req.session?.isAuthenticated) {
-            return res.status(401).json({ authenticated: false });
+            return res.json({ authenticated: false });
         }
         res.json({ authenticated: true, user: req.session.user });
+    });
+
+    // alias estático /servers -> servers.html
+    app.get('/servers', (req, res) => {
+        res.redirect('/servers.html');
     });
 }
 
 module.exports = register;
+module.exports.register = register;

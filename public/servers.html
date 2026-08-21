@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aeternus - Servidores</title>
-    <link id="dynamicFavicon" rel="icon" href="">
     <link rel="stylesheet" href="/theme.css">
     <script src="/theme.js"></script>
     <style>
@@ -16,7 +15,7 @@
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh; box-sizing: border-box;
         }
-        .top-bar { position: fixed; top: 20px; right: 20px; z-index: 1000; }
+        .top-bar { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; gap: 8px; }
         .top-btn {
             background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
             color: var(--text-color); padding: 8px 16px; border-radius: 20px;
@@ -31,8 +30,7 @@
             border: 1px solid var(--border-color, #334155);
             padding: 14px 16px; border-radius: 16px;
             display: flex; align-items: center; justify-content: space-between;
-            text-decoration: none; color: inherit;
-            transition: 0.2s;
+            text-decoration: none; color: inherit; transition: 0.2s;
         }
         .server-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
         .server-info { display: flex; align-items: center; gap: 14px; overflow: hidden; }
@@ -51,70 +49,107 @@
         .server-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .server-meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
         .go { color: #38bdf8; font-weight: bold; font-size: 18px; }
+        .err { color: #f87171; text-align: center; padding: 16px; }
     </style>
 </head>
 <body>
     <div class="top-bar">
         <a class="top-btn" href="/">🏠 Início</a>
+        <a class="top-btn" href="/auth/logout">🚪 Sair</a>
     </div>
     <div class="content-wrapper">
         <h1>🛡️ Seus servidores</h1>
-        <p class="sub">Escolha um servidor em que você é administrador e o bot está presente.</p>
+        <p class="sub">Servidores em que você é admin <strong>e</strong> o bot está presente.</p>
         <div id="serversList" class="servers-container">Carregando…</div>
     </div>
     <script>
+        function esc(s) {
+            return String(s || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/"/g, '&quot;');
+        }
+
         function guildIconUrl(s) {
+            if (s.iconUrl) return s.iconUrl;
             if (!s.icon) return null;
+            // se já veio URL completa
+            if (String(s.icon).startsWith('http')) return s.icon;
             const ext = String(s.icon).startsWith('a_') ? 'gif' : 'png';
             return `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.${ext}?size=128`;
         }
 
         function letterFallback(name) {
             const ch = (name || '?').trim().charAt(0).toUpperCase() || '?';
-            return `<div class="server-icon-fallback">${ch}</div>`;
+            return `<div class="server-icon-fallback">${esc(ch)}</div>`;
         }
 
         async function load() {
             const list = document.getElementById('serversList');
             try {
-                const me = await fetch('/auth/me').then(r => r.json());
+                const meRes = await fetch('/auth/me', { credentials: 'same-origin' });
+                const me = await meRes.json();
                 if (!me.authenticated) {
                     location.href = '/auth/discord';
                     return;
                 }
-                const res = await fetch('/api/servers');
-                const servers = await res.json();
-                if (!Array.isArray(servers) || !servers.length) {
-                    list.innerHTML = '<div style="color:#94a3b8;text-align:center">Nenhum servidor encontrado.</div>';
+
+                // tenta vários endpoints (compatibilidade)
+                let servers = [];
+                for (const url of ['/api/servers', '/api/user/servers']) {
+                    const res = await fetch(url, { credentials: 'same-origin' });
+                    if (res.status === 401) {
+                        location.href = '/auth/discord';
+                        return;
+                    }
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        servers = data;
+                        break;
+                    }
+                    if (Array.isArray(data.servers)) {
+                        servers = data.servers;
+                        break;
+                    }
+                    if (Array.isArray(data.list)) {
+                        servers = data.list;
+                        break;
+                    }
+                }
+
+                if (!servers.length) {
+                    list.innerHTML =
+                        '<div class="err">Nenhum servidor encontrado.<br><br>' +
+                        'Confira se você é <b>administrador</b> e se o <b>bot está no servidor</b>.<br>' +
+                        'Escopo OAuth precisa incluir <code>guilds</code>.</div>';
                     return;
                 }
-                list.innerHTML = servers.map(s => {
-                    const url = guildIconUrl(s);
-                    const iconHtml = url
-                        ? `<img class="server-icon" src="${url}" alt="" onerror="this.parentNode.innerHTML=letterFallback(this.dataset.name)" data-name="${(s.name || '').replace(/"/g, '')}">`
-                        : letterFallback(s.name);
-                    return `
-                    <a class="server-card" href="/dashboard?guild=${s.id}">
+
+                list.innerHTML = servers
+                    .map((s) => {
+                        const url = guildIconUrl(s);
+                        const iconHtml = url
+                            ? `<img class="server-icon" src="${esc(url)}" alt="" data-name="${esc(s.name)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'server-icon-fallback',textContent:(this.dataset.name||'?').charAt(0).toUpperCase()}))">`
+                            : letterFallback(s.name);
+                        return `
+                    <a class="server-card" href="/dashboard?guild=${encodeURIComponent(s.id)}">
                         <div class="server-info">
                             <div class="server-icon-wrap">${iconHtml}</div>
                             <div class="server-details">
-                                <div class="server-name">${s.name || 'Servidor'}</div>
-                                <div class="server-meta">ID ${s.id}</div>
+                                <div class="server-name">${esc(s.name || 'Servidor')}</div>
+                                <div class="server-meta">ID ${esc(s.id)}${s.owner ? ' · Dono' : ''}</div>
                             </div>
                         </div>
                         <span class="go">→</span>
                     </a>`;
-                }).join('');
+                    })
+                    .join('');
             } catch (e) {
-                list.innerHTML = '<div style="color:#ef4444">Erro ao carregar servidores.</div>';
+                console.error(e);
+                list.innerHTML = '<div class="err">Erro ao carregar servidores. Tente de novo.</div>';
             }
         }
-
-        // helper used by onerror (global)
-        window.letterFallback = function (name) {
-            const ch = (name || '?').trim().charAt(0).toUpperCase() || '?';
-            return `<div class="server-icon-fallback">${ch}</div>`;
-        };
 
         load();
     </script>
