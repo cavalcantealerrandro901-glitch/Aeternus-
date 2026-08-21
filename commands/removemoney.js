@@ -1,58 +1,72 @@
-const fs = require('fs');
-const path = require('path');
-const dbFile = path.join(__dirname, '..', 'database.json');
-
-function parseAmount(str) {
-    if (!str) return null;
-    str = str.trim().toLowerCase().replace(',', '.');
-    let multiplier = 1;
-    if (str.endsWith('k')) { multiplier = 1000; str = str.slice(0, -1); }
-    else if (str.endsWith('m')) { multiplier = 1000000; str = str.slice(0, -1); }
-    else if (str.endsWith('b')) { multiplier = 1000000000; str = str.slice(0, -1); }
-    const num = parseFloat(str);
-    if (isNaN(num)) return null;
-    return Math.floor(num * multiplier);
-}
-
-function formatNumber(num) {
-    return num.toLocaleString('en-US');
-}
-
-function removeBalance(userId, amount) {
-    try {
-        let data = {};
-        if (fs.existsSync(dbFile)) {
-            data = JSON.parse(fs.readFileSync(dbFile, 'utf8'));
-        }
-        if (!data[`user_${userId}`]) data[`user_${userId}`] = { balance: 0 };
-        
-        data[`user_${userId}`].balance = Math.max(0, data[`user_${userId}`].balance - amount);
-        
-        fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
-        return data[`user_${userId}`].balance;
-    } catch (e) { return null; }
-}
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
+const flocos = require('../utils/flocos');
+const { getPanelBase } = require('../utils/panelUrl');
 
 module.exports = {
     name: 'removemoney',
-    description: 'Remove cristais de um usuário.',
+    aliases: ['remflocos', 'takeflocos', 'removebal'],
+    description: 'Remove ❄️ flocos de um usuário (economia + painel)',
     async execute(message, args) {
-        if (!message.member.permissions.has('Administrator')) {
-            return message.reply({ content: '❌ Apenas administradores podem fazer isso.' });
+        if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+            return message.reply('❌ Apenas **administradores** podem usar este comando.');
         }
 
-        const targetUser = message.mentions.users.first();
-        const rawAmount = args[1];
+        const target =
+            message.mentions.users.first() ||
+            (args[0] && !/[^0-9]/.test(args[0])
+                ? await message.client.users.fetch(args[0]).catch(() => null)
+                : null);
 
-        if (!targetUser || !rawAmount) {
-            return message.reply({ content: '⚠️ Uso: `!removemoney @usuario 500`' });
+        let rawAmount = args[1] || args[0];
+        if (message.mentions.users.first()) {
+            rawAmount = args.find((a) => !a.startsWith('<@')) || args[1];
+        } else if (target && args[0] === target.id) {
+            rawAmount = args[1];
         }
 
-        const amount = parseAmount(rawAmount);
-        const newBalance = removeBalance(targetUser.id, amount);
+        if (!target || !rawAmount) {
+            return message.reply(
+                '⚠️ Uso: `O.removemoney @usuário <valor>`\n' +
+                    'Exemplos: `O.removemoney @user 5k` · `O.removemoney @user 500`'
+            );
+        }
 
-        await message.reply({
-            content: `❄️ Removido **${formatNumber(amount)} cristais** de **${targetUser.username}**. Novo saldo: **${formatNumber(newBalance)} cristais**.`
-        });
+        const amount = flocos.parseBet(rawAmount, Number.MAX_SAFE_INTEGER);
+        if (amount == null || amount <= 0) {
+            return message.reply('❌ Valor inválido. Use `100`, `1,5k`, `2.5m`, etc.');
+        }
+
+        const before = flocos.get(target.id);
+        const after = flocos.add(target.id, -amount); // addBal já usa Math.max(0, ...)
+
+        const panel = getPanelBase();
+
+        const embed = new EmbedBuilder()
+            .setColor(0xef4444)
+            .setTitle('❄️ Flocos removidos')
+            .setThumbnail(target.displayAvatarURL({ size: 128 }))
+            .setDescription(`Administrador **${message.author.username}** debitou flocos da economia.`)
+            .addFields(
+                { name: '👤 Usuário', value: `${target}`, inline: true },
+                { name: '➖ Valor', value: flocos.format(amount), inline: true },
+                { name: '📊 Antes', value: flocos.formatPlain(before), inline: true },
+                { name: '🏦 Saldo atual', value: flocos.format(after), inline: true },
+                {
+                    name: '🌐 Painel',
+                    value: `[Abrir painel](${panel}) · \`O.atm\` / \`O.bal\``
+                }
+            )
+            .setFooter({ text: 'Economia unificada · data/economy.json' })
+            .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Painel')
+                .setStyle(ButtonStyle.Link)
+                .setURL(panel)
+                .setEmoji('⚙️')
+        );
+
+        await message.reply({ embeds: [embed], components: [row] });
     }
 };
