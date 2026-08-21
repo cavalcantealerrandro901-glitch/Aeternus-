@@ -53,6 +53,19 @@ function register(app, client) {
 
         const joinedAt = guild.members.me?.joinedAt || guild.joinedAt || null;
 
+        const allChannels = [];
+        guild.channels.cache.forEach((ch) => {
+            if (ch.type === ChannelType.GuildCategory) return;
+            allChannels.push({
+                id: ch.id,
+                name: ch.name,
+                type: ch.type,
+                typeLabel: ChannelType[ch.type] || 'Outro',
+                parentId: ch.parentId || null
+            });
+        });
+        allChannels.sort((a, b) => a.name.localeCompare(b.name));
+
         res.json({
             id: guild.id,
             name: guild.name,
@@ -64,7 +77,8 @@ function register(app, client) {
             joinedAt: joinedAt
                 ? new Date(joinedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
                 : '—',
-            prefix: getPrefix(guild.id)
+            prefix: getPrefix(guild.id),
+            allChannels
         });
     });
 }

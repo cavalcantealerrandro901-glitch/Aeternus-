@@ -1,157 +1,85 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeternus - Servidores</title>
-    <link rel="stylesheet" href="/theme.css">
-    <script src="/theme.js"></script>
-    <style>
-        body {
-            background: var(--bg-color, #0f172a);
-            color: var(--text-color, #f8fafc);
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            margin: 0; padding: 20px;
-            display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; box-sizing: border-box;
-        }
-        .top-bar { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; gap: 8px; }
-        .top-btn {
-            background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155);
-            color: var(--text-color); padding: 8px 16px; border-radius: 20px;
-            text-decoration: none; font-size: 14px; font-weight: bold;
-        }
-        .content-wrapper { margin-top: 80px; width: 100%; max-width: 480px; }
-        h1 { font-size: 1.6rem; margin: 0 0 8px; color: #38bdf8; text-align: center; }
-        .sub { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 22px; }
-        .servers-container { display: flex; flex-direction: column; gap: 12px; max-height: 65vh; overflow-y: auto; }
-        .server-card {
-            background: var(--card-bg, #1e293b);
-            border: 1px solid var(--border-color, #334155);
-            padding: 14px 16px; border-radius: 16px;
-            display: flex; align-items: center; justify-content: space-between;
-            text-decoration: none; color: inherit; transition: 0.2s;
-        }
-        .server-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
-        .server-info { display: flex; align-items: center; gap: 14px; overflow: hidden; }
-        .server-icon-wrap {
-            width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
-            overflow: hidden; background: #0f172a;
-            border: 2px solid #334155;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .server-icon { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .server-icon-fallback {
-            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-            font-size: 22px; font-weight: 800; color: #38bdf8; background: #0f172a;
-        }
-        .server-details { text-align: left; overflow: hidden; }
-        .server-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .server-meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-        .go { color: #38bdf8; font-weight: bold; font-size: 18px; }
-        .err { color: #f87171; text-align: center; padding: 16px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Servidores · Aeternus</title>
+  <link rel="stylesheet" href="/css/panel.css">
 </head>
-<body>
-    <div class="top-bar">
-        <a class="top-btn" href="/">🏠 Início</a>
-        <a class="top-btn" href="/auth/logout">🚪 Sair</a>
+<body class="panel-body">
+  <header class="panel-top">
+    <div class="panel-brand">AETERNUS</div>
+    <div class="panel-actions">
+      <a class="btn" href="/">🏠 Início</a>
+      <a class="btn" href="/auth/logout">🚪 Sair</a>
     </div>
-    <div class="content-wrapper">
-        <h1>🛡️ Seus servidores</h1>
-        <p class="sub">Servidores em que você é admin <strong>e</strong> o bot está presente.</p>
-        <div id="serversList" class="servers-container">Carregando…</div>
+  </header>
+
+  <main class="panel-wrap">
+    <div class="card" style="text-align:center;margin-bottom:18px;">
+      <h1 style="margin:0 0 6px;font-size:1.5rem;">🛡️ Seus servidores</h1>
+      <p class="muted" style="margin:0;color:var(--muted);font-size:14px;">
+        Apenas servidores em que você é <b>administrador</b> e o bot está presente.
+      </p>
     </div>
-    <script>
-        function esc(s) {
-            return String(s || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/"/g, '&quot;');
+    <div id="list" class="server-list">Carregando…</div>
+    <p class="footer-note">Aeternus Panel</p>
+  </main>
+
+  <script>
+    function esc(s) {
+      return String(s || '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    }
+    function iconUrl(s) {
+      if (s.iconUrl) return s.iconUrl;
+      if (!s.icon) return null;
+      if (String(s.icon).startsWith('http')) return s.icon;
+      const ext = String(s.icon).startsWith('a_') ? 'gif' : 'png';
+      return `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.${ext}?size=128`;
+    }
+    async function load() {
+      const box = document.getElementById('list');
+      try {
+        const me = await fetch('/auth/me', { credentials: 'same-origin' }).then(r => r.json());
+        if (!me.authenticated) return location.href = '/auth/discord';
+
+        let servers = [];
+        for (const url of ['/api/servers', '/api/user/servers']) {
+          const res = await fetch(url, { credentials: 'same-origin' });
+          if (res.status === 401) return location.href = '/auth/discord';
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (Array.isArray(data)) { servers = data; break; }
+          if (Array.isArray(data.servers)) { servers = data.servers; break; }
         }
 
-        function guildIconUrl(s) {
-            if (s.iconUrl) return s.iconUrl;
-            if (!s.icon) return null;
-            // se já veio URL completa
-            if (String(s.icon).startsWith('http')) return s.icon;
-            const ext = String(s.icon).startsWith('a_') ? 'gif' : 'png';
-            return `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.${ext}?size=128`;
+        if (!servers.length) {
+          box.innerHTML = `<div class="empty">Nenhum servidor encontrado.<br><br>
+            Confira se você é admin e se o bot está no servidor.</div>`;
+          return;
         }
 
-        function letterFallback(name) {
-            const ch = (name || '?').trim().charAt(0).toUpperCase() || '?';
-            return `<div class="server-icon-fallback">${esc(ch)}</div>`;
-        }
-
-        async function load() {
-            const list = document.getElementById('serversList');
-            try {
-                const meRes = await fetch('/auth/me', { credentials: 'same-origin' });
-                const me = await meRes.json();
-                if (!me.authenticated) {
-                    location.href = '/auth/discord';
-                    return;
-                }
-
-                // tenta vários endpoints (compatibilidade)
-                let servers = [];
-                for (const url of ['/api/servers', '/api/user/servers']) {
-                    const res = await fetch(url, { credentials: 'same-origin' });
-                    if (res.status === 401) {
-                        location.href = '/auth/discord';
-                        return;
-                    }
-                    if (!res.ok) continue;
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        servers = data;
-                        break;
-                    }
-                    if (Array.isArray(data.servers)) {
-                        servers = data.servers;
-                        break;
-                    }
-                    if (Array.isArray(data.list)) {
-                        servers = data.list;
-                        break;
-                    }
-                }
-
-                if (!servers.length) {
-                    list.innerHTML =
-                        '<div class="err">Nenhum servidor encontrado.<br><br>' +
-                        'Confira se você é <b>administrador</b> e se o <b>bot está no servidor</b>.<br>' +
-                        'Escopo OAuth precisa incluir <code>guilds</code>.</div>';
-                    return;
-                }
-
-                list.innerHTML = servers
-                    .map((s) => {
-                        const url = guildIconUrl(s);
-                        const iconHtml = url
-                            ? `<img class="server-icon" src="${esc(url)}" alt="" data-name="${esc(s.name)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'server-icon-fallback',textContent:(this.dataset.name||'?').charAt(0).toUpperCase()}))">`
-                            : letterFallback(s.name);
-                        return `
-                    <a class="server-card" href="/dashboard?guild=${encodeURIComponent(s.id)}">
-                        <div class="server-info">
-                            <div class="server-icon-wrap">${iconHtml}</div>
-                            <div class="server-details">
-                                <div class="server-name">${esc(s.name || 'Servidor')}</div>
-                                <div class="server-meta">ID ${esc(s.id)}${s.owner ? ' · Dono' : ''}</div>
-                            </div>
-                        </div>
-                        <span class="go">→</span>
-                    </a>`;
-                    })
-                    .join('');
-            } catch (e) {
-                console.error(e);
-                list.innerHTML = '<div class="err">Erro ao carregar servidores. Tente de novo.</div>';
-            }
-        }
-
-        load();
-    </script>
+        box.innerHTML = servers.map(s => {
+          const url = iconUrl(s);
+          const icon = url
+            ? `<img class="server-icon" src="${esc(url)}" alt="" onerror="this.className='server-icon fallback';this.removeAttribute('src');this.textContent='${esc((s.name||'?')[0]||'?')}'">`
+            : `<div class="server-icon fallback">${esc((s.name||'?')[0]||'?')}</div>`;
+          return `<a class="server-item" href="/dashboard?guild=${encodeURIComponent(s.id)}">
+            <div class="server-left">${icon}
+              <div style="min-width:0">
+                <div class="server-name">${esc(s.name||'Servidor')}</div>
+                <div class="server-id">${esc(s.id)}${s.owner?' · Dono':''}</div>
+              </div>
+            </div>
+            <span style="color:var(--accent);font-weight:700">→</span>
+          </a>`;
+        }).join('');
+      } catch (e) {
+        box.innerHTML = `<div class="empty">Erro ao carregar. Tente novamente.</div>`;
+      }
+    }
+    load();
+  </script>
 </body>
 </html>

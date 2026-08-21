@@ -1,187 +1,203 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeternus - Painel do Servidor</title>
-    <link id="dynamicFavicon" rel="icon" href="">
-    <link rel="stylesheet" href="/theme.css">
-    <link rel="stylesheet" href="/css/dashboard.css">
-    <script src="/theme.js"></script>
-    <style>
-        body { background-color: var(--bg-color, #0f172a); color: var(--text-color, #f8fafc); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
-        .top-bar { position: fixed; top: 20px; left: 20px; right: 20px; z-index: 1000; display: flex; justify-content: space-between; }
-        .top-btn { background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155); color: var(--text-color); padding: 8px 16px; border-radius: 20px; cursor: pointer; text-decoration: none; font-size: 14px; font-weight: bold; }
-        .content { margin-top: 80px; width: 100%; max-width: 520px; }
-        .card { background: var(--card-bg, #1e293b); border: 1px solid var(--border-color, #334155); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
-        .bot-avatar, #serverIcon, #guild-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; background: #0f172a; }
-        .grid-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-        .stat-box { background: #0f172a; border-radius: 12px; padding: 12px; text-align: center; }
-        .stat-value { font-size: 1.25rem; font-weight: 700; color: #38bdf8; }
-        .stat-label { font-size: 12px; color: #94a3b8; margin-top: 4px; }
-        .menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; margin-bottom: 8px; border-radius: 12px; border: 1px solid #334155; background: #1e293b; color: inherit; cursor: pointer; font-size: 14px; text-align: left; }
-        .menu-item:hover { border-color: #38bdf8; }
-        .system-view { display: none; }
-        .system-view.system-page { display: block; }
-        .prefix-input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #f8fafc; }
-        .btn-save { margin-top: 10px; background: #38bdf8; color: #0f172a; border: none; padding: 10px 16px; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        h2, h3 { margin: 0 0 8px; }
-        .muted { color: #94a3b8; font-size: 13px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel · Aeternus</title>
+  <link rel="stylesheet" href="/css/panel.css">
 </head>
-<body>
-    <div class="top-bar">
-        <a class="top-btn" href="/servers">← Servidores</a>
-        <a class="top-btn" href="/">🏠 Início</a>
+<body class="panel-body">
+  <header class="panel-top">
+    <div class="panel-brand">AETERNUS</div>
+    <div class="panel-actions">
+      <a class="btn" href="/servers">🛡️ Servidores</a>
+      <a class="btn" href="/">🏠 Início</a>
     </div>
+  </header>
 
-    <div class="content" id="main-container">
-        <!-- Home do servidor -->
-        <div id="guild-view" class="system-view home-only" style="display:block;">
-            <div class="card" style="text-align:center;">
-                <img id="guild-avatar" src="" alt="">
-                <h2 id="guild-name" style="margin-top:12px;">Carregando…</h2>
-                <p id="guild-id" class="muted">ID: …</p>
-                <div class="grid-stats">
-                    <div class="stat-box"><div id="guild-members" class="stat-value">—</div><div class="stat-label">👥 Membros</div></div>
-                    <div class="stat-box"><div id="guild-roles" class="stat-value">—</div><div class="stat-label">🛡️ Cargos</div></div>
-                    <div class="stat-box"><div id="guild-channels" class="stat-value">—</div><div class="stat-label">💬 Canais</div></div>
-                    <div class="stat-box"><div id="serverJoined" class="stat-value" style="font-size:13px;">—</div><div class="stat-label">📅 Bot entrou</div></div>
-                </div>
-                <p id="guild-desc" class="muted" style="margin-top:14px;"></p>
-            </div>
-
-            <div class="card" id="serverCard">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <img id="serverIcon" src="" alt="">
-                    <div style="text-align:left;">
-                        <h3 id="serverName">—</h3>
-                        <span id="serverId" class="muted" style="font-family:monospace;font-size:12px;"></span>
-                    </div>
-                </div>
-                <div class="grid-stats">
-                    <div class="stat-box"><div id="serverMembers" class="stat-value">—</div><div class="stat-label">👥 Membros</div></div>
-                    <div class="stat-box"><div id="serverChannels" class="stat-value">—</div><div class="stat-label">💬 Canais</div></div>
-                    <div class="stat-box"><div id="serverRoles" class="stat-value">—</div><div class="stat-label">🛡️ Cargos</div></div>
-                    <div class="stat-box"><div id="botPing" class="stat-value">—</div><div class="stat-label">📡 Ping</div></div>
-                </div>
-            </div>
-
-            <div class="card" style="text-align:center;">
-                <img id="botAvatar" class="bot-avatar" src="" alt="">
-                <h3 id="botName">Bot</h3>
-                <span id="botTag" class="muted"></span>
-                <div class="grid-stats">
-                    <div class="stat-box"><div id="botUptime" class="stat-value" style="font-size:14px;">—</div><div class="stat-label">⏱️ Uptime</div></div>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3>⚙️ Sistemas</h3>
-                <button type="button" class="menu-item" onclick="openSystem('system-geral')"><span>🔧</span> Geral · Prefixo</button>
-                <button type="button" class="menu-item" onclick="openSystem('system-welcome')"><span>👋</span> Boas-vindas</button>
-                <button type="button" class="menu-item" onclick="openSystem('system-logs')"><span>📋</span> Logs</button>
-                <button type="button" class="menu-item" onclick="openSystem('system-music')"><span>🎵</span> Música · Fila</button>
-            </div>
+  <main class="panel-wrap">
+    <!-- HOME -->
+    <section id="view-home" class="view active">
+      <div class="hero-card">
+        <img id="gIcon" src="" alt="">
+        <div class="hero-meta">
+          <h1 id="gName">Carregando…</h1>
+          <p id="gId">ID: —</p>
         </div>
+      </div>
 
-        <!-- Prefixo rápido -->
-        <div id="prefixCard" class="system-view card">
-            <button type="button" class="top-btn" onclick="showGuildView()" style="margin-bottom:12px;">← Voltar</button>
-            <h3>✏️ Prefixo do Bot</h3>
-            <input type="text" id="prefixInput" class="prefix-input" maxlength="10" placeholder="O.">
-            <button class="btn-save" type="button" onclick="savePrefix()">💾 Salvar prefixo</button>
+      <div class="stats">
+        <div class="stat"><b id="gMembers">—</b><span>👥 Membros</span></div>
+        <div class="stat"><b id="gRoles">—</b><span>🛡️ Cargos</span></div>
+        <div class="stat"><b id="gChannels">—</b><span>💬 Canais</span></div>
+        <div class="stat"><b id="gJoined" style="font-size:.85rem">—</b><span>📅 Bot entrou</span></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div style="display:flex;gap:12px;align-items:center">
+          <img id="botAvatar" src="" alt="" style="width:48px;height:48px;border-radius:50%;border:2px solid var(--accent)">
+          <div>
+            <div style="font-weight:700" id="botName">Bot</div>
+            <div style="font-size:12px;color:var(--muted)" id="botMeta">—</div>
+          </div>
         </div>
-    </div>
+      </div>
 
-    <script src="/js/dashboard.js"></script>
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        // Aceita ?guild= e ?server=
-        const serverId = urlParams.get('guild') || urlParams.get('server');
+      <div class="section-title">Configurar sistemas</div>
+      <div class="sys-grid">
+        <button type="button" class="sys-btn" data-open="geral">
+          <span class="ico">🔧</span>
+          <span><span>Geral</span><span class="sub">Prefixo e ajustes básicos</span></span>
+        </button>
+        <button type="button" class="sys-btn" data-open="welcome">
+          <span class="ico">👋</span>
+          <span><span>Boas-vindas</span><span class="sub">Mensagem automática de entrada</span></span>
+        </button>
+        <button type="button" class="sys-btn" data-open="logs">
+          <span class="ico">📋</span>
+          <span><span>Logs</span><span class="sub">Auditoria de mensagens e moderação</span></span>
+        </button>
+        <button type="button" class="sys-btn" data-open="music">
+          <span class="ico">🎵</span>
+          <span><span>Música</span><span class="sub">Canal de voz e fila</span></span>
+        </button>
+      </div>
+    </section>
 
-        function safeText(id, val) {
-            const el = document.getElementById(id);
-            if (el) el.textContent = val ?? '—';
-        }
-        function safeSrc(id, val) {
-            const el = document.getElementById(id);
-            if (el && val) el.src = val;
-        }
+    <!-- GERAL -->
+    <section id="view-geral" class="view">
+      <div class="page-head">
+        <button type="button" class="btn" data-back>← Voltar</button>
+        <h2>🔧 Geral</h2>
+      </div>
+      <div class="card">
+        <div class="field">
+          <label>Prefixo do bot</label>
+          <input id="prefix" data-key="prefix" maxlength="10" placeholder="O.">
+          <p class="hint">Padrão: <code>O.</code> · Exemplo: <code>O.ping</code></p>
+        </div>
+        <button type="button" class="btn btn-primary" id="saveGeral">💾 Salvar</button>
+      </div>
+    </section>
 
-        async function loadGuild() {
-            if (!serverId) {
-                safeText('guild-name', 'Nenhum servidor selecionado');
-                return;
-            }
+    <!-- WELCOME -->
+    <section id="view-welcome" class="view">
+      <div class="page-head">
+        <button type="button" class="btn" data-back>← Voltar</button>
+        <h2>👋 Boas-vindas</h2>
+      </div>
+      <div class="card">
+        <div class="field">
+          <label>Ativar</label>
+          <div class="row-between">
+            <span class="hint" style="margin:0">Enviar mensagem quando alguém entrar</span>
+            <label class="switch"><input type="checkbox" id="welcomeEnabled" data-key="welcomeEnabled"><span class="slider"></span></label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Canal</label>
+          <select id="welcomeChannel" data-key="welcomeChannel"></select>
+        </div>
+        <div class="field">
+          <label>Título</label>
+          <input id="welcomeTitle" data-key="welcomeTitle" placeholder="Bem-vindo!">
+        </div>
+        <div class="field">
+          <label>Mensagem</label>
+          <textarea id="welcomeMessage" data-key="welcomeMessage" placeholder="Olá {user}, bem-vindo ao {server}!"></textarea>
+        </div>
+        <div class="field">
+          <label>Variáveis</label>
+          <div class="vars">
+            <div><code>{user}</code> menção</div>
+            <div><code>{username}</code> nome</div>
+            <div><code>{server}</code> servidor</div>
+            <div><code>{memberCount}</code> membros</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary" id="saveWelcome">💾 Salvar</button>
+      </div>
+    </section>
 
-            try {
-                const res = await fetch('/api/guild-details/' + encodeURIComponent(serverId), {
-                    credentials: 'same-origin'
-                });
-                const data = await res.json();
+    <!-- LOGS -->
+    <section id="view-logs" class="view">
+      <div class="page-head">
+        <button type="button" class="btn" data-back>← Voltar</button>
+        <h2>📋 Logs</h2>
+      </div>
+      <div class="card">
+        <div class="log-card">
+          <div class="row-between">
+            <div>
+              <div class="log-title">📝 Mensagens</div>
+              <div class="log-desc">Editadas e apagadas</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="msgLogEnabled" data-key="msgLogEnabled"><span class="slider"></span></label>
+          </div>
+          <div class="field" style="margin-top:12px;margin-bottom:0">
+            <label>Canal</label>
+            <select id="msgLogChannel" data-key="msgLogChannel"></select>
+          </div>
+        </div>
+        <div class="log-card">
+          <div class="row-between">
+            <div>
+              <div class="log-title">🔨 Moderação</div>
+              <div class="log-desc">Ban, kick, warn</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="modLogEnabled" data-key="modLogEnabled"><span class="slider"></span></label>
+          </div>
+          <div class="field" style="margin-top:12px;margin-bottom:0">
+            <label>Canal</label>
+            <select id="modLogChannel" data-key="modLogChannel"></select>
+          </div>
+        </div>
+        <div class="log-card">
+          <div class="row-between">
+            <div>
+              <div class="log-title">👤 Membros</div>
+              <div class="log-desc">Entrada e saída</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="memberLogEnabled" data-key="memberLogEnabled"><span class="slider"></span></label>
+          </div>
+          <div class="field" style="margin-top:12px;margin-bottom:0">
+            <label>Canal</label>
+            <select id="memberLogChannel" data-key="memberLogChannel"></select>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary" id="saveLogs">💾 Salvar</button>
+      </div>
+    </section>
 
-                if (data.settings) {
-                    window.originalSettings = { ...data.settings };
-                }
+    <!-- MUSIC -->
+    <section id="view-music" class="view">
+      <div class="page-head">
+        <button type="button" class="btn" data-back>← Voltar</button>
+        <h2>🎵 Música</h2>
+      </div>
+      <div class="card">
+        <div class="field">
+          <label>Canal de voz</label>
+          <select id="musicVoiceChannel" data-key="musicVoiceChannel"></select>
+          <p class="hint">O bot entra neste canal com <code>O.play</code></p>
+        </div>
+        <div class="field">
+          <label>Tamanho máximo da fila</label>
+          <input type="number" id="musicMaxQueue" data-key="musicMaxQueue" min="1" max="100" value="50">
+        </div>
+        <div class="field">
+          <label>Comandos</label>
+          <p class="hint" style="line-height:1.7;margin:0">
+            <code>O.play</code> · <code>O.queue</code> · <code>O.skip</code> · <code>O.remove</code> · <code>O.clear</code> · <code>O.loop</code> · <code>O.stop</code>
+          </p>
+        </div>
+        <button type="button" class="btn btn-primary" id="saveMusic">💾 Salvar</button>
+      </div>
+    </section>
+  </main>
 
-                if (data.bot) {
-                    safeSrc('botAvatar', data.bot.avatar);
-                    safeText('botName', data.bot.name || data.bot.username);
-                    safeText('botTag', data.bot.tag ? '@' + data.bot.tag : '');
-                    safeText('botPing', (data.bot.ping ?? '—') + ' ms');
-                    safeText('botUptime', data.bot.uptime || '—');
-                }
+  <div class="toast" id="toast">Salvo com sucesso</div>
 
-                if (data.guild) {
-                    const g = data.guild;
-                    safeSrc('guild-avatar', g.icon);
-                    safeSrc('serverIcon', g.icon);
-                    safeText('guild-name', g.name);
-                    safeText('serverName', g.name);
-                    safeText('guild-id', 'ID: ' + g.id);
-                    safeText('serverId', 'ID: ' + g.id);
-                    safeText('guild-members', g.memberCount);
-                    safeText('serverMembers', g.memberCount);
-                    safeText('guild-channels', g.channelsCount);
-                    safeText('serverChannels', g.channelsCount);
-                    safeText('guild-roles', g.rolesCount);
-                    safeText('serverRoles', g.rolesCount);
-                    safeText('serverJoined', g.joinedAt || '—');
-                    safeText('guild-desc', g.description || '');
-                    const pi = document.getElementById('prefixInput');
-                    if (pi) pi.value = g.prefix || 'O.';
-                } else {
-                    safeText('guild-name', 'Bot não está neste servidor');
-                    const card = document.getElementById('serverCard');
-                    if (card) card.innerHTML = '<p style="color:#ef4444">❌ O bot não está instalado neste servidor.</p>';
-                }
-            } catch (e) {
-                console.error(e);
-                safeText('guild-name', 'Erro ao carregar');
-            }
-        }
-
-        async function savePrefix() {
-            const newPrefix = document.getElementById('prefixInput').value;
-            const res = await fetch('/api/set-setting', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify({ guildId: serverId, key: 'prefix', value: newPrefix })
-            });
-            const data = await res.json();
-            if (data.success) alert('✅ Prefixo salvo: ' + (data.prefix || newPrefix));
-            else alert(data.error || 'Erro ao salvar');
-        }
-
-        // Carrega partials dos sistemas e depois os dados
-        (async () => {
-            if (typeof loadSystemPartials === 'function') {
-                await loadSystemPartials();
-            }
-            await loadGuild();
-        })();
-    </script>
+  <script src="/js/panel.js"></script>
 </body>
 </html>
