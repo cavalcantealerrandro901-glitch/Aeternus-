@@ -3,7 +3,6 @@
  */
 require('dotenv').config();
 
-// Criptografia de voz (obrigatório para @discordjs/voice)
 try {
     require('libsodium-wrappers');
 } catch (_) {
@@ -17,6 +16,7 @@ try {
 const { Client, GatewayIntentBits, Partials, Collection, MessageFlags } = require('discord.js');
 const { loadCommands, loadSlash, loadEvents, loadSystems } = require('./bot/loaders');
 const { startServer } = require('./web/server');
+const { printVoiceReport } = require('./utils/voiceCheck');
 
 const TOKEN = process.env.DISCORD_TOKEN || process.env.TOKEN;
 if (!TOKEN) {
@@ -30,7 +30,7 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates, // obrigatório para voz
+        GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildModeration
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
@@ -66,6 +66,7 @@ client.on('interactionCreate', async (interaction) => {
 
 client.once('clientReady', () => {
     console.log(`🤖 Bot online: ${client.user.tag}`);
+    printVoiceReport();
 });
 
 client.once('ready', () => {
