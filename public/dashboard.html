@@ -16,7 +16,6 @@
   </header>
 
   <main class="panel-wrap">
-    <!-- HOME -->
     <section id="view-home" class="view active">
       <div class="hero-card">
         <img id="gIcon" src="" alt="">
@@ -59,12 +58,11 @@
         </button>
         <button type="button" class="sys-btn" data-open="music">
           <span class="ico">🎵</span>
-          <span><span>Música</span><span class="sub">Canal de voz e fila</span></span>
+          <span><span>Música</span><span class="sub">Categoria das salas privadas</span></span>
         </button>
       </div>
     </section>
 
-    <!-- GERAL -->
     <section id="view-geral" class="view">
       <div class="page-head">
         <button type="button" class="btn" data-back>← Voltar</button>
@@ -74,13 +72,12 @@
         <div class="field">
           <label>Prefixo do bot</label>
           <input id="prefix" data-key="prefix" maxlength="10" placeholder="O.">
-          <p class="hint">Padrão: <code>O.</code> · Exemplo: <code>O.ping</code></p>
+          <p class="hint">Padrão: <code>O.</code></p>
         </div>
         <button type="button" class="btn btn-primary" id="saveGeral">💾 Salvar</button>
       </div>
     </section>
 
-    <!-- WELCOME -->
     <section id="view-welcome" class="view">
       <div class="page-head">
         <button type="button" class="btn" data-back>← Voltar</button>
@@ -90,7 +87,7 @@
         <div class="field">
           <label>Ativar</label>
           <div class="row-between">
-            <span class="hint" style="margin:0">Enviar mensagem quando alguém entrar</span>
+            <span class="hint" style="margin:0">Mensagem ao entrar</span>
             <label class="switch"><input type="checkbox" id="welcomeEnabled" data-key="welcomeEnabled"><span class="slider"></span></label>
           </div>
         </div>
@@ -104,22 +101,12 @@
         </div>
         <div class="field">
           <label>Mensagem</label>
-          <textarea id="welcomeMessage" data-key="welcomeMessage" placeholder="Olá {user}, bem-vindo ao {server}!"></textarea>
-        </div>
-        <div class="field">
-          <label>Variáveis</label>
-          <div class="vars">
-            <div><code>{user}</code> menção</div>
-            <div><code>{username}</code> nome</div>
-            <div><code>{server}</code> servidor</div>
-            <div><code>{memberCount}</code> membros</div>
-          </div>
+          <textarea id="welcomeMessage" data-key="welcomeMessage" placeholder="Olá {user}!"></textarea>
         </div>
         <button type="button" class="btn btn-primary" id="saveWelcome">💾 Salvar</button>
       </div>
     </section>
 
-    <!-- LOGS -->
     <section id="view-logs" class="view">
       <div class="page-head">
         <button type="button" class="btn" data-back>← Voltar</button>
@@ -128,10 +115,7 @@
       <div class="card">
         <div class="log-card">
           <div class="row-between">
-            <div>
-              <div class="log-title">📝 Mensagens</div>
-              <div class="log-desc">Editadas e apagadas</div>
-            </div>
+            <div><div class="log-title">📝 Mensagens</div><div class="log-desc">Editadas e apagadas</div></div>
             <label class="switch"><input type="checkbox" id="msgLogEnabled" data-key="msgLogEnabled"><span class="slider"></span></label>
           </div>
           <div class="field" style="margin-top:12px;margin-bottom:0">
@@ -141,10 +125,7 @@
         </div>
         <div class="log-card">
           <div class="row-between">
-            <div>
-              <div class="log-title">🔨 Moderação</div>
-              <div class="log-desc">Ban, kick, warn</div>
-            </div>
+            <div><div class="log-title">🔨 Moderação</div><div class="log-desc">Ban, kick, warn</div></div>
             <label class="switch"><input type="checkbox" id="modLogEnabled" data-key="modLogEnabled"><span class="slider"></span></label>
           </div>
           <div class="field" style="margin-top:12px;margin-bottom:0">
@@ -154,10 +135,7 @@
         </div>
         <div class="log-card">
           <div class="row-between">
-            <div>
-              <div class="log-title">👤 Membros</div>
-              <div class="log-desc">Entrada e saída</div>
-            </div>
+            <div><div class="log-title">👤 Membros</div><div class="log-desc">Entrada e saída</div></div>
             <label class="switch"><input type="checkbox" id="memberLogEnabled" data-key="memberLogEnabled"><span class="slider"></span></label>
           </div>
           <div class="field" style="margin-top:12px;margin-bottom:0">
@@ -169,7 +147,6 @@
       </div>
     </section>
 
-    <!-- MUSIC -->
     <section id="view-music" class="view">
       <div class="page-head">
         <button type="button" class="btn" data-back>← Voltar</button>
@@ -177,18 +154,24 @@
       </div>
       <div class="card">
         <div class="field">
-          <label>Canal de voz</label>
-          <select id="musicVoiceChannel" data-key="musicVoiceChannel"></select>
-          <p class="hint">O bot entra neste canal com <code>O.play</code></p>
+          <label>📁 Categoria das salas</label>
+          <select id="musicCategory" data-key="musicCategory"></select>
+          <p class="hint">
+            As salas privadas de <code>O.play</code> serão criadas <strong>dentro desta categoria</strong>.
+            Se vazio, criam na raiz do servidor.
+          </p>
         </div>
         <div class="field">
           <label>Tamanho máximo da fila</label>
           <input type="number" id="musicMaxQueue" data-key="musicMaxQueue" min="1" max="100" value="50">
         </div>
         <div class="field">
-          <label>Comandos</label>
+          <label>Regras automáticas</label>
           <p class="hint" style="line-height:1.7;margin:0">
-            <code>O.play</code> · <code>O.queue</code> · <code>O.skip</code> · <code>O.remove</code> · <code>O.clear</code> · <code>O.loop</code> · <code>O.stop</code>
+            • Dono sai da sala → sala é apagada<br>
+            • Sala sem humanos → apagada<br>
+            • <strong>5 minutos</strong> sem música tocando → apagada<br>
+            • Controles: Voltar · Pausa · Passar · Repetir
           </p>
         </div>
         <button type="button" class="btn btn-primary" id="saveMusic">💾 Salvar</button>
@@ -197,7 +180,6 @@
   </main>
 
   <div class="toast" id="toast">Salvo com sucesso</div>
-
   <script src="/js/panel.js"></script>
 </body>
 </html>

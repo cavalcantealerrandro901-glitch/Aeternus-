@@ -22,6 +22,8 @@ const { resolvePlayable } = require('./musicSearch');
 /** @type {Map<string, any>} */
 const guilds = new Map();
 
+const IDLE_MS = 5 * 60 * 1000; // 5 min sem música
+
 const RANDOM_POOL = [
     'lofi hip hop',
     'the weeknd blinding lights',
@@ -44,6 +46,11 @@ function maxQueue(guildId) {
     return Math.min(n, 100);
 }
 
+function getMusicCategoryId(guildId) {
+    const cfg = settings.getGuild(guildId);
+    return cfg.musicCategory || cfg.musicVoiceChannel || null;
+}
+
 function safeDestroy(connection) {
     if (!connection) return;
     try {
@@ -62,7 +69,7 @@ function getState(guildId) {
         guilds.set(guildId, {
             player,
             queue: [],
-            history: [], // faixas já tocadas (para Voltar)
+            history: [],
             textChannelId: null,
             now: null,
             playing: false,
@@ -70,13 +77,13 @@ function getState(guildId) {
             loop: false,
             privateChannelId: null,
             ownerId: null,
-            controlMessageId: null
+            idleTimer: null,
+            client: null
         });
 
         player.on(AudioPlayerStatus.Idle, () => {
             const st = guilds.get(guildId);
-            if (!st) return;
-            if (st.paused) return; // pause não é idle real do fim da faixa em alguns casos
+            if (!st || st.paused) return;
 
             if (st.loop && st.now) {
                 st.queue.unshift({ ...st.now });
@@ -87,7 +94,13 @@ function getState(guildId) {
             st.now = null;
             st.playing = false;
             st.paused = false;
-            playNext(guildId).catch(() => {});
+
+            if (st.queue.length) {
+                playNext(guildId).catch(() => {});
+            } else {
+                // nada na fila → inicia contagem de inatividade
+                armIdleTimer(guildId);
+            }
         });
 
         player.on('error', (err) => {
@@ -102,6 +115,26 @@ function getState(guildId) {
         });
     }
     return guilds.get(guildId);
+}
+
+function clearIdleTimer(guildId) {
+    const st = getState(guildId);
+    if (st.idleTimer) {
+        clearTimeout(st.idleTimer);
+        st.idleTimer = null;
+    }
+}
+
+function armIdleTimer(guildId) {
+    const st = getState(guildId);
+    clearIdleTimer(guildId);
+    st.idleTimer = setTimeout(() => {
+        const s = getState(guildId);
+        // ainda sem música?
+        if (s.now || s.playing || s.queue.length) return;
+        console.log(`[music] inatividade 5min — encerrando sala ${guildId}`);
+        stop(guildId, s.client).catch(() => {});
+    }, IDLE_MS);
 }
 
 function controlRow(guildId) {
@@ -136,20 +169,12 @@ function nowEmbed(guildId) {
     const embed = new EmbedBuilder()
         .setColor(0x1db954)
         .setTitle(st.paused ? '⏸️ Pausado' : '🎶 Tocando agora')
-        .setDescription(t ? `**[${t.title}](${t.url})**` : '_Nada_')
+        .setDescription(t ? `**[${t.title}](${t.url})**` : '_Nada tocando — sala fecha em 5 min_')
         .addFields(
+            { name: 'Fila', value: String(st.queue.length), inline: true },
+            { name: 'Loop', value: st.loop ? 'Ligado' : 'Desligado', inline: true },
             {
-                name: 'Fila',
-                value: String(st.queue.length),
-                inline: true
-            },
-            {
-                name: 'Loop',
-                value: st.loop ? 'Ligado' : 'Desligado',
-                inline: true
-            },
-            {
-                name: 'Canal privado',
+                name: 'Sala',
                 value: st.privateChannelId ? `<#${st.privateChannelId}>` : '—',
                 inline: true
             }
@@ -159,17 +184,25 @@ function nowEmbed(guildId) {
     return embed;
 }
 
-/**
- * Cria canal de voz privado (só o membro + bot veem/entram) e move o membro.
- */
 async function createPrivateVoice(guild, member) {
     const me = guild.members.me || (await guild.members.fetchMe());
     const everyone = guild.roles.everyone;
+    const parentId = getMusicCategoryId(guild.id);
+
+    // valida categoria
+    let parent = null;
+    if (parentId) {
+        parent = await guild.channels.fetch(parentId).catch(() => null);
+        if (parent && parent.type !== ChannelType.GuildCategory && parent.type !== 4) {
+            parent = null;
+        }
+    }
 
     const channel = await guild.channels.create({
         name: `🎵 · ${member.displayName || member.user.username}`.slice(0, 90),
         type: ChannelType.GuildVoice,
-        reason: `Sala privada de música para ${member.user.tag}`,
+        parent: parent ? parent.id : undefined,
+        reason: `Sala privada de música — ${member.user.tag}`,
         permissionOverwrites: [
             {
                 id: everyone.id,
@@ -197,14 +230,8 @@ async function createPrivateVoice(guild, member) {
         ]
     });
 
-    // Move o membro para a sala
     try {
-        if (member.voice?.channelId) {
-            await member.voice.setChannel(channel.id);
-        } else {
-            // não está em VC — tenta mesmo assim (falha se não estiver em voz)
-            await member.voice.setChannel(channel.id).catch(() => {});
-        }
+        await member.voice.setChannel(channel.id);
     } catch (e) {
         console.warn('[music] move member:', e.message);
     }
@@ -214,12 +241,13 @@ async function createPrivateVoice(guild, member) {
 
 async function deletePrivateChannel(guildId, client) {
     const st = getState(guildId);
-    if (!st.privateChannelId) return;
+    if (!st.privateChannelId || !client) return;
+    const id = st.privateChannelId;
+    st.privateChannelId = null;
     try {
-        const ch = await client.channels.fetch(st.privateChannelId).catch(() => null);
+        const ch = await client.channels.fetch(id).catch(() => null);
         if (ch) await ch.delete('Sessão de música encerrada').catch(() => {});
     } catch (_) {}
-    st.privateChannelId = null;
 }
 
 async function ensureConnection(guild, voiceChannelId) {
@@ -262,13 +290,11 @@ async function ensureConnection(guild, voiceChannelId) {
         await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
     } catch {
         safeDestroy(connection);
-        throw new Error(
-            'Não consegui conectar na voz (UDP). No Termux costuma falhar — use Render/VPS.'
-        );
+        throw new Error('Não consegui conectar na voz. Verifique permissões e a rede do host (Render).');
     }
 
-    const st = getState(guild.id);
-    connection.subscribe(st.player);
+    getState(guild.id).player;
+    connection.subscribe(getState(guild.id).player);
     return connection;
 }
 
@@ -286,6 +312,8 @@ function formatDuration(sec) {
 
 async function playNext(guildId) {
     const st = getState(guildId);
+    clearIdleTimer(guildId);
+
     if (st.playing && !st.paused) return;
 
     const next = st.queue.shift();
@@ -293,7 +321,7 @@ async function playNext(guildId) {
         st.now = null;
         st.playing = false;
         st.paused = false;
-        // sem fila: encerra sala privada depois de um tempo curto
+        armIdleTimer(guildId);
         return;
     }
 
@@ -313,13 +341,11 @@ async function playNext(guildId) {
     }
 }
 
-/**
- * Sessão completa: cria VC privada, conecta, enfileira e toca.
- */
 async function startPrivateSession(guild, member, textChannel, query, client) {
     const st = getState(guild.id);
+    st.client = client;
+    clearIdleTimer(guild.id);
 
-    // Se já tem sala privada do mesmo dono, reutiliza
     let voiceChannelId = st.privateChannelId;
     if (voiceChannelId) {
         const ch = await guild.channels.fetch(voiceChannelId).catch(() => null);
@@ -335,7 +361,6 @@ async function startPrivateSession(guild, member, textChannel, query, client) {
         st.ownerId = member.id;
         voiceChannelId = priv.id;
     } else {
-        // garante membro na sala
         await member.voice.setChannel(voiceChannelId).catch(() => {});
     }
 
@@ -366,10 +391,38 @@ async function startPrivateSession(guild, member, textChannel, query, client) {
     };
 }
 
+/** Se o dono sair da sala privada → encerra */
+async function onVoiceStateUpdate(oldState, newState) {
+    const guildId = oldState.guild.id;
+    const st = getState(guildId);
+    if (!st.privateChannelId || !st.ownerId) return;
+
+    const leftPriv =
+        oldState.channelId === st.privateChannelId &&
+        newState.channelId !== st.privateChannelId &&
+        oldState.id === st.ownerId;
+
+    if (leftPriv) {
+        console.log(`[music] dono saiu da sala — encerrando ${guildId}`);
+        await stop(guildId, st.client || newState.client);
+        return;
+    }
+
+    // sala vazia (só bot ou ninguém)
+    if (oldState.channelId === st.privateChannelId || newState.channelId === st.privateChannelId) {
+        const ch = await oldState.guild.channels.fetch(st.privateChannelId).catch(() => null);
+        if (ch && ch.members) {
+            const humans = ch.members.filter((m) => !m.user.bot);
+            if (humans.size === 0) {
+                console.log(`[music] sala vazia — encerrando ${guildId}`);
+                await stop(guildId, st.client || newState.client);
+            }
+        }
+    }
+}
+
 async function handleControl(interaction) {
-    const id = interaction.customId;
-    // mctl_skip_GUILDID
-    const m = id.match(/^mctl_(skip|prev|pause|loop)_(\d+)$/);
+    const m = interaction.customId.match(/^mctl_(skip|prev|pause|loop)_(\d+)$/);
     if (!m) return false;
 
     const action = m[1];
@@ -381,10 +434,8 @@ async function handleControl(interaction) {
 
     const st = getState(guildId);
     if (st.ownerId && interaction.user.id !== st.ownerId) {
-        // permite quem está no mesmo canal privado
-        const member = interaction.member;
         const inPriv =
-            st.privateChannelId && member?.voice?.channelId === st.privateChannelId;
+            st.privateChannelId && interaction.member?.voice?.channelId === st.privateChannelId;
         if (!inPriv) {
             await interaction.reply({
                 content: 'Só quem pediu a música (ou está na sala) controla.',
@@ -393,6 +444,8 @@ async function handleControl(interaction) {
             return true;
         }
     }
+
+    clearIdleTimer(guildId);
 
     if (action === 'skip') {
         if (st.now) {
@@ -421,20 +474,24 @@ async function handleControl(interaction) {
         if (st.paused) {
             st.player.unpause();
             st.paused = false;
+            clearIdleTimer(guildId);
         } else {
             st.player.pause();
             st.paused = true;
+            armIdleTimer(guildId); // pausado conta como inativo para o timer? user said without playing music - paused is not playing
         }
     } else if (action === 'loop') {
         st.loop = !st.loop;
     }
 
-    await interaction.update({
-        embeds: [nowEmbed(guildId)],
-        components: [controlRow(guildId)]
-    }).catch(async () => {
-        await interaction.deferUpdate().catch(() => {});
-    });
+    await interaction
+        .update({
+            embeds: [nowEmbed(guildId)],
+            components: [controlRow(guildId)]
+        })
+        .catch(async () => {
+            await interaction.deferUpdate().catch(() => {});
+        });
     return true;
 }
 
@@ -450,17 +507,19 @@ function skip(guildId) {
 
 async function stop(guildId, client) {
     const st = getState(guildId);
+    clearIdleTimer(guildId);
     st.queue = [];
     st.history = [];
     st.now = null;
     st.playing = false;
     st.paused = false;
     st.loop = false;
+    st.ownerId = null;
     try {
         st.player.stop(true);
     } catch (_) {}
     safeDestroy(getVoiceConnection(guildId));
-    if (client) await deletePrivateChannel(guildId, client);
+    await deletePrivateChannel(guildId, client || st.client);
     return true;
 }
 
@@ -501,14 +560,9 @@ function buildQueueEmbed(guildId) {
     const lines = [];
     if (data.now) lines.push(`**▶** [${data.now.title}](${data.now.url})`);
     else lines.push('**▶** _Nada_');
-    if (data.queue.length) {
-        lines.push('', `**Fila**`);
-        data.queue.slice(0, 10).forEach((t, i) => lines.push(`**${i + 1}.** ${t.title}`));
-    }
     return new EmbedBuilder().setColor(0x1db954).setTitle('🎶 Fila').setDescription(lines.join('\n'));
 }
 
-// compat enqueue antigo
 async function enqueue(guild, voiceChannelId, textChannelId, query, userId, client) {
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!member) throw new Error('Membro não encontrado.');
@@ -519,6 +573,7 @@ async function enqueue(guild, voiceChannelId, textChannelId, query, userId, clie
 module.exports = {
     startPrivateSession,
     handleControl,
+    onVoiceStateUpdate,
     enqueue,
     skip,
     stop,

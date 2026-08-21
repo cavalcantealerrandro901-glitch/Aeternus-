@@ -6,7 +6,7 @@
   const guildId = params.get('guild') || params.get('server');
   let settings = {};
   let textChannels = [];
-  let voiceChannels = [];
+  let categories = [];
 
   const $ = (id) => document.getElementById(id);
 
@@ -25,15 +25,15 @@
     setTimeout(() => t.classList.remove('show'), 2200);
   }
 
-  function fillSelect(select, channels, selected, placeholder) {
+  function fillSelect(select, items, selected, placeholder, labelFn) {
     if (!select) return;
-    const opts = [`<option value="">${placeholder || '— Selecionar —'}</option>`]
-      .concat(
-        channels.map(
-          (c) =>
-            `<option value="${c.id}" ${String(selected) === String(c.id) ? 'selected' : ''}>#${escapeHtml(c.name)}</option>`
-        )
-      );
+    const lab = labelFn || ((c) => c.name);
+    const opts = [`<option value="">${placeholder || '— Selecionar —'}</option>`].concat(
+      items.map(
+        (c) =>
+          `<option value="${c.id}" ${String(selected) === String(c.id) ? 'selected' : ''}>${escapeHtml(lab(c))}</option>`
+      )
+    );
     select.innerHTML = opts.join('');
   }
 
@@ -76,7 +76,6 @@
       return;
     }
 
-    // detalhes
     const det = await fetch('/api/guild-details/' + encodeURIComponent(guildId), {
       credentials: 'same-origin'
     }).then((r) => r.json());
@@ -105,39 +104,44 @@
         `Ping ${det.bot.ping ?? '—'}ms · Uptime ${det.bot.uptime || '—'}`;
     }
 
-    // canais de texto (guild-data se existir)
     try {
       const gd = await fetch('/api/guild-data/' + encodeURIComponent(guildId), {
         credentials: 'same-origin'
       }).then((r) => r.json());
       if (Array.isArray(gd.allChannels)) {
-        textChannels = gd.allChannels.filter((c) => c.type === 0 || c.type === 5 || c.typeLabel?.includes('Text'));
+        textChannels = gd.allChannels.filter(
+          (c) => c.type === 0 || c.type === 5 || String(c.typeLabel || '').includes('Text')
+        );
         if (!textChannels.length) textChannels = gd.allChannels;
       }
     } catch (_) {}
 
-    // voz
     try {
-      const vc = await fetch('/api/guild/' + encodeURIComponent(guildId) + '/voice-channels', {
+      const cat = await fetch('/api/guild/' + encodeURIComponent(guildId) + '/categories', {
         credentials: 'same-origin'
       }).then((r) => r.json());
-      voiceChannels = vc.channels || [];
+      categories = cat.categories || [];
+      if (cat.selected && !settings.musicCategory) settings.musicCategory = cat.selected;
     } catch (_) {}
-
-    // se não veio lista de texto, tenta voice endpoint only — selects ficam vazios ok
 
     fillSelect($('welcomeChannel'), textChannels, settings.welcomeChannel, 'Canal de boas-vindas');
     fillSelect($('msgLogChannel'), textChannels, settings.msgLogChannel, 'Canal de logs');
     fillSelect($('modLogChannel'), textChannels, settings.modLogChannel, 'Canal de moderação');
     fillSelect($('memberLogChannel'), textChannels, settings.memberLogChannel, 'Canal de membros');
-    fillSelect($('musicVoiceChannel'), voiceChannels, settings.musicVoiceChannel, 'Canal de voz');
+    fillSelect(
+      $('musicCategory'),
+      categories,
+      settings.musicCategory,
+      '— Categoria das salas de música —',
+      (c) => '📁 ' + c.name
+    );
 
     applySettings();
-    if (!$('prefix').value) $('prefix').value = settings.prefix || 'O.';
-    if (!$('musicMaxQueue').value) $('musicMaxQueue').value = settings.musicMaxQueue || 50;
+    if ($('prefix') && !$('prefix').value) $('prefix').value = settings.prefix || 'O.';
+    if ($('musicMaxQueue') && !$('musicMaxQueue').value)
+      $('musicMaxQueue').value = settings.musicMaxQueue || 50;
   }
 
-  // nav
   document.querySelectorAll('[data-open]').forEach((btn) => {
     btn.addEventListener('click', () => showView(btn.getAttribute('data-open')));
   });
@@ -159,10 +163,10 @@
       'memberLogChannel'
     ])
   );
-  $('saveMusic')?.addEventListener('click', () => saveKeys(['musicVoiceChannel', 'musicMaxQueue']));
+  $('saveMusic')?.addEventListener('click', () => saveKeys(['musicCategory', 'musicMaxQueue']));
 
   load().catch((e) => {
     console.error(e);
-    $('gName').textContent = 'Erro ao carregar';
+    if ($('gName')) $('gName').textContent = 'Erro ao carregar';
   });
 })();
