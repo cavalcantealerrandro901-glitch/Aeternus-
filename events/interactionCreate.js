@@ -6,11 +6,12 @@ const sg = require('../utils/supremeGate');
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
+        const cid = interaction.customId || '';
+
+        // SUPREME GATE (sgx_ novo · sgv2_/sg_ legado)
         if (
             (interaction.isButton() || interaction.isStringSelectMenu()) &&
-            (interaction.customId?.startsWith('sgj_') ||
-                interaction.customId?.startsWith('sgv2_') ||
-                interaction.customId?.startsWith('sg_'))
+            (cid.startsWith('sgx_') || cid.startsWith('sgv2_') || cid.startsWith('sg_'))
         ) {
             try {
                 const handled = await sg.handleInteraction(interaction);
@@ -18,10 +19,7 @@ module.exports = {
             } catch (err) {
                 console.error('[SUPREME GATE]', err);
                 try {
-                    const payload = {
-                        content: 'Erro no SUPREME GATE.',
-                        flags: [MessageFlags.Ephemeral]
-                    };
+                    const payload = { content: 'Erro no SUPREME GATE.', flags: [MessageFlags.Ephemeral] };
                     if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
                     else await interaction.reply(payload);
                 } catch (_) {}
@@ -29,7 +27,7 @@ module.exports = {
             return;
         }
 
-        if (interaction.isButton() && interaction.customId.startsWith('mctl_')) {
+        if (interaction.isButton() && cid.startsWith('mctl_')) {
             try {
                 await music.handleControl(interaction);
             } catch (err) {
@@ -38,8 +36,8 @@ module.exports = {
             return;
         }
 
-        if (interaction.isButton() && interaction.customId.startsWith('again:')) {
-            const parts = interaction.customId.split(':');
+        if (interaction.isButton() && cid.startsWith('again:')) {
+            const parts = cid.split(':');
             if (parts.length < 4) {
                 return interaction
                     .reply({ content: 'Dados inválidos.', flags: [MessageFlags.Ephemeral] })

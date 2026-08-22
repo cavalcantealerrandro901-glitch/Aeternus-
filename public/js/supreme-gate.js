@@ -15,7 +15,7 @@
   };
 
   if (!guildId) {
-    if ($('guildLabel')) $('guildLabel').textContent = 'Abra com ?guild=ID';
+    if ($('guildLabel')) $('guildLabel').textContent = 'Abra pelo painel (?guild=ID)';
     return;
   }
 
@@ -43,15 +43,16 @@
         .join('');
   }
 
-  /** Páginas: título em linha #TITULO e cargos label|id|emoji */
+  /** Páginas de cargos: --- TÍTULO --- e linhas nome|id|emoji */
   function pagesToText(pages) {
-    return (pages || [])
+    if (!pages || !pages.length) return '';
+    return pages
       .map((p) => {
-        const head = '#' + (p.title || 'Página');
-        const lines = (p.roles || []).map((r) =>
-          [r.label, r.roleId, r.emoji || ''].filter((x, i) => i < 2 || x).join('|')
-        );
-        return [head, ...lines].join('\n');
+        const head = `--- ${p.title || 'PÁGINA'} ---`;
+        const lines = (p.items || [])
+          .map((i) => [i.label, i.roleId, i.emoji || ''].filter((x, idx) => idx < 2 || x).join('|'))
+          .join('\n');
+        return head + '\n' + lines;
       })
       .join('\n\n');
   }
@@ -62,23 +63,24 @@
     for (const raw of String(text || '').split('\n')) {
       const line = raw.trim();
       if (!line) continue;
-      if (line.startsWith('#')) {
-        cur = { title: line.slice(1).trim() || 'Página', roles: [] };
+      const m = line.match(/^---+\s*(.+)\s*---+$/);
+      if (m) {
+        cur = { title: m[1].trim(), items: [] };
         pages.push(cur);
         continue;
       }
       if (!cur) {
-        cur = { title: 'Página 1', roles: [] };
+        cur = { title: 'CARGOS', items: [] };
         pages.push(cur);
       }
       const p = line.split('|').map((x) => x.trim());
-      cur.roles.push({ label: p[0] || 'Cargo', roleId: p[1] || '', emoji: p[2] || undefined });
+      cur.items.push({ label: p[0] || 'Cargo', roleId: p[1] || '', emoji: p[2] || undefined });
     }
-    return pages.length ? pages : [];
+    return pages;
   }
 
-  function rulesToText(rules) {
-    return (rules || []).map((r) => `${r.title}|${r.text}`).join('\n');
+  function rulesToText(items) {
+    return (items || []).map((r) => `${r.title || 'Regra'}|${r.text || ''}`).join('\n');
   }
 
   function textToRules(text) {
@@ -87,39 +89,71 @@
       .map((l) => l.trim())
       .filter(Boolean)
       .map((l) => {
-        const i = l.indexOf('|');
-        if (i === -1) return { title: l, text: '' };
-        return { title: l.slice(0, i).trim(), text: l.slice(i + 1).trim() };
+        const p = l.split('|').map((x) => x.trim());
+        return { title: p[0] || 'Regra', text: p.slice(1).join('|') || '' };
       });
   }
 
-  function applyForm() {
+  function applyToForm() {
     if (!cfg) return;
     $('enabled').checked = !!cfg.enabled;
     $('stStatus').textContent = cfg.enabled ? 'ON' : 'OFF';
-    fillSelect($('wChannel'), channels, cfg.channelId, 'Canal do portal');
-    fillSelect($('logChannel'), channels, cfg.logChannelId, 'Canal de logs');
-    fillSelect($('roleVisitor'), roles, cfg.visitorRoleId, 'Visitante');
-    fillSelect($('roleVerified'), roles, cfg.verifiedRoleId, 'Verificado');
-    fillSelect($('exploreChannel'), channels, cfg.exploreChannelId, 'Canal explorar');
-    if ($('sgColor')) $('sgColor').value = cfg.color || '#7c3aed';
-    if ($('maxRoles')) $('maxRoles').value = cfg.maxRoles || 10;
-    if ($('rolePages')) $('rolePages').value = pagesToText(cfg.rolePages);
-    if ($('rulesText')) $('rulesText').value = rulesToText(cfg.rules);
+
+    fillSelect($('wChannel'), channels, cfg.welcome?.channelId, 'Canal do portal');
+    if ($('wColor')) $('wColor').value = cfg.welcome?.color || '#7c3aed';
+    if ($('wPing')) $('wPing').checked = cfg.welcome?.ping !== false;
+
+    fillSelect($('lChannel'), channels, cfg.leave?.channelId, 'Canal saída');
+    if ($('lTitle')) $('lTitle').value = cfg.leave?.title || '';
+    if ($('lDesc')) $('lDesc').value = cfg.leave?.description || '';
+    if ($('lColor')) $('lColor').value = cfg.leave?.color || '#64748b';
+
+    if ($('rolePages')) $('rolePages').value = pagesToText(cfg.roles?.pages);
+    if ($('roleMax')) $('roleMax').value = cfg.roles?.maxSelect || 15;
+    fillSelect($('roleVisitor'), roles, cfg.roles?.visitorId, 'Visitante');
+    fillSelect($('roleVerified'), roles, cfg.roles?.verifiedId, 'Verificado');
+
+    if ($('rItems')) $('rItems').value = rulesToText(cfg.rules?.items);
+    if ($('rColor')) $('rColor').value = cfg.rules?.color || '#38bdf8';
+
+    fillSelect($('logChannel'), channels, cfg.logs?.channelId, 'Canal logs');
   }
 
-  function collect() {
+  function collectConfig() {
     return {
       enabled: $('enabled').checked,
-      channelId: $('wChannel').value || null,
-      logChannelId: $('logChannel').value || null,
-      visitorRoleId: $('roleVisitor').value || null,
-      verifiedRoleId: $('roleVerified').value || null,
-      exploreChannelId: $('exploreChannel')?.value || null,
-      color: $('sgColor')?.value || '#7c3aed',
-      maxRoles: parseInt($('maxRoles')?.value || '10', 10) || 10,
-      rolePages: textToPages($('rolePages')?.value),
-      rules: textToRules($('rulesText')?.value)
+      welcome: {
+        enabled: true,
+        channelId: $('wChannel')?.value || null,
+        color: $('wColor')?.value || '#7c3aed',
+        ping: $('wPing') ? $('wPing').checked : true
+      },
+      leave: {
+        enabled: true,
+        channelId: $('lChannel')?.value || null,
+        title: $('lTitle')?.value || '🌙 UMA JORNADA CHEGOU AO FIM',
+        description: $('lDesc')?.value || '**{username}** deixou **{server}**.',
+        color: $('lColor')?.value || '#64748b',
+        footer: 'SUPREME GATE'
+      },
+      roles: {
+        visitorId: $('roleVisitor')?.value || null,
+        verifiedId: $('roleVerified')?.value || null,
+        maxSelect: parseInt($('roleMax')?.value || '15', 10) || 15,
+        pages: textToPages($('rolePages')?.value || '')
+      },
+      rules: {
+        color: $('rColor')?.value || '#38bdf8',
+        items: textToRules($('rItems')?.value || '')
+      },
+      logs: {
+        channelId: $('logChannel')?.value || null,
+        join: true,
+        leave: true,
+        rules: true,
+        roles: true,
+        verify: true
+      }
     };
   }
 
@@ -128,49 +162,51 @@
       fetch('/api/gate/' + guildId, { credentials: 'same-origin' }).then((r) => r.json()),
       fetch('/api/guild-data/' + guildId, { credentials: 'same-origin' }).then((r) => r.json())
     ]);
+
     cfg = gate.config || {};
     if (gate.stats) {
       if ($('stJoins')) $('stJoins').textContent = gate.stats.joins || 0;
       if ($('stLeaves')) $('stLeaves').textContent = gate.stats.leaves || 0;
       if ($('stVerified')) $('stVerified').textContent = gate.stats.verified || 0;
     }
+
     if ($('guildLabel')) $('guildLabel').textContent = (data.name || 'Servidor') + ' · ' + guildId;
+
     channels = (data.allChannels || []).filter(
       (c) => c.type === 0 || c.type === 5 || String(c.typeLabel || '').includes('Text')
     );
     if (!channels.length) channels = data.allChannels || [];
     roles = data.roles || [];
-    applyForm();
+    applyToForm();
   }
 
-  $('btnSave')?.addEventListener('click', async () => {
-    const config = collect();
-    const res = await fetch('/api/gate/' + guildId, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ config })
-    }).then((r) => r.json());
-    if (res.success) {
-      cfg = res.config;
-      $('stStatus').textContent = cfg.enabled ? 'ON' : 'OFF';
-      toast('💾 Jornada salva');
-    } else toast(res.error || 'Erro');
-  });
+  if ($('btnSave')) {
+    $('btnSave').onclick = async () => {
+      const config = collectConfig();
+      const res = await fetch('/api/gate/' + guildId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ config })
+      }).then((r) => r.json());
+      if (res.success) {
+        cfg = res.config;
+        if ($('stStatus')) $('stStatus').textContent = cfg.enabled ? 'ON' : 'OFF';
+        toast('💾 Salvo');
+      } else toast(res.error || 'Erro');
+    };
+  }
 
-  $('btnTest')?.addEventListener('click', async () => {
-    await fetch('/api/gate/' + guildId, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ config: collect() })
-    });
-    const res = await fetch('/api/gate/' + guildId + '/test', {
-      method: 'POST',
-      credentials: 'same-origin'
-    }).then((r) => r.json());
-    toast(res.success ? '🧪 Teste enviado (aguarde 3s)' : res.error || 'Falha');
-  });
+  if ($('btnTest')) {
+    $('btnTest').onclick = async () => {
+      if ($('btnSave')) await $('btnSave').onclick();
+      const res = await fetch('/api/gate/' + guildId + '/test', {
+        method: 'POST',
+        credentials: 'same-origin'
+      }).then((r) => r.json());
+      toast(res.success ? '🧪 Fluxo de teste iniciado' : res.error || 'Falha');
+    };
+  }
 
   load().catch((e) => {
     console.error(e);

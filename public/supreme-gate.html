@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SUPREME GATE · Jornada</title>
+  <title>SUPREME GATE · Aeternus</title>
   <link rel="stylesheet" href="/css/panel.css">
   <style>
     .gate-nav { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
@@ -22,6 +22,7 @@
     <div class="panel-brand">🌌 SUPREME GATE</div>
     <div class="panel-actions">
       <a class="btn" id="backDash" href="/dashboard">← Painel</a>
+      <a class="btn" href="/servers">Servidores</a>
     </div>
   </header>
 
@@ -29,64 +30,82 @@
     <div class="card">
       <div class="row-between">
         <div>
-          <h2 style="margin:0 0 4px">👑 Jornada de perfil</h2>
+          <h2 style="margin:0 0 4px">👑 Personalização de perfil</h2>
           <p class="hint" style="margin:0" id="guildLabel">…</p>
         </div>
         <label class="switch"><input type="checkbox" id="enabled"><span class="slider"></span></label>
       </div>
       <div class="stats-row" style="margin-top:14px">
-        <div class="stat"><b id="stJoins">0</b><span>Entradas</span></div>
-        <div class="stat"><b id="stLeaves">0</b><span>Saídas</span></div>
-        <div class="stat"><b id="stVerified">0</b><span>Verificados</span></div>
+        <div class="stat"><b id="stJoins">0</b><span>👋 Entradas</span></div>
+        <div class="stat"><b id="stLeaves">0</b><span>🚪 Saídas</span></div>
+        <div class="stat"><b id="stVerified">0</b><span>🔐 Verificados</span></div>
         <div class="stat"><b id="stStatus">OFF</b><span>Status</span></div>
       </div>
-      <p class="hint" style="margin-top:12px;line-height:1.6">
-        Fluxo: <strong>Loading 3s</strong> → <strong>Cargos (páginas)</strong> → <strong>Regras</strong> → <strong>Acesso</strong><br>
-        Tudo na <em>mesma mensagem</em>, progresso por usuário.
-      </p>
     </div>
 
     <div class="gate-nav" id="nav">
-      <button type="button" data-tab="geral" class="active">⚙️ Geral</button>
-      <button type="button" data-tab="cargos">🛡️ Cargos</button>
-      <button type="button" data-tab="regras">📜 Regras</button>
+      <button type="button" data-tab="portal" class="active">🌌 Portal</button>
+      <button type="button" data-tab="roles">🛡️ Cargos</button>
+      <button type="button" data-tab="rules">📜 Regras</button>
+      <button type="button" data-tab="leave">🚪 Saída</button>
+      <button type="button" data-tab="logs">📊 Logs</button>
     </div>
 
-    <div class="tab active" id="tab-geral">
+    <div class="tab active" id="tab-portal">
       <div class="card">
+        <p class="hint">Fluxo: loading 3s → cargos paginados → regras → perfil concluído (mesma mensagem).</p>
         <div class="field"><label>Canal do portal</label><select id="wChannel"></select></div>
-        <div class="field"><label>Canal de logs</label><select id="logChannel"></select></div>
-        <div class="field"><label>Canal “explorar servidor”</label><select id="exploreChannel"></select></div>
+        <div class="field"><label>Cor do embed</label><input id="wColor" placeholder="#7c3aed"></div>
+        <div class="field row-between">
+          <span>Mencionar membro</span>
+          <label class="switch"><input type="checkbox" id="wPing" checked><span class="slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-roles">
+      <div class="card">
         <div class="field"><label>Cargo visitante</label><select id="roleVisitor"></select></div>
         <div class="field"><label>Cargo verificado</label><select id="roleVerified"></select></div>
-        <div class="field"><label>Cor (#hex)</label><input id="sgColor" value="#7c3aed"></div>
-        <div class="field"><label>Máx. cargos por membro</label><input type="number" id="maxRoles" min="1" max="25" value="10"></div>
+        <div class="field"><label>Máx. cargos selecionáveis</label><input type="number" id="roleMax" min="1" max="25" value="15"></div>
+        <div class="field">
+          <label>Páginas de cargos (máx. 5 por página)</label>
+          <textarea id="rolePages" rows="16" placeholder="--- PERSONALIDADE ---&#10;Explorador|ID|🌌&#10;Místico|ID|🔮&#10;&#10;--- INTERESSES ---&#10;Gamer|ID|🎮"></textarea>
+          <p class="hint">Separe páginas com <code>--- TÍTULO ---</code> e cargos com <code>Nome|ID|emoji</code></p>
+        </div>
       </div>
     </div>
 
-    <div class="tab" id="tab-cargos">
+    <div class="tab" id="tab-rules">
       <div class="card">
-        <p class="hint">
-          Cada página começa com <code>#TÍTULO</code> e até 5 linhas<br>
-          <code>Nome|ID_DO_CARGO|emoji</code>
-        </p>
-        <textarea id="rolePages" rows="18" placeholder="#PERSONALIDADE&#10;Explorador|123|🌌&#10;Místico|456|🔮&#10;&#10;#INTERESSES&#10;Gamer|789|🎮"></textarea>
+        <div class="field"><label>Cor</label><input id="rColor" placeholder="#38bdf8"></div>
+        <div class="field">
+          <label>Regras (Título|Texto) — 3 por página</label>
+          <textarea id="rItems" rows="10" placeholder="Respeito|Respeite todos.&#10;Spam|Evite mensagens repetidas."></textarea>
+        </div>
       </div>
     </div>
 
-    <div class="tab" id="tab-regras">
+    <div class="tab" id="tab-leave">
       <div class="card">
-        <p class="hint">Uma por linha: <code>Título|Descrição</code> · 3 regras por página na jornada</p>
-        <textarea id="rulesText" rows="12" placeholder="Respeito|Respeite todos os membros."></textarea>
+        <div class="field"><label>Canal</label><select id="lChannel"></select></div>
+        <div class="field"><label>Título</label><input id="lTitle"></div>
+        <div class="field"><label>Descrição</label><textarea id="lDesc" rows="4"></textarea></div>
+        <div class="field"><label>Cor</label><input id="lColor"></div>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-logs">
+      <div class="card">
+        <div class="field"><label>Canal de logs</label><select id="logChannel"></select></div>
       </div>
     </div>
 
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">
       <button type="button" class="btn btn-primary" id="btnSave">💾 Salvar</button>
-      <button type="button" class="btn" id="btnTest">🧪 Testar jornada</button>
+      <button type="button" class="btn" id="btnTest">🧪 Testar fluxo</button>
     </div>
   </main>
-
   <div class="toast" id="toast">OK</div>
   <script src="/js/supreme-gate.js"></script>
 </body>
