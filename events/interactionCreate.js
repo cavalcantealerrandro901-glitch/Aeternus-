@@ -19,6 +19,27 @@ module.exports = {
             return;
         }
 
+        // Música — controles e convites
+        if (
+            interaction.isButton() &&
+            (cid.startsWith('mctl_') || cid.startsWith('minvite_'))
+        ) {
+            try {
+                await music.handleControl(interaction);
+            } catch (err) {
+                console.error('[music control]', err);
+                try {
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.reply({
+                            content: 'Erro no controle de música.',
+                            flags: [MessageFlags.Ephemeral]
+                        });
+                    }
+                } catch (_) {}
+            }
+            return;
+        }
+
         // SUPREME GATE
         if (
             (interaction.isButton() || interaction.isStringSelectMenu()) &&
@@ -34,15 +55,6 @@ module.exports = {
                     if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
                     else await interaction.reply(payload);
                 } catch (_) {}
-            }
-            return;
-        }
-
-        if (interaction.isButton() && cid.startsWith('mctl_')) {
-            try {
-                await music.handleControl(interaction);
-            } catch (err) {
-                console.error('[music control]', err);
             }
             return;
         }
@@ -79,12 +91,9 @@ module.exports = {
             }
 
             try {
-                // evita "already acknowledged"
                 if (!interaction.deferred && !interaction.replied) {
                     await interaction.deferUpdate().catch(() => {});
                 }
-
-                // remove botão da mensagem antiga
                 try {
                     await interaction.message.edit({ components: [] }).catch(() => {});
                 } catch (_) {}
@@ -110,12 +119,6 @@ module.exports = {
                 await command.execute(fakeMessage, args, client);
             } catch (err) {
                 console.error('again button:', err);
-                try {
-                    await interaction.followUp({
-                        content: 'Não consegui reiniciar o jogo. Use o comando de novo.',
-                        flags: [MessageFlags.Ephemeral]
-                    });
-                } catch (_) {}
             }
             return;
         }

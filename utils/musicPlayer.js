@@ -164,7 +164,12 @@ function controlRow(guildId) {
             .setCustomId(`mctl_loop_${guildId}`)
             .setLabel('Repetir')
             .setEmoji('🔁')
-            .setStyle(st.loop ? ButtonStyle.Success : ButtonStyle.Secondary)
+            .setStyle(st.loop ? ButtonStyle.Success : ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`mctl_stop_${guildId}`)
+            .setLabel('Parar')
+            .setEmoji('⏹️')
+            .setStyle(ButtonStyle.Danger)
     );
 }
 
@@ -184,7 +189,7 @@ function nowEmbed(guildId) {
                 inline: true
             }
         )
-        .setFooter({ text: '⏮️ Voltar · ⏸️ Pausa · ⏭️ Passar · 🔁 Repetir' });
+        .setFooter({ text: '⏮️ Voltar · ⏸️ Pausa · ⏭️ Passar · 🔁 Loop · ⏹️ Parar' });
     if (t?.thumbnail) embed.setThumbnail(t.thumbnail);
     return embed;
 }
@@ -276,6 +281,23 @@ async function deletePrivateChannel(guildId, client) {
     } catch (_) {}
 }
 
+/** Abre a sala para um amigo (overwrite) */
+async function allowUserInPrivate(guildId, userId, client) {
+    const st = getState(guildId);
+    if (!st.privateChannelId || !client) return false;
+    const ch = await client.channels.fetch(st.privateChannelId).catch(() => null);
+    if (!ch) return false;
+    await ch.permissionOverwrites
+        .edit(userId, {
+            ViewChannel: true,
+            Connect: true,
+            Speak: true,
+            Stream: true
+        })
+        .catch(() => {});
+    return true;
+}
+
 async function ensureConnection(guild, voiceChannelId) {
     const existing = getVoiceConnection(guild.id);
     if (existing) {
@@ -312,10 +334,10 @@ async function ensureConnection(guild, voiceChannelId) {
 
         const perms = channel.permissionsFor(me);
         if (perms && !perms.has(PermissionFlagsBits.Connect)) {
-            throw new Error('Bot sem permissão de **Conectar** na sala privada.');
+            throw new Error('Bot sem permissão de **Conectar** na sala.');
         }
         if (perms && !perms.has(PermissionFlagsBits.Speak)) {
-            throw new Error('Bot sem permissão de **Falar** na sala privada.');
+            throw new Error('Bot sem permissão de **Falar** na sala.');
         }
     }
 
@@ -333,12 +355,26 @@ async function ensureConnection(guild, voiceChannelId) {
         }
     });
 
+    // Se a conexão cair, encerra a sala
+    connection.on(VoiceConnectionStatus.Disconnected, async () => {
+        try {
+            await Promise.race([
+                entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                entersState(connection, VoiceConnectionStatus.Connecting, 5_000)
+            ]);
+        } catch {
+            safeDestroy(connection);
+            const st = getState(guild.id);
+            stop(guild.id, st.client).catch(() => {});
+        }
+    });
+
     try {
         await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
     } catch {
         safeDestroy(connection);
         throw new Error(
-            'Não consegui conectar na call privada. Confira se o bot tem Conectar/Falar e se está no Render.'
+            'Não consegui conectar na call. Confira permissões (Conectar/Falar) e se está no Render/Wi‑Fi.'
         );
     }
 
@@ -391,6 +427,10 @@ async function playNext(guildId) {
     }
 }
 
+/**
+ * Cria sala privada (ou usa a atual) → conecta → 5s → toca
+ * Fallback: se create falhar, usa o VC atual do membro
+ */
 async function startPrivateSession(guild, member, textChannel, query, client) {
     const st = getState(guild.id);
     st.client = client;
@@ -409,12 +449,25 @@ async function startPrivateSession(guild, member, textChannel, query, client) {
     }
 
     if (!voiceChannelId) {
-        const priv = await createPrivateVoice(guild, member);
-        st.privateChannelId = priv.id;
-        st.ownerId = member.id;
-        voiceChannelId = priv.id;
-        createdNew = true;
-        console.log(`[music] sala privada criada: ${voiceChannelId}`);
+        try {
+            const priv = await createPrivateVoice(guild, member);
+            st.privateChannelId = priv.id;
+            st.ownerId = member.id;
+            voiceChannelId = priv.id;
+            createdNew = true;
+            console.log(`[music] sala privada criada: ${voiceChannelId}`);
+        } catch (e) {
+            console.warn('[music] falha sala privada, usando VC atual:', e.message);
+            if (!member.voice?.channelId) {
+                st.joining = false;
+                throw new Error(
+                    'Não consegui criar sala privada e você não está em um canal de voz.'
+                );
+            }
+            voiceChannelId = member.voice.channelId;
+            st.privateChannelId = null;
+            st.ownerId = member.id;
+        }
     } else {
         await member.voice.setChannel(voiceChannelId).catch(() => {});
     }
@@ -486,7 +539,63 @@ async function onVoiceStateUpdate(oldState, newState) {
 }
 
 async function handleControl(interaction) {
-    const m = interaction.customId.match(/^mctl_(skip|prev|pause|loop)_(\d+)$/);
+    const cid = interaction.customId || '';
+
+    // Convite: minvite_guildId_channelId_userId  ou minvite_pick_
+    if (cid.startsWith('minvite_')) {
+        if (cid.startsWith('minvite_pick_')) {
+            await interaction.reply({
+                content:
+                    'Para convidar: `O.play @usuario`\nOu mencione o amigo no chat.',
+                ephemeral: true
+            });
+            return true;
+        }
+
+        const parts = cid.split('_');
+        // minvite_guildId_channelId_userId
+        const guildId = parts[1];
+        const channelId = parts[2];
+        const targetId = parts[3];
+
+        if (interaction.guildId !== guildId) {
+            await interaction.reply({ content: 'Servidor inválido.', ephemeral: true });
+            return true;
+        }
+
+        // Qualquer um pode clicar para entrar se for o alvo; ou o dono convida e o alvo clica
+        await allowUserInPrivate(guildId, interaction.user.id, interaction.client);
+
+        const member = interaction.member;
+        try {
+            if (member?.voice?.channelId) {
+                await member.voice.setChannel(channelId);
+                await interaction.reply({ content: `🎧 Você entrou em <#${channelId}>!`, ephemeral: true });
+            } else {
+                await interaction.reply({
+                    content: `Entre em qualquer canal de voz e clique de novo, ou vá em <#${channelId}>.`,
+                    ephemeral: true
+                });
+            }
+        } catch (e) {
+            await interaction.reply({
+                content: `Não consegui te mover. Entre manualmente em <#${channelId}>.`,
+                ephemeral: true
+            });
+        }
+        return true;
+    }
+
+    if (cid.startsWith('mctl_cancelstop_')) {
+        await interaction.update({
+            content: 'Ok, sessão mantida.',
+            embeds: [],
+            components: []
+        }).catch(() => interaction.deferUpdate().catch(() => {}));
+        return true;
+    }
+
+    const m = cid.match(/^mctl_(skip|prev|pause|loop|stop)_(\d+)$/);
     if (!m) return false;
 
     const action = m[1];
@@ -510,6 +619,20 @@ async function handleControl(interaction) {
     }
 
     clearIdleTimer(guildId);
+
+    if (action === 'stop') {
+        await stop(guildId, interaction.client);
+        await interaction
+            .update({
+                content: '⏹️ Sessão encerrada. Sala fechada.',
+                embeds: [],
+                components: []
+            })
+            .catch(async () => {
+                await interaction.reply({ content: '⏹️ Sessão encerrada.', ephemeral: true });
+            });
+        return true;
+    }
 
     if (action === 'skip') {
         if (st.now) {
@@ -566,6 +689,10 @@ function skip(guildId) {
         if (st.history.length > 30) st.history.shift();
     }
     st.player.stop(true);
+    st.playing = false;
+    st.paused = false;
+    st.now = null;
+    playNext(guildId).catch(() => {});
     return true;
 }
 
@@ -625,7 +752,11 @@ function buildQueueEmbed(guildId) {
     const lines = [];
     if (data.now) lines.push(`**▶** [${data.now.title}](${data.now.url})`);
     else lines.push('**▶** _Nada_');
-    return new EmbedBuilder().setColor(0x1db954).setTitle('🎶 Fila').setDescription(lines.join('\n'));
+    data.queue.slice(0, 10).forEach((t, i) => lines.push(`**${i + 1}.** ${t.title}`));
+    return new EmbedBuilder()
+        .setColor(0x1db954)
+        .setTitle('📃 Fila')
+        .setDescription(lines.join('\n').slice(0, 4000));
 }
 
 async function enqueue(guild, voiceChannelId, textChannelId, query, userId, client) {
@@ -650,5 +781,6 @@ module.exports = {
     formatDuration,
     controlRow,
     nowEmbed,
+    allowUserInPrivate,
     RANDOM_POOL
 };
