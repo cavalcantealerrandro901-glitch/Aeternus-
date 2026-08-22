@@ -1,8 +1,8 @@
 const sg = require('../utils/supremeGate');
 
 module.exports = (client) => {
-    // Entrada de membros (além do welcome clássico)
     client.on('guildMemberAdd', async (member) => {
+        if (member.user.bot) return;
         try {
             await sg.onMemberJoin(member);
         } catch (e) {
@@ -11,14 +11,9 @@ module.exports = (client) => {
     });
 
     client.on('guildMemberRemove', async (member) => {
+        if (member.user?.bot) return;
         try {
-            const c = sg.cfg(member.guild.id);
-            if (!c.enabled) return;
-            await sg.log(
-                member.guild,
-                'leave',
-                `🚪 **Saída**\n${member.user?.tag || member.id} (\`${member.id}\`) saiu do servidor.`
-            );
+            await sg.onMemberLeave(member);
         } catch (e) {
             console.error('[SUPREME GATE leave]', e.message);
         }

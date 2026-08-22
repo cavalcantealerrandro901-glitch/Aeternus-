@@ -1,3 +1,7 @@
+/**
+ * SUPREME GATE — módulo profissional de entrada
+ * Boas-vindas · Saída · Regras · Verificação · Cargos · Logs
+ */
 const fs = require('fs');
 const path = require('path');
 const {
@@ -10,376 +14,543 @@ const {
 } = require('discord.js');
 const settings = require('./settings');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'supremeGate.json');
+const DATA = path.join(__dirname, '..', 'data', 'supremeGate.json');
+const STATS = path.join(__dirname, '..', 'data', 'sgStats.json');
 
-function readProgress() {
-    if (!fs.existsSync(DATA_FILE)) return {};
+const BUTTON_STYLES = {
+    primary: ButtonStyle.Primary,
+    secondary: ButtonStyle.Secondary,
+    success: ButtonStyle.Success,
+    danger: ButtonStyle.Danger
+};
+
+function readJson(file, fallback = {}) {
+    if (!fs.existsSync(file)) return fallback;
     try {
-        return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+        return JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch {
-        return {};
+        return fallback;
     }
 }
 
-function writeProgress(data) {
-    const dir = path.dirname(DATA_FILE);
+function writeJson(file, data) {
+    const dir = path.dirname(file);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-function progressKey(guildId, userId) {
-    return `${guildId}:${userId}`;
-}
-
-function getProgress(guildId, userId) {
-    const all = readProgress();
-    return (
-        all[progressKey(guildId, userId)] || {
-            rules: false,
-            verified: false,
-            roles: false,
-            interests: [],
-            notifications: [],
-            startedAt: null,
-            finishedAt: null
-        }
-    );
-}
-
-function setProgress(guildId, userId, patch) {
-    const all = readProgress();
-    const k = progressKey(guildId, userId);
-    all[k] = { ...getProgress(guildId, userId), ...patch };
-    writeProgress(all);
-    return all[k];
-}
-
-function cfg(guildId) {
-    const g = settings.getGuild(guildId);
+/** Config padrão por servidor */
+function defaults() {
     return {
-        enabled: g.sgEnabled === true || g.sgEnabled === 'true',
-        channelId: g.sgChannel || g.welcomeChannel || null,
-        logChannelId: g.sgLogChannel || null,
-        visitorRoleId: g.sgVisitorRole || null,
-        verifiedRoleId: g.sgVerifiedRole || null,
-        color: g.sgColor || '#7c3aed',
-        title: g.sgTitle || '🌌 UMA NOVA PRESENÇA SURGIU',
-        message:
-            g.sgMessage ||
-            'Bem-vindo(a), **{username}**.\nVocê acaba de atravessar o **SUPREME GATE** de **{server}**.\nSomos **{memberCount}** presenças neste plano.',
-        rulesText:
-            g.sgRulesText ||
-            '**⚖️ Conduta**\nRespeito e convivência.\n\n**🛡️ Segurança**\nProteja sua conta e a comunidade.\n\n**🚫 Proibições**\nSpam, abuso e conteúdo inadequado.\n\n**👑 Moderação**\nA equipe aplica as regras.\n\n**🌌 Comunidade**\nValorize o servidor e os membros.',
-        // IDs separados por vírgula: label|roleId|emoji
-        interestRoles: parseRoleList(g.sgInterestRoles),
-        notifyRoles: parseRoleList(g.sgNotifyRoles)
+        enabled: false,
+        theme: 'arcano',
+        // Boas-vindas
+        welcome: {
+            enabled: true,
+            channelId: null,
+            title: '🌌 UMA NOVA PRESENÇA CHEGOU',
+            description:
+                'Seja muito bem-vindo(a), {user}!\n\n✦ Você acaba de entrar em **{server}**.\n👥 Somos agora **{memberCount}** membros.\n\nEsperamos que você aproveite sua jornada por aqui.',
+            color: '#7c3aed',
+            footer: 'SUPREME GATE · {server}',
+            thumbnail: 'avatar',
+            image: '',
+            author: '',
+            ping: true,
+            buttons: [
+                { label: '📜 Regras', style: 'secondary', action: 'rules' },
+                { label: '🛡️ Cargos', style: 'primary', action: 'roles' }
+            ]
+        },
+        // Saída
+        leave: {
+            enabled: true,
+            channelId: null,
+            title: '🌙 UMA JORNADA CHEGOU AO FIM',
+            description:
+                '**{username}** deixou **{server}**.\n\n👥 Membros atuais: **{memberCount}**\n\nEsperamos que nossos caminhos se cruzem novamente.',
+            color: '#64748b',
+            footer: 'SUPREME GATE'
+        },
+        // Regras
+        rules: {
+            channelId: null,
+            title: '📜 CÓDIGO DE CONDUTA',
+            color: '#38bdf8',
+            items: [
+                { emoji: '⚖️', title: 'Respeito', text: 'Trate todos os membros com respeito.' },
+                { emoji: '🚫', title: 'Proibições', text: 'Não utilize o servidor para atividades proibidas.' },
+                { emoji: '🛡️', title: 'Segurança', text: 'Nunca compartilhe informações pessoais.' },
+                { emoji: '👑', title: 'Moderação', text: 'Respeite a equipe responsável pela comunidade.' }
+            ],
+            acceptLabel: '✅ ACEITAR REGRAS',
+            acceptDm: true
+        },
+        // Cargos
+        roles: {
+            visitorId: null,
+            verifiedId: null,
+            interests: [
+                { label: 'Gamer', roleId: '', emoji: '🎮' },
+                { label: 'Anime', roleId: '', emoji: '🎭' },
+                { label: 'Programador', roleId: '', emoji: '💻' },
+                { label: 'Designer', roleId: '', emoji: '🎨' },
+                { label: 'Música', roleId: '', emoji: '🎵' },
+                { label: 'Tecnologia', roleId: '', emoji: '🤖' }
+            ],
+            notifications: [
+                { label: 'Sorteios', roleId: '', emoji: '🎁' },
+                { label: 'Eventos', roleId: '', emoji: '🎉' },
+                { label: 'Anúncios', roleId: '', emoji: '📢' },
+                { label: 'Economia', roleId: '', emoji: '💰' }
+            ],
+            interestMin: 0,
+            interestMax: 6,
+            notifyMin: 0,
+            notifyMax: 6
+        },
+        // Logs
+        logs: {
+            channelId: null,
+            join: true,
+            leave: true,
+            rules: true,
+            roles: true,
+            verify: true,
+            errors: true
+        }
     };
 }
 
-function parseRoleList(raw) {
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
-    return String(raw)
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-            const parts = line.split('|').map((p) => p.trim());
-            return {
-                label: parts[0] || 'Cargo',
-                roleId: parts[1] || '',
-                emoji: parts[2] || undefined
-            };
-        })
-        .filter((r) => r.roleId);
+function getConfig(guildId) {
+    const g = settings.getGuild(guildId);
+    const base = defaults();
+    // merge legado sg*
+    if (g.sgEnabled) base.enabled = g.sgEnabled === true || g.sgEnabled === 'true';
+    if (g.sgChannel) base.welcome.channelId = g.sgChannel;
+    if (g.sgLogChannel) base.logs.channelId = g.sgLogChannel;
+    if (g.sgVisitorRole) base.roles.visitorId = g.sgVisitorRole;
+    if (g.sgVerifiedRole) base.roles.verifiedId = g.sgVerifiedRole;
+    if (g.sgTitle) base.welcome.title = g.sgTitle;
+    if (g.sgMessage) base.welcome.description = g.sgMessage;
+    if (g.sgColor) base.welcome.color = g.sgColor;
+    if (g.sgRulesText) {
+        base.rules.items = [{ emoji: '📜', title: 'Regras', text: g.sgRulesText }];
+    }
+    if (g.supremeGate && typeof g.supremeGate === 'object') {
+        return deepMerge(base, g.supremeGate);
+    }
+    return base;
 }
 
-function vars(str, member) {
-    const u = member.user || member;
-    const g = member.guild;
-    return String(str || '')
-        .replace(/{user}/g, `<@${u.id}>`)
-        .replace(/{username}/g, u.username)
-        .replace(/{userId}/g, u.id)
-        .replace(/{server}/g, g.name)
-        .replace(/{memberCount}/g, String(g.memberCount))
-        .replace(/{owner}/g, `<@${g.ownerId}>`);
+function setConfig(guildId, cfg) {
+    return settings.setKey(guildId, 'supremeGate', cfg);
 }
 
-async function log(guild, type, text) {
-    const c = cfg(guild.id);
-    if (!c.logChannelId) return;
-    const ch = await guild.channels.fetch(c.logChannelId).catch(() => null);
+function deepMerge(a, b) {
+    const out = { ...a };
+    for (const k of Object.keys(b || {})) {
+        if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) {
+            out[k] = deepMerge(a[k] || {}, b[k]);
+        } else {
+            out[k] = b[k];
+        }
+    }
+    return out;
+}
+
+function replaceVars(str, member, guild) {
+    if (!str) return '';
+    const u = member?.user || member || {};
+    const g = guild || member?.guild || {};
+    const created = u.createdTimestamp ? Math.floor(u.createdTimestamp / 1000) : null;
+    const joined = member?.joinedTimestamp ? Math.floor(member.joinedTimestamp / 1000) : null;
+    return String(str)
+        .replace(/{user}/g, u.id ? `<@${u.id}>` : '')
+        .replace(/{username}/g, u.username || '')
+        .replace(/{displayName}/g, member?.displayName || u.username || '')
+        .replace(/{userId}/g, u.id || '')
+        .replace(/{server}/g, g.name || '')
+        .replace(/{serverId}/g, g.id || '')
+        .replace(/{memberCount}/g, String(g.memberCount ?? ''))
+        .replace(/{userAvatar}/g, u.displayAvatarURL?.({ size: 256 }) || '')
+        .replace(/{serverIcon}/g, g.iconURL?.({ size: 256 }) || '')
+        .replace(/{createdAt}/g, created ? `<t:${created}:D>` : '')
+        .replace(/{joinedAt}/g, joined ? `<t:${joined}:D>` : '');
+}
+
+function buildEmbed(opts, member, guild) {
+    const e = new EmbedBuilder().setColor(opts.color || '#7c3aed');
+    if (opts.title) e.setTitle(replaceVars(opts.title, member, guild));
+    if (opts.description) e.setDescription(replaceVars(opts.description, member, guild));
+    if (opts.footer) e.setFooter({ text: replaceVars(opts.footer, member, guild).slice(0, 2048) });
+    if (opts.author) e.setAuthor({ name: replaceVars(opts.author, member, guild).slice(0, 256) });
+    if (opts.image) e.setImage(replaceVars(opts.image, member, guild));
+    if (opts.thumbnail === 'avatar' && member?.user) {
+        e.setThumbnail(member.user.displayAvatarURL({ size: 256 }));
+    } else if (opts.thumbnail && opts.thumbnail !== 'avatar') {
+        e.setThumbnail(replaceVars(opts.thumbnail, member, guild));
+    }
+    e.setTimestamp();
+    return e;
+}
+
+function buildWelcomeButtons(guildId, buttons) {
+    if (!buttons?.length) return [];
+    const row = new ActionRowBuilder();
+    for (const b of buttons.slice(0, 5)) {
+        const btn = new ButtonBuilder()
+            .setLabel((b.label || 'Botão').slice(0, 80))
+            .setStyle(BUTTON_STYLES[b.style] || ButtonStyle.Secondary);
+
+        if (b.emoji) {
+            try {
+                btn.setEmoji(b.emoji);
+            } catch (_) {}
+        }
+
+        if (b.action === 'url' && b.url) {
+            btn.setStyle(ButtonStyle.Link).setURL(b.url);
+        } else {
+            const act = b.action || 'rules';
+            btn.setCustomId(`sgv2_${act}_${guildId}`);
+        }
+        row.addComponents(btn);
+    }
+    return [row];
+}
+
+function rulesEmbed(cfg, member, guild) {
+    const items = cfg.rules.items || [];
+    const body = items
+        .map((r, i) => `**${r.emoji || '✦'} ${r.title || `Regra ${i + 1}`}**\n${r.text || ''}`)
+        .join('\n\n');
+    return new EmbedBuilder()
+        .setColor(cfg.rules.color || '#38bdf8')
+        .setTitle(cfg.rules.title || '📜 CÓDIGO DE CONDUTA')
+        .setDescription(body || 'Sem regras configuradas.')
+        .setFooter({ text: replaceVars('{server}', member, guild) })
+        .setTimestamp();
+}
+
+function acceptRow(guildId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`sgv2_accept_${guildId}`)
+            .setLabel('✅ ACEITAR REGRAS')
+            .setStyle(ButtonStyle.Success)
+    );
+}
+
+function rolesPanel(cfg, guildId) {
+    const rows = [];
+    const interests = (cfg.roles.interests || []).filter((r) => r.roleId);
+    const notifs = (cfg.roles.notifications || []).filter((r) => r.roleId);
+
+    if (interests.length) {
+        const menu = new StringSelectMenuBuilder()
+            .setCustomId(`sgv2_int_${guildId}`)
+            .setPlaceholder('🎮 Escolha seus interesses')
+            .setMinValues(cfg.roles.interestMin || 0)
+            .setMaxValues(Math.min(cfg.roles.interestMax || interests.length, interests.length, 25));
+        interests.slice(0, 25).forEach((r) => {
+            const o = new StringSelectMenuOptionBuilder().setLabel(r.label.slice(0, 100)).setValue(r.roleId);
+            if (r.emoji) o.setEmoji(r.emoji);
+            menu.addOptions(o);
+        });
+        rows.push(new ActionRowBuilder().addComponents(menu));
+    }
+
+    if (notifs.length) {
+        const menu = new StringSelectMenuBuilder()
+            .setCustomId(`sgv2_ntf_${guildId}`)
+            .setPlaceholder('🔔 Notificações')
+            .setMinValues(cfg.roles.notifyMin || 0)
+            .setMaxValues(Math.min(cfg.roles.notifyMax || notifs.length, notifs.length, 25));
+        notifs.slice(0, 25).forEach((r) => {
+            const o = new StringSelectMenuOptionBuilder().setLabel(r.label.slice(0, 100)).setValue(r.roleId);
+            if (r.emoji) o.setEmoji(r.emoji);
+            menu.addOptions(o);
+        });
+        rows.push(new ActionRowBuilder().addComponents(menu));
+    }
+
+    return rows;
+}
+
+function bumpStat(guildId, key) {
+    const all = readJson(STATS, {});
+    if (!all[guildId]) all[guildId] = { joins: 0, leaves: 0, verified: 0 };
+    all[guildId][key] = (all[guildId][key] || 0) + 1;
+    writeJson(STATS, all);
+}
+
+function getStats(guildId) {
+    const all = readJson(STATS, {});
+    return all[guildId] || { joins: 0, leaves: 0, verified: 0 };
+}
+
+function markAccepted(guildId, userId) {
+    const all = readJson(DATA, {});
+    const k = `${guildId}:${userId}`;
+    all[k] = { ...(all[k] || {}), rules: true, verified: true, at: Date.now() };
+    writeJson(DATA, all);
+}
+
+function hasAccepted(guildId, userId) {
+    const all = readJson(DATA, {});
+    return !!all[`${guildId}:${userId}`]?.rules;
+}
+
+async function sendLog(guild, cfg, type, description) {
+    if (!cfg.logs?.channelId) return;
+    if (cfg.logs[type] === false) return;
+    const ch = await guild.channels.fetch(cfg.logs.channelId).catch(() => null);
     if (!ch?.isTextBased()) return;
     const colors = {
         join: 0x22c55e,
+        leave: 0x64748b,
         rules: 0x38bdf8,
-        verify: 0xa78bfa,
         roles: 0xf59e0b,
-        leave: 0xef4444,
-        error: 0xf43f5e
+        verify: 0xa78bfa,
+        errors: 0xef4444
     };
     await ch
         .send({
             embeds: [
                 new EmbedBuilder()
                     .setColor(colors[type] || 0x7c3aed)
-                    .setTitle(`SUPREME GATE · ${type}`)
-                    .setDescription(text)
+                    .setTitle(`📋 GATE · ${type}`)
+                    .setDescription(description)
                     .setTimestamp()
             ]
         })
         .catch(() => {});
 }
 
-function portalEmbed(member, c) {
-    return new EmbedBuilder()
-        .setColor(c.color)
-        .setTitle(c.title)
-        .setDescription(vars(c.message, member))
-        .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-        .addFields(
-            { name: '👤 Membro', value: `${member}`, inline: true },
-            { name: '🏛️ Servidor', value: member.guild.name, inline: true },
-            { name: '👥 Membros', value: String(member.guild.memberCount), inline: true }
-        )
-        .setFooter({ text: 'SUPREME GATE · clique para iniciar a jornada' })
-        .setTimestamp();
-}
-
-function portalRow(userId) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`sg_start_${userId}`)
-            .setLabel('INICIAR JORNADA')
-            .setEmoji('✨')
-            .setStyle(ButtonStyle.Primary)
-    );
-}
-
-function rulesEmbed(member, c) {
-    return new EmbedBuilder()
-        .setColor(c.color)
-        .setTitle('📜 CÓDIGO DE CONDUTA')
-        .setDescription(vars(c.rulesText, member))
-        .setFooter({ text: 'Leia com atenção antes de aceitar' });
-}
-
-function rulesRow(userId) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`sg_rules_${userId}`)
-            .setLabel('LI E ACEITO AS REGRAS')
-            .setEmoji('✅')
-            .setStyle(ButtonStyle.Success)
-    );
-}
-
-function pathEmbed() {
-    return new EmbedBuilder()
-        .setColor(0x7c3aed)
-        .setTitle('🛡️ ESCOLHA SEU CAMINHO')
-        .setDescription(
-            'Sua jornada começa agora.\nEscolha os **interesses** que representam você.\nDepois configure suas **notificações**.'
-        );
-}
-
-function interestSelect(userId, roles) {
-    if (!roles.length) return null;
-    const menu = new StringSelectMenuBuilder()
-        .setCustomId(`sg_int_${userId}`)
-        .setPlaceholder('🎮 Interesses')
-        .setMinValues(0)
-        .setMaxValues(Math.min(roles.length, 25));
-    roles.slice(0, 25).forEach((r) => {
-        const opt = new StringSelectMenuOptionBuilder().setLabel(r.label.slice(0, 100)).setValue(r.roleId);
-        if (r.emoji) opt.setEmoji(r.emoji);
-        menu.addOptions(opt);
-    });
-    return new ActionRowBuilder().addComponents(menu);
-}
-
-function notifySelect(userId, roles) {
-    if (!roles.length) return null;
-    const menu = new StringSelectMenuBuilder()
-        .setCustomId(`sg_ntf_${userId}`)
-        .setPlaceholder('🔔 Notificações')
-        .setMinValues(0)
-        .setMaxValues(Math.min(roles.length, 25));
-    roles.slice(0, 25).forEach((r) => {
-        const opt = new StringSelectMenuOptionBuilder().setLabel(r.label.slice(0, 100)).setValue(r.roleId);
-        if (r.emoji) opt.setEmoji(r.emoji);
-        menu.addOptions(opt);
-    });
-    return new ActionRowBuilder().addComponents(menu);
-}
-
-function continueRow(userId) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`sg_finish_${userId}`)
-            .setLabel('CONCLUIR JORNADA')
-            .setEmoji('👑')
-            .setStyle(ButtonStyle.Primary)
-    );
-}
-
-function doneEmbed(member) {
-    return new EmbedBuilder()
-        .setColor(0x22c55e)
-        .setTitle('👑 ACESSO CONCEDIDO')
-        .setDescription(
-            `✦ Sua identidade foi registrada, **${member.user.username}**.\n\n` +
-                `📜 Regras — **ACEITAS** ✅\n` +
-                `🛡️ Cargos — **CONFIGURADOS** ✅\n` +
-                `🔐 Verificação — **CONCLUÍDA** ✅\n` +
-                `🌌 Acesso — **LIBERADO** ✅\n\n` +
-                `Bem-vindo(a) à comunidade.`
-        )
-        .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-        .setTimestamp();
-}
-
 async function onMemberJoin(member) {
-    const c = cfg(member.guild.id);
-    if (!c.enabled || !c.channelId) return;
+    const cfg = getConfig(member.guild.id);
+    if (!cfg.enabled) return;
 
-    if (c.visitorRoleId) {
-        await member.roles.add(c.visitorRoleId).catch(() => {});
+    bumpStat(member.guild.id, 'joins');
+
+    if (cfg.roles.visitorId) {
+        await member.roles.add(cfg.roles.visitorId).catch(() => {});
     }
 
-    setProgress(member.guild.id, member.id, {
-        rules: false,
-        verified: false,
-        roles: false,
-        interests: [],
-        notifications: [],
-        startedAt: Date.now(),
-        finishedAt: null
-    });
+    if (cfg.welcome?.enabled && cfg.welcome.channelId) {
+        const ch = await member.guild.channels.fetch(cfg.welcome.channelId).catch(() => null);
+        if (ch?.isTextBased()) {
+            const embed = buildEmbed(cfg.welcome, member, member.guild);
+            const components = buildWelcomeButtons(member.guild.id, cfg.welcome.buttons);
+            await ch
+                .send({
+                    content: cfg.welcome.ping ? `${member}` : undefined,
+                    embeds: [embed],
+                    components
+                })
+                .catch((e) => console.error('[GATE welcome]', e.message));
+        }
+    }
 
-    const channel = await member.guild.channels.fetch(c.channelId).catch(() => null);
-    if (!channel?.isTextBased()) return;
-
-    await channel.send({
-        content: `${member}`,
-        embeds: [portalEmbed(member, c)],
-        components: [portalRow(member.id)]
-    });
-
-    await log(
+    await sendLog(
         member.guild,
+        cfg,
         'join',
-        `🟢 **Entrada**\n${member} (\`${member.id}\`) entrou em **${member.guild.name}**.`
+        `👋 **Entrada**\n${member} (\`${member.id}\`)\nConta: ${replaceVars('{createdAt}', member, member.guild)}`
+    );
+}
+
+async function onMemberLeave(member) {
+    const cfg = getConfig(member.guild.id);
+    if (!cfg.enabled) return;
+
+    bumpStat(member.guild.id, 'leaves');
+
+    if (cfg.leave?.enabled && cfg.leave.channelId) {
+        const ch = await member.guild.channels.fetch(cfg.leave.channelId).catch(() => null);
+        if (ch?.isTextBased()) {
+            const embed = buildEmbed(cfg.leave, member, member.guild);
+            await ch.send({ embeds: [embed] }).catch(() => {});
+        }
+    }
+
+    await sendLog(
+        member.guild,
+        cfg,
+        'leave',
+        `🚪 **Saída**\n**${member.user?.tag || member.id}** (\`${member.id}\`)`
     );
 }
 
 async function handleInteraction(interaction) {
     const id = interaction.customId || '';
-    if (!id.startsWith('sg_')) return false;
+    if (!id.startsWith('sgv2_')) return false;
 
     const parts = id.split('_');
-    const action = parts[1]; // start | rules | finish | int | ntf
-    const userId = parts[2];
+    // sgv2_action_guildId
+    const action = parts[1];
+    const guildId = parts[2] || interaction.guildId;
 
-    if (interaction.user.id !== userId) {
-        await interaction.reply({ content: 'Este portal não é seu.', ephemeral: true }).catch(() => {});
+    if (interaction.guildId !== guildId) {
+        await interaction.reply({ content: 'Servidor inválido.', ephemeral: true }).catch(() => {});
         return true;
     }
 
+    const cfg = getConfig(guildId);
     const member = interaction.member;
-    const guild = interaction.guild;
-    const c = cfg(guild.id);
-
-    if (action === 'start') {
-        await interaction.update({
-            embeds: [rulesEmbed(member, c)],
-            components: [rulesRow(userId)]
-        });
-        return true;
-    }
 
     if (action === 'rules') {
-        setProgress(guild.id, userId, { rules: true, verified: true });
-
-        if (c.visitorRoleId) await member.roles.remove(c.visitorRoleId).catch(() => {});
-        if (c.verifiedRoleId) await member.roles.add(c.verifiedRoleId).catch(() => {});
-
-        await log(
-            guild,
-            'verify',
-            `🔐 **Verificação**\n${member} aceitou as regras e foi verificado.`
-        );
-
-        const rows = [];
-        const intRow = interestSelect(userId, c.interestRoles);
-        const ntfRow = notifySelect(userId, c.notifyRoles);
-        if (intRow) rows.push(intRow);
-        if (ntfRow) rows.push(ntfRow);
-        rows.push(continueRow(userId));
-
-        await interaction.update({
-            embeds: [pathEmbed()],
-            components: rows
-        });
-        return true;
-    }
-
-    if (action === 'int' && interaction.isStringSelectMenu()) {
-        const selected = interaction.values || [];
-        const prev = getProgress(guild.id, userId);
-        // remove old interest roles from config list
-        for (const r of c.interestRoles) {
-            if (prev.interests?.includes(r.roleId) && !selected.includes(r.roleId)) {
-                await member.roles.remove(r.roleId).catch(() => {});
-            }
-        }
-        for (const roleId of selected) {
-            await member.roles.add(roleId).catch(() => {});
-        }
-        setProgress(guild.id, userId, { interests: selected, roles: true });
-        await interaction.reply({ content: `🎮 Interesses atualizados (**${selected.length}**).`, ephemeral: true });
-        await log(guild, 'roles', `🛡️ **Interesses**\n${member}: ${selected.map((id) => `<@&${id}>`).join(', ') || 'nenhum'}`);
-        return true;
-    }
-
-    if (action === 'ntf' && interaction.isStringSelectMenu()) {
-        const selected = interaction.values || [];
-        const prev = getProgress(guild.id, userId);
-        for (const r of c.notifyRoles) {
-            if (prev.notifications?.includes(r.roleId) && !selected.includes(r.roleId)) {
-                await member.roles.remove(r.roleId).catch(() => {});
-            }
-        }
-        for (const roleId of selected) {
-            await member.roles.add(roleId).catch(() => {});
-        }
-        setProgress(guild.id, userId, { notifications: selected });
         await interaction.reply({
-            content: `🔔 Notificações atualizadas (**${selected.length}**).`,
+            embeds: [rulesEmbed(cfg, member, interaction.guild)],
+            components: [acceptRow(guildId)],
             ephemeral: true
         });
         return true;
     }
 
-    if (action === 'finish') {
-        setProgress(guild.id, userId, { finishedAt: Date.now(), roles: true, verified: true, rules: true });
-        await interaction.update({
-            embeds: [doneEmbed(member)],
-            components: []
+    if (action === 'roles') {
+        const rows = rolesPanel(cfg, guildId);
+        if (!rows.length) {
+            await interaction.reply({
+                content: 'Nenhum cargo de interesse/notificação configurado.',
+                ephemeral: true
+            });
+            return true;
+        }
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor('#7c3aed')
+                    .setTitle('🛡️ ESCOLHA SEU CAMINHO')
+                    .setDescription('Selecione interesses e notificações nos menus abaixo.')
+            ],
+            components: rows,
+            ephemeral: true
         });
-        await log(guild, 'verify', `👑 **Jornada concluída**\n${member} liberou o acesso completo.`);
+        return true;
+    }
+
+    if (action === 'accept') {
+        markAccepted(guildId, interaction.user.id);
+        bumpStat(guildId, 'verified');
+
+        if (cfg.roles.visitorId) await member.roles.remove(cfg.roles.visitorId).catch(() => {});
+        if (cfg.roles.verifiedId) await member.roles.add(cfg.roles.verifiedId).catch(() => {});
+
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0x22c55e)
+                    .setTitle('✅ REGRAS ACEITAS')
+                    .setDescription(
+                        'Você confirmou que leu e concorda com as regras.\n🔓 Seu acesso foi atualizado.'
+                    )
+            ],
+            ephemeral: true
+        });
+
+        if (cfg.rules.acceptDm) {
+            await interaction.user
+                .send({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(0x22c55e)
+                            .setTitle(`✅ Verificado em ${interaction.guild.name}`)
+                            .setDescription('Regras aceitas. Bem-vindo(a)!')
+                    ]
+                })
+                .catch(() => {});
+        }
+
+        await sendLog(
+            interaction.guild,
+            cfg,
+            'verify',
+            `🔐 **Verificação**\n${member} aceitou as regras.`
+        );
+        return true;
+    }
+
+    if (action === 'int' && interaction.isStringSelectMenu()) {
+        const selected = interaction.values;
+        const list = (cfg.roles.interests || []).map((r) => r.roleId).filter(Boolean);
+        for (const roleId of list) {
+            if (member.roles.cache.has(roleId) && !selected.includes(roleId)) {
+                await member.roles.remove(roleId).catch(() => {});
+            }
+        }
+        for (const roleId of selected) {
+            await member.roles.add(roleId).catch(() => {});
+        }
+        await interaction.reply({
+            content: `🎮 Interesses: **${selected.length}** cargo(s).`,
+            ephemeral: true
+        });
+        await sendLog(
+            interaction.guild,
+            cfg,
+            'roles',
+            `🛡️ **Interesses** · ${member}\n${selected.map((id) => `<@&${id}>`).join(' ') || '—'}`
+        );
+        return true;
+    }
+
+    if (action === 'ntf' && interaction.isStringSelectMenu()) {
+        const selected = interaction.values;
+        const list = (cfg.roles.notifications || []).map((r) => r.roleId).filter(Boolean);
+        for (const roleId of list) {
+            if (member.roles.cache.has(roleId) && !selected.includes(roleId)) {
+                await member.roles.remove(roleId).catch(() => {});
+            }
+        }
+        for (const roleId of selected) {
+            await member.roles.add(roleId).catch(() => {});
+        }
+        await interaction.reply({
+            content: `🔔 Notificações: **${selected.length}** cargo(s).`,
+            ephemeral: true
+        });
+        await sendLog(
+            interaction.guild,
+            cfg,
+            'roles',
+            `🔔 **Notificações** · ${member}\n${selected.map((id) => `<@&${id}>`).join(' ') || '—'}`
+        );
         return true;
     }
 
     return false;
 }
 
+/** Teste: envia preview no canal de boas-vindas */
+async function sendTest(guild, user) {
+    const cfg = getConfig(guild.id);
+    const member =
+        guild.members.cache.get(user.id) ||
+        (await guild.members.fetch(user.id).catch(() => null));
+    if (!member) throw new Error('Membro não encontrado');
+    if (!cfg.welcome.channelId) throw new Error('Configure o canal de boas-vindas');
+    const ch = await guild.channels.fetch(cfg.welcome.channelId).catch(() => null);
+    if (!ch?.isTextBased()) throw new Error('Canal inválido');
+
+    const embed = buildEmbed(cfg.welcome, member, guild);
+    embed.setFooter({ text: '🧪 MODO TESTE · SUPREME GATE' });
+    const components = buildWelcomeButtons(guild.id, cfg.welcome.buttons);
+    await ch.send({ content: `🧪 Teste por ${user}`, embeds: [embed], components });
+    return true;
+}
+
 module.exports = {
-    cfg,
+    defaults,
+    getConfig,
+    setConfig,
+    getStats,
     onMemberJoin,
+    onMemberLeave,
     handleInteraction,
-    getProgress,
-    setProgress,
-    log
+    sendTest,
+    replaceVars,
+    buildEmbed,
+    rulesEmbed
 };

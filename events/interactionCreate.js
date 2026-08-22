@@ -6,10 +6,10 @@ const sg = require('../utils/supremeGate');
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
-        // SUPREME GATE
+        // SUPREME GATE v2
         if (
             (interaction.isButton() || interaction.isStringSelectMenu()) &&
-            interaction.customId?.startsWith('sg_')
+            (interaction.customId?.startsWith('sgv2_') || interaction.customId?.startsWith('sg_'))
         ) {
             try {
                 const handled = await sg.handleInteraction(interaction);
@@ -17,10 +17,7 @@ module.exports = {
             } catch (err) {
                 console.error('[SUPREME GATE]', err);
                 try {
-                    const payload = {
-                        content: 'Erro no SUPREME GATE.',
-                        flags: [MessageFlags.Ephemeral]
-                    };
+                    const payload = { content: 'Erro no SUPREME GATE.', flags: [MessageFlags.Ephemeral] };
                     if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
                     else await interaction.reply(payload);
                 } catch (_) {}
@@ -28,18 +25,15 @@ module.exports = {
             return;
         }
 
-        // Controles de música
         if (interaction.isButton() && interaction.customId.startsWith('mctl_')) {
             try {
-                const handled = await music.handleControl(interaction);
-                if (handled) return;
+                await music.handleControl(interaction);
             } catch (err) {
                 console.error('[music control]', err);
             }
             return;
         }
 
-        // Botão Novamente (jogos)
         if (interaction.isButton() && interaction.customId.startsWith('again:')) {
             const parts = interaction.customId.split(':');
             if (parts.length < 4) {
@@ -47,20 +41,14 @@ module.exports = {
                     .reply({ content: 'Dados inválidos.', flags: [MessageFlags.Ephemeral] })
                     .catch(() => {});
             }
-
             const game = parts[1];
             const ownerId = parts[2];
             const payloadB64 = parts.slice(3).join(':');
-
             if (interaction.user.id !== ownerId) {
                 return interaction
-                    .reply({
-                        content: 'Só quem jogou pode usar **Novamente**.',
-                        flags: [MessageFlags.Ephemeral]
-                    })
+                    .reply({ content: 'Só quem jogou pode usar **Novamente**.', flags: [MessageFlags.Ephemeral] })
                     .catch(() => {});
             }
-
             const payload = decodePayload(payloadB64);
             const args = payload?.a || [];
             const command = client.commands.get(game);
@@ -69,12 +57,10 @@ module.exports = {
                     .reply({ content: 'Jogo não encontrado.', flags: [MessageFlags.Ephemeral] })
                     .catch(() => {});
             }
-
             try {
                 await interaction.update({ components: interaction.message.components }).catch(async () => {
                     await interaction.deferUpdate().catch(() => {});
                 });
-
                 const fakeMessage = {
                     id: `${interaction.id}_again`,
                     author: interaction.user,
@@ -86,7 +72,6 @@ module.exports = {
                     mentions: { users: { first: () => null, size: 0, values: () => [] } },
                     reply: (p) => interaction.channel.send(p)
                 };
-
                 await command.execute(fakeMessage, args, client);
             } catch (err) {
                 console.error('again button:', err);
@@ -95,10 +80,8 @@ module.exports = {
         }
 
         if (!interaction.isChatInputCommand()) return;
-
         const command = client.slashCommands.get(interaction.commandName);
         if (!command) return;
-
         try {
             await command.execute(interaction);
         } catch (error) {
