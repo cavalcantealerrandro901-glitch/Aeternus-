@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SUPREME GATE · Aeternus</title>
+  <link rel="stylesheet" href="/css/panel.css">
+  <style>
+    .gate-nav { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+    .gate-nav button {
+      border:1px solid var(--border); background:var(--bg2); color:var(--text);
+      padding:8px 12px; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer;
+    }
+    .gate-nav button.active { border-color:var(--accent); color:var(--accent); background:#0c1a2e; }
+    .tab { display:none; }
+    .tab.active { display:block; }
+    .preview {
+      background:#1e1f22; border-radius:12px; padding:16px; border:1px solid #2b2d31;
+      font-family: 'gg sans','Segoe UI',sans-serif;
+    }
+    .preview .ptitle { font-weight:700; font-size:16px; margin-bottom:8px; color:#f2f3f5; }
+    .preview .pdesc { color:#dbdee1; font-size:14px; white-space:pre-wrap; line-height:1.45; }
+    .preview .pfoot { color:#949ba4; font-size:12px; margin-top:10px; }
+    .preview-btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .preview-btns span {
+      background:#4e5058; color:#fff; padding:6px 12px; border-radius:3px; font-size:13px; font-weight:500;
+    }
+    .role-line { display:grid; grid-template-columns: 1fr 1.2fr 60px 32px; gap:6px; margin-bottom:6px; }
+    .role-line input { font-size:13px; }
+    .stats-row { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    @media(min-width:700px){ .stats-row { grid-template-columns:repeat(4,1fr); } }
+  </style>
+</head>
+<body class="panel-body">
+  <header class="panel-top">
+    <div class="panel-brand">🌌 SUPREME GATE</div>
+    <div class="panel-actions">
+      <a class="btn" id="backDash" href="/dashboard">← Painel</a>
+      <a class="btn" href="/servers">Servidores</a>
+    </div>
+  </header>
+
+  <main class="panel-wrap">
+    <div class="card">
+      <div class="row-between">
+        <div>
+          <h2 style="margin:0 0 4px">👑 SUPREME GATE</h2>
+          <p class="hint" style="margin:0" id="guildLabel">Carregando servidor…</p>
+        </div>
+        <label class="switch" title="Ativar sistema">
+          <input type="checkbox" id="enabled"><span class="slider"></span>
+        </label>
+      </div>
+      <div class="stats-row" style="margin-top:14px">
+        <div class="stat"><b id="stJoins">0</b><span>👋 Entradas</span></div>
+        <div class="stat"><b id="stLeaves">0</b><span>🚪 Saídas</span></div>
+        <div class="stat"><b id="stVerified">0</b><span>🔐 Verificados</span></div>
+        <div class="stat"><b id="stStatus">OFF</b><span>Status</span></div>
+      </div>
+    </div>
+
+    <div class="gate-nav" id="nav">
+      <button type="button" data-tab="welcome" class="active">👋 Boas-vindas</button>
+      <button type="button" data-tab="leave">🚪 Saída</button>
+      <button type="button" data-tab="rules">📜 Regras</button>
+      <button type="button" data-tab="roles">🛡️ Cargos</button>
+      <button type="button" data-tab="buttons">🔘 Botões</button>
+      <button type="button" data-tab="logs">📊 Logs</button>
+      <button type="button" data-tab="preview">👁️ Prévia</button>
+    </div>
+
+    <!-- WELCOME -->
+    <div class="tab active" id="tab-welcome">
+      <div class="card">
+        <div class="field row-between">
+          <label style="margin:0">Ativar boas-vindas</label>
+          <label class="switch"><input type="checkbox" id="wEnabled"><span class="slider"></span></label>
+        </div>
+        <div class="field"><label>Canal</label><select id="wChannel"></select></div>
+        <div class="field"><label>Título</label><input id="wTitle"></div>
+        <div class="field"><label>Descrição</label><textarea id="wDesc" rows="6"></textarea></div>
+        <div class="field"><label>Cor (#hex)</label><input id="wColor" placeholder="#7c3aed"></div>
+        <div class="field"><label>Rodapé</label><input id="wFooter"></div>
+        <div class="field"><label>Imagem (URL)</label><input id="wImage" placeholder="https://..."></div>
+        <div class="field row-between">
+          <label style="margin:0">Mencionar membro</label>
+          <label class="switch"><input type="checkbox" id="wPing"><span class="slider"></span></label>
+        </div>
+        <p class="hint">Variáveis: {user} {username} {displayName} {server} {memberCount} {createdAt} {joinedAt}</p>
+      </div>
+    </div>
+
+    <!-- LEAVE -->
+    <div class="tab" id="tab-leave">
+      <div class="card">
+        <div class="field row-between">
+          <label style="margin:0">Ativar saída</label>
+          <label class="switch"><input type="checkbox" id="lEnabled"><span class="slider"></span></label>
+        </div>
+        <div class="field"><label>Canal</label><select id="lChannel"></select></div>
+        <div class="field"><label>Título</label><input id="lTitle"></div>
+        <div class="field"><label>Descrição</label><textarea id="lDesc" rows="5"></textarea></div>
+        <div class="field"><label>Cor</label><input id="lColor"></div>
+        <div class="field"><label>Rodapé</label><input id="lFooter"></div>
+      </div>
+    </div>
+
+    <!-- RULES -->
+    <div class="tab" id="tab-rules">
+      <div class="card">
+        <div class="field"><label>Título do painel de regras</label><input id="rTitle"></div>
+        <div class="field"><label>Cor</label><input id="rColor"></div>
+        <div class="field row-between">
+          <label style="margin:0">DM de confirmação</label>
+          <label class="switch"><input type="checkbox" id="rDm"><span class="slider"></span></label>
+        </div>
+        <label class="hint">Regras (emoji | título | texto) — uma por linha</label>
+        <textarea id="rItems" rows="10" placeholder="⚖️|Respeito|Trate todos com respeito."></textarea>
+      </div>
+    </div>
+
+    <!-- ROLES -->
+    <div class="tab" id="tab-roles">
+      <div class="card">
+        <div class="field"><label>Cargo visitante</label><select id="roleVisitor"></select></div>
+        <div class="field"><label>Cargo verificado</label><select id="roleVerified"></select></div>
+        <h3 style="font-size:14px;margin:16px 0 8px">🎮 Interesses (nome | id do cargo | emoji)</h3>
+        <textarea id="roleInterests" rows="6" placeholder="Gamer|123|🎮"></textarea>
+        <h3 style="font-size:14px;margin:16px 0 8px">🔔 Notificações</h3>
+        <textarea id="roleNotifs" rows="5" placeholder="Eventos|456|🎉"></textarea>
+      </div>
+    </div>
+
+    <!-- BUTTONS -->
+    <div class="tab" id="tab-buttons">
+      <div class="card">
+        <p class="hint">Até 5 botões na mensagem de boas-vindas. Ações: rules, roles, url</p>
+        <p class="hint">Formato: rótulo | estilo(primary/secondary/success) | ação | url(opcional)</p>
+        <textarea id="wButtons" rows="6" placeholder="📜 Regras|secondary|rules&#10;🛡️ Cargos|primary|roles&#10;🔗 Site|secondary|url|https://exemplo.com"></textarea>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="tab" id="tab-logs">
+      <div class="card">
+        <div class="field"><label>Canal de logs</label><select id="logChannel"></select></div>
+        <div class="field row-between"><span>Entradas</span><label class="switch"><input type="checkbox" id="logJoin"><span class="slider"></span></label></div>
+        <div class="field row-between"><span>Saídas</span><label class="switch"><input type="checkbox" id="logLeave"><span class="slider"></span></label></div>
+        <div class="field row-between"><span>Regras / verificação</span><label class="switch"><input type="checkbox" id="logVerify"><span class="slider"></span></label></div>
+        <div class="field row-between"><span>Cargos</span><label class="switch"><input type="checkbox" id="logRoles"><span class="slider"></span></label></div>
+      </div>
+    </div>
+
+    <!-- PREVIEW -->
+    <div class="tab" id="tab-preview">
+      <div class="card">
+        <div class="preview" id="previewBox">
+          <div class="ptitle" id="pTitle">—</div>
+          <div class="pdesc" id="pDesc">—</div>
+          <div class="pfoot" id="pFoot">—</div>
+          <div class="preview-btns" id="pBtns"></div>
+        </div>
+        <p class="hint" style="margin-top:12px">Prévia aproximada do embed no Discord.</p>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">
+      <button type="button" class="btn btn-primary" id="btnSave">💾 Salvar</button>
+      <button type="button" class="btn" id="btnTest">🧪 Testar no Discord</button>
+      <button type="button" class="btn" id="btnRefreshPreview">👁️ Atualizar prévia</button>
+    </div>
+  </main>
+
+  <div class="toast" id="toast">OK</div>
+  <script src="/js/supreme-gate.js"></script>
+</body>
+</html>
