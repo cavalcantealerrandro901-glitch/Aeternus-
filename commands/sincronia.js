@@ -5,22 +5,20 @@ const {
     ButtonStyle,
     ComponentType
 } = require('discord.js');
-const flocos = require('../utils/flocos');
-const xp = require('../utils/xp');
 const cristais = require('../utils/cristais');
 const { againRow } = require('../utils/gameAgain');
 
 module.exports = {
     name: 'sincronia',
     aliases: ['sync', 'regra'],
-    description: 'Regra secreta com ❄️ flocos',
+    description: 'Regra secreta com 💠 cristais',
     async execute(message, args) {
         const stakeRaw = args[0] || '100';
-        const stake = flocos.parseBet(stakeRaw, flocos.get(message.author.id)) || 100;
-        const check = flocos.canBet(message.author.id, stake);
+        const stake = cristais.parseBet(stakeRaw, cristais.get(message.author.id)) || 100;
+        const check = cristais.canBet(message.author.id, stake);
         if (!check.ok) return message.reply(check.error);
 
-        flocos.add(message.author.id, -stake);
+        cristais.add(message.author.id, -stake);
         const againArgs = [String(stakeRaw)];
 
         const a = 2 + Math.floor(Math.random() * 20);
@@ -57,7 +55,7 @@ module.exports = {
                     .setColor(0xd946ef)
                     .setTitle('🔗 SINCRONIA')
                     .setDescription(
-                        `Números **${a}** e **${b}**. Qual o resultado da regra secreta?\n${flocos.format(stake)} → **2,5x**`
+                        `Números **${a}** e **${b}**. Qual o resultado da regra secreta?\n${cristais.format(stake)} → **2,5x**`
                     )
             ],
             components: [row]
@@ -75,16 +73,14 @@ module.exports = {
             const ok = pick === answer;
             if (ok) {
                 const win = Math.floor(stake * 2.5);
-                flocos.add(message.author.id, win);
-                xp.add(message.author.id, 12);
-                cristais.add(message.author.id, 2);
+                cristais.add(message.author.id, win);
                 await i.update({
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x22c55e)
                             .setTitle('🔗 Certo')
                             .setDescription(
-                                `Regra: **${rule.name}** = **${answer}**\n${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
+                                `Regra: **${rule.name}** = **${answer}**\n${cristais.format(win)}\nSaldo: ${cristais.formatPlain(cristais.get(message.author.id))}`
                             )
                     ],
                     components: [againRow('sincronia', message.author.id, againArgs)]
@@ -96,7 +92,7 @@ module.exports = {
                             .setColor(0xef4444)
                             .setTitle('🔗 Errado')
                             .setDescription(
-                                `Certo: **${answer}** (${rule.name}). Perdeu ${flocos.format(stake)}.`
+                                `Certo: **${answer}** (${rule.name}). Perdeu ${cristais.format(stake)}.`
                             )
                     ],
                     components: [againRow('sincronia', message.author.id, againArgs)]

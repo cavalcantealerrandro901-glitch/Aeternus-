@@ -5,22 +5,20 @@ const {
     ButtonStyle,
     ComponentType
 } = require('discord.js');
-const flocos = require('../utils/flocos');
-const xp = require('../utils/xp');
 const cristais = require('../utils/cristais');
 const { againRow } = require('../utils/gameAgain');
 
 module.exports = {
     name: 'leilao',
     aliases: ['auction', 'lance'],
-    description: 'Leilão cego com ❄️ flocos',
+    description: 'Leilão cego com 💠 cristais',
     async execute(message, args) {
         const stakeRaw = args[0] || '200';
-        const entry = flocos.parseBet(stakeRaw, flocos.get(message.author.id)) || 200;
-        const check = flocos.canBet(message.author.id, entry);
+        const entry = cristais.parseBet(stakeRaw, cristais.get(message.author.id)) || 200;
+        const check = cristais.canBet(message.author.id, entry);
         if (!check.ok) return message.reply(check.error);
 
-        flocos.add(message.author.id, -entry);
+        cristais.add(message.author.id, -entry);
         const pot = entry * 2;
         const secret = 30 + Math.floor(Math.random() * 70);
         const againArgs = [String(stakeRaw)];
@@ -40,7 +38,7 @@ module.exports = {
                     .setColor(0xeab308)
                     .setTitle('🏛️ LEILÃO CEGO')
                     .setDescription(
-                        `Pote: ${flocos.format(pot)}\nValor secreto **30–99**. Chegue perto **sem passar**.`
+                        `Pote: ${cristais.format(pot)}\nValor secreto **30–99**. Chegue perto **sem passar**.`
                     )
             ],
             components: [row]
@@ -66,22 +64,20 @@ module.exports = {
             let text;
             let color = 0x38bdf8;
             if (pScore === Infinity && bScore === Infinity) {
-                flocos.add(message.author.id, Math.floor(entry / 2));
+                cristais.add(message.author.id, Math.floor(entry / 2));
                 text = `Real **${secret}**. Ambos passaram. Metade devolvida.`;
                 color = 0x64748b;
             } else if (pScore < bScore) {
-                flocos.add(message.author.id, pot);
-                xp.add(message.author.id, 15);
-                cristais.add(message.author.id, 2);
-                text = `Real **${secret}**. Você **${playerBid}** vs bot **${botBid}**. Pote ${flocos.format(pot)}!`;
+                cristais.add(message.author.id, pot);
+                text = `Real **${secret}**. Você **${playerBid}** vs bot **${botBid}**. Pote ${cristais.format(pot)}!`;
                 color = 0x22c55e;
             } else if (bScore < pScore) {
-                text = `Real **${secret}**. Bot **${botBid}** venceu. Perdeu ${flocos.format(entry)}.`;
+                text = `Real **${secret}**. Bot **${botBid}** venceu. Perdeu ${cristais.format(entry)}.`;
                 color = 0xef4444;
             } else {
                 const half = Math.floor(pot / 2);
-                flocos.add(message.author.id, half);
-                text = `Empate. Metade: ${flocos.format(half)}`;
+                cristais.add(message.author.id, half);
+                text = `Empate. Metade: ${cristais.format(half)}`;
                 color = 0xf59e0b;
             }
 
@@ -90,7 +86,7 @@ module.exports = {
                     new EmbedBuilder()
                         .setColor(color)
                         .setTitle('🏛️ Resultado')
-                        .setDescription(`${text}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`)
+                        .setDescription(`${text}\nSaldo: ${cristais.formatPlain(cristais.get(message.author.id))}`)
                 ],
                 components: [againRow('leilao', message.author.id, againArgs)]
             });
@@ -98,14 +94,14 @@ module.exports = {
 
         collector.on('end', async (c) => {
             if (c.size > 0) return;
-            flocos.add(message.author.id, entry);
+            cristais.add(message.author.id, entry);
             try {
                 await sent.edit({
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x64748b)
                             .setTitle('🏛️ Sem lances')
-                            .setDescription('Entrada devolvida em ❄️ flocos.')
+                            .setDescription('Entrada devolvida em 💠 cristais.')
                     ],
                     components: [againRow('leilao', message.author.id, againArgs)]
                 });
