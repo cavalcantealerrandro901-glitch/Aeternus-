@@ -6,11 +6,11 @@ function loadCommands(client) {
     if (!fs.existsSync(dir)) return;
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
         try {
+            delete require.cache[require.resolve(path.join(dir, file))];
             const cmd = require(path.join(dir, file));
-            if (cmd && cmd.name) {
-                client.commands.set(cmd.name, cmd);
-                console.log(`✨ [COMANDO] ${cmd.name}`);
-            }
+            if (!cmd?.name) continue;
+            client.commands.set(cmd.name, cmd);
+            console.log(`✨ [COMANDO] ${cmd.name}`);
         } catch (e) {
             console.error(`Erro comando ${file}:`, e.message);
         }
@@ -23,10 +23,10 @@ function loadSlash(client) {
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
         try {
             const cmd = require(path.join(dir, file));
-            if (cmd && cmd.data && cmd.data.name) {
-                client.slashCommands.set(cmd.data.name, cmd);
-                console.log(`⚡ [SLASH] ${cmd.data.name}`);
-            }
+            const name = cmd.data?.name || cmd.name;
+            if (!name) continue;
+            client.slashCommands.set(name, cmd);
+            console.log(`⚡ [SLASH] ${name}`);
         } catch (e) {
             console.error(`Erro slash ${file}:`, e.message);
         }
@@ -38,12 +38,11 @@ function loadEvents(client) {
     if (!fs.existsSync(dir)) return;
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
         try {
-            const event = require(path.join(dir, file));
-            if (!event || !event.name) continue;
-            const runner = (...args) => event.execute(...args, client);
-            if (event.once) client.once(event.name, runner);
-            else client.on(event.name, runner);
-            console.log(`🔌 [EVENTO] ${event.name}`);
+            const ev = require(path.join(dir, file));
+            if (!ev?.name || !ev.execute) continue;
+            if (ev.once) client.once(ev.name, (...args) => ev.execute(...args, client));
+            else client.on(ev.name, (...args) => ev.execute(...args, client));
+            console.log(`🔌 [EVENTO] ${ev.name}`);
         } catch (e) {
             console.error(`Erro evento ${file}:`, e.message);
         }
@@ -51,18 +50,14 @@ function loadEvents(client) {
 }
 
 function loadSystems(client) {
-    const { getSettings } = require('../utils/settings');
-    const systemsDir = path.join(__dirname, '..', 'systems');
-    if (!fs.existsSync(systemsDir)) return;
-
-    for (const file of fs.readdirSync(systemsDir).filter((f) => f.endsWith('.js'))) {
+    const dir = path.join(__dirname, '..', 'systems');
+    if (!fs.existsSync(dir)) return;
+    const settings = require('../utils/settings');
+    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
         try {
-            const mod = require(path.join(systemsDir, file));
+            const mod = require(path.join(dir, file));
             if (typeof mod === 'function') {
-                mod(client, getSettings);
-                console.log(`🧩 [SISTEMA] ${file}`);
-            } else if (mod && typeof mod.setup === 'function') {
-                mod.setup(client, getSettings);
+                mod(client, settings.getSettings);
                 console.log(`🧩 [SISTEMA] ${file}`);
             }
         } catch (e) {

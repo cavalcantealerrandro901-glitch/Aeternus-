@@ -1,30 +1,40 @@
 const { Events, MessageFlags } = require('discord.js');
 const { decodePayload } = require('../utils/gameAgain');
 const music = require('../utils/musicPlayer');
+const sg = require('../utils/supremeGate');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
-        // Controles de música (passar / voltar / pausa / repetir)
+        // SUPREME GATE
+        if (
+            (interaction.isButton() || interaction.isStringSelectMenu()) &&
+            interaction.customId?.startsWith('sg_')
+        ) {
+            try {
+                const handled = await sg.handleInteraction(interaction);
+                if (handled) return;
+            } catch (err) {
+                console.error('[SUPREME GATE]', err);
+                try {
+                    const payload = {
+                        content: 'Erro no SUPREME GATE.',
+                        flags: [MessageFlags.Ephemeral]
+                    };
+                    if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
+                    else await interaction.reply(payload);
+                } catch (_) {}
+            }
+            return;
+        }
+
+        // Controles de música
         if (interaction.isButton() && interaction.customId.startsWith('mctl_')) {
             try {
                 const handled = await music.handleControl(interaction);
                 if (handled) return;
             } catch (err) {
                 console.error('[music control]', err);
-                try {
-                    if (interaction.replied || interaction.deferred) {
-                        await interaction.followUp({
-                            content: 'Erro no controle de música.',
-                            flags: [MessageFlags.Ephemeral]
-                        });
-                    } else {
-                        await interaction.reply({
-                            content: 'Erro no controle de música.',
-                            flags: [MessageFlags.Ephemeral]
-                        });
-                    }
-                } catch (_) {}
             }
             return;
         }
@@ -74,7 +84,7 @@ module.exports = {
                     client: interaction.client,
                     content: '',
                     mentions: { users: { first: () => null, size: 0, values: () => [] } },
-                    reply: (payload) => interaction.channel.send(payload)
+                    reply: (p) => interaction.channel.send(p)
                 };
 
                 await command.execute(fakeMessage, args, client);
@@ -98,11 +108,8 @@ module.exports = {
                     content: 'Ocorreu um erro ao executar este comando!',
                     flags: [MessageFlags.Ephemeral]
                 };
-                if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp(errorMessage);
-                } else {
-                    await interaction.reply(errorMessage);
-                }
+                if (interaction.replied || interaction.deferred) await interaction.followUp(errorMessage);
+                else await interaction.reply(errorMessage);
             } catch (_) {}
         }
     }
