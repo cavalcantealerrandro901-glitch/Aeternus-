@@ -1,6 +1,7 @@
 /**
- * SUPREME GATE — personalização de perfil (uma mensagem, várias etapas)
- * 1) Loading 3s → 2) Cargos paginados → 3) Regras paginadas → 4) Concluído
+ * SUPREME GATE — processo de personalização de perfil
+ * Etapa 1 loading → 2 cargos (páginas) → 3 regras → 4 concluído
+ * Uma única mensagem atualizada por usuário
  */
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +22,7 @@ const ROLES_PER_PAGE = 5;
 const RULES_PER_PAGE = 3;
 const LOADING_MS = 3000;
 
-/** @type {Map<string, object>} sessão em memória + persistência */
+/** Sessões em memória: key guildId:userId */
 const sessions = new Map();
 
 function readJson(file, fb = {}) {
@@ -32,6 +33,7 @@ function readJson(file, fb = {}) {
         return fb;
     }
 }
+
 function writeJson(file, data) {
     const dir = path.dirname(file);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -45,123 +47,195 @@ function sk(guildId, userId) {
 function defaults() {
     return {
         enabled: false,
-        channelId: null,
-        logChannelId: null,
-        color: '#7c3aed',
-        visitorRoleId: null,
-        verifiedRoleId: null,
-        maxRoles: 10,
-        // páginas de cargos: { title, roles: [{ label, roleId, emoji }] }
-        rolePages: [
-            {
-                title: 'PERSONALIDADE',
-                roles: [
-                    { label: 'Explorador', roleId: '', emoji: '🌌' },
-                    { label: 'Místico', roleId: '', emoji: '🔮' },
-                    { label: 'Líder', roleId: '', emoji: '👑' },
-                    { label: 'Guerreiro', roleId: '', emoji: '⚔️' },
-                    { label: 'Estrategista', roleId: '', emoji: '🧠' }
-                ]
-            },
-            {
-                title: 'INTERESSES',
-                roles: [
-                    { label: 'Gamer', roleId: '', emoji: '🎮' },
-                    { label: 'Anime', roleId: '', emoji: '🎭' },
-                    { label: 'Música', roleId: '', emoji: '🎵' },
-                    { label: 'Designer', roleId: '', emoji: '🎨' },
-                    { label: 'Programador', roleId: '', emoji: '💻' }
-                ]
-            },
-            {
-                title: 'ENTRETENIMENTO',
-                roles: [
-                    { label: 'Filmes', roleId: '', emoji: '🎬' },
-                    { label: 'Séries', roleId: '', emoji: '📺' },
-                    { label: 'Livros', roleId: '', emoji: '📚' },
-                    { label: 'Podcasts', roleId: '', emoji: '🎧' },
-                    { label: 'Jogos', roleId: '', emoji: '🕹️' }
-                ]
-            },
-            {
-                title: 'NOTIFICAÇÕES',
-                roles: [
-                    { label: 'Sorteios', roleId: '', emoji: '🎁' },
-                    { label: 'Eventos', roleId: '', emoji: '🎉' },
-                    { label: 'Anúncios', roleId: '', emoji: '📢' },
-                    { label: 'RPG', roleId: '', emoji: '⚔️' },
-                    { label: 'Economia', roleId: '', emoji: '💰' }
-                ]
-            }
-        ],
-        rules: [
-            { title: 'Respeito', text: 'Respeite todos os membros.' },
-            { title: 'Proibições', text: 'Não pratique atividades proibidas pelas regras da plataforma.' },
-            { title: 'Spam', text: 'Evite mensagens repetitivas ou perturbações.' },
-            { title: 'Segurança', text: 'Não compartilhe informações pessoais.' },
-            { title: 'Equipe', text: 'Respeite a equipe de moderação.' },
-            { title: 'Conteúdo', text: 'Mantenha o conteúdo adequado aos canais.' }
-        ],
-        exploreChannelId: null
+        welcome: {
+            enabled: true,
+            channelId: null,
+            color: '#7c3aed',
+            ping: true
+        },
+        leave: {
+            enabled: true,
+            channelId: null,
+            title: '🌙 UMA JORNADA CHEGOU AO FIM',
+            description:
+                '**{username}** deixou **{server}**.\n👥 Membros: **{memberCount}**',
+            color: '#64748b',
+            footer: 'SUPREME GATE'
+        },
+        roles: {
+            visitorId: null,
+            verifiedId: null,
+            maxSelect: 15,
+            /** páginas de cargos: { title, items:[{label,roleId,emoji}] } */
+            pages: [
+                {
+                    title: 'PERSONALIDADE',
+                    items: [
+                        { label: 'Explorador', roleId: '', emoji: '🌌' },
+                        { label: 'Místico', roleId: '', emoji: '🔮' },
+                        { label: 'Líder', roleId: '', emoji: '👑' },
+                        { label: 'Guerreiro', roleId: '', emoji: '⚔️' },
+                        { label: 'Estrategista', roleId: '', emoji: '🧠' }
+                    ]
+                },
+                {
+                    title: 'INTERESSES',
+                    items: [
+                        { label: 'Gamer', roleId: '', emoji: '🎮' },
+                        { label: 'Anime', roleId: '', emoji: '🎭' },
+                        { label: 'Música', roleId: '', emoji: '🎵' },
+                        { label: 'Designer', roleId: '', emoji: '🎨' },
+                        { label: 'Programador', roleId: '', emoji: '💻' }
+                    ]
+                },
+                {
+                    title: 'ENTRETENIMENTO',
+                    items: [
+                        { label: 'Filmes', roleId: '', emoji: '🎬' },
+                        { label: 'Séries', roleId: '', emoji: '📺' },
+                        { label: 'Livros', roleId: '', emoji: '📚' },
+                        { label: 'Podcasts', roleId: '', emoji: '🎧' },
+                        { label: 'Jogos', roleId: '', emoji: '🕹️' }
+                    ]
+                },
+                {
+                    title: 'NOTIFICAÇÕES',
+                    items: [
+                        { label: 'Sorteios', roleId: '', emoji: '🎁' },
+                        { label: 'Eventos', roleId: '', emoji: '🎉' },
+                        { label: 'Anúncios', roleId: '', emoji: '📢' },
+                        { label: 'RPG', roleId: '', emoji: '⚔️' },
+                        { label: 'Economia', roleId: '', emoji: '💰' }
+                    ]
+                }
+            ]
+        },
+        rules: {
+            color: '#38bdf8',
+            items: [
+                { title: 'Respeito', text: 'Respeite todos os membros.' },
+                { title: 'Proibições', text: 'Não pratique atividades proibidas pela plataforma.' },
+                { title: 'Spam', text: 'Evite mensagens repetitivas ou perturbações.' },
+                { title: 'Segurança', text: 'Não compartilhe informações pessoais.' },
+                { title: 'Equipe', text: 'Respeite a equipe de moderação.' },
+                { title: 'Canais', text: 'Use cada canal conforme sua finalidade.' }
+            ]
+        },
+        logs: {
+            channelId: null,
+            join: true,
+            leave: true,
+            rules: true,
+            roles: true,
+            verify: true
+        }
     };
+}
+
+function deepMerge(a, b) {
+    const out = Array.isArray(a) ? [...a] : { ...a };
+    for (const k of Object.keys(b || {})) {
+        if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) {
+            out[k] = deepMerge(a[k] || {}, b[k]);
+        } else {
+            out[k] = b[k];
+        }
+    }
+    return out;
 }
 
 function getConfig(guildId) {
     const g = settings.getGuild(guildId);
-    const base = defaults();
+    let base = defaults();
     if (g.supremeGate && typeof g.supremeGate === 'object') {
-        return { ...base, ...g.supremeGate, rolePages: g.supremeGate.rolePages || base.rolePages, rules: g.supremeGate.rules || base.rules };
+        base = deepMerge(base, g.supremeGate);
     }
     // legado
-    if (g.sgEnabled) base.enabled = g.sgEnabled === true || g.sgEnabled === 'true';
-    if (g.sgChannel) base.channelId = g.sgChannel;
-    if (g.sgLogChannel) base.logChannelId = g.sgLogChannel;
-    if (g.sgVisitorRole) base.visitorRoleId = g.sgVisitorRole;
-    if (g.sgVerifiedRole) base.verifiedRoleId = g.sgVerifiedRole;
+    if (g.sgEnabled === true || g.sgEnabled === 'true') base.enabled = true;
+    if (g.sgChannel) base.welcome.channelId = g.sgChannel;
+    if (g.sgLogChannel) base.logs.channelId = g.sgLogChannel;
+    if (g.sgVisitorRole) base.roles.visitorId = g.sgVisitorRole;
+    if (g.sgVerifiedRole) base.roles.verifiedId = g.sgVerifiedRole;
     return base;
 }
 
 function setConfig(guildId, cfg) {
     settings.setKey(guildId, 'supremeGate', cfg);
     settings.setKey(guildId, 'sgEnabled', !!cfg.enabled);
-    if (cfg.channelId) settings.setKey(guildId, 'sgChannel', cfg.channelId);
-    if (cfg.logChannelId) settings.setKey(guildId, 'sgLogChannel', cfg.logChannelId);
-    if (cfg.visitorRoleId) settings.setKey(guildId, 'sgVisitorRole', cfg.visitorRoleId);
-    if (cfg.verifiedRoleId) settings.setKey(guildId, 'sgVerifiedRole', cfg.verifiedRoleId);
-    return cfg;
+    if (cfg.welcome?.channelId) settings.setKey(guildId, 'sgChannel', cfg.welcome.channelId);
+    if (cfg.logs?.channelId) settings.setKey(guildId, 'sgLogChannel', cfg.logs.channelId);
+    if (cfg.roles?.visitorId) settings.setKey(guildId, 'sgVisitorRole', cfg.roles.visitorId);
+    if (cfg.roles?.verifiedId) settings.setKey(guildId, 'sgVerifiedRole', cfg.roles.verifiedId);
+    return getConfig(guildId);
+}
+
+function replaceVars(str, member, guild) {
+    if (!str) return '';
+    const u = member?.user || member || {};
+    const g = guild || member?.guild || {};
+    const created = u.createdTimestamp ? Math.floor(u.createdTimestamp / 1000) : null;
+    return String(str)
+        .replace(/{user}/g, u.id ? `<@${u.id}>` : '')
+        .replace(/{username}/g, u.username || '')
+        .replace(/{displayName}/g, member?.displayName || u.username || '')
+        .replace(/{userId}/g, u.id || '')
+        .replace(/{server}/g, g.name || '')
+        .replace(/{memberCount}/g, String(g.memberCount ?? ''));
+}
+
+function colorInt(hex) {
+    if (!hex) return 0x7c3aed;
+    const h = String(hex).replace('#', '');
+    const n = parseInt(h, 16);
+    return Number.isFinite(n) ? n : 0x7c3aed;
+}
+
+/** Lista plana de cargos válidos a partir das páginas */
+function flatRoles(cfg) {
+    const pages = cfg.roles?.pages || [];
+    const out = [];
+    for (const p of pages) {
+        for (const it of p.items || []) {
+            if (it.roleId) out.push({ ...it, pageTitle: p.title || '' });
+        }
+    }
+    return out;
+}
+
+/** Páginas efetivas (só com roleId ou placeholders para demo UI) */
+function rolePages(cfg) {
+    const pages = cfg.roles?.pages || [];
+    // garante pelo menos estrutura de páginas; itens sem roleId não entram no select
+    return pages.map((p) => ({
+        title: p.title || 'Cargos',
+        items: (p.items || []).filter((i) => i.roleId).slice(0, ROLES_PER_PAGE)
+    })).filter((p) => p.items.length > 0);
 }
 
 function getSession(guildId, userId) {
     const key = sk(guildId, userId);
-    if (sessions.has(key)) return sessions.get(key);
-    const saved = readJson(DATA, {})[key] || {};
-    const s = {
-        step: saved.step || 'loading',
-        rolePage: saved.rolePage || 0,
-        rulesPage: saved.rulesPage || 0,
-        selected: new Set(saved.selected || []),
-        rulesAccepted: !!saved.rulesAccepted,
-        messageId: saved.messageId || null,
-        channelId: saved.channelId || null,
-        finished: !!saved.finished
-    };
-    sessions.set(key, s);
-    return s;
+    if (!sessions.has(key)) {
+        const saved = readJson(DATA, {})[key] || {};
+        sessions.set(key, {
+            step: 'loading', // loading | roles | rules_intro | rules | done
+            rolePage: 0,
+            rulesPage: 0,
+            selected: new Set(saved.selected || []),
+            accepted: !!saved.accepted,
+            messageId: null,
+            channelId: null,
+            startedAt: Date.now()
+        });
+    }
+    return sessions.get(key);
 }
 
-function saveSession(guildId, userId, s) {
-    const key = sk(guildId, userId);
-    sessions.set(key, s);
+function persistSession(guildId, userId, sess) {
     const all = readJson(DATA, {});
-    all[key] = {
-        step: s.step,
-        rolePage: s.rolePage,
-        rulesPage: s.rulesPage,
-        selected: [...s.selected],
-        rulesAccepted: s.rulesAccepted,
-        messageId: s.messageId,
-        channelId: s.channelId,
-        finished: s.finished,
+    all[sk(guildId, userId)] = {
+        selected: [...sess.selected],
+        accepted: sess.accepted,
+        finishedAt: sess.finishedAt || null,
         updatedAt: Date.now()
     };
     writeJson(DATA, all);
@@ -178,86 +252,84 @@ function getStats(guildId) {
     return readJson(STATS, {})[guildId] || { joins: 0, leaves: 0, verified: 0 };
 }
 
-/** Flatten role pages → only entries with roleId */
-function activePages(cfg) {
-    const pages = (cfg.rolePages || []).map((p) => ({
-        title: p.title || 'Cargos',
-        roles: (p.roles || []).filter((r) => r.roleId)
-    }));
-    // garante páginas mesmo se vazias para UI (mín. 1)
-    return pages.length ? pages : [{ title: 'Cargos', roles: [] }];
+async function sendLog(guild, cfg, type, text) {
+    if (!cfg.logs?.channelId || cfg.logs[type] === false) return;
+    const ch = await guild.channels.fetch(cfg.logs.channelId).catch(() => null);
+    if (!ch?.isTextBased()) return;
+    const colors = { join: 0x22c55e, leave: 0x64748b, rules: 0x38bdf8, roles: 0xf59e0b, verify: 0xa78bfa };
+    await ch
+        .send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(colors[type] || 0x7c3aed)
+                    .setTitle(`📋 GATE · ${type}`)
+                    .setDescription(text)
+                    .setTimestamp()
+            ]
+        })
+        .catch(() => {});
 }
 
-function color(cfg) {
-    try {
-        return cfg.color || 0x7c3aed;
-    } catch {
-        return 0x7c3aed;
-    }
-}
+/* ───────── UI builders ───────── */
 
 function embedLoading(member, cfg) {
     return new EmbedBuilder()
-        .setColor(color(cfg))
+        .setColor(colorInt(cfg.welcome?.color))
         .setTitle('✦ PERSONALIZANDO SEU PERFIL')
         .setDescription(
             `Olá, ${member}.\n\n` +
-                `Estamos preparando seu perfil para **${member.guild.name}**.\n\n` +
+                `Estamos preparando seu perfil para este servidor.\n\n` +
                 `🔮 Carregando sistema de personalização...\n` +
                 `Aguarde alguns segundos.`
         )
         .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-        .setFooter({ text: 'SUPREME GATE · etapa 1/4' })
+        .setFooter({ text: `SUPREME GATE · ${member.guild.name}` })
         .setTimestamp();
 }
 
-function embedRoles(member, cfg, session) {
-    const pages = activePages(cfg);
+function embedRoles(member, cfg, sess) {
+    const pages = rolePages(cfg);
     const total = Math.max(pages.length, 1);
-    const page = Math.min(session.rolePage, total - 1);
-    const p = pages[page] || { title: 'Cargos', roles: [] };
-    const selected = [...session.selected];
+    const page = Math.min(sess.rolePage, total - 1);
+    const cur = pages[page] || { title: 'Cargos', items: [] };
+    const selectedCount = sess.selected.size;
 
     return new EmbedBuilder()
-        .setColor(color(cfg))
+        .setColor(colorInt(cfg.welcome?.color))
         .setTitle('🛡️ PERSONALIZE SEU PERFIL')
         .setDescription(
-            `Agora escolha os cargos que representam seus interesses.\n` +
-                `Use o menu abaixo · **máx. ${cfg.maxRoles || 10}** cargos.\n\n` +
-                `**✦ ${p.title}**\n` +
-                `Selecionados: **${selected.length}**\n` +
-                (selected.length
-                    ? selected.map((id) => `<@&${id}>`).join(' ')
-                    : '_Nenhum ainda_')
+            `Agora escolha os cargos que representam seus interesses.\n\n` +
+                `**${cur.title}** · Página **${page + 1}/${total}**\n` +
+                `Selecionados: **${selectedCount}**` +
+                (cfg.roles.maxSelect ? ` / máx. ${cfg.roles.maxSelect}` : '') +
+                `\n\nUse o menu abaixo e navegue com os botões.`
         )
         .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: `SUPREME GATE · Página ${page + 1}/${total} · etapa 2/4` })
-        .setTimestamp();
+        .setFooter({ text: `✦ Página ${page + 1}/${total} · SUPREME GATE` });
 }
 
-function componentsRoles(cfg, session, guildId, userId) {
-    const pages = activePages(cfg);
+function componentsRoles(guildId, userId, cfg, sess) {
+    const pages = rolePages(cfg);
     const total = Math.max(pages.length, 1);
-    const page = Math.min(session.rolePage, total - 1);
-    const p = pages[page] || { title: 'Cargos', roles: [] };
+    const page = Math.min(sess.rolePage, total - 1);
+    const cur = pages[page] || { items: [] };
     const rows = [];
 
-    const roles = (p.roles || []).slice(0, ROLES_PER_PAGE);
-    if (roles.length) {
+    if (cur.items.length) {
         const menu = new StringSelectMenuBuilder()
-            .setCustomId(`sgj_roles_${guildId}_${userId}_${page}`)
-            .setPlaceholder(`Escolha · ${p.title}`)
+            .setCustomId(`sgx_role_${guildId}_${userId}_${page}`)
+            .setPlaceholder(`Escolha nesta página (${cur.items.length})`)
             .setMinValues(0)
-            .setMaxValues(Math.min(roles.length, cfg.maxRoles || 10));
+            .setMaxValues(Math.min(cur.items.length, 5));
 
-        for (const r of roles) {
+        for (const it of cur.items) {
             const opt = new StringSelectMenuOptionBuilder()
-                .setLabel(String(r.label).slice(0, 100))
-                .setValue(r.roleId)
-                .setDefault(session.selected.has(r.roleId));
-            if (r.emoji) {
+                .setLabel(String(it.label).slice(0, 100))
+                .setValue(it.roleId)
+                .setDefault(sess.selected.has(it.roleId));
+            if (it.emoji) {
                 try {
-                    opt.setEmoji(r.emoji);
+                    opt.setEmoji(it.emoji);
                 } catch (_) {}
             }
             menu.addOptions(opt);
@@ -267,19 +339,18 @@ function componentsRoles(cfg, session, guildId, userId) {
 
     const nav = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`sgj_rprev_${guildId}_${userId}`)
+            .setCustomId(`sgx_prev_${guildId}_${userId}`)
             .setLabel('ANTERIOR')
             .setEmoji('◀️')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(page <= 0),
         new ButtonBuilder()
-            .setCustomId(`sgj_rinfo_${guildId}_${userId}`)
-            .setLabel(`${page + 1}/${total}`)
-            .setEmoji('📄')
-            .setStyle(ButtonStyle.Primary)
+            .setCustomId(`sgx_page_${guildId}_${userId}`)
+            .setLabel(`📄 ${page + 1}/${total}`)
+            .setStyle(ButtonStyle.Secondary)
             .setDisabled(true),
         new ButtonBuilder()
-            .setCustomId(`sgj_rnext_${guildId}_${userId}`)
+            .setCustomId(`sgx_next_${guildId}_${userId}`)
             .setLabel('PRÓXIMO')
             .setEmoji('▶️')
             .setStyle(ButtonStyle.Secondary)
@@ -287,106 +358,13 @@ function componentsRoles(cfg, session, guildId, userId) {
     );
     rows.push(nav);
 
-    // Continuar só na última página (ou sempre disponível)
-    const cont = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`sgj_rgo_${guildId}_${userId}`)
-            .setLabel('CONTINUAR')
-            .setEmoji('✅')
-            .setStyle(ButtonStyle.Success)
-    );
-    rows.push(cont);
-
-    return rows;
-}
-
-function embedRulesIntro(member, cfg) {
-    return new EmbedBuilder()
-        .setColor(color(cfg))
-        .setTitle('📜 ANTES DE CONTINUAR...')
-        .setDescription(
-            `Para finalizar a personalização do seu perfil, você precisa conhecer e aceitar as regras desta comunidade.\n\n` +
-                `Leia atentamente todas as regras antes de continuar.`
-        )
-        .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'SUPREME GATE · etapa 3/4' })
-        .setTimestamp();
-}
-
-function componentsRulesIntro(guildId, userId) {
-    return [
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`sgj_read_${guildId}_${userId}`)
-                .setLabel('LER REGRAS')
-                .setEmoji('📜')
-                .setStyle(ButtonStyle.Primary)
-        )
-    ];
-}
-
-function embedRulesPage(member, cfg, session) {
-    const rules = cfg.rules || [];
-    const totalPages = Math.max(1, Math.ceil(rules.length / RULES_PER_PAGE));
-    const page = Math.min(session.rulesPage, totalPages - 1);
-    const slice = rules.slice(page * RULES_PER_PAGE, page * RULES_PER_PAGE + RULES_PER_PAGE);
-    const isLast = page >= totalPages - 1;
-
-    let body = slice
-        .map((r, i) => {
-            const n = String(page * RULES_PER_PAGE + i + 1).padStart(2, '0');
-            return `**${n}・${r.title}**\n${r.text}`;
-        })
-        .join('\n\n');
-
-    if (isLast) {
-        body +=
-            '\n\n**🔐 CONFIRMAÇÃO**\nAo clicar abaixo, você confirma que leu e concorda com as regras da comunidade.';
-    }
-
-    return new EmbedBuilder()
-        .setColor(color(cfg))
-        .setTitle('📜 REGRAS DA COMUNIDADE')
-        .setDescription(body || '_Sem regras configuradas._')
-        .setFooter({ text: `SUPREME GATE · Regras ${page + 1}/${totalPages}` })
-        .setTimestamp();
-}
-
-function componentsRulesPage(cfg, session, guildId, userId) {
-    const rules = cfg.rules || [];
-    const totalPages = Math.max(1, Math.ceil(rules.length / RULES_PER_PAGE));
-    const page = Math.min(session.rulesPage, totalPages - 1);
-    const isLast = page >= totalPages - 1;
-
-    const rows = [
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`sgj_uprev_${guildId}_${userId}`)
-                .setLabel('ANTERIOR')
-                .setEmoji('◀️')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(page <= 0),
-            new ButtonBuilder()
-                .setCustomId(`sgj_uinfo_${guildId}_${userId}`)
-                .setLabel(`${page + 1}/${totalPages}`)
-                .setEmoji('📄')
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(true),
-            new ButtonBuilder()
-                .setCustomId(`sgj_unext_${guildId}_${userId}`)
-                .setLabel('PRÓXIMO')
-                .setEmoji('▶️')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(isLast)
-        )
-    ];
-
-    if (isLast) {
+    // Continuar só na última página
+    if (page >= total - 1) {
         rows.push(
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`sgj_accept_${guildId}_${userId}`)
-                    .setLabel('ACEITAR E CONTINUAR')
+                    .setCustomId(`sgx_continue_${guildId}_${userId}`)
+                    .setLabel('CONTINUAR')
                     .setEmoji('✅')
                     .setStyle(ButtonStyle.Success)
             )
@@ -396,7 +374,97 @@ function componentsRulesPage(cfg, session, guildId, userId) {
     return rows;
 }
 
-function embedDone(member, cfg) {
+function embedRulesIntro(member) {
+    return new EmbedBuilder()
+        .setColor(0x38bdf8)
+        .setTitle('📜 ANTES DE CONTINUAR...')
+        .setDescription(
+            `Para finalizar a personalização do seu perfil, você precisa conhecer e aceitar as regras desta comunidade.\n\n` +
+                `Leia atentamente todas as regras antes de continuar.`
+        )
+        .setThumbnail(member.user.displayAvatarURL({ size: 128 }));
+}
+
+function componentsRulesIntro(guildId, userId) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`sgx_readrules_${guildId}_${userId}`)
+                .setLabel('LER REGRAS')
+                .setEmoji('📜')
+                .setStyle(ButtonStyle.Primary)
+        )
+    ];
+}
+
+function embedRulesPage(member, cfg, sess) {
+    const items = cfg.rules?.items || [];
+    const total = Math.max(Math.ceil(items.length / RULES_PER_PAGE), 1);
+    const page = Math.min(sess.rulesPage, total - 1);
+    const slice = items.slice(page * RULES_PER_PAGE, page * RULES_PER_PAGE + RULES_PER_PAGE);
+
+    let body = slice
+        .map((r, i) => {
+            const n = String(page * RULES_PER_PAGE + i + 1).padStart(2, '0');
+            return `**${n}・${r.title}**\n${r.text}`;
+        })
+        .join('\n\n');
+
+    if (page >= total - 1) {
+        body +=
+            `\n\n───\n**🔐 CONFIRMAÇÃO**\n` +
+            `Ao clicar abaixo, você confirma que leu e concorda com as regras.`;
+    }
+
+    return new EmbedBuilder()
+        .setColor(colorInt(cfg.rules?.color || '#38bdf8'))
+        .setTitle('📜 REGRAS DA COMUNIDADE')
+        .setDescription(body || '_Nenhuma regra configurada._')
+        .setFooter({ text: `📄 ${page + 1}/${total}` });
+}
+
+function componentsRulesPage(guildId, userId, cfg, sess) {
+    const items = cfg.rules?.items || [];
+    const total = Math.max(Math.ceil(items.length / RULES_PER_PAGE), 1);
+    const page = Math.min(sess.rulesPage, total - 1);
+    const rows = [];
+
+    const nav = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`sgx_rprev_${guildId}_${userId}`)
+            .setLabel('ANTERIOR')
+            .setEmoji('◀️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page <= 0),
+        new ButtonBuilder()
+            .setCustomId(`sgx_rpage_${guildId}_${userId}`)
+            .setLabel(`📄 ${page + 1}/${total}`)
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true),
+        new ButtonBuilder()
+            .setCustomId(`sgx_rnext_${guildId}_${userId}`)
+            .setLabel('PRÓXIMO')
+            .setEmoji('▶️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page >= total - 1)
+    );
+    rows.push(nav);
+
+    if (page >= total - 1) {
+        rows.push(
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`sgx_accept_${guildId}_${userId}`)
+                    .setLabel('ACEITAR E CONTINUAR')
+                    .setEmoji('✅')
+                    .setStyle(ButtonStyle.Success)
+            )
+        );
+    }
+    return rows;
+}
+
+function embedDone(member) {
     return new EmbedBuilder()
         .setColor(0x22c55e)
         .setTitle('👑 PERFIL CONFIGURADO')
@@ -409,128 +477,97 @@ function embedDone(member, cfg) {
                 `🌌 Sua jornada começa agora.`
         )
         .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
-        .setFooter({ text: 'SUPREME GATE · concluído' })
         .setTimestamp();
 }
 
-function componentsDone(cfg, guildId, userId) {
-    const row = new ActionRowBuilder();
-    if (cfg.exploreChannelId) {
-        // Discord não permite link interno fácil; botão custom confirma
-        row.addComponents(
+function componentsDone(guildId, userId) {
+    return [
+        new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`sgj_enter_${guildId}_${userId}`)
+                .setCustomId(`sgx_enter_${guildId}_${userId}`)
                 .setLabel('ENTRAR NO SERVIDOR')
                 .setEmoji('🌌')
                 .setStyle(ButtonStyle.Primary)
-        );
-    } else {
-        row.addComponents(
-            new ButtonBuilder()
-                .setCustomId(`sgj_enter_${guildId}_${userId}`)
-                .setLabel('ENTRAR NO SERVIDOR')
-                .setEmoji('🌌')
-                .setStyle(ButtonStyle.Success)
-        );
-    }
-    return [row];
+        )
+    ];
 }
 
-async function render(message, member, cfg, session) {
-    const guildId = member.guild.id;
-    const userId = member.id;
-    let embeds;
-    let components;
-
-    if (session.step === 'loading') {
-        embeds = [embedLoading(member, cfg)];
-        components = [];
-    } else if (session.step === 'roles') {
-        embeds = [embedRoles(member, cfg, session)];
-        components = componentsRoles(cfg, session, guildId, userId);
-    } else if (session.step === 'rules_intro') {
-        embeds = [embedRulesIntro(member, cfg)];
-        components = componentsRulesIntro(guildId, userId);
-    } else if (session.step === 'rules') {
-        embeds = [embedRulesPage(member, cfg, session)];
-        components = componentsRulesPage(cfg, session, guildId, userId);
-    } else {
-        embeds = [embedDone(member, cfg)];
-        components = componentsDone(cfg, guildId, userId);
-    }
-
-    await message.edit({ embeds, components, content: null }).catch(() => {});
+async function editSessionMessage(client, sess, payload) {
+    if (!sess.messageId || !sess.channelId) return;
+    const ch = await client.channels.fetch(sess.channelId).catch(() => null);
+    if (!ch) return;
+    const msg = await ch.messages.fetch(sess.messageId).catch(() => null);
+    if (!msg) return;
+    await msg.edit(payload).catch(() => {});
 }
 
-async function sendLog(guild, cfg, text) {
-    if (!cfg.logChannelId) return;
-    const ch = await guild.channels.fetch(cfg.logChannelId).catch(() => null);
-    if (!ch?.isTextBased()) return;
-    await ch
-        .send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(color(cfg))
-                    .setTitle('📋 SUPREME GATE')
-                    .setDescription(text)
-                    .setTimestamp()
-            ]
-        })
-        .catch(() => {});
-}
-
-async function applySelectedRoles(member, session, cfg) {
-    const allIds = new Set();
-    for (const p of cfg.rolePages || []) {
-        for (const r of p.roles || []) if (r.roleId) allIds.add(r.roleId);
-    }
+async function applyRoleSelection(member, cfg, selectedSet) {
+    const allIds = flatRoles(cfg).map((r) => r.roleId);
     for (const id of allIds) {
-        if (session.selected.has(id)) {
-            await member.roles.add(id).catch(() => {});
-        } else if (member.roles.cache.has(id)) {
+        if (member.roles.cache.has(id) && !selectedSet.has(id)) {
             await member.roles.remove(id).catch(() => {});
+        }
+    }
+    for (const id of selectedSet) {
+        if (!member.roles.cache.has(id)) {
+            await member.roles.add(id).catch(() => {});
         }
     }
 }
 
+/* ───────── Join / Leave ───────── */
+
 async function onMemberJoin(member) {
     const cfg = getConfig(member.guild.id);
-    if (!cfg.enabled || !cfg.channelId) return;
+    if (!cfg.enabled || !cfg.welcome?.channelId) return;
 
     bumpStat(member.guild.id, 'joins');
-    if (cfg.visitorRoleId) await member.roles.add(cfg.visitorRoleId).catch(() => {});
 
-    const channel = await member.guild.channels.fetch(cfg.channelId).catch(() => null);
+    if (cfg.roles?.visitorId) {
+        await member.roles.add(cfg.roles.visitorId).catch(() => {});
+    }
+
+    const channel = await member.guild.channels.fetch(cfg.welcome.channelId).catch(() => null);
     if (!channel?.isTextBased()) return;
 
-    const session = getSession(member.guild.id, member.id);
-    session.step = 'loading';
-    session.rolePage = 0;
-    session.rulesPage = 0;
-    session.selected = new Set();
-    session.rulesAccepted = false;
-    session.finished = false;
+    const sess = getSession(member.guild.id, member.id);
+    sess.step = 'loading';
+    sess.rolePage = 0;
+    sess.rulesPage = 0;
+    // recupera seleções salvas se houver
+    const saved = readJson(DATA, {})[sk(member.guild.id, member.id)];
+    if (saved?.selected?.length) sess.selected = new Set(saved.selected);
 
     const msg = await channel.send({
-        content: `${member}`,
+        content: cfg.welcome.ping !== false ? `${member}` : undefined,
         embeds: [embedLoading(member, cfg)],
         components: []
     });
 
-    session.messageId = msg.id;
-    session.channelId = channel.id;
-    saveSession(member.guild.id, member.id, session);
+    sess.messageId = msg.id;
+    sess.channelId = channel.id;
 
-    await sendLog(member.guild, cfg, `👋 **Entrada** · ${member} (\`${member.id}\`)`);
+    await sendLog(
+        member.guild,
+        cfg,
+        'join',
+        `👋 **Entrada**\n${member} (\`${member.id}\`) · personalização iniciada`
+    );
 
-    // Após 3s → etapa de cargos (mesma mensagem)
+    // Após 3s → etapa cargos
     setTimeout(async () => {
-        const s = getSession(member.guild.id, member.id);
-        if (s.step !== 'loading') return;
-        s.step = 'roles';
-        saveSession(member.guild.id, member.id, s);
-        const m = await channel.messages.fetch(msg.id).catch(() => null);
-        if (m) await render(m, member, cfg, s);
+        try {
+            const s = getSession(member.guild.id, member.id);
+            if (s.step !== 'loading') return;
+            s.step = 'roles';
+            await msg.edit({
+                content: cfg.welcome.ping !== false ? `${member}` : null,
+                embeds: [embedRoles(member, cfg, s)],
+                components: componentsRoles(member.guild.id, member.id, cfg, s)
+            });
+        } catch (e) {
+            console.error('[GATE loading→roles]', e.message);
+        }
     }, LOADING_MS);
 }
 
@@ -538,144 +575,157 @@ async function onMemberLeave(member) {
     const cfg = getConfig(member.guild.id);
     if (!cfg.enabled) return;
     bumpStat(member.guild.id, 'leaves');
+
+    if (cfg.leave?.enabled && cfg.leave.channelId) {
+        const ch = await member.guild.channels.fetch(cfg.leave.channelId).catch(() => null);
+        if (ch?.isTextBased()) {
+            const e = new EmbedBuilder()
+                .setColor(colorInt(cfg.leave.color))
+                .setTitle(replaceVars(cfg.leave.title, member, member.guild))
+                .setDescription(replaceVars(cfg.leave.description, member, member.guild))
+                .setTimestamp();
+            await ch.send({ embeds: [e] }).catch(() => {});
+        }
+    }
     await sendLog(
         member.guild,
         cfg,
-        `🚪 **Saída** · **${member.user?.tag || member.id}** (\`${member.id}\`)`
+        'leave',
+        `🚪 **Saída**\n**${member.user?.tag || member.id}** (\`${member.id}\`)`
     );
 }
 
-function onlyOwner(interaction, userId) {
-    if (interaction.user.id !== userId) {
-        interaction.reply({ content: 'Este portal não é seu.', ephemeral: true }).catch(() => {});
-        return false;
-    }
-    return true;
-}
+/* ───────── Interactions ───────── */
 
 async function handleInteraction(interaction) {
     const id = interaction.customId || '';
-    if (!id.startsWith('sgj_')) return false;
+    if (!id.startsWith('sgx_')) return false;
 
     const parts = id.split('_');
-    // sgj_ACTION_guildId_userId[...]
+    // sgx_ACTION_guildId_userId[_extra]
     const action = parts[1];
     const guildId = parts[2];
     const userId = parts[3];
 
-    if (!onlyOwner(interaction, userId)) return true;
+    if (interaction.user.id !== userId) {
+        await interaction.reply({ content: 'Esta personalização não é sua.', ephemeral: true }).catch(() => {});
+        return true;
+    }
     if (interaction.guildId !== guildId) {
-        await interaction.reply({ content: 'Servidor inválido.', ephemeral: true });
+        await interaction.reply({ content: 'Servidor inválido.', ephemeral: true }).catch(() => {});
         return true;
     }
 
     const cfg = getConfig(guildId);
     const member = interaction.member;
-    const session = getSession(guildId, userId);
+    const sess = getSession(guildId, userId);
 
-    // ——— Select cargos nesta página ———
-    if (action === 'roles' && interaction.isStringSelectMenu()) {
-        const pageRoles = activePages(cfg)[session.rolePage]?.roles || [];
-        const pageIds = new Set(pageRoles.map((r) => r.roleId));
-        // remove seleções desta página, aplica novas
-        for (const rid of pageIds) session.selected.delete(rid);
-        for (const v of interaction.values) {
-            if (session.selected.size >= (cfg.maxRoles || 10) && !session.selected.has(v)) continue;
-            session.selected.add(v);
+    // ── Select cargos ──
+    if (action === 'role' && interaction.isStringSelectMenu()) {
+        const pageIdx = parseInt(parts[4], 10) || 0;
+        const pages = rolePages(cfg);
+        const pageItems = pages[pageIdx]?.items || [];
+        const pageIds = pageItems.map((i) => i.roleId);
+
+        // remove seleções desta página e aplica novas
+        for (const rid of pageIds) sess.selected.delete(rid);
+        for (const rid of interaction.values) {
+            if (cfg.roles.maxSelect && sess.selected.size >= cfg.roles.maxSelect) break;
+            sess.selected.add(rid);
         }
-        // trim excess
-        while (session.selected.size > (cfg.maxRoles || 10)) {
-            const first = session.selected.values().next().value;
-            session.selected.delete(first);
-        }
-        saveSession(guildId, userId, session);
-        await applySelectedRoles(member, session, cfg);
-        await interaction.update({
-            embeds: [embedRoles(member, cfg, session)],
-            components: componentsRoles(cfg, session, guildId, userId)
-        });
-        return true;
-    }
 
-    // Nav cargos
-    if (action === 'rprev' || action === 'rnext') {
-        const total = Math.max(activePages(cfg).length, 1);
-        if (action === 'rprev') session.rolePage = Math.max(0, session.rolePage - 1);
-        else session.rolePage = Math.min(total - 1, session.rolePage + 1);
-        saveSession(guildId, userId, session);
-        await interaction.update({
-            embeds: [embedRoles(member, cfg, session)],
-            components: componentsRoles(cfg, session, guildId, userId)
-        });
-        return true;
-    }
+        await applyRoleSelection(member, cfg, sess.selected);
+        persistSession(guildId, userId, sess);
 
-    if (action === 'rgo') {
-        session.step = 'rules_intro';
-        saveSession(guildId, userId, session);
-        await applySelectedRoles(member, session, cfg);
         await interaction.update({
-            embeds: [embedRulesIntro(member, cfg)],
-            components: componentsRulesIntro(guildId, userId)
+            embeds: [embedRoles(member, cfg, sess)],
+            components: componentsRoles(guildId, userId, cfg, sess)
         });
+
         await sendLog(
             interaction.guild,
             cfg,
-            `🛡️ **Cargos** · ${member}\n${[...session.selected].map((id) => `<@&${id}>`).join(' ') || 'nenhum'}`
+            'roles',
+            `🛡️ **Cargos** · ${member}\n${[...sess.selected].map((x) => `<@&${x}>`).join(' ') || '—'}`
         );
         return true;
     }
 
-    if (action === 'read') {
-        session.step = 'rules';
-        session.rulesPage = 0;
-        saveSession(guildId, userId, session);
+    // ── Navegação cargos ──
+    if (action === 'prev' || action === 'next') {
+        const pages = rolePages(cfg);
+        const total = Math.max(pages.length, 1);
+        if (action === 'prev') sess.rolePage = Math.max(0, sess.rolePage - 1);
+        else sess.rolePage = Math.min(total - 1, sess.rolePage + 1);
+
         await interaction.update({
-            embeds: [embedRulesPage(member, cfg, session)],
-            components: componentsRulesPage(cfg, session, guildId, userId)
+            embeds: [embedRoles(member, cfg, sess)],
+            components: componentsRoles(guildId, userId, cfg, sess)
         });
         return true;
     }
 
-    if (action === 'uprev' || action === 'unext') {
-        const total = Math.max(1, Math.ceil((cfg.rules || []).length / RULES_PER_PAGE));
-        if (action === 'uprev') session.rulesPage = Math.max(0, session.rulesPage - 1);
-        else session.rulesPage = Math.min(total - 1, session.rulesPage + 1);
-        saveSession(guildId, userId, session);
+    if (action === 'continue') {
+        sess.step = 'rules_intro';
         await interaction.update({
-            embeds: [embedRulesPage(member, cfg, session)],
-            components: componentsRulesPage(cfg, session, guildId, userId)
+            embeds: [embedRulesIntro(member)],
+            components: componentsRulesIntro(guildId, userId)
+        });
+        return true;
+    }
+
+    if (action === 'readrules') {
+        sess.step = 'rules';
+        sess.rulesPage = 0;
+        await interaction.update({
+            embeds: [embedRulesPage(member, cfg, sess)],
+            components: componentsRulesPage(guildId, userId, cfg, sess)
+        });
+        return true;
+    }
+
+    if (action === 'rprev' || action === 'rnext') {
+        const items = cfg.rules?.items || [];
+        const total = Math.max(Math.ceil(items.length / RULES_PER_PAGE), 1);
+        if (action === 'rprev') sess.rulesPage = Math.max(0, sess.rulesPage - 1);
+        else sess.rulesPage = Math.min(total - 1, sess.rulesPage + 1);
+
+        await interaction.update({
+            embeds: [embedRulesPage(member, cfg, sess)],
+            components: componentsRulesPage(guildId, userId, cfg, sess)
         });
         return true;
     }
 
     if (action === 'accept') {
-        session.rulesAccepted = true;
-        session.step = 'done';
-        session.finished = true;
-        saveSession(guildId, userId, session);
+        sess.accepted = true;
+        sess.finishedAt = Date.now();
+        sess.step = 'done';
+        persistSession(guildId, userId, sess);
         bumpStat(guildId, 'verified');
 
-        if (cfg.visitorRoleId) await member.roles.remove(cfg.visitorRoleId).catch(() => {});
-        if (cfg.verifiedRoleId) await member.roles.add(cfg.verifiedRoleId).catch(() => {});
+        if (cfg.roles.visitorId) await member.roles.remove(cfg.roles.visitorId).catch(() => {});
+        if (cfg.roles.verifiedId) await member.roles.add(cfg.roles.verifiedId).catch(() => {});
 
         await interaction.update({
-            embeds: [embedDone(member, cfg)],
-            components: componentsDone(cfg, guildId, userId)
+            embeds: [embedDone(member)],
+            components: componentsDone(guildId, userId)
         });
 
         await sendLog(
             interaction.guild,
             cfg,
-            `🔐 **Verificado** · ${member} · <t:${Math.floor(Date.now() / 1000)}:F>`
+            'verify',
+            `🔐 **Verificado**\n${member} aceitou as regras · ${new Date().toLocaleString('pt-BR')}`
         );
         return true;
     }
 
     if (action === 'enter') {
-        let content = '🌌 Bem-vindo(a)! Explore o servidor.';
-        if (cfg.exploreChannelId) content += ` Comece em <#${cfg.exploreChannelId}>.`;
-        await interaction.reply({ content, ephemeral: true });
+        await interaction.reply({
+            content: `🌌 Bem-vindo(a) a **${interaction.guild.name}**! Explore os canais e aproveite.`,
+            ephemeral: true
+        });
         return true;
     }
 
@@ -684,37 +734,11 @@ async function handleInteraction(interaction) {
 
 async function sendTest(guild, user) {
     const cfg = getConfig(guild.id);
-    if (!cfg.channelId) throw new Error('Configure o canal do portal');
+    if (!cfg.welcome?.channelId) throw new Error('Configure o canal do portal');
     const member = await guild.members.fetch(user.id).catch(() => null);
     if (!member) throw new Error('Você precisa estar no servidor');
-    // força join flow de teste
-    const channel = await guild.channels.fetch(cfg.channelId).catch(() => null);
-    if (!channel?.isTextBased()) throw new Error('Canal inválido');
-
-    const session = getSession(guild.id, user.id);
-    session.step = 'loading';
-    session.rolePage = 0;
-    session.rulesPage = 0;
-    session.selected = new Set();
-    session.finished = false;
-
-    const msg = await channel.send({
-        content: `🧪 Teste · ${member}`,
-        embeds: [embedLoading(member, cfg)],
-        components: []
-    });
-    session.messageId = msg.id;
-    session.channelId = channel.id;
-    saveSession(guild.id, user.id, session);
-
-    setTimeout(async () => {
-        const s = getSession(guild.id, user.id);
-        s.step = 'roles';
-        saveSession(guild.id, user.id, s);
-        const m = await channel.messages.fetch(msg.id).catch(() => null);
-        if (m) await render(m, member, cfg, s);
-    }, LOADING_MS);
-
+    // reutiliza fluxo de join
+    await onMemberJoin(member);
     return true;
 }
 
@@ -727,6 +751,6 @@ module.exports = {
     onMemberLeave,
     handleInteraction,
     sendTest,
-    getSession,
-    saveSession
+    rolePages,
+    ROLES_PER_PAGE
 };
