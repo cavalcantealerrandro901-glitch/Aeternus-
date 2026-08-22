@@ -3,6 +3,22 @@
  */
 require('dotenv').config();
 
+// Evita TimeoutNegativeWarning (ex.: -12 ms em collectors / clock skew)
+(function patchTimers() {
+    const _setTimeout = global.setTimeout;
+    const _setInterval = global.setInterval;
+    global.setTimeout = (fn, ms, ...args) => {
+        let t = Number(ms);
+        if (!Number.isFinite(t) || t < 0) t = 0;
+        return _setTimeout(fn, t, ...args);
+    };
+    global.setInterval = (fn, ms, ...args) => {
+        let t = Number(ms);
+        if (!Number.isFinite(t) || t < 1) t = 1;
+        return _setInterval(fn, t, ...args);
+    };
+})();
+
 try {
     require('libsodium-wrappers');
 } catch (_) {

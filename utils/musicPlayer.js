@@ -23,7 +23,7 @@ const { resolvePlayable } = require('./musicSearch');
 const guilds = new Map();
 
 const IDLE_MS = 5 * 60 * 1000;
-const PLAY_DELAY_MS = 5 * 1000; // 5s após conectar
+const PLAY_DELAY_MS = 5 * 1000;
 
 const RANDOM_POOL = [
     'lofi hip hop',
@@ -65,7 +65,8 @@ function safeDestroy(connection) {
 }
 
 function sleep(ms) {
-    return new Promise((r) => setTimeout(r, ms));
+    const t = Math.max(0, Number(ms) || 0);
+    return new Promise((r) => setTimeout(r, t));
 }
 
 function getState(guildId) {
@@ -84,7 +85,7 @@ function getState(guildId) {
             ownerId: null,
             idleTimer: null,
             client: null,
-            joining: false // evita apagar sala enquanto conecta
+            joining: false
         });
 
         player.on(AudioPlayerStatus.Idle, () => {
@@ -201,7 +202,6 @@ async function createPrivateVoice(guild, member) {
         }
     }
 
-    // Permissões explícitas para o bot entrar mesmo em canal “privado”
     const channel = await guild.channels.create({
         name: `🎵 · ${member.displayName || member.user.username}`.slice(0, 90),
         type: ChannelType.GuildVoice,
@@ -243,17 +243,17 @@ async function createPrivateVoice(guild, member) {
         ]
     });
 
-    // Garante overwrites do bot (às vezes o create atrasa)
-    await channel.permissionOverwrites.edit(me.id, {
-        ViewChannel: true,
-        Connect: true,
-        Speak: true,
-        Stream: true,
-        MoveMembers: true,
-        ManageChannels: true
-    }).catch(() => {});
+    await channel.permissionOverwrites
+        .edit(me.id, {
+            ViewChannel: true,
+            Connect: true,
+            Speak: true,
+            Stream: true,
+            MoveMembers: true,
+            ManageChannels: true
+        })
+        .catch(() => {});
 
-    // Move o membro
     try {
         if (member.voice?.channelId) {
             await member.voice.setChannel(channel.id);
@@ -295,7 +295,6 @@ async function ensureConnection(guild, voiceChannelId) {
         }
     }
 
-    // re-fetch canal e confirma permissão do bot
     const channel = await guild.channels.fetch(voiceChannelId).catch(() => null);
     if (!channel || (channel.type !== ChannelType.GuildVoice && channel.type !== 2)) {
         throw new Error('Canal de voz inválido.');
@@ -303,11 +302,13 @@ async function ensureConnection(guild, voiceChannelId) {
 
     const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
     if (me) {
-        await channel.permissionOverwrites.edit(me.id, {
-            ViewChannel: true,
-            Connect: true,
-            Speak: true
-        }).catch(() => {});
+        await channel.permissionOverwrites
+            .edit(me.id, {
+                ViewChannel: true,
+                Connect: true,
+                Speak: true
+            })
+            .catch(() => {});
 
         const perms = channel.permissionsFor(me);
         if (perms && !perms.has(PermissionFlagsBits.Connect)) {
@@ -390,9 +391,6 @@ async function playNext(guildId) {
     }
 }
 
-/**
- * Cria sala privada → bot entra na hora → espera 5s → toca
- */
 async function startPrivateSession(guild, member, textChannel, query, client) {
     const st = getState(guild.id);
     st.client = client;
@@ -421,7 +419,6 @@ async function startPrivateSession(guild, member, textChannel, query, client) {
         await member.voice.setChannel(voiceChannelId).catch(() => {});
     }
 
-    // Bot conecta IMEDIATAMENTE na call privada
     await ensureConnection(guild, voiceChannelId);
 
     const track = await resolveTrack(query);
@@ -440,7 +437,6 @@ async function startPrivateSession(guild, member, textChannel, query, client) {
     const shouldStart = !st.playing && !st.now;
     st.queue.push(track);
 
-    // Aguarda 5 segundos depois de conectar, então toca
     if (shouldStart) {
         console.log(`[music] aguardando ${PLAY_DELAY_MS / 1000}s para tocar…`);
         await sleep(PLAY_DELAY_MS);
@@ -464,8 +460,6 @@ async function onVoiceStateUpdate(oldState, newState) {
     const guildId = oldState.guild.id;
     const st = getState(guildId);
     if (!st.privateChannelId || !st.ownerId) return;
-
-    // Enquanto está conectando, não apaga
     if (st.joining) return;
 
     const leftPriv =
