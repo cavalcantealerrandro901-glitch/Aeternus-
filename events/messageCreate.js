@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { getPrefix } = require('../utils/prefixManager');
+const chatXp = require('../utils/chatXp');
 
 function formatAfkTime(ms) {
     const sec = Math.floor(ms / 1000);
@@ -27,7 +28,9 @@ module.exports = {
                 client.afk.delete(message.author.id);
                 const tempo = formatAfkTime(Date.now() - (data.timestamp || Date.now()));
                 message
-                    .reply(`👋 Bem-vindo de volta, **${message.author.username}**! AFK removido (ausente por ${tempo}).`)
+                    .reply(
+                        `👋 Bem-vindo de volta, **${message.author.username}**! AFK removido (ausente por ${tempo}).`
+                    )
                     .then((msg) => setTimeout(() => msg.delete().catch(() => {}), 6000))
                     .catch(() => {});
             }
@@ -46,9 +49,27 @@ module.exports = {
             }
         }
 
-        const prefix = getPrefix(message.guild.id); // padrão O.
+        const prefix = getPrefix(message.guild.id);
 
-        if (!message.content.startsWith(prefix)) return;
+        // XP por conversa (não em comandos)
+        if (!message.content.startsWith(prefix)) {
+            try {
+                const awarded = chatXp.tryAward(message);
+                if (awarded?.result?.leveledUp) {
+                    const r = awarded.result;
+                    message.channel
+                        .send(
+                            `🎉 **${message.author.username}** subiu para o nível **${r.levelAfter}**!\n` +
+                                `❄️ Ganhou **${r.flocosGained.toLocaleString('pt-BR')}** flocos · Daily ×**${r.dailyMultiplier.toFixed(2)}**`
+                        )
+                        .then((m) => setTimeout(() => m.delete().catch(() => {}), 12000))
+                        .catch(() => {});
+                }
+            } catch (e) {
+                console.error('[chatXp]', e.message);
+            }
+            return;
+        }
 
         const args = message.content.slice(prefix.length).trim().split(/ +/);
         const commandName = (args.shift() || '').toLowerCase();

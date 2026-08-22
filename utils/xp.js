@@ -1,15 +1,15 @@
 const db = require('./database');
+const flocos = require('./flocos');
 
 const EMOJI = '⭐';
 const NAME = 'XP';
 
-/** XP necessário para ir do nível L para L+1 */
+/** XP para ir do nível L → L+1 */
 function xpForLevel(level) {
     const l = Math.max(1, Math.floor(level));
     return 100 * l * l;
 }
 
-/** Converte XP total → nível (começa no 1) */
 function levelFromXp(totalXp) {
     let xp = Math.max(0, Math.floor(totalXp || 0));
     let level = 1;
@@ -21,7 +21,6 @@ function levelFromXp(totalXp) {
     return level;
 }
 
-/** XP dentro do nível atual e quanto falta pro próximo */
 function progress(totalXp) {
     let remaining = Math.max(0, Math.floor(totalXp || 0));
     let level = 1;
@@ -30,13 +29,18 @@ function progress(totalXp) {
         level += 1;
         if (level > 500) break;
     }
-    const need = xpForLevel(level);
     return {
         level,
         xpInLevel: remaining,
-        xpNeed: need,
+        xpNeed: xpForLevel(level),
         total: Math.max(0, Math.floor(totalXp || 0))
     };
+}
+
+/** Multiplicador do daily pelo nível de XP: 1.00 + 0.03 por nível acima de 1 */
+function dailyMultiplier(userId) {
+    const level = levelFromXp(get(userId));
+    return Math.round((1 + (level - 1) * 0.03) * 100) / 100;
 }
 
 function format(amount) {
@@ -54,19 +58,32 @@ function get(userId) {
 }
 
 /**
- * Adiciona XP. Retorna { total, levelBefore, levelAfter, leveledUp }
+ * Adiciona XP. Em level-up: 300–5000 flocos e registra níveis subidos.
  */
 function add(userId, amount) {
     const before = get(userId);
     const levelBefore = levelFromXp(before);
     const total = db.addXp(String(userId), Math.floor(Number(amount) || 0));
     const levelAfter = levelFromXp(total);
+    const leveledUp = levelAfter > levelBefore;
+
+    let flocosGained = 0;
+    if (leveledUp) {
+        for (let lv = levelBefore + 1; lv <= levelAfter; lv++) {
+            const reward = 300 + Math.floor(Math.random() * (5000 - 300 + 1));
+            flocosGained += reward;
+        }
+        if (flocosGained > 0) flocos.add(userId, flocosGained);
+    }
+
     return {
         total,
         levelBefore,
         levelAfter,
-        leveledUp: levelAfter > levelBefore,
-        progress: progress(total)
+        leveledUp,
+        flocosGained,
+        progress: progress(total),
+        dailyMultiplier: dailyMultiplier(userId)
     };
 }
 
@@ -76,6 +93,7 @@ module.exports = {
     xpForLevel,
     levelFromXp,
     progress,
+    dailyMultiplier,
     format,
     formatPlain,
     get,

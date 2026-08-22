@@ -1,72 +1,47 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const cristais = require('../utils/cristais');
 const flocos = require('../utils/flocos');
-const { getPanelBase } = require('../utils/panelUrl');
 
 module.exports = {
     name: 'removemoney',
-    aliases: ['remflocos', 'takeflocos', 'removebal'],
-    description: 'Remove ❄️ flocos de um usuário (economia + painel)',
+    aliases: ['remcristais', 'remflocos', 'take'],
+    description: 'Remove 💠 cristais ou ❄️ flocos',
     async execute(message, args) {
         if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
-            return message.reply('❌ Apenas **administradores** podem usar este comando.');
+            return message.reply('❌ Apenas **administradores**.');
         }
 
-        const target =
-            message.mentions.users.first() ||
-            (args[0] && !/[^0-9]/.test(args[0])
-                ? await message.client.users.fetch(args[0]).catch(() => null)
-                : null);
-
-        let rawAmount = args[1] || args[0];
-        if (message.mentions.users.first()) {
-            rawAmount = args.find((a) => !a.startsWith('<@')) || args[1];
-        } else if (target && args[0] === target.id) {
-            rawAmount = args[1];
+        let currency = 'cristais';
+        const first = (args[0] || '').toLowerCase();
+        if (['flocos', 'floco', 'f'].includes(first)) {
+            currency = 'flocos';
+            args = args.slice(1);
+        } else if (['cristais', 'cristal', 'c'].includes(first)) {
+            currency = 'cristais';
+            args = args.slice(1);
         }
+
+        const lib = currency === 'flocos' ? flocos : cristais;
+        const target = message.mentions.users.first();
+        const rawAmount = args.find((a) => !a.startsWith('<@'));
 
         if (!target || !rawAmount) {
-            return message.reply(
-                '⚠️ Uso: `O.removemoney @usuário <valor>`\n' +
-                    'Exemplos: `O.removemoney @user 5k` · `O.removemoney @user 500`'
-            );
+            return message.reply('Uso: `O.removemoney [@] <valor>` ou `O.removemoney flocos @user 1k`');
         }
 
-        const amount = flocos.parseBet(rawAmount, Number.MAX_SAFE_INTEGER);
-        if (amount == null || amount <= 0) {
-            return message.reply('❌ Valor inválido. Use `100`, `1,5k`, `2.5m`, etc.');
-        }
+        const amount = lib.parseBet(rawAmount, Number.MAX_SAFE_INTEGER);
+        if (amount == null || amount <= 0) return message.reply('❌ Valor inválido.');
 
-        const before = flocos.get(target.id);
-        const after = flocos.add(target.id, -amount); // addBal já usa Math.max(0, ...)
-
-        const panel = getPanelBase();
+        const before = lib.get(target.id);
+        const after = lib.add(target.id, -amount);
 
         const embed = new EmbedBuilder()
             .setColor(0xef4444)
-            .setTitle('❄️ Flocos removidos')
-            .setThumbnail(target.displayAvatarURL({ size: 128 }))
-            .setDescription(`Administrador **${message.author.username}** debitou flocos da economia.`)
-            .addFields(
-                { name: '👤 Usuário', value: `${target}`, inline: true },
-                { name: '➖ Valor', value: flocos.format(amount), inline: true },
-                { name: '📊 Antes', value: flocos.formatPlain(before), inline: true },
-                { name: '🏦 Saldo atual', value: flocos.format(after), inline: true },
-                {
-                    name: '🌐 Painel',
-                    value: `[Abrir painel](${panel}) · \`O.atm\` / \`O.bal\``
-                }
-            )
-            .setFooter({ text: 'Economia unificada · data/economy.json' })
-            .setTimestamp();
+            .setTitle(currency === 'flocos' ? '❄️ Flocos removidos' : '💠 Cristais removidos')
+            .setDescription(
+                `${target}: ${before.toLocaleString('pt-BR')} → **${after.toLocaleString('pt-BR')}**`
+            );
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel('Painel')
-                .setStyle(ButtonStyle.Link)
-                .setURL(panel)
-                .setEmoji('⚙️')
-        );
-
-        await message.reply({ embeds: [embed], components: [row] });
+        await message.reply({ embeds: [embed] });
     }
 };

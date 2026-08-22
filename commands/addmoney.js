@@ -1,11 +1,12 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
+const cristais = require('../utils/cristais');
 const flocos = require('../utils/flocos');
-const { getPanelBase, getDailyPageUrl } = require('../utils/panelUrl');
+const { getPanelBase } = require('../utils/panelUrl');
 
 module.exports = {
     name: 'addmoney',
-    aliases: ['addflocos', 'giveflocos', 'addbal'],
-    description: 'Adiciona ❄️ flocos a um ou vários usuários',
+    aliases: ['addcristais', 'give', 'addbal'],
+    description: 'Adiciona 💠 cristais (ou ❄️ flocos) a um ou vários usuários',
     async execute(message, args) {
         if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
             return message.reply('❌ Apenas **administradores** podem usar este comando.');
@@ -14,23 +15,31 @@ module.exports = {
         if (!args.length) {
             return message.reply(
                 '⚠️ Uso:\n' +
-                    '`O.addmoney @user1 @user2 @user3 5k`\n' +
-                    '`O.addmoney @user 500`\n' +
-                    'Vários usuários + **um valor** no final (ou no início).'
+                    '`O.addmoney @a @b 5k` → cristais 💠\n' +
+                    '`O.addmoney flocos @a 5k` → flocos ❄️\n' +
+                    '`O.addmoney cristais @a @b 1m`'
             );
         }
 
-        // Valor: primeiro ou último arg que pareça quantia (não menção / não só ID)
+        let currency = 'cristais';
+        const first = (args[0] || '').toLowerCase();
+        if (['flocos', 'floco', 'f'].includes(first)) {
+            currency = 'flocos';
+            args = args.slice(1);
+        } else if (['cristais', 'cristal', 'c'].includes(first)) {
+            currency = 'cristais';
+            args = args.slice(1);
+        }
+
+        const lib = currency === 'flocos' ? flocos : cristais;
         const isMention = (a) => /^<@!?\d+>$/.test(a);
         const isSnowflake = (a) => /^\d{16,20}$/.test(a);
 
         let amountArg = null;
         let amountIndex = -1;
-
-        // prioriza o último token que parseia como valor
         for (let i = args.length - 1; i >= 0; i--) {
             if (isMention(args[i]) || isSnowflake(args[i])) continue;
-            const parsed = flocos.parseBet(args[i], Number.MAX_SAFE_INTEGER);
+            const parsed = lib.parseBet(args[i], Number.MAX_SAFE_INTEGER);
             if (parsed != null && parsed > 0) {
                 amountArg = args[i];
                 amountIndex = i;
@@ -38,92 +47,60 @@ module.exports = {
             }
         }
 
-        // fallback: primeiro token numérico
         if (amountArg == null) {
-            for (let i = 0; i < args.length; i++) {
-                if (isMention(args[i]) || isSnowflake(args[i])) continue;
-                const parsed = flocos.parseBet(args[i], Number.MAX_SAFE_INTEGER);
-                if (parsed != null && parsed > 0) {
-                    amountArg = args[i];
-                    amountIndex = i;
-                    break;
-                }
-            }
+            return message.reply('❌ Informe o **valor** (ex.: `5k`, `500`).');
         }
 
-        if (amountArg == null) {
-            return message.reply(
-                '❌ Informe o **valor**. Exemplos: `500`, `5k`, `1,5m`\n' +
-                    '`O.addmoney @a @b 5k`'
-            );
-        }
-
-        const amount = flocos.parseBet(amountArg, Number.MAX_SAFE_INTEGER);
+        const amount = lib.parseBet(amountArg, Number.MAX_SAFE_INTEGER);
         if (amount == null || amount <= 0) {
-            return message.reply('❌ Valor inválido. Use `100`, `1,5k`, `2.5m`, etc.');
+            return message.reply('❌ Valor inválido.');
         }
 
-        // Alvos: menções + IDs nos args (exceto o do valor)
         const targets = new Map();
-
         for (const u of message.mentions.users.values()) {
             if (!u.bot) targets.set(u.id, u);
         }
-
         for (let i = 0; i < args.length; i++) {
             if (i === amountIndex) continue;
-            const a = args[i];
-            if (isMention(a)) continue; // já pego em mentions
-            if (isSnowflake(a)) {
-                if (targets.has(a)) continue;
-                const u = await message.client.users.fetch(a).catch(() => null);
+            if (isSnowflake(args[i])) {
+                const u = await message.client.users.fetch(args[i]).catch(() => null);
                 if (u && !u.bot) targets.set(u.id, u);
             }
         }
 
         if (!targets.size) {
-            return message.reply(
-                '❌ Mencione **pelo menos um usuário**.\n' +
-                    '`O.addmoney @user1 @user2 10k`'
-            );
+            return message.reply('❌ Mencione pelo menos um usuário.');
         }
 
         const results = [];
         for (const user of targets.values()) {
-            const before = flocos.get(user.id);
-            const after = flocos.add(user.id, amount);
+            const before = lib.get(user.id);
+            const after = lib.add(user.id, amount);
             results.push({ user, before, after });
         }
 
-        const panel = getPanelBase();
-        const daily = getDailyPageUrl();
-
+        const label = currency === 'flocos' ? '❄️ Flocos' : '💠 Cristais';
         const lines = results
             .slice(0, 20)
             .map(
                 (r, i) =>
-                    `**${i + 1}.** ${r.user} → ${flocos.formatPlain(r.before)} → **${r.after.toLocaleString('pt-BR')}** ❄️`
+                    `**${i + 1}.** ${r.user} → ${beforeFmt(r.before)} → **${r.after.toLocaleString('pt-BR')}**`
             )
             .join('\n');
 
-        const extra =
-            results.length > 20 ? `\n_…e mais ${results.length - 20} usuários._` : '';
+        function beforeFmt(n) {
+            return n.toLocaleString('pt-BR');
+        }
 
+        const panel = getPanelBase();
         const embed = new EmbedBuilder()
             .setColor(0x22c55e)
-            .setTitle(`❄️ Flocos adicionados · ${results.length} usuário(s)`)
+            .setTitle(`${label} adicionados · ${results.length} usuário(s)`)
             .setDescription(
-                `**+${amount.toLocaleString('pt-BR')}** flocos para cada um.\n` +
-                    `Por **${message.author.username}**`
+                `**+${amount.toLocaleString('pt-BR')}** para cada um · por **${message.author.username}**`
             )
-            .addFields(
-                { name: '📋 Resultado', value: (lines + extra).slice(0, 1024) || '—' },
-                {
-                    name: '🌐 Painel',
-                    value: `[Painel](${panel}) · [Daily](${daily}) · \`O.atm\` / \`O.bal\``
-                }
-            )
-            .setFooter({ text: 'Economia unificada · data/economy.json' })
+            .addFields({ name: '📋 Resultado', value: lines.slice(0, 1024) || '—' })
+            .setFooter({ text: 'O.saldo para ver · economia unificada' })
             .setTimestamp();
 
         const row = new ActionRowBuilder().addComponents(
