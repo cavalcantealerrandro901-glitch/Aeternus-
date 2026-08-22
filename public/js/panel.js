@@ -1,11 +1,10 @@
-/**
- * Aeternus Panel — lógica unificada do dashboard
- */
+/** Aeternus Panel */
 (function () {
   const params = new URLSearchParams(location.search);
   const guildId = params.get('guild') || params.get('server');
   let settings = {};
   let textChannels = [];
+  let roles = [];
   let categories = [];
 
   const $ = (id) => document.getElementById(id);
@@ -25,23 +24,24 @@
     setTimeout(() => t.classList.remove('show'), 2200);
   }
 
-  function fillSelect(select, items, selected, placeholder, labelFn) {
-    if (!select) return;
-    const lab = labelFn || ((c) => c.name);
-    const opts = [`<option value="">${placeholder || '— Selecionar —'}</option>`].concat(
-      items.map(
-        (c) =>
-          `<option value="${c.id}" ${String(selected) === String(c.id) ? 'selected' : ''}>${escapeHtml(lab(c))}</option>`
-      )
-    );
-    select.innerHTML = opts.join('');
-  }
-
   function escapeHtml(s) {
     return String(s || '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function fillSelect(select, items, selected, placeholder, labelFn) {
+    if (!select) return;
+    const lab = labelFn || ((c) => c.name);
+    select.innerHTML = [`<option value="">${placeholder || '— Selecionar —'}</option>`]
+      .concat(
+        items.map(
+          (c) =>
+            `<option value="${c.id}" ${String(selected) === String(c.id) ? 'selected' : ''}>${escapeHtml(lab(c))}</option>`
+        )
+      )
+      .join('');
   }
 
   function applySettings() {
@@ -72,7 +72,7 @@
 
   async function load() {
     if (!guildId) {
-      $('gName').textContent = 'Nenhum servidor';
+      if ($('gName')) $('gName').textContent = 'Nenhum servidor';
       return;
     }
 
@@ -92,8 +92,6 @@
       $('gChannels').textContent = g.channelsCount ?? '—';
       $('gJoined').textContent = g.joinedAt || '—';
       if (g.prefix) settings.prefix = g.prefix;
-    } else {
-      $('gName').textContent = 'Bot não está neste servidor';
     }
 
     if (det.bot) {
@@ -101,7 +99,7 @@
       $('botName').textContent = det.bot.name || det.bot.username || 'Bot';
       $('botMeta').textContent =
         (det.bot.tag ? '@' + det.bot.tag + ' · ' : '') +
-        `Ping ${det.bot.ping ?? '—'}ms · Uptime ${det.bot.uptime || '—'}`;
+        `Ping ${det.bot.ping ?? '—'}ms`;
     }
 
     try {
@@ -114,6 +112,7 @@
         );
         if (!textChannels.length) textChannels = gd.allChannels;
       }
+      if (Array.isArray(gd.roles)) roles = gd.roles;
     } catch (_) {}
 
     try {
@@ -121,25 +120,30 @@
         credentials: 'same-origin'
       }).then((r) => r.json());
       categories = cat.categories || [];
-      if (cat.selected && !settings.musicCategory) settings.musicCategory = cat.selected;
     } catch (_) {}
 
-    fillSelect($('welcomeChannel'), textChannels, settings.welcomeChannel, 'Canal de boas-vindas');
-    fillSelect($('msgLogChannel'), textChannels, settings.msgLogChannel, 'Canal de logs');
-    fillSelect($('modLogChannel'), textChannels, settings.modLogChannel, 'Canal de moderação');
-    fillSelect($('memberLogChannel'), textChannels, settings.memberLogChannel, 'Canal de membros');
-    fillSelect(
-      $('musicCategory'),
-      categories,
-      settings.musicCategory,
-      '— Categoria das salas de música —',
-      (c) => '📁 ' + c.name
-    );
+    // roles fallback via guild-details if needed
+    try {
+      const rr = await fetch('/api/guild/' + encodeURIComponent(guildId) + '/roles', {
+        credentials: 'same-origin'
+      }).then((r) => r.json());
+      if (Array.isArray(rr.roles)) roles = rr.roles;
+    } catch (_) {}
+
+    const chSel = (id, key, ph) => fillSelect($(id), textChannels, settings[key], ph);
+    chSel('welcomeChannel', 'welcomeChannel', 'Canal de boas-vindas');
+    chSel('msgLogChannel', 'msgLogChannel', 'Canal de logs');
+    chSel('modLogChannel', 'modLogChannel', 'Canal moderação');
+    chSel('memberLogChannel', 'memberLogChannel', 'Canal membros');
+    chSel('sgChannel', 'sgChannel', 'Canal do portal GATE');
+    chSel('sgLogChannel', 'sgLogChannel', 'Canal de logs GATE');
+
+    fillSelect($('sgVisitorRole'), roles, settings.sgVisitorRole, 'Cargo visitante', (r) => r.name);
+    fillSelect($('sgVerifiedRole'), roles, settings.sgVerifiedRole, 'Cargo verificado', (r) => r.name);
+    fillSelect($('musicCategory'), categories, settings.musicCategory, 'Categoria música', (c) => '📁 ' + c.name);
 
     applySettings();
     if ($('prefix') && !$('prefix').value) $('prefix').value = settings.prefix || 'O.';
-    if ($('musicMaxQueue') && !$('musicMaxQueue').value)
-      $('musicMaxQueue').value = settings.musicMaxQueue || 50;
   }
 
   document.querySelectorAll('[data-open]').forEach((btn) => {
@@ -164,6 +168,21 @@
     ])
   );
   $('saveMusic')?.addEventListener('click', () => saveKeys(['musicCategory', 'musicMaxQueue']));
+  $('saveGate')?.addEventListener('click', () =>
+    saveKeys([
+      'sgEnabled',
+      'sgChannel',
+      'sgLogChannel',
+      'sgVisitorRole',
+      'sgVerifiedRole',
+      'sgTitle',
+      'sgMessage',
+      'sgRulesText',
+      'sgColor',
+      'sgInterestRoles',
+      'sgNotifyRoles'
+    ])
+  );
 
   load().catch((e) => {
     console.error(e);

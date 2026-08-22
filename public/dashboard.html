@@ -48,17 +48,21 @@
           <span class="ico">🔧</span>
           <span><span>Geral</span><span class="sub">Prefixo e ajustes básicos</span></span>
         </button>
+        <button type="button" class="sys-btn" data-open="gate">
+          <span class="ico">🌌</span>
+          <span><span>SUPREME GATE</span><span class="sub">Portal · regras · verificação · cargos</span></span>
+        </button>
         <button type="button" class="sys-btn" data-open="welcome">
           <span class="ico">👋</span>
-          <span><span>Boas-vindas</span><span class="sub">Mensagem automática de entrada</span></span>
+          <span><span>Boas-vindas</span><span class="sub">Mensagem simples de entrada</span></span>
         </button>
         <button type="button" class="sys-btn" data-open="logs">
           <span class="ico">📋</span>
-          <span><span>Logs</span><span class="sub">Auditoria de mensagens e moderação</span></span>
+          <span><span>Logs</span><span class="sub">Auditoria</span></span>
         </button>
         <button type="button" class="sys-btn" data-open="music">
           <span class="ico">🎵</span>
-          <span><span>Música</span><span class="sub">Categoria das salas privadas</span></span>
+          <span><span>Música</span><span class="sub">Categoria das salas</span></span>
         </button>
       </div>
     </section>
@@ -72,22 +76,88 @@
         <div class="field">
           <label>Prefixo do bot</label>
           <input id="prefix" data-key="prefix" maxlength="10" placeholder="O.">
-          <p class="hint">Padrão: <code>O.</code></p>
         </div>
         <button type="button" class="btn btn-primary" id="saveGeral">💾 Salvar</button>
+      </div>
+    </section>
+
+    <!-- SUPREME GATE -->
+    <section id="view-gate" class="view">
+      <div class="page-head">
+        <button type="button" class="btn" data-back>← Voltar</button>
+        <h2>🌌 SUPREME GATE</h2>
+      </div>
+      <div class="card">
+        <p class="hint" style="margin-top:0;line-height:1.6">
+          Portal completo: boas-vindas → regras → verificação → interesses → notificações → acesso liberado.
+        </p>
+
+        <div class="field">
+          <label>Ativar SUPREME GATE</label>
+          <div class="row-between">
+            <span class="hint" style="margin:0">Substitui a entrada comum por jornada interativa</span>
+            <label class="switch"><input type="checkbox" id="sgEnabled" data-key="sgEnabled"><span class="slider"></span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>📢 Canal do portal</label>
+          <select id="sgChannel" data-key="sgChannel"></select>
+        </div>
+        <div class="field">
+          <label>📋 Canal de logs do GATE</label>
+          <select id="sgLogChannel" data-key="sgLogChannel"></select>
+        </div>
+        <div class="field">
+          <label>👤 Cargo Visitante (antes de verificar)</label>
+          <select id="sgVisitorRole" data-key="sgVisitorRole"></select>
+        </div>
+        <div class="field">
+          <label>✅ Cargo Verificado (após regras)</label>
+          <select id="sgVerifiedRole" data-key="sgVerifiedRole"></select>
+        </div>
+        <div class="field">
+          <label>Título do portal</label>
+          <input id="sgTitle" data-key="sgTitle" placeholder="🌌 UMA NOVA PRESENÇA SURGIU">
+        </div>
+        <div class="field">
+          <label>Mensagem do portal</label>
+          <textarea id="sgMessage" data-key="sgMessage" rows="4" placeholder="Bem-vindo {username}..."></textarea>
+          <p class="hint">{user} {username} {server} {memberCount}</p>
+        </div>
+        <div class="field">
+          <label>Texto das regras</label>
+          <textarea id="sgRulesText" data-key="sgRulesText" rows="8" placeholder="Código de conduta..."></textarea>
+        </div>
+        <div class="field">
+          <label>Cor do embed</label>
+          <input id="sgColor" data-key="sgColor" placeholder="#7c3aed">
+        </div>
+        <div class="field">
+          <label>🎮 Cargos de interesse</label>
+          <textarea id="sgInterestRoles" data-key="sgInterestRoles" rows="6" placeholder="Gamer|ID_DO_CARGO|🎮&#10;Anime|ID_DO_CARGO|🎭"></textarea>
+          <p class="hint">Uma linha por cargo: <code>Nome|ID_do_cargo|emoji</code></p>
+        </div>
+        <div class="field">
+          <label>🔔 Cargos de notificação</label>
+          <textarea id="sgNotifyRoles" data-key="sgNotifyRoles" rows="6" placeholder="Eventos|ID_DO_CARGO|🎉&#10;Anúncios|ID_DO_CARGO|📢"></textarea>
+          <p class="hint">Mesmo formato: <code>Nome|ID|emoji</code></p>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="saveGate">💾 Salvar SUPREME GATE</button>
       </div>
     </section>
 
     <section id="view-welcome" class="view">
       <div class="page-head">
         <button type="button" class="btn" data-back>← Voltar</button>
-        <h2>👋 Boas-vindas</h2>
+        <h2>👋 Boas-vindas simples</h2>
       </div>
       <div class="card">
         <div class="field">
           <label>Ativar</label>
           <div class="row-between">
-            <span class="hint" style="margin:0">Mensagem ao entrar</span>
+            <span class="hint" style="margin:0">Mensagem clássica (se o GATE estiver off)</span>
             <label class="switch"><input type="checkbox" id="welcomeEnabled" data-key="welcomeEnabled"><span class="slider"></span></label>
           </div>
         </div>
@@ -115,31 +185,28 @@
       <div class="card">
         <div class="log-card">
           <div class="row-between">
-            <div><div class="log-title">📝 Mensagens</div><div class="log-desc">Editadas e apagadas</div></div>
+            <div><div class="log-title">📝 Mensagens</div></div>
             <label class="switch"><input type="checkbox" id="msgLogEnabled" data-key="msgLogEnabled"><span class="slider"></span></label>
           </div>
           <div class="field" style="margin-top:12px;margin-bottom:0">
-            <label>Canal</label>
             <select id="msgLogChannel" data-key="msgLogChannel"></select>
           </div>
         </div>
         <div class="log-card">
           <div class="row-between">
-            <div><div class="log-title">🔨 Moderação</div><div class="log-desc">Ban, kick, warn</div></div>
+            <div><div class="log-title">🔨 Moderação</div></div>
             <label class="switch"><input type="checkbox" id="modLogEnabled" data-key="modLogEnabled"><span class="slider"></span></label>
           </div>
           <div class="field" style="margin-top:12px;margin-bottom:0">
-            <label>Canal</label>
             <select id="modLogChannel" data-key="modLogChannel"></select>
           </div>
         </div>
         <div class="log-card">
           <div class="row-between">
-            <div><div class="log-title">👤 Membros</div><div class="log-desc">Entrada e saída</div></div>
+            <div><div class="log-title">👤 Membros</div></div>
             <label class="switch"><input type="checkbox" id="memberLogEnabled" data-key="memberLogEnabled"><span class="slider"></span></label>
           </div>
           <div class="field" style="margin-top:12px;margin-bottom:0">
-            <label>Canal</label>
             <select id="memberLogChannel" data-key="memberLogChannel"></select>
           </div>
         </div>
@@ -156,30 +223,17 @@
         <div class="field">
           <label>📁 Categoria das salas</label>
           <select id="musicCategory" data-key="musicCategory"></select>
-          <p class="hint">
-            As salas privadas de <code>O.play</code> serão criadas <strong>dentro desta categoria</strong>.
-            Se vazio, criam na raiz do servidor.
-          </p>
         </div>
         <div class="field">
-          <label>Tamanho máximo da fila</label>
+          <label>Fila máxima</label>
           <input type="number" id="musicMaxQueue" data-key="musicMaxQueue" min="1" max="100" value="50">
-        </div>
-        <div class="field">
-          <label>Regras automáticas</label>
-          <p class="hint" style="line-height:1.7;margin:0">
-            • Dono sai da sala → sala é apagada<br>
-            • Sala sem humanos → apagada<br>
-            • <strong>5 minutos</strong> sem música tocando → apagada<br>
-            • Controles: Voltar · Pausa · Passar · Repetir
-          </p>
         </div>
         <button type="button" class="btn btn-primary" id="saveMusic">💾 Salvar</button>
       </div>
     </section>
   </main>
 
-  <div class="toast" id="toast">Salvo com sucesso</div>
+  <div class="toast" id="toast">Salvo</div>
   <script src="/js/panel.js"></script>
 </body>
 </html>

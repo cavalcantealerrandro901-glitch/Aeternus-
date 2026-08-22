@@ -66,6 +66,11 @@ function register(app, client) {
         });
         allChannels.sort((a, b) => a.name.localeCompare(b.name));
 
+        const roles = guild.roles.cache
+            .filter((r) => r.id !== guild.id)
+            .sort((a, b) => b.position - a.position)
+            .map((r) => ({ id: r.id, name: r.name, color: r.hexColor }));
+
         res.json({
             id: guild.id,
             name: guild.name,
@@ -78,8 +83,20 @@ function register(app, client) {
                 ? new Date(joinedAt).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
                 : '—',
             prefix: getPrefix(guild.id),
-            allChannels
+            allChannels,
+            roles
         });
+    });
+
+    app.get('/api/guild/:guildId/roles', requireAuth, async (req, res) => {
+        const guild = client.guilds.cache.get(req.params.guildId);
+        if (!guild) return res.status(404).json({ roles: [] });
+        await guild.roles.fetch().catch(() => {});
+        const roles = guild.roles.cache
+            .filter((r) => r.id !== guild.id && !r.managed)
+            .sort((a, b) => b.position - a.position)
+            .map((r) => ({ id: r.id, name: r.name }));
+        res.json({ roles });
     });
 }
 
