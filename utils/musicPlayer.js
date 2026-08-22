@@ -23,7 +23,7 @@ const { resolvePlayable } = require('./musicSearch');
 const guilds = new Map();
 
 const IDLE_MS = 5 * 60 * 1000;
-const PLAY_DELAY_MS = 5 * 1000;
+const PLAY_DELAY_MS = 3 * 1000;
 
 const RANDOM_POOL = [
     'lofi hip hop',
@@ -81,6 +81,10 @@ function getState(guildId) {
             playing: false,
             paused: false,
             loop: false,
+            /** canal atual (público ou privado) */
+            voiceChannelId: null,
+            /** se true, a sala foi criada pelo bot e pode ser apagada */
+            isPrivate: false,
             privateChannelId: null,
             ownerId: null,
             idleTimer: null,
@@ -137,7 +141,7 @@ function armIdleTimer(guildId) {
     st.idleTimer = setTimeout(() => {
         const s = getState(guildId);
         if (s.now || s.playing || s.queue.length || s.joining) return;
-        console.log(`[music] inatividade 5min — encerrando sala ${guildId}`);
+        console.log(`[music] inatividade — encerrando ${guildId}`);
         stop(guildId, s.client).catch(() => {});
     }, IDLE_MS);
 }
@@ -176,6 +180,8 @@ function controlRow(guildId) {
 function nowEmbed(guildId) {
     const st = getState(guildId);
     const t = st.now;
+    const mode = st.isPrivate ? '🔒 Privada' : '🌐 Pública';
+    const chId = st.voiceChannelId || st.privateChannelId;
     const embed = new EmbedBuilder()
         .setColor(0x1db954)
         .setTitle(st.paused ? '⏸️ Pausado' : st.joining ? '⏳ Conectando…' : '🎶 Tocando agora')
@@ -183,9 +189,10 @@ function nowEmbed(guildId) {
         .addFields(
             { name: 'Fila', value: String(st.queue.length), inline: true },
             { name: 'Loop', value: st.loop ? 'Ligado' : 'Desligado', inline: true },
+            { name: 'Modo', value: mode, inline: true },
             {
-                name: 'Sala',
-                value: st.privateChannelId ? `<#${st.privateChannelId}>` : '—',
+                name: 'Canal',
+                value: chId ? `<#${chId}>` : '—',
                 inline: true
             }
         )
@@ -272,19 +279,23 @@ async function createPrivateVoice(guild, member) {
 
 async function deletePrivateChannel(guildId, client) {
     const st = getState(guildId);
-    if (!st.privateChannelId || !client) return;
+    if (!st.isPrivate || !st.privateChannelId || !client) {
+        st.privateChannelId = null;
+        st.isPrivate = false;
+        return;
+    }
     const id = st.privateChannelId;
     st.privateChannelId = null;
+    st.isPrivate = false;
     try {
         const ch = await client.channels.fetch(id).catch(() => null);
         if (ch) await ch.delete('Sessão de música encerrada').catch(() => {});
     } catch (_) {}
 }
 
-/** Abre a sala para um amigo (overwrite) */
 async function allowUserInPrivate(guildId, userId, client) {
     const st = getState(guildId);
-    if (!st.privateChannelId || !client) return false;
+    if (!st.isPrivate || !st.privateChannelId || !client) return false;
     const ch = await client.channels.fetch(st.privateChannelId).catch(() => null);
     if (!ch) return false;
     await ch.permissionOverwrites
@@ -324,20 +335,15 @@ async function ensureConnection(guild, voiceChannelId) {
 
     const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
     if (me) {
-        await channel.permissionOverwrites
-            .edit(me.id, {
-                ViewChannel: true,
-                Connect: true,
-                Speak: true
-            })
-            .catch(() => {});
-
         const perms = channel.permissionsFor(me);
         if (perms && !perms.has(PermissionFlagsBits.Connect)) {
-            throw new Error('Bot sem permissão de **Conectar** na sala.');
+            throw new Error('Bot sem permissão de **Conectar** neste canal.');
         }
         if (perms && !perms.has(PermissionFlagsBits.Speak)) {
-            throw new Error('Bot sem permissão de **Falar** na sala.');
+            throw new Error('Bot sem permissão de **Falar** neste canal.');
+        }
+        if (perms && !perms.has(PermissionFlagsBits.ViewChannel)) {
+            throw new Error('Bot sem permissão de **Ver canal**.');
         }
     }
 
@@ -355,7 +361,6 @@ async function ensureConnection(guild, voiceChannelId) {
         }
     });
 
-    // Se a conexão cair, encerra a sala
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
         try {
             await Promise.race([
@@ -374,7 +379,7 @@ async function ensureConnection(guild, voiceChannelId) {
     } catch {
         safeDestroy(connection);
         throw new Error(
-            'Não consegui conectar na call. Confira permissões (Conectar/Falar) e se está no Render/Wi‑Fi.'
+            'Não consegui conectar no canal de voz. Verifique permissões e a conexão (Render/Wi‑Fi).'
         );
     }
 
@@ -428,47 +433,70 @@ async function playNext(guildId) {
 }
 
 /**
- * Cria sala privada (ou usa a atual) → conecta → 5s → toca
- * Fallback: se create falhar, usa o VC atual do membro
+ * @param {object} opts
+ * @param {boolean} [opts.privateMode] — true = cria sala privada; false/default = canal público do usuário
  */
-async function startPrivateSession(guild, member, textChannel, query, client) {
+async function startSession(guild, member, textChannel, query, client, opts = {}) {
+    const privateMode = !!opts.privateMode;
     const st = getState(guild.id);
     st.client = client;
     st.joining = true;
     clearIdleTimer(guild.id);
 
-    let voiceChannelId = st.privateChannelId;
+    let voiceChannelId = null;
     let createdNew = false;
 
-    if (voiceChannelId) {
-        const ch = await guild.channels.fetch(voiceChannelId).catch(() => null);
-        if (!ch) {
+    // Já existe sessão no mesmo servidor: continua no mesmo canal
+    if (st.voiceChannelId) {
+        const ch = await guild.channels.fetch(st.voiceChannelId).catch(() => null);
+        if (ch) {
+            voiceChannelId = ch.id;
+        } else {
+            st.voiceChannelId = null;
             st.privateChannelId = null;
-            voiceChannelId = null;
+            st.isPrivate = false;
         }
     }
 
     if (!voiceChannelId) {
-        try {
-            const priv = await createPrivateVoice(guild, member);
-            st.privateChannelId = priv.id;
-            st.ownerId = member.id;
-            voiceChannelId = priv.id;
-            createdNew = true;
-            console.log(`[music] sala privada criada: ${voiceChannelId}`);
-        } catch (e) {
-            console.warn('[music] falha sala privada, usando VC atual:', e.message);
+        if (privateMode) {
+            try {
+                const priv = await createPrivateVoice(guild, member);
+                voiceChannelId = priv.id;
+                st.privateChannelId = priv.id;
+                st.isPrivate = true;
+                createdNew = true;
+                console.log(`[music] sala privada: ${voiceChannelId}`);
+            } catch (e) {
+                console.warn('[music] privada falhou, tentando público:', e.message);
+                if (!member.voice?.channelId) {
+                    st.joining = false;
+                    throw new Error(
+                        'Não consegui criar sala privada e você não está em um canal de voz.'
+                    );
+                }
+                voiceChannelId = member.voice.channelId;
+                st.isPrivate = false;
+                st.privateChannelId = null;
+            }
+        } else {
+            // Modo público: entra onde o usuário está
             if (!member.voice?.channelId) {
                 st.joining = false;
-                throw new Error(
-                    'Não consegui criar sala privada e você não está em um canal de voz.'
-                );
+                throw new Error('Entre em um **canal de voz** (público ou privado) e tente de novo.');
             }
             voiceChannelId = member.voice.channelId;
+            st.isPrivate = false;
             st.privateChannelId = null;
-            st.ownerId = member.id;
+            console.log(`[music] canal público: ${voiceChannelId}`);
         }
-    } else {
+    }
+
+    st.voiceChannelId = voiceChannelId;
+    st.ownerId = st.ownerId || member.id;
+
+    // Se for privada e o membro não está nela, tenta mover
+    if (st.isPrivate && member.voice?.channelId !== voiceChannelId) {
         await member.voice.setChannel(voiceChannelId).catch(() => {});
     }
 
@@ -491,7 +519,7 @@ async function startPrivateSession(guild, member, textChannel, query, client) {
     st.queue.push(track);
 
     if (shouldStart) {
-        console.log(`[music] aguardando ${PLAY_DELAY_MS / 1000}s para tocar…`);
+        console.log(`[music] aguardando ${PLAY_DELAY_MS / 1000}s…`);
         await sleep(PLAY_DELAY_MS);
         st.joining = false;
         await playNext(guild.id);
@@ -503,31 +531,45 @@ async function startPrivateSession(guild, member, textChannel, query, client) {
         track,
         voiceChannelId,
         createdNew,
+        isPrivate: st.isPrivate,
         started: shouldStart,
         embed: nowEmbed(guild.id),
         components: [controlRow(guild.id)]
     };
 }
 
+/** Compat: nome antigo */
+async function startPrivateSession(guild, member, textChannel, query, client) {
+    return startSession(guild, member, textChannel, query, client, { privateMode: true });
+}
+
 async function onVoiceStateUpdate(oldState, newState) {
     const guildId = oldState.guild.id;
     const st = getState(guildId);
-    if (!st.privateChannelId || !st.ownerId) return;
+    if (!st.voiceChannelId || !st.ownerId) return;
     if (st.joining) return;
 
-    const leftPriv =
-        oldState.channelId === st.privateChannelId &&
-        newState.channelId !== st.privateChannelId &&
+    const chId = st.voiceChannelId;
+
+    // Dono saiu do canal da sessão
+    const left =
+        oldState.channelId === chId &&
+        newState.channelId !== chId &&
         oldState.id === st.ownerId;
 
-    if (leftPriv) {
-        console.log(`[music] dono saiu da sala — encerrando ${guildId}`);
-        await stop(guildId, st.client || newState.client);
+    if (left) {
+        // Em canal público: só encerra se não sobrar ninguém (humano)
+        const ch = await oldState.guild.channels.fetch(chId).catch(() => null);
+        const humans = ch?.members?.filter((m) => !m.user.bot) || { size: 0 };
+        if (st.isPrivate || humans.size === 0) {
+            console.log(`[music] canal vazio/dono saiu — encerrando ${guildId}`);
+            await stop(guildId, st.client || newState.client);
+        }
         return;
     }
 
-    if (oldState.channelId === st.privateChannelId || newState.channelId === st.privateChannelId) {
-        const ch = await oldState.guild.channels.fetch(st.privateChannelId).catch(() => null);
+    if (oldState.channelId === chId || newState.channelId === chId) {
+        const ch = await oldState.guild.channels.fetch(chId).catch(() => null);
         if (ch && ch.members) {
             const humans = ch.members.filter((m) => !m.user.bot);
             if (humans.size === 0) {
@@ -541,45 +583,39 @@ async function onVoiceStateUpdate(oldState, newState) {
 async function handleControl(interaction) {
     const cid = interaction.customId || '';
 
-    // Convite: minvite_guildId_channelId_userId  ou minvite_pick_
     if (cid.startsWith('minvite_')) {
         if (cid.startsWith('minvite_pick_')) {
             await interaction.reply({
-                content:
-                    'Para convidar: `O.play @usuario`\nOu mencione o amigo no chat.',
+                content: 'Para convidar: `O.play @usuario`',
                 ephemeral: true
             });
             return true;
         }
 
         const parts = cid.split('_');
-        // minvite_guildId_channelId_userId
         const guildId = parts[1];
         const channelId = parts[2];
-        const targetId = parts[3];
 
         if (interaction.guildId !== guildId) {
             await interaction.reply({ content: 'Servidor inválido.', ephemeral: true });
             return true;
         }
 
-        // Qualquer um pode clicar para entrar se for o alvo; ou o dono convida e o alvo clica
         await allowUserInPrivate(guildId, interaction.user.id, interaction.client);
 
-        const member = interaction.member;
         try {
-            if (member?.voice?.channelId) {
-                await member.voice.setChannel(channelId);
-                await interaction.reply({ content: `🎧 Você entrou em <#${channelId}>!`, ephemeral: true });
+            if (interaction.member?.voice?.channelId) {
+                await interaction.member.voice.setChannel(channelId);
+                await interaction.reply({ content: `🎧 Entrou em <#${channelId}>!`, ephemeral: true });
             } else {
                 await interaction.reply({
-                    content: `Entre em qualquer canal de voz e clique de novo, ou vá em <#${channelId}>.`,
+                    content: `Entre em um canal de voz e clique de novo, ou vá em <#${channelId}>.`,
                     ephemeral: true
                 });
             }
-        } catch (e) {
+        } catch {
             await interaction.reply({
-                content: `Não consegui te mover. Entre manualmente em <#${channelId}>.`,
+                content: `Não consegui te mover. Entre em <#${channelId}>.`,
                 ephemeral: true
             });
         }
@@ -587,11 +623,9 @@ async function handleControl(interaction) {
     }
 
     if (cid.startsWith('mctl_cancelstop_')) {
-        await interaction.update({
-            content: 'Ok, sessão mantida.',
-            embeds: [],
-            components: []
-        }).catch(() => interaction.deferUpdate().catch(() => {}));
+        await interaction
+            .update({ content: 'Ok, sessão mantida.', embeds: [], components: [] })
+            .catch(() => interaction.deferUpdate().catch(() => {}));
         return true;
     }
 
@@ -607,11 +641,11 @@ async function handleControl(interaction) {
 
     const st = getState(guildId);
     if (st.ownerId && interaction.user.id !== st.ownerId) {
-        const inPriv =
-            st.privateChannelId && interaction.member?.voice?.channelId === st.privateChannelId;
-        if (!inPriv) {
+        const inCh =
+            st.voiceChannelId && interaction.member?.voice?.channelId === st.voiceChannelId;
+        if (!inCh) {
             await interaction.reply({
-                content: 'Só quem pediu a música (ou está na sala) controla.',
+                content: 'Só quem pediu a música (ou está no canal) controla.',
                 ephemeral: true
             });
             return true;
@@ -623,11 +657,7 @@ async function handleControl(interaction) {
     if (action === 'stop') {
         await stop(guildId, interaction.client);
         await interaction
-            .update({
-                content: '⏹️ Sessão encerrada. Sala fechada.',
-                embeds: [],
-                components: []
-            })
+            .update({ content: '⏹️ Sessão encerrada.', embeds: [], components: [] })
             .catch(async () => {
                 await interaction.reply({ content: '⏹️ Sessão encerrada.', ephemeral: true });
             });
@@ -672,10 +702,7 @@ async function handleControl(interaction) {
     }
 
     await interaction
-        .update({
-            embeds: [nowEmbed(guildId)],
-            components: [controlRow(guildId)]
-        })
+        .update({ embeds: [nowEmbed(guildId)], components: [controlRow(guildId)] })
         .catch(async () => {
             await interaction.deferUpdate().catch(() => {});
         });
@@ -707,6 +734,7 @@ async function stop(guildId, client) {
     st.loop = false;
     st.ownerId = null;
     st.joining = false;
+    st.voiceChannelId = null;
     try {
         st.player.stop(true);
     } catch (_) {}
@@ -743,7 +771,9 @@ function getQueue(guildId) {
         queue: [...st.queue],
         loop: st.loop,
         max: maxQueue(guildId),
-        privateChannelId: st.privateChannelId
+        privateChannelId: st.privateChannelId,
+        voiceChannelId: st.voiceChannelId,
+        isPrivate: st.isPrivate
     };
 }
 
@@ -763,10 +793,11 @@ async function enqueue(guild, voiceChannelId, textChannelId, query, userId, clie
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!member) throw new Error('Membro não encontrado.');
     const textChannel = await client.channels.fetch(textChannelId);
-    return startPrivateSession(guild, member, textChannel, query, client);
+    return startSession(guild, member, textChannel, query, client, { privateMode: false });
 }
 
 module.exports = {
+    startSession,
     startPrivateSession,
     handleControl,
     onVoiceStateUpdate,
