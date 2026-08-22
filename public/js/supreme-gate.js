@@ -8,209 +8,119 @@
   const $ = (id) => document.getElementById(id);
   const toast = (m) => {
     const t = $('toast');
+    if (!t) return;
     t.textContent = m;
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2200);
   };
 
   if (!guildId) {
-    $('guildLabel').textContent = 'Abra pelo painel de um servidor (?guild=ID)';
+    if ($('guildLabel')) $('guildLabel').textContent = 'Abra com ?guild=ID';
     return;
   }
 
-  $('backDash').href = '/dashboard?guild=' + encodeURIComponent(guildId);
+  if ($('backDash')) $('backDash').href = '/dashboard?guild=' + encodeURIComponent(guildId);
 
   document.querySelectorAll('#nav button').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#nav button').forEach((b) => b.classList.remove('active'));
       document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
       btn.classList.add('active');
-      $('tab-' + btn.dataset.tab).classList.add('active');
-      if (btn.dataset.tab === 'preview') refreshPreview();
+      const tab = $('tab-' + btn.dataset.tab);
+      if (tab) tab.classList.add('active');
     });
   });
 
   function fillSelect(sel, items, selected, ph) {
+    if (!sel) return;
     sel.innerHTML =
       `<option value="">${ph || '—'}</option>` +
       items
         .map(
           (c) =>
-            `<option value="${c.id}" ${String(selected) === String(c.id) ? 'selected' : ''}>&nbsp;${c.name}</option>`
+            `<option value="${c.id}" ${String(selected) === String(c.id) ? 'selected' : ''}>${c.name}</option>`
         )
         .join('');
   }
 
-  function linesToRoles(text) {
-    return String(text || '')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l) => {
-        const p = l.split('|').map((x) => x.trim());
-        return { label: p[0] || 'Cargo', roleId: p[1] || '', emoji: p[2] || undefined };
-      });
-  }
-
-  function rolesToLines(arr) {
-    return (arr || [])
-      .map((r) => [r.label, r.roleId, r.emoji || ''].filter((x, i) => i < 2 || x).join('|'))
-      .join('\n');
-  }
-
-  function linesToRules(text) {
-    return String(text || '')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l) => {
-        const p = l.split('|').map((x) => x.trim());
-        if (p.length >= 3) return { emoji: p[0], title: p[1], text: p.slice(2).join('|') };
-        return { emoji: '✦', title: p[0] || 'Regra', text: p[1] || '' };
-      });
-  }
-
-  function rulesToLines(items) {
-    return (items || []).map((r) => `${r.emoji || '✦'}|${r.title || ''}|${r.text || ''}`).join('\n');
-  }
-
-  function linesToButtons(text) {
-    return String(text || '')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l) => {
-        const p = l.split('|').map((x) => x.trim());
-        return {
-          label: p[0] || 'Botão',
-          style: p[1] || 'secondary',
-          action: p[2] || 'rules',
-          url: p[3] || ''
-        };
-      });
-  }
-
-  function buttonsToLines(btns) {
-    return (btns || [])
-      .map((b) => {
-        const parts = [b.label, b.style || 'secondary', b.action || 'rules'];
-        if (b.action === 'url' && b.url) parts.push(b.url);
-        return parts.join('|');
+  /** Páginas: título em linha #TITULO e cargos label|id|emoji */
+  function pagesToText(pages) {
+    return (pages || [])
+      .map((p) => {
+        const head = '#' + (p.title || 'Página');
+        const lines = (p.roles || []).map((r) =>
+          [r.label, r.roleId, r.emoji || ''].filter((x, i) => i < 2 || x).join('|')
+        );
+        return [head, ...lines].join('\n');
       })
-      .join('\n');
+      .join('\n\n');
   }
 
-  function applyToForm() {
+  function textToPages(text) {
+    const pages = [];
+    let cur = null;
+    for (const raw of String(text || '').split('\n')) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (line.startsWith('#')) {
+        cur = { title: line.slice(1).trim() || 'Página', roles: [] };
+        pages.push(cur);
+        continue;
+      }
+      if (!cur) {
+        cur = { title: 'Página 1', roles: [] };
+        pages.push(cur);
+      }
+      const p = line.split('|').map((x) => x.trim());
+      cur.roles.push({ label: p[0] || 'Cargo', roleId: p[1] || '', emoji: p[2] || undefined });
+    }
+    return pages.length ? pages : [];
+  }
+
+  function rulesToText(rules) {
+    return (rules || []).map((r) => `${r.title}|${r.text}`).join('\n');
+  }
+
+  function textToRules(text) {
+    return String(text || '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const i = l.indexOf('|');
+        if (i === -1) return { title: l, text: '' };
+        return { title: l.slice(0, i).trim(), text: l.slice(i + 1).trim() };
+      });
+  }
+
+  function applyForm() {
     if (!cfg) return;
     $('enabled').checked = !!cfg.enabled;
     $('stStatus').textContent = cfg.enabled ? 'ON' : 'OFF';
-
-    const w = cfg.welcome || {};
-    $('wEnabled').checked = w.enabled !== false;
-    fillSelect($('wChannel'), channels, w.channelId, 'Canal boas-vindas');
-    $('wTitle').value = w.title || '';
-    $('wDesc').value = w.description || '';
-    $('wColor').value = w.color || '#7c3aed';
-    $('wFooter').value = w.footer || '';
-    $('wImage').value = w.image || '';
-    $('wPing').checked = w.ping !== false;
-    $('wButtons').value = buttonsToLines(w.buttons);
-
-    const l = cfg.leave || {};
-    $('lEnabled').checked = l.enabled !== false;
-    fillSelect($('lChannel'), channels, l.channelId, 'Canal saída');
-    $('lTitle').value = l.title || '';
-    $('lDesc').value = l.description || '';
-    $('lColor').value = l.color || '#64748b';
-    $('lFooter').value = l.footer || '';
-
-    const r = cfg.rules || {};
-    $('rTitle').value = r.title || '';
-    $('rColor').value = r.color || '#38bdf8';
-    $('rDm').checked = r.acceptDm !== false;
-    $('rItems').value = rulesToLines(r.items);
-
-    const rolesCfg = cfg.roles || {};
-    fillSelect($('roleVisitor'), roles, rolesCfg.visitorId, 'Visitante');
-    fillSelect($('roleVerified'), roles, rolesCfg.verifiedId, 'Verificado');
-    $('roleInterests').value = rolesToLines(rolesCfg.interests);
-    $('roleNotifs').value = rolesToLines(rolesCfg.notifications);
-
-    const logs = cfg.logs || {};
-    fillSelect($('logChannel'), channels, logs.channelId, 'Canal logs');
-    $('logJoin').checked = logs.join !== false;
-    $('logLeave').checked = logs.leave !== false;
-    $('logVerify').checked = logs.verify !== false;
-    $('logRoles').checked = logs.roles !== false;
-
-    refreshPreview();
+    fillSelect($('wChannel'), channels, cfg.channelId, 'Canal do portal');
+    fillSelect($('logChannel'), channels, cfg.logChannelId, 'Canal de logs');
+    fillSelect($('roleVisitor'), roles, cfg.visitorRoleId, 'Visitante');
+    fillSelect($('roleVerified'), roles, cfg.verifiedRoleId, 'Verificado');
+    fillSelect($('exploreChannel'), channels, cfg.exploreChannelId, 'Canal explorar');
+    if ($('sgColor')) $('sgColor').value = cfg.color || '#7c3aed';
+    if ($('maxRoles')) $('maxRoles').value = cfg.maxRoles || 10;
+    if ($('rolePages')) $('rolePages').value = pagesToText(cfg.rolePages);
+    if ($('rulesText')) $('rulesText').value = rulesToText(cfg.rules);
   }
 
-  function collectConfig() {
+  function collect() {
     return {
       enabled: $('enabled').checked,
-      theme: (cfg && cfg.theme) || 'arcano',
-      welcome: {
-        enabled: $('wEnabled').checked,
-        channelId: $('wChannel').value || null,
-        title: $('wTitle').value,
-        description: $('wDesc').value,
-        color: $('wColor').value || '#7c3aed',
-        footer: $('wFooter').value,
-        image: $('wImage').value,
-        thumbnail: 'avatar',
-        ping: $('wPing').checked,
-        buttons: linesToButtons($('wButtons').value)
-      },
-      leave: {
-        enabled: $('lEnabled').checked,
-        channelId: $('lChannel').value || null,
-        title: $('lTitle').value,
-        description: $('lDesc').value,
-        color: $('lColor').value || '#64748b',
-        footer: $('lFooter').value
-      },
-      rules: {
-        title: $('rTitle').value,
-        color: $('rColor').value || '#38bdf8',
-        acceptDm: $('rDm').checked,
-        items: linesToRules($('rItems').value),
-        acceptLabel: '✅ ACEITAR REGRAS'
-      },
-      roles: {
-        visitorId: $('roleVisitor').value || null,
-        verifiedId: $('roleVerified').value || null,
-        interests: linesToRoles($('roleInterests').value),
-        notifications: linesToRoles($('roleNotifs').value),
-        interestMin: 0,
-        interestMax: 6,
-        notifyMin: 0,
-        notifyMax: 6
-      },
-      logs: {
-        channelId: $('logChannel').value || null,
-        join: $('logJoin').checked,
-        leave: $('logLeave').checked,
-        rules: true,
-        roles: $('logRoles').checked,
-        verify: $('logVerify').checked,
-        errors: true
-      }
+      channelId: $('wChannel').value || null,
+      logChannelId: $('logChannel').value || null,
+      visitorRoleId: $('roleVisitor').value || null,
+      verifiedRoleId: $('roleVerified').value || null,
+      exploreChannelId: $('exploreChannel')?.value || null,
+      color: $('sgColor')?.value || '#7c3aed',
+      maxRoles: parseInt($('maxRoles')?.value || '10', 10) || 10,
+      rolePages: textToPages($('rolePages')?.value),
+      rules: textToRules($('rulesText')?.value)
     };
-  }
-
-  function refreshPreview() {
-    $('pTitle').textContent = $('wTitle').value || '—';
-    $('pDesc').textContent = ($('wDesc').value || '—')
-      .replace(/{user}/g, '@Você')
-      .replace(/{username}/g, 'Você')
-      .replace(/{displayName}/g, 'Você')
-      .replace(/{server}/g, 'Servidor')
-      .replace(/{memberCount}/g, '100');
-    $('pFoot').textContent = $('wFooter').value || '';
-    const btns = linesToButtons($('wButtons').value);
-    $('pBtns').innerHTML = btns.map((b) => `<span>${b.label}</span>`).join('');
-    $('previewBox').style.borderLeft = '4px solid ' + ($('wColor').value || '#7c3aed');
   }
 
   async function load() {
@@ -218,27 +128,23 @@
       fetch('/api/gate/' + guildId, { credentials: 'same-origin' }).then((r) => r.json()),
       fetch('/api/guild-data/' + guildId, { credentials: 'same-origin' }).then((r) => r.json())
     ]);
-
     cfg = gate.config || {};
     if (gate.stats) {
-      $('stJoins').textContent = gate.stats.joins || 0;
-      $('stLeaves').textContent = gate.stats.leaves || 0;
-      $('stVerified').textContent = gate.stats.verified || 0;
+      if ($('stJoins')) $('stJoins').textContent = gate.stats.joins || 0;
+      if ($('stLeaves')) $('stLeaves').textContent = gate.stats.leaves || 0;
+      if ($('stVerified')) $('stVerified').textContent = gate.stats.verified || 0;
     }
-
-    $('guildLabel').textContent = (data.name || 'Servidor') + ' · ' + guildId;
-
+    if ($('guildLabel')) $('guildLabel').textContent = (data.name || 'Servidor') + ' · ' + guildId;
     channels = (data.allChannels || []).filter(
       (c) => c.type === 0 || c.type === 5 || String(c.typeLabel || '').includes('Text')
     );
     if (!channels.length) channels = data.allChannels || [];
     roles = data.roles || [];
-
-    applyToForm();
+    applyForm();
   }
 
-  $('btnSave').onclick = async () => {
-    const config = collectConfig();
+  $('btnSave')?.addEventListener('click', async () => {
+    const config = collect();
     const res = await fetch('/api/gate/' + guildId, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -248,24 +154,26 @@
     if (res.success) {
       cfg = res.config;
       $('stStatus').textContent = cfg.enabled ? 'ON' : 'OFF';
-      toast('💾 SUPREME GATE salvo');
+      toast('💾 Jornada salva');
     } else toast(res.error || 'Erro');
-  };
+  });
 
-  $('btnTest').onclick = async () => {
-    await $('btnSave').onclick();
+  $('btnTest')?.addEventListener('click', async () => {
+    await fetch('/api/gate/' + guildId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ config: collect() })
+    });
     const res = await fetch('/api/gate/' + guildId + '/test', {
       method: 'POST',
       credentials: 'same-origin'
     }).then((r) => r.json());
-    if (res.success) toast('🧪 Mensagem de teste enviada');
-    else toast(res.error || 'Falha no teste');
-  };
-
-  $('btnRefreshPreview').onclick = refreshPreview;
+    toast(res.success ? '🧪 Teste enviado (aguarde 3s)' : res.error || 'Falha');
+  });
 
   load().catch((e) => {
     console.error(e);
-    $('guildLabel').textContent = 'Erro ao carregar — faça login no painel';
+    if ($('guildLabel')) $('guildLabel').textContent = 'Erro — faça login no painel';
   });
 })();
