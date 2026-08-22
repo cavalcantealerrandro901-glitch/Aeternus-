@@ -5,8 +5,6 @@ const {
     ButtonStyle,
     ComponentType
 } = require('discord.js');
-const flocos = require('../utils/flocos');
-const xp = require('../utils/xp');
 const cristais = require('../utils/cristais');
 const { againRow } = require('../utils/gameAgain');
 
@@ -19,18 +17,18 @@ const BOMB_COUNT = 6;
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'campo'],
-    description: 'Campo minado 5×4 com ❄️ flocos',
+    description: 'Campo minado 5×4 com 💠 cristais',
     async execute(message, args) {
         const stakeRaw = args[0];
-        const stake = flocos.parseBet(stakeRaw, flocos.get(message.author.id));
+        const stake = cristais.parseBet(stakeRaw, cristais.get(message.author.id));
         if (!stake) {
-            return message.reply('Uso: `O.minas <valor>` — ❄️ flocos. Ex: `O.minas 1,5k`');
+            return message.reply('Uso: `O.minas <valor>` — 💠 cristais. Ex: `O.minas 1,5k`');
         }
 
-        const check = flocos.canBet(message.author.id, stake);
+        const check = cristais.canBet(message.author.id, stake);
         if (!check.ok) return message.reply(check.error);
 
-        flocos.add(message.author.id, -stake);
+        cristais.add(message.author.id, -stake);
 
         const bombs = new Set();
         while (bombs.size < BOMB_COUNT) bombs.add(Math.floor(Math.random() * TILE_TOTAL));
@@ -73,15 +71,14 @@ module.exports = {
                         .setDisabled(opened.size === 0),
                     new ButtonBuilder()
                         .setCustomId(`mn_info_${message.author.id}`)
-                        .setLabel(`❄️ ${Math.floor(stake * mult).toLocaleString('pt-BR')}`)
+                        .setLabel(`💠 ${Math.floor(stake * mult).toLocaleString('pt-BR')}`)
                         .setStyle(ButtonStyle.Secondary)
                         .setDisabled(true)
                 )
             );
-            return rows; // exatamente 5 rows
+            return rows;
         };
 
-        /** No fim: só embed + Novamente (1 row) — nunca 6 components */
         const buildEnd = () => [againRow('minas', message.author.id, againArgs)];
 
         const embed = () =>
@@ -89,9 +86,9 @@ module.exports = {
                 .setColor(0xf59e0b)
                 .setTitle('💣 MINAS 5×4')
                 .setDescription(
-                    `Aposta: ${flocos.format(stake)}\n` +
+                    `Aposta: ${cristais.format(stake)}\n` +
                         `Bombas: **${bombs.size}** · Seguras: **${[...opened].filter((i) => !bombs.has(i)).length}**\n` +
-                        `Multiplicador: **×${mult.toFixed(2)}** → ${flocos.formatPlain(Math.floor(stake * mult))}`
+                        `Multiplicador: **×${mult.toFixed(2)}** → ${cristais.formatPlain(Math.floor(stake * mult))}`
                 );
 
         const sent = await message.reply({ embeds: [embed()], components: buildPlay() });
@@ -114,16 +111,14 @@ module.exports = {
 
             if (i.customId.startsWith('mn_cash_')) {
                 const win = Math.floor(stake * mult);
-                flocos.add(message.author.id, win);
-                xp.add(message.author.id, 15);
-                cristais.add(message.author.id, 2);
+                cristais.add(message.author.id, win);
                 await i.update({
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x22c55e)
                             .setTitle('💰 Saque')
                             .setDescription(
-                                `×${mult.toFixed(2)} · ${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
+                                `×${mult.toFixed(2)} · ${cristais.format(win)}\nSaldo: ${cristais.formatPlain(cristais.get(message.author.id))}`
                             )
                     ],
                     components: buildEnd()
@@ -146,7 +141,7 @@ module.exports = {
                             .setColor(0xef4444)
                             .setTitle('💥 Explodiu')
                             .setDescription(
-                                `Perdeu ${flocos.format(stake)}.\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
+                                `Perdeu ${cristais.format(stake)}.\nSaldo: ${cristais.formatPlain(cristais.get(message.author.id))}`
                             )
                     ],
                     components: buildEnd()
@@ -160,16 +155,14 @@ module.exports = {
 
             if (safeCount >= TILE_TOTAL - bombs.size) {
                 const win = Math.floor(stake * mult);
-                flocos.add(message.author.id, win);
-                xp.add(message.author.id, 20);
-                cristais.add(message.author.id, 3);
+                cristais.add(message.author.id, win);
                 await i.update({
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x22c55e)
                             .setTitle('💎 Campo limpo')
                             .setDescription(
-                                `${flocos.format(win)}\nSaldo: ${flocos.formatPlain(flocos.get(message.author.id))}`
+                                `${cristais.format(win)}\nSaldo: ${cristais.formatPlain(cristais.get(message.author.id))}`
                             )
                     ],
                     components: buildEnd()
@@ -189,7 +182,7 @@ module.exports = {
                         new EmbedBuilder()
                             .setColor(0x64748b)
                             .setTitle('⏰ Tempo esgotado')
-                            .setDescription(`Aposta ${flocos.format(stake)} perdida.`)
+                            .setDescription(`Aposta ${cristais.format(stake)} perdida.`)
                     ],
                     components: buildEnd()
                 });
