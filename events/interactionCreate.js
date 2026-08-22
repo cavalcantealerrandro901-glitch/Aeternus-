@@ -6,10 +6,11 @@ const sg = require('../utils/supremeGate');
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
-        // SUPREME GATE v2
         if (
             (interaction.isButton() || interaction.isStringSelectMenu()) &&
-            (interaction.customId?.startsWith('sgv2_') || interaction.customId?.startsWith('sg_'))
+            (interaction.customId?.startsWith('sgj_') ||
+                interaction.customId?.startsWith('sgv2_') ||
+                interaction.customId?.startsWith('sg_'))
         ) {
             try {
                 const handled = await sg.handleInteraction(interaction);
@@ -17,7 +18,10 @@ module.exports = {
             } catch (err) {
                 console.error('[SUPREME GATE]', err);
                 try {
-                    const payload = { content: 'Erro no SUPREME GATE.', flags: [MessageFlags.Ephemeral] };
+                    const payload = {
+                        content: 'Erro no SUPREME GATE.',
+                        flags: [MessageFlags.Ephemeral]
+                    };
                     if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
                     else await interaction.reply(payload);
                 } catch (_) {}
@@ -46,7 +50,10 @@ module.exports = {
             const payloadB64 = parts.slice(3).join(':');
             if (interaction.user.id !== ownerId) {
                 return interaction
-                    .reply({ content: 'Só quem jogou pode usar **Novamente**.', flags: [MessageFlags.Ephemeral] })
+                    .reply({
+                        content: 'Só quem jogou pode usar **Novamente**.',
+                        flags: [MessageFlags.Ephemeral]
+                    })
                     .catch(() => {});
             }
             const payload = decodePayload(payloadB64);
