@@ -1,8 +1,7 @@
 const {
     SlashCommandBuilder,
     PermissionFlagsBits,
-    EmbedBuilder,
-    InteractionContextType
+    EmbedBuilder
 } = require('discord.js');
 
 module.exports = {
@@ -71,7 +70,6 @@ module.exports = {
             });
         }
 
-        // hierarquia do bot
         if (role.position >= me.roles.highest.position) {
             return interaction.editReply({
                 embeds: [
@@ -82,16 +80,13 @@ module.exports = {
             });
         }
 
-        // hierarquia do staff (exceto dono)
         if (
             interaction.guild.ownerId !== author.id &&
             role.position >= author.roles.highest.position
         ) {
             return interaction.editReply({
                 embeds: [
-                    fail(
-                        `O cargo ${role} está **acima ou igual** ao seu cargo mais alto.`
-                    )
+                    fail(`O cargo ${role} está **acima ou igual** ao seu cargo mais alto.`)
                 ]
             });
         }
@@ -111,7 +106,6 @@ module.exports = {
             });
         }
 
-        // hierarquia do alvo vs staff
         if (
             interaction.guild.ownerId !== author.id &&
             member.roles.highest.position >= author.roles.highest.position &&
@@ -130,11 +124,8 @@ module.exports = {
         const audit = `${interaction.user.tag}: ${reason}`.slice(0, 512);
 
         try {
-            if (has) {
-                await member.roles.remove(role, audit);
-            } else {
-                await member.roles.add(role, audit);
-            }
+            if (has) await member.roles.remove(role, audit);
+            else await member.roles.add(role, audit);
         } catch (e) {
             console.error('[cargo]', e);
             return interaction.editReply({
@@ -146,10 +137,9 @@ module.exports = {
             });
         }
 
-        const action = has ? 'removido' : 'concedido';
-        const verb = has ? 'RETIRADO' : 'CONCEDIDO';
         const color = has ? 0xf43f5e : 0x22c55e;
         const emoji = has ? '➖' : '➕';
+        const verb = has ? 'RETIRADO' : 'CONCEDIDO';
 
         const embed = new EmbedBuilder()
             .setColor(color)
@@ -162,16 +152,12 @@ module.exports = {
                 [
                     '```',
                     has
-                        ? '  ╔══════════════════════════╗'
-                        : '  ╔══════════════════════════╗',
-                    has
                         ? '  ║   ROLE  ·  REMOVED       ║'
                         : '  ║   ROLE  ·  GRANTED       ║',
-                    '  ╚══════════════════════════╝',
                     '```',
                     `**Membro:** ${member} \`${member.user.tag}\``,
                     `**Cargo:** ${role} \`${role.name}\``,
-                    `**Ação:** ${action}`,
+                    `**Ação:** ${has ? 'removido' : 'concedido'}`,
                     `**Staff:** ${interaction.user}`,
                     reason !== 'Alternância de cargo via /cargo'
                         ? `**Motivo:** ${reason}`
@@ -187,27 +173,22 @@ module.exports = {
                         `Membro \`${member.id}\``,
                         `Cargo \`${role.id}\``,
                         `Staff \`${interaction.user.id}\``
-                    ].join('\n'),
-                    inline: false
+                    ].join('\n')
                 },
                 {
                     name: '📌 Estado atual',
                     value: has
                         ? 'O membro **não possui** mais este cargo.'
-                        : 'O membro **possui** este cargo agora.',
-                    inline: false
+                        : 'O membro **possui** este cargo agora.'
                 }
             )
             .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
-            .setFooter({
-                text: 'Toggle automático · /cargo membro:@user cargo:@role'
-            })
+            .setFooter({ text: 'Toggle automático · /cargo membro:@user cargo:@role' })
             .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
     },
 
-    /** Prefixo opcional: O.cargo @user @cargo [motivo] */
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
             return message.reply('❌ Sem permissão **Gerenciar Cargos**.');
@@ -219,12 +200,10 @@ module.exports = {
 
         if (!member || !role) {
             return message.reply(
-                'Uso slash (recomendado): `/cargo membro:@user cargo:@role`\n' +
-                    'Prefixo: `O.cargo @membro @cargo [motivo]`'
+                'Uso: `/cargo membro:@user cargo:@role`\nPrefixo: `O.cargo @membro @cargo [motivo]`'
             );
         }
 
-        // simula opções de slash reutilizando a lógica via fake shallow call
         const me = message.guild.members.me;
         if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) {
             return message.reply('❌ Eu preciso de **Gerenciar Cargos**.');
@@ -243,7 +222,10 @@ module.exports = {
         }
 
         const has = member.roles.cache.has(role.id);
-        const reason = args.filter((a) => !a.startsWith('<@')).join(' ') || 'Toggle via prefixo';
+        const reason =
+            args.filter((a) => !a.startsWith('<@') && !/^\d{17,20}$/.test(a)).join(' ') ||
+            'Toggle via prefixo';
+
         try {
             if (has) await member.roles.remove(role, `${message.author.tag}: ${reason}`);
             else await member.roles.add(role, `${message.author.tag}: ${reason}`);
@@ -251,15 +233,17 @@ module.exports = {
             return message.reply(`❌ Falha: ${e.message}`);
         }
 
-        const embed = new EmbedBuilder()
-            .setColor(has ? 0xf43f5e : 0x22c55e)
-            .setTitle(has ? '➖  Cargo RETIRADO' : '➕  Cargo CONCEDIDO')
-            .setDescription(
-                `**Membro:** ${member}\n**Cargo:** ${role}\n**Staff:** ${message.author}`
-            )
-            .setTimestamp();
-
-        await message.reply({ embeds: [embed] });
+        await message.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(has ? 0xf43f5e : 0x22c55e)
+                    .setTitle(has ? '➖  Cargo RETIRADO' : '➕  Cargo CONCEDIDO')
+                    .setDescription(
+                        `**Membro:** ${member}\n**Cargo:** ${role}\n**Staff:** ${message.author}`
+                    )
+                    .setTimestamp()
+            ]
+        });
     }
 };
 
