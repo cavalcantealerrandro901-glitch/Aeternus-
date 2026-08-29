@@ -3,12 +3,13 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const crypto = require('crypto');
 const { getSettings, setSettings } = require('../utils/settings');
+const dropsUtil = require('../utils/drops');
 
 const sessions = new Map();
 const SETTINGS_KEYS = [
     'prefix', 'logs', 'welcome', 'leave', 'automod', 'tickets', 'music',
     'economy', 'xp', 'suggestions', 'reports', 'levels', 'starboard',
-    'autorole', 'verification', 'antinuke'
+    'autorole', 'verification', 'antinuke', 'drops'
 ];
 
 function setup(client) {
@@ -28,10 +29,16 @@ function setup(client) {
     }
 
     app.get('/', (req, res) => {
-        res.type('html').send(`<!DOCTYPE html><html><body style="font-family:system-ui;background:#0a0a12;color:#eee;padding:2rem">
-<h1>Aeternus</h1><p>Bot + painel</p>
-<p><a href="/login" style="color:#a78bfa">Login Discord</a> ·
-<a href="/dashboard" style="color:#a78bfa">Dashboard</a></p></body></html>`);
+        res.type('html').send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Aeternus</title></head>
+<body style="font-family:system-ui;background:#07070f;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0">
+<div style="text-align:center;padding:2rem">
+<h1 style="font-size:2.4rem;margin:0 0 .5rem">Ae<span style="color:#8b5cf6">ternus</span></h1>
+<p style="color:#94a3b8">Bot + painel · drops, economia, moderação</p>
+<p style="margin-top:1.5rem">
+<a href="/login" style="background:#8b5cf6;color:#fff;padding:.7rem 1.4rem;border-radius:999px;text-decoration:none;font-weight:600;margin-right:.5rem">Entrar</a>
+<a href="/dashboard" style="border:1px solid #334155;color:#e2e8f0;padding:.7rem 1.4rem;border-radius:999px;text-decoration:none">Dashboard</a>
+</p></div></body></html>`);
     });
 
     app.get('/login', (req, res) => {
@@ -113,10 +120,21 @@ function setup(client) {
         if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
         const guild = client.guilds.cache.get(req.params.id);
         if (!guild) return res.status(404).json({ error: 'not found' });
+        const activeDrops = dropsUtil
+            .listActive()
+            .filter((d) => d.guildId === guild.id)
+            .map((d) => ({
+                id: d.id,
+                prize: d.prize?.label,
+                winners: d.winners,
+                endsAt: d.endsAt,
+                channelId: d.channelId
+            }));
         res.json({
             id: guild.id,
             name: guild.name,
             settings: getSettings(guild.id),
+            activeDrops,
             channels: guild.channels.cache
                 .filter((c) => c.isTextBased() && !c.isThread())
                 .map((c) => ({ id: c.id, name: c.name })),
@@ -140,17 +158,7 @@ function setup(client) {
 
     app.get('/dashboard', (req, res) => {
         if (!sessionUser(req)) return res.redirect('/login');
-        res.type('html').send(`<!DOCTYPE html><html><body style="font-family:system-ui;background:#0a0a12;color:#eee;padding:2rem">
-<h1>Dashboard Aeternus</h1>
-<div id="list">Carregando servidores…</div>
-<p><a href="/logout" style="color:#a78bfa">Sair</a></p>
-<script>
-fetch('/api/guilds').then(r=>r.json()).then(d=>{
-  const el=document.getElementById('list');
-  if(!d.guilds?.length){el.textContent='Nenhum servidor (admin + bot).';return;}
-  el.innerHTML=d.guilds.map(g=>'<p><b>'+g.name+'</b> — '+g.memberCount+' membros — ID '+g.id+'</p>').join('');
-});
-</script></body></html>`);
+        res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
     });
 
     app.listen(PORT, () => console.log(`🌐 Painel na porta ${PORT}`));

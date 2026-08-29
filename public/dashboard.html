@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Painel · Aeternus</title>
+<style>
+:root{--bg:#07070f;--side:#0c0c16;--card:#141422;--accent:#8b5cf6;--text:#e2e8f0;--muted:#94a3b8;--ok:#34d399;--border:#1e293b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+aside{width:250px;background:var(--side);border-right:1px solid var(--border);padding:1rem;display:flex;flex-direction:column;gap:.35rem}
+aside h1{font-size:1.1rem;margin-bottom:.8rem}aside h1 span{color:var(--accent)}
+.nav-btn{background:0;border:0;color:var(--muted);text-align:left;padding:.55rem .7rem;border-radius:.6rem;cursor:pointer;font:inherit;width:100%}
+.nav-btn:hover,.nav-btn.active{background:#1e1b4b66;color:#fff}
+.nav-btn:disabled{opacity:.35;cursor:not-allowed}
+main{flex:1;padding:1.3rem;overflow:auto}
+.card{background:var(--card);border:1px solid var(--border);border-radius:.9rem;padding:1.1rem;margin-bottom:.9rem}
+.card h2{font-size:1.05rem;margin-bottom:.6rem}
+label{display:block;font-size:.82rem;color:var(--muted);margin:.5rem 0 .25rem}
+input,select{width:100%;background:#0b0b14;border:1px solid var(--border);color:var(--text);padding:.55rem .65rem;border-radius:.5rem;font:inherit}
+.switch{display:flex;align-items:center;gap:.5rem;margin:.4rem 0}
+.btn{background:var(--accent);color:#fff;border:0;padding:.6rem 1.1rem;border-radius:.55rem;font-weight:600;cursor:pointer;font:inherit;margin-top:.65rem}
+.guild{background:var(--card);border:1px solid var(--border);border-radius:.85rem;padding:.9rem;cursor:pointer;margin-bottom:.6rem}
+.guild:hover{border-color:var(--accent)}
+.muted{color:var(--muted);font-size:.88rem}
+.panel{display:none}.panel.active{display:block}
+.toast{position:fixed;bottom:1rem;right:1rem;background:var(--ok);color:#052e1c;padding:.65rem 1rem;border-radius:.5rem;font-weight:600;display:none}
+code{background:#1e1b4b;padding:.1rem .35rem;border-radius:.3rem;font-size:.85rem}
+</style>
+</head>
+<body>
+<aside>
+  <h1>Ae<span>ternus</span></h1>
+  <button class="nav-btn active" data-panel="servers">Servidores</button>
+  <button class="nav-btn" data-panel="general" disabled>Geral</button>
+  <button class="nav-btn" data-panel="drops" disabled>Drops / Sorteios</button>
+  <button class="nav-btn" data-panel="welcome" disabled>Boas-vindas</button>
+  <button class="nav-btn" data-panel="logs" disabled>Logs</button>
+  <button class="nav-btn" data-panel="economy" disabled>Economia</button>
+  <div style="flex:1"></div>
+  <a href="/logout" class="nav-btn" style="text-decoration:none">Sair</a>
+</aside>
+<main>
+  <h2 id="title">Servidores</h2>
+  <p class="muted" id="sub" style="margin-bottom:1rem">Escolha um servidor</p>
+
+  <section class="panel active" id="servers"><div id="guildList">Carregando…</div></section>
+
+  <section class="panel" id="general">
+    <div class="card">
+      <h2>Prefixo</h2>
+      <div id="meta" class="muted" style="margin-bottom:.6rem"></div>
+      <label>Prefixo do bot</label>
+      <input id="prefix" maxlength="5"/>
+      <button class="btn" onclick="save({prefix:val('prefix')})">Salvar</button>
+    </div>
+  </section>
+
+  <section class="panel" id="drops">
+    <div class="card">
+      <h2>🎁 Drops / Sorteios</h2>
+      <p class="muted" style="margin-bottom:.8rem">Configure o canal padrão e o emoji. No Discord use:<br/>
+      <code>O.drop &lt;tempo&gt; &lt;vencedores&gt; &lt;prêmio&gt;</code><br/>
+      Ex: <code>O.drop 10m 1 5000 flocos</code> · <code>O.drop 1h 3 Nitro</code></p>
+      <div class="switch"><input type="checkbox" id="dEnabled" checked/><label for="dEnabled">Sistema ativo</label></div>
+      <label>Canal padrão dos drops (vazio = canal do comando)</label>
+      <select id="dChannel"></select>
+      <label>Emoji da reação</label>
+      <input id="dEmoji" maxlength="8" placeholder="🎉"/>
+      <button class="btn" onclick="saveDrops()">Salvar drops</button>
+    </div>
+    <div class="card">
+      <h2>Drops ativos neste servidor</h2>
+      <div id="activeDrops" class="muted">Nenhum</div>
+    </div>
+  </section>
+
+  <section class="panel" id="welcome">
+    <div class="card">
+      <h2>Boas-vindas</h2>
+      <div class="switch"><input type="checkbox" id="wEnabled"/><label for="wEnabled">Ativar</label></div>
+      <label>Canal</label><select id="wChannel"></select>
+      <label>Mensagem</label><input id="wMsg" placeholder="Bem-vindo {user} a {server}"/>
+      <button class="btn" onclick="save({welcome:{enabled:chk('wEnabled'),channelId:val('wChannel')||null,message:val('wMsg'),embed:true}})">Salvar</button>
+    </div>
+  </section>
+
+  <section class="panel" id="logs">
+    <div class="card">
+      <h2>Logs</h2>
+      <div class="switch"><input type="checkbox" id="logEnabled"/><label for="logEnabled">Ativar</label></div>
+      <label>Canal</label><select id="logChannel"></select>
+      <button class="btn" onclick="save({logs:{enabled:chk('logEnabled'),channelId:val('logChannel')||null,events:{}}})">Salvar</button>
+    </div>
+  </section>
+
+  <section class="panel" id="economy">
+    <div class="card">
+      <h2>Economia / Daily</h2>
+      <label>Daily mínimo</label><input type="number" id="dMin"/>
+      <label>Daily máximo</label><input type="number" id="dMax"/>
+      <button class="btn" onclick="save({economy:{dailyMin:+val('dMin'),dailyMax:+val('dMax')}})">Salvar</button>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast">Salvo!</div>
+<script>
+let gid=null, data=null;
+const val=id=>document.getElementById(id).value;
+const chk=id=>document.getElementById(id).checked;
+function toast(m){const t=document.getElementById('toast');t.textContent=m||'Salvo!';t.style.display='block';setTimeout(()=>t.style.display='none',2000)}
+function show(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const b=[...document.querySelectorAll('.nav-btn')].find(x=>x.dataset.panel===id);
+  if(b) b.classList.add('active');
+  document.getElementById('title').textContent=b?b.textContent.trim():id;
+}
+document.querySelectorAll('.nav-btn[data-panel]').forEach(b=>b.addEventListener('click',()=>{if(!b.disabled)show(b.dataset.panel)}));
+function fill(sel,items,ph){sel.innerHTML=`<option value="">${ph||'…'}</option>`+(items||[]).map(i=>`<option value="${i.id}">#${i.name}</option>`).join('')}
+async function loadGuilds(){
+  const r=await fetch('/api/guilds'); if(r.status===401) return location.href='/login';
+  const j=await r.json(); const el=document.getElementById('guildList');
+  if(!j.guilds?.length){el.innerHTML='<p class="muted">Nenhum servidor.</p>';return;}
+  el.innerHTML=j.guilds.map(g=>`<div class="guild" onclick="sel('${g.id}')"><b>${g.name}</b><br/><span class="muted">${g.memberCount} membros</span></div>`).join('');
+}
+async function sel(id){
+  gid=id; const r=await fetch('/api/guild/'+id); data=await r.json();
+  if(data.error) return toast(data.error);
+  document.querySelectorAll('.nav-btn[data-panel]').forEach(b=>{if(b.dataset.panel!=='servers')b.disabled=false});
+  const s=data.settings, ch=data.channels||[];
+  document.getElementById('meta').innerHTML=`<b>${data.name}</b> · ${id}`;
+  document.getElementById('prefix').value=s.prefix||'O.';
+  fill(document.getElementById('dChannel'),ch,'Canal do comando');
+  fill(document.getElementById('wChannel'),ch,'Canal');
+  fill(document.getElementById('logChannel'),ch,'Canal');
+  dEnabled.checked=s.drops?.enabled!==false;
+  dChannel.value=s.drops?.channelId||'';
+  dEmoji.value=s.drops?.emoji||'🎉';
+  wEnabled.checked=!!s.welcome?.enabled; wChannel.value=s.welcome?.channelId||''; wMsg.value=s.welcome?.message||'';
+  logEnabled.checked=!!s.logs?.enabled; logChannel.value=s.logs?.channelId||'';
+  dMin.value=s.economy?.dailyMin??5000; dMax.value=s.economy?.dailyMax??50000;
+  const ad=data.activeDrops||[];
+  document.getElementById('activeDrops').innerHTML=ad.length
+    ? ad.map(d=>`• <b>${d.prize}</b> — ${d.winners} vencedor(es) — termina <span class="muted">${new Date(d.endsAt).toLocaleString('pt-BR')}</span>`).join('<br/>')
+    : 'Nenhum drop ativo.';
+  show('drops');
+}
+async function save(patch){
+  if(!gid)return;
+  const r=await fetch('/api/guild/'+gid+'/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+  const j=await r.json(); toast(j.ok?'Salvo!':(j.error||'Erro'));
+}
+function saveDrops(){
+  save({drops:{enabled:chk('dEnabled'),channelId:val('dChannel')||null,emoji:val('dEmoji')||'🎉'}});
+}
+loadGuilds();
+</script>
+</body>
+</html>

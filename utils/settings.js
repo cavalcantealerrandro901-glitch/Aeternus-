@@ -16,7 +16,8 @@ const DEFAULT = {
     starboard: { enabled: false, channelId: null, minStars: 3 },
     autorole: { enabled: false, roleId: null },
     verification: { enabled: false, roleId: null, channelId: null },
-    antinuke: { enabled: false }
+    antinuke: { enabled: false },
+    drops: { enabled: true, channelId: null, emoji: '🎉' }
 };
 
 function deepMerge(a, b) {
@@ -48,7 +49,8 @@ function getSettings(guildId) {
         starboard: { ...DEFAULT.starboard, ...(g.starboard || {}) },
         autorole: { ...DEFAULT.autorole, ...(g.autorole || {}) },
         verification: { ...DEFAULT.verification, ...(g.verification || {}) },
-        antinuke: { ...DEFAULT.antinuke, ...(g.antinuke || {}) }
+        antinuke: { ...DEFAULT.antinuke, ...(g.antinuke || {}) },
+        drops: { ...DEFAULT.drops, ...(g.drops || {}) }
     };
 }
 
