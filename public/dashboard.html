@@ -9,8 +9,7 @@
 :root{
   --bg:#04040c;--side:rgba(8,8,18,.92);--card:rgba(16,16,30,.7);
   --line:rgba(255,255,255,.08);--text:#f1f5f9;--mut:#94a3b8;
-  --v:#8b5cf6;--c:#22d3ee;--p:#f472b6;--ok:#34d399;--bad:#f87171;
-  --sw:268px
+  --v:#8b5cf6;--ok:#34d399;--bad:#f87171;--sw:268px
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
@@ -39,7 +38,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;bac
 .lo:hover{color:var(--bad);background:rgba(248,113,113,.08)}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;position:relative;z-index:1}
 .top{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.4rem;border-bottom:1px solid var(--line);background:rgba(4,4,12,.55);backdrop-filter:blur(14px)}
-.top h2{font-family:Syne,sans-serif;font-size:1.15rem;font-weight:700;letter-spacing:-.02em}
+.top h2{font-family:Syne,sans-serif;font-size:1.15rem;font-weight:700}
 .top .sub{color:var(--mut);font-size:.8rem;margin-top:.12rem}
 .bal{display:flex;gap:.5rem;flex-wrap:wrap}
 .bal span{font-size:.75rem;font-weight:600;padding:.3rem .65rem;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
@@ -49,20 +48,20 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;bac
 @keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1rem}
 .gc{background:var(--card);border:1px solid var(--line);border-radius:1.15rem;padding:1.15rem;cursor:pointer;transition:.3s;backdrop-filter:blur(12px)}
-.gc:hover{border-color:rgba(139,92,246,.5);transform:translateY(-3px);box-shadow:0 18px 40px rgba(0,0,0,.35)}
+.gc:hover{border-color:rgba(139,92,246,.5);transform:translateY(-3px)}
 .gc .t{display:flex;align-items:center;gap:.8rem}
 .gc img,.gph{width:50px;height:50px;border-radius:14px;object-fit:cover}
 .gph{background:linear-gradient(135deg,#7c3aed,#22d3ee);display:grid;place-items:center;font-family:Syne,sans-serif;font-weight:800}
 .gc .nm{font-weight:700}.gc .mt{color:var(--mut);font-size:.78rem;margin-top:.12rem}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.7rem;margin-bottom:1.1rem}
-.st{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:.95rem;backdrop-filter:blur(10px)}
+.st{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:.95rem}
 .st .l{font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
 .st .v{font-family:Syne,sans-serif;font-size:1.3rem;font-weight:700;margin-top:.2rem;background:linear-gradient(135deg,#e2e8f0,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .card{background:var(--card);border:1px solid var(--line);border-radius:1.15rem;padding:1.25rem 1.3rem;margin-bottom:1rem;backdrop-filter:blur(14px)}
-.card h3{font-family:Syne,sans-serif;font-size:1rem;font-weight:700;margin-bottom:.3rem;display:flex;align-items:center;gap:.45rem}
+.card h3{font-family:Syne,sans-serif;font-size:1rem;font-weight:700;margin-bottom:.3rem}
 .hint{color:var(--mut);font-size:.84rem;margin-bottom:.85rem;line-height:1.5}
 .f{display:block;font-size:.72rem;color:var(--mut);margin:.5rem 0 .25rem;font-weight:600}
-input,select,textarea{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--line);color:var(--text);padding:.65rem .75rem;border-radius:.7rem;font:inherit;font-size:.9rem;outline:0;transition:.2s}
+input,select,textarea{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--line);color:var(--text);padding:.65rem .75rem;border-radius:.7rem;font:inherit;font-size:.9rem;outline:0}
 input:focus,select:focus,textarea:focus{border-color:rgba(139,92,246,.55);box-shadow:0 0 0 3px rgba(139,92,246,.12)}
 textarea{min-height:84px;resize:vertical}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
@@ -77,12 +76,9 @@ textarea{min-height:84px;resize:vertical}
 .sw i::before{content:'';position:absolute;width:18px;height:18px;left:2px;top:2px;background:#94a3b8;border-radius:50%;transition:.25s}
 .sw input:checked+i{background:linear-gradient(135deg,#7c3aed,#8b5cf6);border-color:transparent}
 .sw input:checked+i::before{transform:translateX(20px);background:#fff}
-.btn{display:inline-flex;align-items:center;gap:.4rem;background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:0;padding:.7rem 1.2rem;border-radius:.75rem;font-weight:700;cursor:pointer;font:inherit;font-size:.88rem;margin-top:.8rem;transition:.2s;box-shadow:0 6px 24px rgba(139,92,246,.35)}
-.btn:hover{transform:translateY(-1px);box-shadow:0 10px 32px rgba(139,92,246,.5)}
-.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn{display:inline-flex;align-items:center;gap:.4rem;background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:0;padding:.7rem 1.2rem;border-radius:.75rem;font-weight:700;cursor:pointer;font:inherit;font-size:.88rem;margin-top:.8rem;box-shadow:0 6px 24px rgba(139,92,246,.35)}
+.btn:hover{transform:translateY(-1px)}
 .btn.g{background:transparent;border:1px solid var(--line);box-shadow:none;color:var(--text)}
-.btn.g:hover{background:rgba(255,255,255,.05)}
-.btn.gold{background:linear-gradient(135deg,#d97706,#fbbf24);color:#1c1004;box-shadow:0 6px 28px rgba(251,191,36,.35)}
 .btn.sm{padding:.42rem .8rem;font-size:.78rem;margin-top:0}
 code{background:rgba(139,92,246,.18);padding:.1rem .38rem;border-radius:.3rem;font-size:.78rem;color:#c4b5fd}
 .entry{display:grid;grid-template-columns:1.2fr 1fr 1fr .7fr auto;gap:.4rem;align-items:center;margin:.4rem 0;background:rgba(0,0,0,.28);padding:.5rem;border-radius:.7rem;border:1px solid var(--line)}
@@ -90,12 +86,11 @@ code{background:rgba(139,92,246,.18);padding:.1rem .38rem;border-radius:.3rem;fo
 .entry .x{background:rgba(248,113,113,.15);color:var(--bad);border:0;width:32px;height:32px;border-radius:.5rem;cursor:pointer}
 .di{display:flex;justify-content:space-between;padding:.65rem .8rem;background:rgba(0,0,0,.22);border-radius:.7rem;margin:.3rem 0;border:1px solid var(--line);font-size:.86rem}
 .di .m{color:var(--mut);font-size:.76rem}
-.daily-hero{text-align:center;padding:1.5rem 1rem;border-radius:1.2rem;background:linear-gradient(145deg,rgba(251,191,36,.12),rgba(139,92,246,.1));border:1px solid rgba(251,191,36,.25);margin-bottom:1rem}
-.daily-hero .amt{font-family:Syne,sans-serif;font-size:2rem;font-weight:800;background:linear-gradient(135deg,#fde68a,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.daily-hero .st{color:var(--mut);font-size:.9rem;margin:.4rem 0 1rem}
+.prefix-hero{text-align:center;padding:1.6rem 1rem;border-radius:1.2rem;background:linear-gradient(145deg,rgba(139,92,246,.18),rgba(34,211,238,.08));border:1px solid rgba(139,92,246,.3);margin-bottom:1rem}
+.prefix-hero .big{font-family:Syne,sans-serif;font-size:2.4rem;font-weight:800;letter-spacing:-.03em;background:linear-gradient(135deg,#e9d5ff,#67e8f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .toast{position:fixed;bottom:1.4rem;right:1.4rem;z-index:99;padding:.75rem 1.15rem;border-radius:.8rem;font-weight:700;font-size:.88rem;transform:translateY(140%);opacity:0;transition:.35s}
 .toast.show{transform:none;opacity:1}
-.toast.ok{background:linear-gradient(135deg,#059669,#34d399);color:#042f1c;box-shadow:0 8px 30px rgba(52,211,153,.35)}
+.toast.ok{background:linear-gradient(135deg,#059669,#34d399);color:#042f1c}
 .toast.er{background:linear-gradient(135deg,#dc2626,#f87171);color:#fff}
 .empty{text-align:center;padding:3rem 1rem;color:var(--mut)}
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:4}
@@ -116,7 +111,7 @@ code{background:rgba(139,92,246,.18);padding:.1rem .38rem;border-radius:.3rem;fo
   <div class="sec">Navegação</div>
   <button class="nb on" data-p="servers"><span class="i">🏠</span> Servidores</button>
   <button class="nb" data-p="overview" disabled><span class="i">✨</span> Visão geral</button>
-  <button class="nb" data-p="daily" disabled><span class="i">❄️</span> Daily</button>
+  <button class="nb" data-p="prefixo" disabled><span class="i">⌨️</span> Prefixo</button>
   <div class="sec">Módulos</div>
   <button class="nb" data-p="general" disabled><span class="i">⚙️</span> Geral</button>
   <button class="nb" data-p="drops" disabled><span class="i">🎁</span> Drops</button>
@@ -126,7 +121,7 @@ code{background:rgba(139,92,246,.18);padding:.1rem .38rem;border-radius:.3rem;fo
   <button class="nb" data-p="economy" disabled><span class="i">💰</span> Economia</button>
   <button class="nb" data-p="xp" disabled><span class="i">⭐</span> XP</button>
   <div class="foot">
-    <div class="uchip" id="uchip"><div class="gph" style="width:34px;height:34px;border-radius:50%"></div><div><div class="n">…</div><div class="s">…</div></div></div>
+    <div class="uchip" id="uchip"></div>
     <a class="lo" href="/logout">Sair</a>
   </div>
 </aside>
@@ -148,7 +143,7 @@ code{background:rgba(139,92,246,.18);padding:.1rem .38rem;border-radius:.3rem;fo
       <div class="stats" id="ovStats"></div>
       <div class="card"><h3>🚀 Atalhos</h3>
         <div style="display:flex;flex-wrap:wrap;gap:.45rem">
-          <button class="btn sm" onclick="show('daily')">❄️ Daily</button>
+          <button class="btn sm" onclick="show('prefixo')">⌨️ Prefixo</button>
           <button class="btn sm g" onclick="show('drops')">🎁 Drops</button>
           <button class="btn sm g" onclick="show('automod')">🛡️ Spam</button>
           <button class="btn sm g" onclick="show('economy')">💰 Eco</button>
@@ -157,29 +152,27 @@ code{background:rgba(139,92,246,.18);padding:.1rem .38rem;border-radius:.3rem;fo
       <div class="card"><h3>🎁 Drops ativos</h3><div id="ovDrops" class="hint">Nenhum</div></div>
     </section>
 
-    <section class="panel" id="daily">
-      <div class="daily-hero" id="dailyHero">
-        <div class="hint" style="margin:0">Carregando daily…</div>
+    <section class="panel" id="prefixo">
+      <div class="prefix-hero">
+        <div class="hint" style="margin:0 0 .4rem">Prefixo atual do servidor</div>
+        <div class="big" id="prefixPreview">O.</div>
       </div>
       <div class="card">
-        <h3>⚙️ Configuração do daily (servidor)</h3>
-        <p class="hint">Define a faixa de flocos. Multiplicador de nível aplica em cima.</p>
-        <div class="row">
-          <div><label class="f">Mínimo</label><input type="number" id="dMin"/></div>
-          <div><label class="f">Máximo</label><input type="number" id="dMax"/></div>
-        </div>
-        <button class="btn" onclick="save({economy:{dailyMin:+val('dMin'),dailyMax:+val('dMax')}})">Salvar faixa</button>
+        <h3>⌨️ Alterar prefixo</h3>
+        <p class="hint">Troque o prefixo dos comandos deste servidor. Padrão: <code>O.</code></p>
+        <label class="f">Novo prefixo</label>
+        <input id="prefixInput" maxlength="8" placeholder="Ex: O.  !  ?  a!"/>
+        <button class="btn" onclick="savePrefix()">Salvar prefixo</button>
       </div>
       <div class="card">
-        <h3>ℹ️ Como funciona</h3>
-        <p class="hint">Reset à meia-noite <b>BRT</b>. Sequência aumenta se coletar dias seguidos. Nível de XP multiplica o valor. Também: <code>O.daily</code> no Discord.</p>
+        <h3>ℹ️ Dica</h3>
+        <p class="hint">O comando de prefixo no Discord foi removido. Toda alteração deve ser feita aqui no painel.</p>
       </div>
     </section>
 
     <section class="panel" id="general">
       <div class="card"><h3>⚙️ Geral</h3><p class="hint" id="meta"></p>
-        <label class="f">Prefixo</label><input id="prefix" maxlength="8"/>
-        <button class="btn" onclick="save({prefix:val('prefix')||'O.'})">Salvar</button>
+        <p class="hint">Use o módulo <b>Prefixo</b> para alterar o prefixo do bot neste servidor.</p>
       </div>
     </section>
 
@@ -247,12 +240,12 @@ code{background:rgba(139,92,246,.18);padding:.1rem .38rem;border-radius:.3rem;fo
 
     <section class="panel" id="economy">
       <div class="card"><h3>💰 Economia</h3>
-        <p class="hint">Faixa do daily e toggles futuros.</p>
+        <p class="hint">Faixa do daily (comando Discord).</p>
         <div class="row">
           <div><label class="f">Daily min</label><input type="number" id="ecoMin"/></div>
           <div><label class="f">Daily max</label><input type="number" id="ecoMax"/></div>
         </div>
-        <button class="btn" onclick="save({economy:{dailyMin:+val('ecoMin'),dailyMax:+val('ecoMax')}});$('dMin').value=val('ecoMin');$('dMax').value=val('ecoMax')">Salvar</button>
+        <button class="btn" onclick="save({economy:{dailyMin:+val('ecoMin'),dailyMax:+val('ecoMax')}})">Salvar</button>
       </div>
     </section>
 
@@ -284,9 +277,8 @@ function show(id){
   $(id)?.classList.add('on');
   const b=[...document.querySelectorAll('.nb')].find(x=>x.dataset.p===id);
   if(b) b.classList.add('on');
-  const T={servers:['Servidores','Escolha um servidor'],overview:['Visão geral','Resumo'],daily:['Daily','Recompensa diária'],general:['Geral','Prefixo'],drops:['Drops','Sorteios'],automod:['Anti-spam','Proteção'],welcome:['Welcome','Entrada'],logs:['Logs','Auditoria'],economy:['Economia','Moedas'],xp:['XP','Níveis']};
+  const T={servers:['Servidores','Escolha um servidor'],overview:['Visão geral','Resumo'],prefixo:['Prefixo','Comandos do bot'],general:['Geral','Servidor'],drops:['Drops','Sorteios'],automod:['Anti-spam','Proteção'],welcome:['Welcome','Entrada'],logs:['Logs','Auditoria'],economy:['Economia','Moedas'],xp:['XP','Níveis']};
   const t=T[id]||[id,''];$('title').textContent=t[0];$('sub').textContent=t[1];
-  if(id==='daily') loadDaily();
   closeSide();
 }
 document.querySelectorAll('.nb[data-p]').forEach(b=>b.addEventListener('click',()=>{if(!b.disabled)show(b.dataset.p)}));
@@ -332,27 +324,10 @@ async function loadGuilds(){
     return `<div class="gc" onclick="sel('${g.id}')"><div class="t">${ic}<div><div class="nm">${g.name}</div><div class="mt">${g.memberCount} membros</div></div></div></div>`;
   }).join('');
 }
-async function loadDaily(){
-  const q=gid?`?guildId=${gid}`:'';
-  const r=await fetch('/api/daily'+q);
-  if(!r.ok) return;
-  const d=await r.json();
-  const hero=$('dailyHero');
-  if(d.claimed){
-    hero.innerHTML=`<div class="amt">Já coletado</div><div class="st">🔥 Sequência <b>${d.streak}</b> · volte após meia-noite BRT</div><button class="btn" disabled>Daily resgatado</button>`;
-  } else {
-    hero.innerHTML=`<div class="amt">❄️ ${fmt(d.dailyMin)} – ${fmt(d.dailyMax)}</div>
-      <div class="st">×${Number(d.multiplier).toFixed(2)} (nível ${d.level}) · próxima sequência <b>${d.nextStreak}</b></div>
-      <button class="btn gold" id="claimBtn" onclick="claimDaily()">Coletar daily</button>`;
-  }
-}
-async function claimDaily(){
-  const btn=$('claimBtn'); if(btn) btn.disabled=true;
-  const r=await fetch('/api/daily/claim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({guildId:gid})});
-  const j=await r.json();
-  if(!j.ok){toast(j.error||'Erro',false);if(btn)btn.disabled=false;return}
-  toast(`+${fmt(j.amount)} flocos · sequência ${j.streak}`);
-  loadDaily(); loadMe();
+async function savePrefix(){
+  const p=(val('prefixInput')||'O.').slice(0,8);
+  await save({prefix:p});
+  $('prefixPreview').textContent=p;
 }
 async function sel(id){
   gid=id; toast('Carregando…');
@@ -361,7 +336,8 @@ async function sel(id){
   document.querySelectorAll('.nb[data-p]').forEach(b=>{if(b.dataset.p!=='servers')b.disabled=false});
   const s=data.settings,ch=data.channels||[],roles=data.roles||[];
   $('meta').textContent=`${data.name} · ${data.id}`;
-  $('prefix').value=s.prefix||'O.';
+  const pref=s.prefix||'O.';
+  $('prefixInput').value=pref; $('prefixPreview').textContent=pref;
   fill($('dChannel'),ch,'Canal do comando'); fill($('wChannel'),ch,'Canal'); fill($('logChannel'),ch,'Canal'); fill($('reqRole'),roles,'Nenhum');
   $('dEnabled').checked=s.drops?.enabled!==false; $('dChannel').value=s.drops?.channelId||'';
   const rq=s.drops?.requirements||{};
@@ -377,12 +353,11 @@ async function sel(id){
   $('amMax').value=am.maxMessages??6; $('amWin').value=am.windowMs??5000; $('amDup').value=am.maxDuplicates??3; $('amPunish').value=am.punish||'delete';
   $('wEnabled').checked=!!s.welcome?.enabled; $('wChannel').value=s.welcome?.channelId||''; $('wMsg').value=s.welcome?.message||'';
   $('logEnabled').checked=!!s.logs?.enabled; $('logChannel').value=s.logs?.channelId||'';
-  const dmin=s.economy?.dailyMin??5000, dmax=s.economy?.dailyMax??50000;
-  $('dMin').value=dmin; $('dMax').value=dmax; $('ecoMin').value=dmin; $('ecoMax').value=dmax;
+  $('ecoMin').value=s.economy?.dailyMin??5000; $('ecoMax').value=s.economy?.dailyMax??50000;
   $('xpEnabled').checked=s.xp?.enabled!==false; $('xpMin').value=s.xp?.min??30; $('xpMax').value=s.xp?.max??77; $('xpCd').value=s.xp?.cooldownSec??45;
   const ad=data.activeDrops||[];
   $('activeDrops').innerHTML=dropHtml(ad); $('ovDrops').innerHTML=dropHtml(ad);
-  $('ovStats').innerHTML=`<div class="st"><div class="l">Prefixo</div><div class="v">${s.prefix||'O.'}</div></div>
+  $('ovStats').innerHTML=`<div class="st"><div class="l">Prefixo</div><div class="v">${pref}</div></div>
     <div class="st"><div class="l">Drops</div><div class="v">${ad.length}</div></div>
     <div class="st"><div class="l">Canais</div><div class="v">${ch.length}</div></div>
     <div class="st"><div class="l">Cargos</div><div class="v">${roles.length}</div></div>`;
