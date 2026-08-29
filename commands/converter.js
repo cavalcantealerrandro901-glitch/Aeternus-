@@ -6,7 +6,7 @@ const {
 } = require('discord.js');
 const flocos = require('../utils/flocos');
 const cristais = require('../utils/cristais');
-const { resolveBet } = require('../utils/parseAmount');
+const { parseAmount } = require('../utils/parseAmount');
 const pending = require('../utils/converterPending');
 
 /** Taxa oficial: 2 flocos = 1 cristal */
@@ -16,48 +16,48 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
+function usage() {
+    return [
+        '💱 **Converter**',
+        'Uso: `O.converter <valor|all|half|k|m>`',
+        '',
+        'Taxa: **2 ❄️ = 1 💠**',
+        'Depois de escolher a direção, o valor fica em liquidação por **1 dia**.',
+        '• Flocos → depositados no **banco**',
+        '• Cristais → liberados na **carteira 💠**'
+    ].join('\n');
+}
+
 module.exports = {
     name: 'converter',
     aliases: ['cambio', 'câmbio', 'trocar', 'reverter', 'exchange', 'convert'],
     description: 'Converte flocos ↔ cristais (2❄️ = 1💠) com liquidação em 1 dia',
+
     async execute(message, args) {
-        // libera pendências vencidas do usuário
         try {
             const rel = pending.releaseDue(message.author.id);
             if (rel.length) {
                 const sum = rel.map((r) => `• ${fmt(r.amount)} → ${r.deposited}`).join('\n');
                 await message.channel
-                    .send({
-                        content: `${message.author} 💼 **Câmbio liberado:**\n${sum}`
-                    })
+                    .send(`${message.author} 💼 **Câmbio liberado:**\n${sum}`)
                     .catch(() => {});
             }
         } catch (_) {}
 
-        const bet = resolveBet(args[0], Math.max(flocos.get(message.author.id), cristais.get(message.author.id)), {
-            label: 'valor'
-        });
+        if (!args[0]) return message.reply(usage());
 
-        // resolveBet com max balance is wrong for dual currency — parse amount alone first
-        const { parseAmount } = require('../utils/parseAmount');
-        let amount = parseAmount(args[0], flocos.get(message.author.id));
-        if (!Number.isFinite(amount) || amount <= 0) {
-            amount = parseAmount(args[0], cristais.get(message.author.id));
-        }
-        if (!Number.isFinite(amount) || amount <= 0) {
-            return message.reply(
-                [
-                    '💱 **Converter**',
-                    'Uso: `O.converter <valor|all|half|k|m>`',
-                    '',
-                    'Taxa: **2 ❄️ = 1 💠**',
-                    'Após escolher, o valor fica em liquidação **1 dia** e vai para o **banco** (flocos) ou carteira de cristais.'
-                ].join('\n')
-            );
-        }
+        const rawArg = String(args[0]).trim();
+        // valida se o valor faz sentido em pelo menos uma moeda
+        const asFlocos = parseAmount(rawArg, flocos.get(message.author.id));
+        const asCristais = parseAmount(rawArg, cristais.get(message.author.id));
+        const okNum =
+            (Number.isFinite(asFlocos) && asFlocos > 0) ||
+            (Number.isFinite(asCristais) && asCristais > 0);
 
-        // all/half: user picks direction on buttons — we store raw amount interpretation per button
-        const rawArg = args[0];
+        if (!okNum) return message.reply(usage());
+
+        // customId limitado a 100 chars no Discord
+        const safeArg = encodeURIComponent(rawArg).slice(0, 40);
 
         const embed = new EmbedBuilder()
             .setColor(0xa78bfa)
@@ -73,7 +73,7 @@ module.exports = {
                     '  ║   AETERNUS   EXCHANGE    ║',
                     '  ╚══════════════════════════╝',
                     '```',
-                    `Valor informado: **${String(rawArg)}**`,
+                    `Valor informado: **${rawArg}**`,
                     '',
                     '**Taxa oficial**',
                     '• **2 ❄️ flocos**  =  **1 💠 cristal**',
@@ -82,7 +82,7 @@ module.exports = {
                     '💠 **Em cristais** — gasta flocos (2:1)',
                     '❄️ **Em flocos** — gasta cristais (×2)',
                     '',
-                    '⏳ Após confirmar, o valor entra em **liquidação de 1 dia** e só então é depositado no banco / carteira.'
+                    '⏳ Após confirmar, o valor entra em **liquidação de 1 dia**.'
                 ].join('\n')
             )
             .addFields(
@@ -102,12 +102,12 @@ module.exports = {
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId(`converter:toCristais:${message.author.id}:${encodeURIComponent(rawArg)}`)
+                .setCustomId(`converter:toCristais:${message.author.id}:${safeArg}`)
                 .setLabel('Converter em cristais')
                 .setEmoji('💠')
                 .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
-                .setCustomId(`converter:toFlocos:${message.author.id}:${encodeURIComponent(rawArg)}`)
+                .setCustomId(`converter:toFlocos:${message.author.id}:${safeArg}`)
                 .setLabel('Converter em flocos')
                 .setEmoji('❄️')
                 .setStyle(ButtonStyle.Success)
@@ -120,42 +120,53 @@ module.exports = {
         const parts = interaction.customId.split(':');
         const action = parts[1];
         const owner = parts[2];
-        const rawArg = decodeURIComponent(parts.slice(3).join(':') || '');
-
-        if (interaction.user.id !== owner) {
-            return interaction.reply({ content: 'Esta mesa de câmbio não é sua.', ephemeral: true });
+        let rawArg = '';
+        try {
+            rawArg = decodeURIComponent(parts.slice(3).join(':') || '');
+        } catch (_) {
+            rawArg = parts.slice(3).join(':') || '';
         }
 
-        const { parseAmount } = require('../utils/parseAmount');
+        if (interaction.user.id !== owner) {
+            return interaction.reply({
+                content: 'Esta mesa de câmbio não é sua.',
+                ephemeral: true
+            });
+        }
 
         if (action === 'toCristais') {
-            // gasta flocos → recebe cristais (2 flocos = 1 cristal)
-            const amount = parseAmount(rawArg, flocos.get(owner));
-            if (!Number.isFinite(amount) || amount <= 0) {
+            // gasta flocos → recebe cristais
+            const spendWanted = parseAmount(rawArg, flocos.get(owner));
+            if (!Number.isFinite(spendWanted) || spendWanted <= 0) {
                 return interaction.reply({ content: 'Valor inválido.', ephemeral: true });
             }
-            // amount = flocos a gastar; precisa ser par preferencialmente
-            const spend = amount;
-            if (flocos.get(owner) < spend) {
+            if (flocos.get(owner) < spendWanted) {
                 return interaction.reply({
                     content: `❌ ❄️ Insuficiente. Você tem **${fmt(flocos.get(owner))}**.`,
                     ephemeral: true
                 });
             }
-            const gain = Math.floor(spend / RATE);
+
+            const gain = Math.floor(spendWanted / RATE);
             if (gain < 1) {
                 return interaction.reply({
                     content: `❌ Mínimo **${RATE}** flocos para obter 1 cristal.`,
                     ephemeral: true
                 });
             }
+
             const actualSpend = gain * RATE;
             flocos.remove(owner, actualSpend, { reason: 'câmbio → liquidação' });
             const p = pending.addPending(owner, {
                 to: 'bank_cristais',
                 amount: gain,
-                source: `-${actualSpend}❄️`
+                source: `-${fmt(actualSpend)}❄️`
             });
+
+            if (!p) {
+                flocos.add(owner, actualSpend, false);
+                return interaction.reply({ content: '❌ Erro ao registrar liquidação.', ephemeral: true });
+            }
 
             const release = Math.floor(p.releaseAt / 1000);
             return interaction.update({
@@ -181,25 +192,30 @@ module.exports = {
         }
 
         if (action === 'toFlocos') {
-            // gasta cristais → recebe flocos (1 cristal = 2 flocos)
-            const amount = parseAmount(rawArg, cristais.get(owner));
-            if (!Number.isFinite(amount) || amount <= 0) {
+            // gasta cristais → recebe flocos no banco após 1d
+            const spend = parseAmount(rawArg, cristais.get(owner));
+            if (!Number.isFinite(spend) || spend <= 0) {
                 return interaction.reply({ content: 'Valor inválido.', ephemeral: true });
             }
-            const spend = amount;
             if (cristais.get(owner) < spend) {
                 return interaction.reply({
                     content: `❌ 💠 Insuficiente. Você tem **${fmt(cristais.get(owner))}**.`,
                     ephemeral: true
                 });
             }
+
             const gain = spend * RATE;
             cristais.remove(owner, spend);
             const p = pending.addPending(owner, {
                 to: 'bank_flocos',
                 amount: gain,
-                source: `-${spend}💠`
+                source: `-${fmt(spend)}💠`
             });
+
+            if (!p) {
+                cristais.add(owner, spend);
+                return interaction.reply({ content: '❌ Erro ao registrar liquidação.', ephemeral: true });
+            }
 
             const release = Math.floor(p.releaseAt / 1000);
             return interaction.update({
@@ -223,5 +239,7 @@ module.exports = {
                 components: []
             });
         }
+
+        return interaction.reply({ content: 'Ação inválida.', ephemeral: true }).catch(() => {});
     }
 };

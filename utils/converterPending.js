@@ -18,48 +18,63 @@ function list(userId) {
 
 /**
  * @param {string} userId
- * @param {{ to:'flocos'|'cristais'|'bank_flocos'|'bank_cristais', amount:number, source:string }}
+ * @param {{ to: 'bank_flocos' | 'bank_cristais', amount: number, source?: string }}
  */
 function addPending(userId, entry) {
     const data = all();
-    if (!data[userId]) data[userId] = [];
-    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    data[userId].push({
-        id,
-        to: entry.to,
-        amount: Math.floor(Number(entry.amount) || 0),
+    if (!Array.isArray(data[userId])) data[userId] = [];
+
+    const amount = Math.max(0, Math.floor(Number(entry.amount) || 0));
+    if (!amount) return null;
+
+    const item = {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        to: entry.to === 'bank_cristais' ? 'bank_cristais' : 'bank_flocos',
+        amount,
         source: entry.source || '',
         createdAt: Date.now(),
         releaseAt: Date.now() + DAY,
         done: false
-    });
+    };
+
+    data[userId].push(item);
     save(data);
-    return data[userId][data[userId].length - 1];
+    return item;
 }
 
-/** Libera pendências vencidas → banco (flocos) ou cristais na carteira */
+/** Libera pendências vencidas */
 function releaseDue(userId) {
     const data = all();
-    const list = data[userId] || [];
+    const list = Array.isArray(data[userId]) ? data[userId] : [];
     if (!list.length) return [];
 
     const now = Date.now();
     const released = [];
 
     for (const p of list) {
-        if (p.done || p.releaseAt > now) continue;
+        if (!p || p.done || !p.releaseAt || p.releaseAt > now) continue;
+
         p.done = true;
-        if (p.to === 'flocos' || p.to === 'bank_flocos') {
-            bank.add(userId, p.amount);
+        const amount = Math.max(0, Math.floor(Number(p.amount) || 0));
+        if (!amount) continue;
+
+        if (p.to === 'bank_flocos') {
+            bank.add(userId, amount);
             released.push({ ...p, deposited: 'banco ❄️' });
-        } else if (p.to === 'cristais' || p.to === 'bank_cristais') {
-            // cristais vão para o "cofre" via saldo de cristais (não há bank de cristais)
-            cristais.add(userId, p.amount);
+        } else if (p.to === 'bank_cristais') {
+            cristais.add(userId, amount);
             released.push({ ...p, deposited: 'carteira 💠' });
         }
     }
 
-    data[userId] = list.filter((p) => !p.done || now - p.releaseAt < DAY * 2);
+    // mantém só pendentes + concluídos recentes (2 dias)
+    data[userId] = list.filter((p) => {
+        if (!p) return false;
+        if (!p.done) return true;
+        return now - (p.releaseAt || 0) < DAY * 2;
+    });
+
+    if (!data[userId].length) delete data[userId];
     save(data);
     return released;
 }
