@@ -4,6 +4,10 @@ const path = require('path');
 const crypto = require('crypto');
 const { getSettings, setSettings } = require('../utils/settings');
 const dropsUtil = require('../utils/drops');
+const daily = require('../utils/daily');
+const flocos = require('../utils/flocos');
+const cristais = require('../utils/cristais');
+const xp = require('../utils/xp');
 
 const sessions = new Map();
 const SETTINGS_KEYS = [
@@ -89,8 +93,14 @@ function setup(client) {
     app.get('/api/me', (req, res) => {
         const s = sessionUser(req);
         if (!s) return res.status(401).json({ error: 'auth' });
+        const uid = s.user.id;
         res.json({
             user: s.user,
+            economy: {
+                flocos: flocos.get(uid),
+                cristais: cristais.get(uid),
+                xp: xp.get(uid)
+            },
             bot: client.user
                 ? {
                       tag: client.user.tag,
@@ -99,6 +109,22 @@ function setup(client) {
                   }
                 : null
         });
+    });
+
+    app.get('/api/daily', (req, res) => {
+        const s = sessionUser(req);
+        if (!s) return res.status(401).json({ error: 'auth' });
+        const guildId = req.query.guildId || null;
+        res.json(daily.status(s.user.id, guildId));
+    });
+
+    app.post('/api/daily/claim', (req, res) => {
+        const s = sessionUser(req);
+        if (!s) return res.status(401).json({ error: 'auth' });
+        const guildId = req.body?.guildId || null;
+        const result = daily.claim(s.user.id, guildId);
+        if (!result.ok) return res.status(400).json(result);
+        res.json(result);
     });
 
     app.get('/api/guilds', (req, res) => {
