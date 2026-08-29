@@ -40,16 +40,8 @@ function panelEmbed(game, extra) {
     }
 
     const fields = [
-        {
-            name: '📊 Status',
-            value: status,
-            inline: true
-        },
-        {
-            name: '💣 Minas',
-            value: `**${game.bombCount}**`,
-            inline: true
-        },
+        { name: '📊 Status', value: status, inline: true },
+        { name: '💣 Minas', value: `**${game.bombCount}**`, inline: true },
         {
             name: '💎 Abertas',
             value: `**${game.opened.size}** / ${TOTAL - game.bombCount}`,
@@ -58,36 +50,24 @@ function panelEmbed(game, extra) {
     ];
 
     if (game.fun) {
-        fields.push({
-            name: '🎮 Modo',
-            value: 'Diversão · sem aposta',
-            inline: true
-        });
-        fields.push({
-            name: '🟩 Seguras',
-            value: `**${safeLeft}** restantes`,
-            inline: true
-        });
-        fields.push({ name: '\u200b', value: '\u200b', inline: true });
+        fields.push(
+            { name: '🎮 Modo', value: 'Diversão', inline: true },
+            { name: '🟩 Seguras', value: `**${safeLeft}**`, inline: true },
+            { name: '\u200b', value: '\u200b', inline: true }
+        );
     } else {
-        fields.push({
-            name: '💠 Aposta',
-            value: `**${fmt(game.amount)}**`,
-            inline: true
-        });
-        fields.push({
-            name: '📈 Multi',
-            value: `**×${m}**`,
-            inline: true
-        });
-        fields.push({
-            name: '💵 Saque',
-            value:
-                game.opened.size > 0 && !game.dead && !game.cashed
-                    ? `**${fmt(pot)}**`
-                    : '—',
-            inline: true
-        });
+        fields.push(
+            { name: '💠 Aposta', value: `**${fmt(game.amount)}**`, inline: true },
+            { name: '📈 Multi', value: `**×${m}**`, inline: true },
+            {
+                name: '💵 Saque',
+                value:
+                    game.opened.size > 0 && !game.dead && !game.cashed
+                        ? `**${fmt(pot)}**`
+                        : '—',
+                inline: true
+            }
+        );
     }
 
     let desc = 'Toque nas casas · **Aleatório** abre uma segura · **Sacar** finaliza.';
@@ -98,12 +78,10 @@ function panelEmbed(game, extra) {
     } else if (game.cashed && game.fun) {
         desc = '🏁 Partida de diversão encerrada.';
     }
-
     if (extra) desc += `\n\n${extra}`;
 
     return new EmbedBuilder()
         .setColor(color)
-        .setAuthor({ name: 'Aeternus Mines', iconURL: null })
         .setTitle('💎  Mines · 5×4')
         .setDescription(desc)
         .addFields(fields)
@@ -116,7 +94,6 @@ function panelEmbed(game, extra) {
 function boardRows(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
     const rows = [];
-
     for (let y = 0; y < ROWS; y++) {
         const row = new ActionRowBuilder();
         for (let x = 0; x < COLS; x++) {
@@ -124,10 +101,8 @@ function boardRows(game, reveal = false) {
             const num = String(i + 1);
             const opened = game.opened.has(i);
             const bomb = game.bombs.has(i);
-
             let label = '·';
             let style = ButtonStyle.Secondary;
-
             if (ended) {
                 if (bomb) {
                     label = `💣${num}`;
@@ -137,13 +112,11 @@ function boardRows(game, reveal = false) {
                     style = ButtonStyle.Success;
                 } else {
                     label = num;
-                    style = ButtonStyle.Secondary;
                 }
             } else if (opened) {
                 label = '💎';
                 style = ButtonStyle.Success;
             }
-
             row.addComponents(
                 new ButtonBuilder()
                     .setCustomId(`minas:cell:${game.id}:${i}`)
@@ -161,10 +134,8 @@ function controlRow(game) {
     const ended = game.dead || game.cashed;
     const pot = potential(game);
     const canCash = game.opened.size > 0 && !ended;
-
     let cashLabel = game.fun ? 'Encerrar' : 'Sacar';
     if (canCash && !game.fun) cashLabel = `Sacar ${fmt(pot)}`;
-
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`minas:random:${game.id}`)
@@ -196,7 +167,6 @@ function againRow(game) {
     );
 }
 
-/** Máx. 5 rows: 4 grade + 1 controles (ou Tentar novamente no fim) */
 function fullComponents(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
     if (ended) return [...boardRows(game, true), againRow(game)];
@@ -256,14 +226,9 @@ function pickRandom(game) {
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
 }
 
-function endPayload(game, win, note) {
-    const extra = note || null;
-    // reforça mensagem emocional no description via panelEmbed status
-    if (!game.fun && win && game._lastWin) {
-        /* já setado */
-    }
+function endPayload(game, note) {
     return {
-        embeds: [panelEmbed(game, extra)],
+        embeds: [panelEmbed(game, note || null)],
         components: fullComponents(game, true)
     };
 }
@@ -359,11 +324,9 @@ module.exports = {
             }
             const res = openCell(game, idx);
             if (res.bomb) {
-                return interaction.update(endPayload(game, false, `Casa **#${idx + 1}** era mina.`));
+                return interaction.update(endPayload(game, `Casa **#${idx + 1}** era mina.`));
             }
-            if (res.autoWin) {
-                return interaction.update(endPayload(game, true));
-            }
+            if (res.autoWin) return interaction.update(endPayload(game));
             return interaction.update({
                 embeds: [panelEmbed(game, `🎲 Aleatório abriu **#${idx + 1}**`)],
                 components: fullComponents(game)
@@ -376,7 +339,7 @@ module.exports = {
             }
             if (game.fun) {
                 game.cashed = true;
-                return interaction.update(endPayload(game, true));
+                return interaction.update(endPayload(game));
             }
             if (!game.opened.size) {
                 return interaction.reply({
@@ -388,7 +351,9 @@ module.exports = {
             const win = potential(game);
             game._lastWin = win;
             cristais.add(game.userId, win);
-            return interaction.update(endPayload(game, true, `Saldo: 💠 **${fmt(cristais.get(game.userId))}**`));
+            return interaction.update(
+                endPayload(game, `Saldo: 💠 **${fmt(cristais.get(game.userId))}**`)
+            );
         }
 
         if (action === 'cell') {
@@ -400,8 +365,10 @@ module.exports = {
             if (game.opened.has(idx)) return interaction.deferUpdate().catch(() => {});
 
             const res = openCell(game, idx);
-            if (res.bomb) return interaction.update(endPayload(game, false, `Casa **#${idx + 1}** era mina.`));
-            if (res.autoWin) return interaction.update(endPayload(game, true));
+            if (res.bomb) {
+                return interaction.update(endPayload(game, `Casa **#${idx + 1}** era mina.`));
+            }
+            if (res.autoWin) return interaction.update(endPayload(game));
             return interaction.update({
                 embeds: [panelEmbed(game)],
                 components: fullComponents(game)
