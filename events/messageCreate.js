@@ -3,10 +3,12 @@ const xp = require('../utils/xp');
 const afk = require('../utils/afk');
 const msgStats = require('../utils/msgStats');
 const antispam = require('../utils/antispam');
+const pending = require('../utils/converterPending');
 const { PermissionFlagsBits } = require('discord.js');
 const { rerollDrop } = require('../systems/drops');
 
 const xpCd = new Map();
+const pendingPing = new Map();
 
 module.exports = {
     name: 'messageCreate',
@@ -18,6 +20,22 @@ module.exports = {
             if (spam.block) {
                 await antispam.apply(message, spam);
                 return;
+            }
+        } catch (_) {}
+
+        // liquidação de câmbio (1x a cada 2 min por user)
+        try {
+            const now = Date.now();
+            const last = pendingPing.get(message.author.id) || 0;
+            if (now - last > 120000) {
+                pendingPing.set(message.author.id, now);
+                const rel = pending.releaseDue(message.author.id);
+                if (rel.length) {
+                    const sum = rel.map((r) => `• ${Number(r.amount).toLocaleString('pt-BR')} → ${r.deposited}`).join('\n');
+                    message.channel
+                        .send(`${message.author} 💼 **Câmbio liberado após 1 dia:**\n${sum}`)
+                        .catch(() => {});
+                }
             }
         } catch (_) {}
 
