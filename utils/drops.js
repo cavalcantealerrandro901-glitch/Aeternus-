@@ -50,6 +50,48 @@ function parsePrize(text) {
     return { type: 'text', amount: 0, label: t || 'Prêmio misterioso' };
 }
 
+/**
+ * Parse: msgs:10 semana:50 mes:100 nivel:5 cargo:ID invites:2 flocos:1000 cristais:10
+ */
+function parseReqFlags(text, message) {
+    const out = {
+        minMessagesDay: 0,
+        minMessagesWeek: 0,
+        minMessagesMonth: 0,
+        minLevel: 0,
+        minInvites: 0,
+        minFlocos: 0,
+        minCristais: 0,
+        requiredRoleIds: []
+    };
+    if (!text) return out;
+    const t = text.toLowerCase();
+
+    const num = (re) => {
+        const m = t.match(re);
+        return m ? parseInt(m[1], 10) : 0;
+    };
+
+    out.minMessagesDay = num(/(?:msgs?|mensagens?)[:\s]+(\d+)/) || num(/hoje[:\s]+(\d+)/);
+    out.minMessagesWeek = num(/(?:semana|week)[:\s]+(\d+)/);
+    out.minMessagesMonth = num(/(?:m[eê]s|month)[:\s]+(\d+)/);
+    out.minLevel = num(/(?:nivel|nível|level|xp)[:\s]+(\d+)/);
+    out.minInvites = num(/(?:invites?|convites?)[:\s]+(\d+)/);
+    out.minFlocos = num(/(?:flocos?)[:\s]+(\d+)/);
+    out.minCristais = num(/(?:cristais?)[:\s]+(\d+)/);
+
+    // cargo:id ou menção
+    const roleMention = text.match(/<@&(\d+)>/);
+    const roleId = text.match(/(?:cargo|role)[:\s]+(\d{15,20})/i);
+    if (roleMention) out.requiredRoleIds.push(roleMention[1]);
+    else if (roleId) out.requiredRoleIds.push(roleId[1]);
+    else if (message?.mentions?.roles?.size) {
+        out.requiredRoleIds.push(...message.mentions.roles.map((r) => r.id));
+    }
+
+    return out;
+}
+
 function createDrop(entry) {
     const data = all();
     if (!entry.participants) entry.participants = {};
@@ -60,6 +102,15 @@ function createDrop(entry) {
 
 function getDrop(id) {
     return all()[id] || null;
+}
+
+function findByRerollId(rerollId) {
+    const id = String(rerollId);
+    return Object.values(all()).find((d) => d && (String(d.rerollId) === id || String(d.messageId) === id)) || null;
+}
+
+function findByMessageId(messageId) {
+    return findByRerollId(messageId);
 }
 
 function updateDrop(id, patch) {
@@ -78,6 +129,20 @@ function removeDrop(id) {
 
 function listActive() {
     return Object.values(all()).filter((d) => d && !d.ended);
+}
+
+function cleanupOld(days = 14) {
+    const data = all();
+    const cut = Date.now() - days * 864e5;
+    let n = 0;
+    for (const [id, d] of Object.entries(data)) {
+        if (d?.ended && (d.endedAt || d.endsAt || 0) < cut) {
+            delete data[id];
+            n++;
+        }
+    }
+    if (n) save(data);
+    return n;
 }
 
 function payPrize(userId, prize) {
@@ -180,16 +245,6 @@ function calcExtraEntries(member, drop) {
         }
     }
 
-    if (Array.isArray(drop?.extraEntries)) {
-        for (const rule of drop.extraEntries) {
-            if (rule?.type === 'role' && rule.roleId && member.roles.cache.has(rule.roleId)) {
-                const b = Math.max(0, Math.floor(Number(rule.bonus) || 0));
-                bonus += b;
-                details.push(`+${b} (drop)`);
-            }
-        }
-    }
-
     return { bonus, details, total: 1 + bonus };
 }
 
@@ -207,15 +262,6 @@ function joinDrop(dropId, userId, tag, entries) {
     return drop;
 }
 
-function leaveDrop(dropId, userId) {
-    const data = all();
-    const drop = data[dropId];
-    if (!drop?.participants?.[userId]) return null;
-    delete drop.participants[userId];
-    save(data);
-    return drop;
-}
-
 function participantCount(drop) {
     return Object.keys(drop?.participants || {}).length;
 }
@@ -224,7 +270,9 @@ function totalTickets(drop) {
     return Object.values(drop?.participants || {}).reduce((a, p) => a + (p.entries || 1), 0);
 }
 
-function pickWinners(drop) {
+/** excludeIds: evita repetir o mesmo vencedor no reroll quando possível */
+function pickWinners(drop, excludeIds = []) {
+    const exclude = new Set(excludeIds || []);
     const pool = [];
     for (const [uid, p] of Object.entries(drop.participants || {})) {
         const n = Math.max(1, p.entries || 1);
@@ -234,13 +282,20 @@ function pickWinners(drop) {
         const j = Math.floor(Math.random() * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
     }
+
     const winners = [];
     const seen = new Set();
-    for (const p of pool) {
-        if (seen.has(p.id)) continue;
-        seen.add(p.id);
-        winners.push(p);
-        if (winners.length >= (drop.winners || 1)) break;
+
+    // tenta primeiro quem não estava no último sorteio
+    for (const pass of [true, false]) {
+        for (const p of pool) {
+            if (seen.has(p.id)) continue;
+            if (pass && exclude.has(p.id) && Object.keys(drop.participants).length > (drop.winners || 1))
+                continue;
+            seen.add(p.id);
+            winners.push(p);
+            if (winners.length >= (drop.winners || 1)) return winners;
+        }
     }
     return winners;
 }
@@ -249,16 +304,19 @@ module.exports = {
     parseDuration,
     formatDuration,
     parsePrize,
+    parseReqFlags,
     createDrop,
     getDrop,
+    findByRerollId,
+    findByMessageId,
     updateDrop,
     removeDrop,
     listActive,
+    cleanupOld,
     payPrize,
     checkRequirements,
     calcExtraEntries,
     joinDrop,
-    leaveDrop,
     participantCount,
     totalTickets,
     pickWinners,

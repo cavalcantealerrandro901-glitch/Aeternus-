@@ -3,6 +3,8 @@ const xp = require('../utils/xp');
 const afk = require('../utils/afk');
 const msgStats = require('../utils/msgStats');
 const antispam = require('../utils/antispam');
+const { PermissionFlagsBits } = require('discord.js');
+const { rerollDrop } = require('../systems/drops');
 
 const xpCd = new Map();
 
@@ -20,7 +22,6 @@ module.exports = {
             }
         } catch (_) {}
 
-        // Contador de mensagens (após anti-spam)
         try {
             if (message.content && message.content.length >= 1) {
                 msgStats.add(message.guild.id, message.author.id, 1);
@@ -62,6 +63,20 @@ module.exports = {
                 }
             }
         } catch (_) {}
+
+        // reroll 123456789 sem prefixo (staff)
+        const plainReroll = message.content.trim().match(/^reroll\s+(\d{15,25})$/i);
+        if (plainReroll) {
+            if (
+                message.member.permissions.has(PermissionFlagsBits.ManageGuild) ||
+                message.member.permissions.has(PermissionFlagsBits.Administrator)
+            ) {
+                const result = await rerollDrop(client, plainReroll[1]);
+                if (!result.ok) message.reply(`❌ ${result.error}`).catch(() => {});
+                else message.reply(`✅ Reroll \`${plainReroll[1]}\` ok.`).catch(() => {});
+            }
+            return;
+        }
 
         const prefix = getPrefix(message.guild.id);
         if (!message.content.toLowerCase().startsWith(prefix.toLowerCase())) return;

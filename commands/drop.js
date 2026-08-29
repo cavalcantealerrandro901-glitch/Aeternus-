@@ -9,6 +9,9 @@ const drops = require('../utils/drops');
 const { getSettings } = require('../utils/settings');
 const { schedule } = require('../systems/drops');
 
+/** Cargo que pode usar autopix */
+const AUTOPIX_ROLE_ID = '1506043064723050556';
+
 module.exports = {
     name: 'drop',
     aliases: ['sorteio', 'giveaway', 'sortear'],
@@ -30,26 +33,60 @@ module.exports = {
                         .setTitle('🎁 Como usar drops')
                         .setDescription(
                             [
-                                '`O.drop <tempo> <vencedores> <prêmio>`',
+                                '`O.drop <tempo> <vencedores> <prêmio> [req …] [autopix]`',
                                 '',
                                 '**Tempo:** `30s` `5m` `1h` `2d`',
                                 '**Vencedores:** 1–20',
-                                '**Prêmio:** `5000 flocos` · `100 cristais` · texto livre',
+                                '**Prêmio:** texto ou `5000 flocos` / `100 cristais`',
                                 '',
-                                'Use o botão **verde Participar** (não reação).',
-                                'Requisitos e entradas extras: **painel → Drops**.',
+                                '**req** (opcional) — requisitos deste drop:',
+                                '`req msgs:20 semana:50 nivel:5 cargo:ID`',
+                                '',
+                                '**autopix** — paga flocos/cristais no fim (só cargo autorizado).',
+                                'Sem `autopix` só anuncia os vencedores.',
+                                '',
+                                'No fim aparece `reroll <id>` para re-sortear.',
                                 '',
                                 '`O.drop 10m 1 5000 flocos`',
-                                '`O.drop 1h 3 VIP no servidor`'
+                                '`O.drop 1h 1 200 cristais autopix`',
+                                '`O.drop 30m 2 Nitro req msgs:15`'
                             ].join('\n')
                         )
                 ]
             });
         }
 
-        const ms = drops.parseDuration(args[0]);
-        const winners = parseInt(args[1], 10);
-        const prizeRaw = args.slice(2).join(' ');
+        // --- flags: autopix + req ---
+        const tokens = [...args];
+        let wantAutopix = false;
+        const autoIdx = tokens.findIndex((t) => /^autopix$/i.test(t));
+        if (autoIdx !== -1) {
+            wantAutopix = true;
+            tokens.splice(autoIdx, 1);
+        }
+
+        let reqOverride = null;
+        const reqIdx = tokens.findIndex((t) => /^req$/i.test(t));
+        if (reqIdx !== -1) {
+            const reqText = tokens.splice(reqIdx).slice(1).join(' ');
+            reqOverride = drops.parseReqFlags(reqText, message);
+        }
+
+        if (wantAutopix) {
+            if (!message.member.roles.cache.has(AUTOPIX_ROLE_ID)) {
+                return message.reply({
+                    embeds: [
+                        err(
+                            'Você **não tem** o cargo autorizado para usar **autopix**.\nO drop não foi criado. Remova `autopix` ou peça o cargo.'
+                        )
+                    ]
+                });
+            }
+        }
+
+        const ms = drops.parseDuration(tokens[0]);
+        const winners = parseInt(tokens[1], 10);
+        const prizeRaw = tokens.slice(2).join(' ');
 
         if (!ms) return message.reply({ embeds: [err('Tempo inválido. Use `30s`, `5m`, `1h`, `2d`.')] });
         if (!winners || winners < 1 || winners > 20)
@@ -61,6 +98,16 @@ module.exports = {
             return message.reply({ embeds: [err('Drops desativados no painel.')] });
 
         const prize = drops.parsePrize(prizeRaw);
+        if (wantAutopix && prize.type === 'text') {
+            return message.reply({
+                embeds: [
+                    err(
+                        '**autopix** só funciona com prêmio em **flocos** ou **cristais**.\nEx: `O.drop 10m 1 5000 flocos autopix`'
+                    )
+                ]
+            });
+        }
+
         let channel = message.channel;
         if (conf.channelId) {
             const ch = message.guild.channels.cache.get(conf.channelId);
@@ -69,17 +116,20 @@ module.exports = {
 
         const endsAt = Date.now() + ms;
         const endsUnix = Math.floor(endsAt / 1000);
-        const req = drops.getRequirements(message.guild.id, null);
+
+        // requisitos: painel + override do comando
+        const dropStub = reqOverride ? { requirements: reqOverride } : null;
+        const req = drops.getRequirements(message.guild.id, dropStub);
 
         const reqLines = [];
         if (req.minMessagesDay) reqLines.push(`• ${req.minMessagesDay}+ msgs **hoje**`);
-        if (req.minMessagesWeek) reqLines.push(`• ${req.minMessagesWeek}+ msgs **na semana**`);
-        if (req.minMessagesMonth) reqLines.push(`• ${req.minMessagesMonth}+ msgs **no mês**`);
+        if (req.minMessagesWeek) reqLines.push(`• ${req.minMessagesWeek}+ msgs **semana**`);
+        if (req.minMessagesMonth) reqLines.push(`• ${req.minMessagesMonth}+ msgs **mês**`);
         if (req.minLevel) reqLines.push(`• Nível XP ≥ **${req.minLevel}**`);
         if (req.minInvites) reqLines.push(`• Convites ≥ **${req.minInvites}**`);
         if (req.minFlocos) reqLines.push(`• Flocos ≥ **${req.minFlocos}**`);
         if (req.minCristais) reqLines.push(`• Cristais ≥ **${req.minCristais}**`);
-        if (req.requiredRoleIds?.length) reqLines.push(`• Cargo exigido configurado`);
+        if (req.requiredRoleIds?.length) reqLines.push(`• Cargo exigido`);
 
         const embed = new EmbedBuilder()
             .setColor(0xf472b6)
@@ -89,19 +139,18 @@ module.exports = {
                     `**Prêmio:** ${prize.label}`,
                     `**Vencedores:** ${winners}`,
                     `**Termina:** <t:${endsUnix}:R> (<t:${endsUnix}:f>)`,
+                    wantAutopix
+                        ? '**Pagamento:** ⚡ autopix (automático)'
+                        : '**Pagamento:** manual (staff entrega)',
                     '',
                     'Clique em **Participar** para entrar.',
                     'Use **Participantes** para ver quem já entrou.',
-                    reqLines.length ? `\n**Requisitos**\n${reqLines.join('\n')}` : '',
-                    prize.type !== 'text'
-                        ? `\n_Pagamento automático: ${prize.amount.toLocaleString('pt-BR')} ${prize.type}_`
-                        : '\n_Prêmio anunciado no fim / staff_'
+                    reqLines.length ? `\n**Requisitos**\n${reqLines.join('\n')}` : ''
                 ].join('\n')
             )
             .setFooter({ text: `Por ${message.author.tag} · 0 participantes` })
             .setTimestamp(endsAt);
 
-        // id temporário até ter messageId
         const tempId = `tmp_${Date.now()}`;
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -119,7 +168,8 @@ module.exports = {
         const msg = await channel.send({ embeds: [embed], components: [row] });
 
         const id = `${message.guild.id}_${msg.id}`;
-        // atualiza customIds com id real
+        const rerollId = msg.id; // número que o user copia
+
         const row2 = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId(`drop:join:${id}`)
@@ -136,6 +186,7 @@ module.exports = {
 
         const entry = {
             id,
+            rerollId,
             guildId: message.guild.id,
             channelId: channel.id,
             messageId: msg.id,
@@ -143,10 +194,13 @@ module.exports = {
             hostTag: message.author.tag,
             winners,
             prize,
+            autopix: !!wantAutopix,
             endsAt,
             createdAt: Date.now(),
             ended: false,
-            participants: {}
+            participants: {},
+            requirements: reqOverride || undefined,
+            lastWinners: []
         };
 
         drops.createDrop(entry);
@@ -154,14 +208,20 @@ module.exports = {
 
         if (channel.id !== message.channel.id) {
             await message.reply({
-                embeds: [new EmbedBuilder().setColor(0x34d399).setDescription(`✅ Drop criado em ${channel}`)]
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0x34d399)
+                        .setDescription(
+                            `✅ Drop criado em ${channel}\nReroll ID: \`reroll ${rerollId}\``
+                        )
+                ]
             });
         } else {
             await message.delete().catch(() => {});
         }
     },
 
-    async handleComponent(interaction, client) {
+    async handleComponent(interaction) {
         const [, action, dropId] = (interaction.customId || '').split(':');
         if (!dropId) return;
 
@@ -186,7 +246,7 @@ module.exports = {
                         .setColor(0x38bdf8)
                         .setTitle(`👥 Participantes (${parts.length})`)
                         .setDescription(lines.join('\n') + more)
-                        .setFooter({ text: `Tickets totais: ${drops.totalTickets(drop)}` })
+                        .setFooter({ text: `Tickets: ${drops.totalTickets(drop)}` })
                 ],
                 ephemeral: true
             });
@@ -208,9 +268,7 @@ module.exports = {
             const check = drops.checkRequirements(member, drop);
             if (!check.ok) {
                 return interaction.reply({
-                    content:
-                        '❌ Você **não cumpre** os requisitos deste drop:\n• ' +
-                        check.fails.join('\n• '),
+                    content: '❌ Você **não cumpre** os requisitos:\n• ' + check.fails.join('\n• '),
                     ephemeral: true
                 });
             }
@@ -218,7 +276,6 @@ module.exports = {
             const extras = drops.calcExtraEntries(member, drop);
             drops.joinDrop(dropId, interaction.user.id, interaction.user.tag, extras.total);
 
-            // atualiza footer da mensagem
             try {
                 const fresh = drops.getDrop(dropId);
                 const count = drops.participantCount(fresh);
@@ -229,9 +286,9 @@ module.exports = {
                 await interaction.message.edit({ embeds: [emb] }).catch(() => {});
             } catch (_) {}
 
-            const extraTxt = extras.details.length ? `\nEntradas extras: ${extras.details.join(', ')}` : '';
+            const extraTxt = extras.details.length ? `\nExtras: ${extras.details.join(', ')}` : '';
             return interaction.reply({
-                content: `✅ Você entrou no drop com **${extras.total}** entrada(s)!${extraTxt}`,
+                content: `✅ Entrou com **${extras.total}** entrada(s)!${extraTxt}`,
                 ephemeral: true
             });
         }
