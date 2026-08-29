@@ -1,25 +1,27 @@
-const { REST, Routes } = require('discord.js');
+const { registerSlash } = require('../utils/registerSlash');
 
 module.exports = {
     name: 'clientReady',
     once: true,
     async execute(client) {
         console.log(`🤖 Bot online: ${client.user.tag}`);
-        const body = [];
-        const seen = new Set();
-        for (const cmd of client.commands.values()) {
-            if (cmd.data && !seen.has(cmd.data.name)) {
-                seen.add(cmd.data.name);
-                body.push(cmd.data.toJSON());
-            }
-        }
-        if (!process.env.CLIENT_ID || !process.env.TOKEN || !body.length) return;
+
+        // Auto-registro no boot (Render / Termux / qualquer host)
         try {
-            const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-            await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body });
-            console.log(`✨ ${body.length} slash registrados`);
+            const result = await registerSlash(client);
+            if (result.ok) {
+                console.log(`✅ Slash sincronizados (${result.count}).`);
+            }
         } catch (e) {
-            console.error('Slash:', e.message);
+            console.error('❌ Falha no registro de slash:', e);
         }
+
+        // status
+        try {
+            client.user.setPresence({
+                activities: [{ name: 'O.ajuda · Aeternus', type: 3 }],
+                status: 'online'
+            });
+        } catch (_) {}
     }
 };

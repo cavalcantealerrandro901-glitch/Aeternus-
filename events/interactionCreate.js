@@ -3,17 +3,39 @@ module.exports = {
     async execute(interaction, client) {
         try {
             if (interaction.isChatInputCommand()) {
+                const name = interaction.commandName;
                 const cmd =
-                    client.slash.get(interaction.commandName) ||
-                    client.commands.get(interaction.commandName);
-                if (!cmd?.executeSlash && !cmd?.execute) {
+                    client.slash.get(name) ||
+                    client.commands.get(name);
+
+                if (!cmd) {
                     return interaction
-                        .reply({ content: 'Indisponível.', ephemeral: true })
+                        .reply({
+                            content:
+                                '❌ Este slash não existe mais no bot. Aguarde a sincronização ou rode `node scripts/deploy-slash.js`.',
+                            ephemeral: true
+                        })
                         .catch(() => {});
                 }
-                if (cmd.executeSlash) await cmd.executeSlash(interaction, client);
-                else await cmd.execute(interaction, [], client);
-                return;
+
+                if (typeof cmd.executeSlash === 'function') {
+                    await cmd.executeSlash(interaction, client);
+                    return;
+                }
+
+                // fallback: alguns comandos só têm execute (prefixo)
+                if (typeof cmd.execute === 'function') {
+                    await interaction.reply({
+                        content:
+                            'Este comando é de **prefixo**. Use no chat, não como slash.',
+                        ephemeral: true
+                    }).catch(() => {});
+                    return;
+                }
+
+                return interaction
+                    .reply({ content: 'Indisponível.', ephemeral: true })
+                    .catch(() => {});
             }
 
             if (interaction.isButton() || interaction.isStringSelectMenu()) {
@@ -21,9 +43,7 @@ module.exports = {
                 const parts = id.split(':');
                 let cmd = client.commands.get(parts[0]);
 
-                // legado blackjack bj:*
                 if (!cmd && parts[0] === 'bj') cmd = client.commands.get('blackjack');
-
                 if (parts[0] === 'act' && parts[1] === 'devolver' && parts[2]) {
                     cmd = client.commands.get(parts[2]);
                 }
