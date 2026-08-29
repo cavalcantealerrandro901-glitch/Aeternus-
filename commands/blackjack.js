@@ -14,6 +14,20 @@ function total(hand) {
 function handStr(hand) {
     return hand.join(' · ') + `  (**${total(hand)}**)`;
 }
+function controls(userId) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`blackjack:hit:${userId}`)
+            .setLabel('Carta')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🃏'),
+        new ButtonBuilder()
+            .setCustomId(`blackjack:stand:${userId}`)
+            .setLabel('Parar')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('🛑')
+    );
+}
 
 module.exports = {
     name: 'blackjack',
@@ -29,10 +43,22 @@ module.exports = {
         const dealer = [draw(), draw()];
         games.set(message.author.id, { amount: bet.amount, player, dealer });
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`bj:hit:${message.author.id}`).setLabel('Carta').setStyle(ButtonStyle.Primary).setEmoji('🃏'),
-            new ButtonBuilder().setCustomId(`bj:stand:${message.author.id}`).setLabel('Parar').setStyle(ButtonStyle.Secondary).setEmoji('🛑')
-        );
+        // natural 21
+        if (total(player) === 21) {
+            cristais.add(message.author.id, Math.floor(bet.amount * 2.5));
+            games.delete(message.author.id);
+            return message.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(C.win)
+                        .setTitle('🃏  Blackjack natural!')
+                        .setDescription(
+                            `👤 ${handStr(player)}\n✨ +💠 **${fmt(Math.floor(bet.amount * 2.5))}**\nSaldo: 💠 **${fmt(cristais.get(message.author.id))}**`
+                        )
+                        .setFooter({ text: betFooter() })
+                ]
+            });
+        }
 
         await message.reply({
             embeds: [
@@ -50,16 +76,19 @@ module.exports = {
                     )
                     .setFooter({ text: betFooter() })
             ],
-            components: [row]
+            components: [controls(message.author.id)]
         });
     },
 
     async handleComponent(interaction) {
-        const [, action, id] = interaction.customId.split(':');
+        const parts = interaction.customId.split(':');
+        // blackjack:hit:userId  OR  bj:hit:userId (legado)
+        const action = parts[1];
+        const id = parts[2];
         if (interaction.user.id !== id)
             return interaction.reply({ content: 'Não é seu jogo.', ephemeral: true });
         const g = games.get(id);
-        if (!g) return interaction.reply({ content: 'Jogo expirado.', ephemeral: true });
+        if (!g) return interaction.reply({ content: 'Jogo expirado. Inicie outro com o comando.', ephemeral: true });
 
         if (action === 'hit') {
             g.player.push(draw());
@@ -83,9 +112,12 @@ module.exports = {
                     new EmbedBuilder()
                         .setColor(C.info)
                         .setTitle('🃏  Blackjack')
-                        .setDescription(`👤 Você → ${handStr(g.player)}\n🏠 Dealer → **${g.dealer[0]}** · ?`)
+                        .setDescription(
+                            `Aposta: 💠 **${fmt(g.amount)}**\n\n👤 Você → ${handStr(g.player)}\n🏠 Dealer → **${g.dealer[0]}** · ?`
+                        )
                         .setFooter({ text: betFooter() })
-                ]
+                ],
+                components: [controls(id)]
             });
         }
 
@@ -106,7 +138,11 @@ module.exports = {
                     new EmbedBuilder()
                         .setColor(result === 'win' ? C.win : result === 'push' ? C.draw : C.lose)
                         .setTitle(
-                            result === 'win' ? '🃏  Blackjack · Vitória' : result === 'push' ? '🃏  Empate' : '🃏  Derrota'
+                            result === 'win'
+                                ? '🃏  Blackjack · Vitória'
+                                : result === 'push'
+                                  ? '🃏  Empate'
+                                  : '🃏  Derrota'
                         )
                         .setDescription(
                             [
