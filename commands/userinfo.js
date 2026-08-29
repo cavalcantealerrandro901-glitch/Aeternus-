@@ -1,0 +1,23 @@
+const { EmbedBuilder } = require('discord.js');
+module.exports = {
+    name: 'userinfo',
+    aliases: ['whois', 'ui', 'user'],
+    async execute(message) {
+        const user = message.mentions.users.first() || message.author;
+        const member = await message.guild.members.fetch(user.id).catch(() => null);
+        await message.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0x38bdf8)
+                    .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL() })
+                    .setThumbnail(user.displayAvatarURL({ size: 256 }))
+                    .addFields(
+                        { name: 'ID', value: user.id, inline: true },
+                        { name: 'Conta', value: `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
+                        { name: 'Entrou', value: member?.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : '—', inline: true },
+                        { name: 'Cargos', value: member?.roles.cache.filter((r) => r.id !== message.guild.id).map((r) => r.toString()).slice(0, 12).join(' ') || 'Nenhum' }
+                    )
+            ]
+        });
+    }
+};
