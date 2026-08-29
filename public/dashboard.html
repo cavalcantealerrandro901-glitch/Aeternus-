@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Painel · Aeternus</title>
 <style>
-:root{--bg:#07070f;--side:#0c0c16;--card:#141422;--accent:#8b5cf6;--text:#e2e8f0;--muted:#94a3b8;--ok:#34d399;--border:#1e293b}
+:root{--bg:#07070f;--side:#0c0c16;--card:#141422;--accent:#8b5cf6;--text:#e2e8f0;--muted:#94a3b8;--ok:#34d399;--border:#1e293b;--danger:#ef4444}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
 aside{width:250px;background:var(--side);border-right:1px solid var(--border);padding:1rem;display:flex;flex-direction:column;gap:.35rem}
@@ -18,14 +18,21 @@ main{flex:1;padding:1.3rem;overflow:auto}
 .card h2{font-size:1.05rem;margin-bottom:.6rem}
 label{display:block;font-size:.82rem;color:var(--muted);margin:.5rem 0 .25rem}
 input,select{width:100%;background:#0b0b14;border:1px solid var(--border);color:var(--text);padding:.55rem .65rem;border-radius:.5rem;font:inherit}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+@media(max-width:700px){.row{grid-template-columns:1fr}}
 .switch{display:flex;align-items:center;gap:.5rem;margin:.4rem 0}
 .btn{background:var(--accent);color:#fff;border:0;padding:.6rem 1.1rem;border-radius:.55rem;font-weight:600;cursor:pointer;font:inherit;margin-top:.65rem}
+.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn.danger{background:var(--danger)}
 .guild{background:var(--card);border:1px solid var(--border);border-radius:.85rem;padding:.9rem;cursor:pointer;margin-bottom:.6rem}
 .guild:hover{border-color:var(--accent)}
 .muted{color:var(--muted);font-size:.88rem}
 .panel{display:none}.panel.active{display:block}
-.toast{position:fixed;bottom:1rem;right:1rem;background:var(--ok);color:#052e1c;padding:.65rem 1rem;border-radius:.5rem;font-weight:600;display:none}
+.toast{position:fixed;bottom:1rem;right:1rem;background:var(--ok);color:#052e1c;padding:.65rem 1rem;border-radius:.5rem;font-weight:600;display:none;z-index:9}
 code{background:#1e1b4b;padding:.1rem .35rem;border-radius:.3rem;font-size:.85rem}
+.entry{display:flex;gap:.4rem;align-items:center;margin:.35rem 0;flex-wrap:wrap;background:#0b0b14;padding:.5rem;border-radius:.5rem;border:1px solid var(--border)}
+.entry select,.entry input{width:auto;flex:1;min-width:100px}
+.entry button{background:#334155;color:#fff;border:0;padding:.4rem .6rem;border-radius:.4rem;cursor:pointer}
 </style>
 </head>
 <body>
@@ -33,7 +40,8 @@ code{background:#1e1b4b;padding:.1rem .35rem;border-radius:.3rem;font-size:.85re
   <h1>Ae<span>ternus</span></h1>
   <button class="nav-btn active" data-panel="servers">Servidores</button>
   <button class="nav-btn" data-panel="general" disabled>Geral</button>
-  <button class="nav-btn" data-panel="drops" disabled>Drops / Sorteios</button>
+  <button class="nav-btn" data-panel="drops" disabled>🎁 Drops</button>
+  <button class="nav-btn" data-panel="automod" disabled>🛡️ Anti-spam</button>
   <button class="nav-btn" data-panel="welcome" disabled>Boas-vindas</button>
   <button class="nav-btn" data-panel="logs" disabled>Logs</button>
   <button class="nav-btn" data-panel="economy" disabled>Economia</button>
@@ -59,19 +67,66 @@ code{background:#1e1b4b;padding:.1rem .35rem;border-radius:.3rem;font-size:.85re
   <section class="panel" id="drops">
     <div class="card">
       <h2>🎁 Drops / Sorteios</h2>
-      <p class="muted" style="margin-bottom:.8rem">Configure o canal padrão e o emoji. No Discord use:<br/>
-      <code>O.drop &lt;tempo&gt; &lt;vencedores&gt; &lt;prêmio&gt;</code><br/>
-      Ex: <code>O.drop 10m 1 5000 flocos</code> · <code>O.drop 1h 3 Nitro</code></p>
+      <p class="muted" style="margin-bottom:.8rem">
+        Participação por <b>botão verde</b> (não reação).<br/>
+        <code>O.drop &lt;tempo&gt; &lt;vencedores&gt; &lt;prêmio&gt;</code><br/>
+        Ex: <code>O.drop 10m 1 5000 flocos</code>
+      </p>
       <div class="switch"><input type="checkbox" id="dEnabled" checked/><label for="dEnabled">Sistema ativo</label></div>
-      <label>Canal padrão dos drops (vazio = canal do comando)</label>
+      <label>Canal padrão (vazio = canal do comando)</label>
       <select id="dChannel"></select>
-      <label>Emoji da reação</label>
-      <input id="dEmoji" maxlength="8" placeholder="🎉"/>
       <button class="btn" onclick="saveDrops()">Salvar drops</button>
     </div>
+
     <div class="card">
-      <h2>Drops ativos neste servidor</h2>
+      <h2>📋 Requisitos para participar</h2>
+      <p class="muted">Se o membro não cumprir, o botão Participar é bloqueado.</p>
+      <div class="row">
+        <div><label>Msgs mín. hoje</label><input type="number" id="reqDay" min="0" value="0"/></div>
+        <div><label>Msgs mín. semana</label><input type="number" id="reqWeek" min="0" value="0"/></div>
+        <div><label>Msgs mín. mês</label><input type="number" id="reqMonth" min="0" value="0"/></div>
+        <div><label>Nível XP mínimo</label><input type="number" id="reqLevel" min="0" value="0"/></div>
+        <div><label>Convites mínimos</label><input type="number" id="reqInv" min="0" value="0"/></div>
+        <div><label>Flocos mínimos</label><input type="number" id="reqFlocos" min="0" value="0"/></div>
+        <div><label>Cristais mínimos</label><input type="number" id="reqCrist" min="0" value="0"/></div>
+        <div><label>Cargo obrigatório</label><select id="reqRole"></select></div>
+      </div>
+      <button class="btn" onclick="saveDrops()">Salvar requisitos</button>
+    </div>
+
+    <div class="card">
+      <h2>➕ Entradas extras</h2>
+      <p class="muted">Adicione quantas quiser. Cada regra cumprida soma entradas no sorteio.</p>
+      <div id="extraList"></div>
+      <button class="btn ghost" type="button" onclick="addExtra()">+ Adicionar regra</button>
+      <button class="btn" onclick="saveDrops()">Salvar entradas</button>
+    </div>
+
+    <div class="card">
+      <h2>Drops ativos</h2>
       <div id="activeDrops" class="muted">Nenhum</div>
+    </div>
+  </section>
+
+  <section class="panel" id="automod">
+    <div class="card">
+      <h2>🛡️ Anti-spam</h2>
+      <div class="switch"><input type="checkbox" id="amEnabled" checked/><label for="amEnabled">Ativar automod</label></div>
+      <div class="switch"><input type="checkbox" id="amSpam" checked/><label for="amSpam">Anti-spam (velocidade + repetição)</label></div>
+      <div class="switch"><input type="checkbox" id="amInvite" checked/><label for="amInvite">Bloquear convites Discord</label></div>
+      <div class="switch"><input type="checkbox" id="amLink"/><label for="amLink">Bloquear links</label></div>
+      <div class="row">
+        <div><label>Máx. msgs na janela</label><input type="number" id="amMax" min="2" value="6"/></div>
+        <div><label>Janela (ms)</label><input type="number" id="amWin" min="1000" value="5000"/></div>
+        <div><label>Máx. msgs iguais</label><input type="number" id="amDup" min="2" value="3"/></div>
+        <div><label>Punição</label>
+          <select id="amPunish">
+            <option value="delete">Só apagar</option>
+            <option value="timeout">Apagar + timeout 1 min</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" onclick="saveAutomod()">Salvar anti-spam</button>
     </div>
   </section>
 
@@ -105,7 +160,7 @@ code{background:#1e1b4b;padding:.1rem .35rem;border-radius:.3rem;font-size:.85re
 </main>
 <div class="toast" id="toast">Salvo!</div>
 <script>
-let gid=null, data=null;
+let gid=null, data=null, extras=[];
 const val=id=>document.getElementById(id).value;
 const chk=id=>document.getElementById(id).checked;
 function toast(m){const t=document.getElementById('toast');t.textContent=m||'Salvo!';t.style.display='block';setTimeout(()=>t.style.display='none',2000)}
@@ -118,7 +173,37 @@ function show(id){
   document.getElementById('title').textContent=b?b.textContent.trim():id;
 }
 document.querySelectorAll('.nav-btn[data-panel]').forEach(b=>b.addEventListener('click',()=>{if(!b.disabled)show(b.dataset.panel)}));
-function fill(sel,items,ph){sel.innerHTML=`<option value="">${ph||'…'}</option>`+(items||[]).map(i=>`<option value="${i.id}">#${i.name}</option>`).join('')}
+function fill(sel,items,ph){sel.innerHTML=`<option value="">${ph||'…'}</option>`+(items||[]).map(i=>`<option value="${i.id}">${i.name||('#'+i.id)}</option>`).join('')}
+
+function renderExtras(){
+  const el=document.getElementById('extraList');
+  if(!extras.length){el.innerHTML='<p class="muted">Nenhuma regra ainda.</p>';return;}
+  el.innerHTML=extras.map((e,i)=>`
+    <div class="entry">
+      <input placeholder="Nome" value="${e.name||''}" onchange="extras[${i}].name=this.value"/>
+      <select onchange="extras[${i}].type=this.value;renderExtras()">
+        <option value="role" ${e.type==='role'?'selected':''}>Cargo</option>
+        <option value="messages_day" ${e.type==='messages_day'?'selected':''}>Msgs hoje ≥</option>
+        <option value="messages_week" ${e.type==='messages_week'?'selected':''}>Msgs semana ≥</option>
+        <option value="messages_month" ${e.type==='messages_month'?'selected':''}>Msgs mês ≥</option>
+        <option value="level" ${e.type==='level'?'selected':''}>Nível ≥</option>
+      </select>
+      ${e.type==='role'
+        ? `<select onchange="extras[${i}].roleId=this.value">${roleOptions(e.roleId)}</select>`
+        : `<input type="number" min="0" value="${e.value||0}" onchange="extras[${i}].value=+this.value" placeholder="Valor"/>`}
+      <input type="number" min="1" value="${e.bonus||1}" style="max-width:80px" onchange="extras[${i}].bonus=+this.value" title="Entradas extras"/>
+      <button type="button" onclick="extras.splice(${i},1);renderExtras()">✕</button>
+    </div>`).join('');
+}
+function roleOptions(selected){
+  const roles=data?.roles||[];
+  return `<option value="">Cargo…</option>`+roles.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>@${r.name}</option>`).join('');
+}
+function addExtra(){
+  extras.push({name:'',type:'role',roleId:'',value:10,bonus:1});
+  renderExtras();
+}
+
 async function loadGuilds(){
   const r=await fetch('/api/guilds'); if(r.status===401) return location.href='/login';
   const j=await r.json(); const el=document.getElementById('guildList');
@@ -129,21 +214,44 @@ async function sel(id){
   gid=id; const r=await fetch('/api/guild/'+id); data=await r.json();
   if(data.error) return toast(data.error);
   document.querySelectorAll('.nav-btn[data-panel]').forEach(b=>{if(b.dataset.panel!=='servers')b.disabled=false});
-  const s=data.settings, ch=data.channels||[];
+  const s=data.settings, ch=data.channels||[], roles=data.roles||[];
   document.getElementById('meta').innerHTML=`<b>${data.name}</b> · ${id}`;
   document.getElementById('prefix').value=s.prefix||'O.';
   fill(document.getElementById('dChannel'),ch,'Canal do comando');
   fill(document.getElementById('wChannel'),ch,'Canal');
   fill(document.getElementById('logChannel'),ch,'Canal');
+  fill(document.getElementById('reqRole'),roles,'Nenhum');
+
   dEnabled.checked=s.drops?.enabled!==false;
   dChannel.value=s.drops?.channelId||'';
-  dEmoji.value=s.drops?.emoji||'🎉';
+  const rq=s.drops?.requirements||{};
+  reqDay.value=rq.minMessagesDay||0;
+  reqWeek.value=rq.minMessagesWeek||0;
+  reqMonth.value=rq.minMessagesMonth||0;
+  reqLevel.value=rq.minLevel||0;
+  reqInv.value=rq.minInvites||0;
+  reqFlocos.value=rq.minFlocos||0;
+  reqCrist.value=rq.minCristais||0;
+  reqRole.value=(rq.requiredRoleIds&&rq.requiredRoleIds[0])||'';
+  extras=Array.isArray(s.drops?.extraEntries)?JSON.parse(JSON.stringify(s.drops.extraEntries)):[];
+  renderExtras();
+
+  const am=s.automod||{};
+  amEnabled.checked=am.enabled!==false;
+  amSpam.checked=am.antiSpam!==false;
+  amInvite.checked=!!am.antiInvite;
+  amLink.checked=!!am.antiLink;
+  amMax.value=am.maxMessages??6;
+  amWin.value=am.windowMs??5000;
+  amDup.value=am.maxDuplicates??3;
+  amPunish.value=am.punish||'delete';
+
   wEnabled.checked=!!s.welcome?.enabled; wChannel.value=s.welcome?.channelId||''; wMsg.value=s.welcome?.message||'';
   logEnabled.checked=!!s.logs?.enabled; logChannel.value=s.logs?.channelId||'';
   dMin.value=s.economy?.dailyMin??5000; dMax.value=s.economy?.dailyMax??50000;
   const ad=data.activeDrops||[];
   document.getElementById('activeDrops').innerHTML=ad.length
-    ? ad.map(d=>`• <b>${d.prize}</b> — ${d.winners} vencedor(es) — termina <span class="muted">${new Date(d.endsAt).toLocaleString('pt-BR')}</span>`).join('<br/>')
+    ? ad.map(d=>`• <b>${d.prize}</b> — ${d.winners} vencedor(es) — ${new Date(d.endsAt).toLocaleString('pt-BR')}`).join('<br/>')
     : 'Nenhum drop ativo.';
   show('drops');
 }
@@ -153,7 +261,44 @@ async function save(patch){
   const j=await r.json(); toast(j.ok?'Salvo!':(j.error||'Erro'));
 }
 function saveDrops(){
-  save({drops:{enabled:chk('dEnabled'),channelId:val('dChannel')||null,emoji:val('dEmoji')||'🎉'}});
+  const role=val('reqRole');
+  save({
+    drops:{
+      enabled:chk('dEnabled'),
+      channelId:val('dChannel')||null,
+      requirements:{
+        minMessagesDay:+val('reqDay')||0,
+        minMessagesWeek:+val('reqWeek')||0,
+        minMessagesMonth:+val('reqMonth')||0,
+        minLevel:+val('reqLevel')||0,
+        minInvites:+val('reqInv')||0,
+        minFlocos:+val('reqFlocos')||0,
+        minCristais:+val('reqCrist')||0,
+        requiredRoleIds: role ? [role] : []
+      },
+      extraEntries: extras.map(e=>({
+        name:e.name||'',
+        type:e.type||'role',
+        roleId:e.roleId||null,
+        value:+e.value||0,
+        bonus:Math.max(1,+e.bonus||1)
+      }))
+    }
+  });
+}
+function saveAutomod(){
+  save({
+    automod:{
+      enabled:chk('amEnabled'),
+      antiSpam:chk('amSpam'),
+      antiInvite:chk('amInvite'),
+      antiLink:chk('amLink'),
+      maxMessages:+val('amMax')||6,
+      windowMs:+val('amWin')||5000,
+      maxDuplicates:+val('amDup')||3,
+      punish:val('amPunish')||'delete'
+    }
+  });
 }
 loadGuilds();
 </script>
