@@ -9,8 +9,23 @@ const drops = require('../utils/drops');
 const { getSettings } = require('../utils/settings');
 const { schedule } = require('../systems/drops');
 
-/** Cargo que pode usar autopix */
 const AUTOPIX_ROLE_ID = '1506043064723050556';
+
+function joinRow(dropId, count = 0) {
+    const n = Math.max(0, Number(count) || 0);
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`drop:join:${dropId}`)
+            .setLabel(`Participar (${n})`.slice(0, 80))
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('✅'),
+        new ButtonBuilder()
+            .setCustomId(`drop:list:${dropId}`)
+            .setLabel('Participantes')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('👥')
+    );
+}
 
 module.exports = {
     name: 'drop',
@@ -39,24 +54,16 @@ module.exports = {
                                 '**Vencedores:** 1–20',
                                 '**Prêmio:** texto ou `5000 flocos` / `100 cristais`',
                                 '',
-                                '**req** (opcional) — requisitos deste drop:',
-                                '`req msgs:20 semana:50 nivel:5 cargo:ID`',
+                                '**req** (opcional): `req msgs:20 semana:50 nivel:5`',
+                                '**autopix** — paga automaticamente (cargo autorizado).',
                                 '',
-                                '**autopix** — paga flocos/cristais no fim (só cargo autorizado).',
-                                'Sem `autopix` só anuncia os vencedores.',
-                                '',
-                                'No fim aparece `reroll <id>` para re-sortear.',
-                                '',
-                                '`O.drop 10m 1 5000 flocos`',
-                                '`O.drop 1h 1 200 cristais autopix`',
-                                '`O.drop 30m 2 Nitro req msgs:15`'
+                                'No fim: `reroll <id>` para re-sortear.'
                             ].join('\n')
                         )
                 ]
             });
         }
 
-        // --- flags: autopix + req ---
         const tokens = [...args];
         let wantAutopix = false;
         const autoIdx = tokens.findIndex((t) => /^autopix$/i.test(t));
@@ -72,16 +79,14 @@ module.exports = {
             reqOverride = drops.parseReqFlags(reqText, message);
         }
 
-        if (wantAutopix) {
-            if (!message.member.roles.cache.has(AUTOPIX_ROLE_ID)) {
-                return message.reply({
-                    embeds: [
-                        err(
-                            'Você **não tem** o cargo autorizado para usar **autopix**.\nO drop não foi criado. Remova `autopix` ou peça o cargo.'
-                        )
-                    ]
-                });
-            }
+        if (wantAutopix && !message.member.roles.cache.has(AUTOPIX_ROLE_ID)) {
+            return message.reply({
+                embeds: [
+                    err(
+                        'Você **não tem** o cargo autorizado para **autopix**.\nRemova `autopix` ou peça o cargo.'
+                    )
+                ]
+            });
         }
 
         const ms = drops.parseDuration(tokens[0]);
@@ -102,7 +107,7 @@ module.exports = {
             return message.reply({
                 embeds: [
                     err(
-                        '**autopix** só funciona com prêmio em **flocos** ou **cristais**.\nEx: `O.drop 10m 1 5000 flocos autopix`'
+                        '**autopix** só com prêmio em **flocos** ou **cristais**.\nEx: `O.drop 10m 1 5000 flocos autopix`'
                     )
                 ]
             });
@@ -117,7 +122,6 @@ module.exports = {
         const endsAt = Date.now() + ms;
         const endsUnix = Math.floor(endsAt / 1000);
 
-        // requisitos: painel + override do comando
         const dropStub = reqOverride ? { requirements: reqOverride } : null;
         const req = drops.getRequirements(message.guild.id, dropStub);
 
@@ -144,7 +148,7 @@ module.exports = {
                         : '**Pagamento:** manual (staff entrega)',
                     '',
                     'Clique em **Participar** para entrar.',
-                    'Use **Participantes** para ver quem já entrou.',
+                    'Use **Participantes** para ver a lista.',
                     reqLines.length ? `\n**Requisitos**\n${reqLines.join('\n')}` : ''
                 ].join('\n')
             )
@@ -152,37 +156,15 @@ module.exports = {
             .setTimestamp(endsAt);
 
         const tempId = `tmp_${Date.now()}`;
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`drop:join:${tempId}`)
-                .setLabel('Participar')
-                .setStyle(ButtonStyle.Success)
-                .setEmoji('✅'),
-            new ButtonBuilder()
-                .setCustomId(`drop:list:${tempId}`)
-                .setLabel('Participantes')
-                .setStyle(ButtonStyle.Secondary)
-                .setEmoji('👥')
-        );
-
-        const msg = await channel.send({ embeds: [embed], components: [row] });
+        const msg = await channel.send({
+            embeds: [embed],
+            components: [joinRow(tempId, 0)]
+        });
 
         const id = `${message.guild.id}_${msg.id}`;
-        const rerollId = msg.id; // número que o user copia
+        const rerollId = msg.id;
 
-        const row2 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`drop:join:${id}`)
-                .setLabel('Participar')
-                .setStyle(ButtonStyle.Success)
-                .setEmoji('✅'),
-            new ButtonBuilder()
-                .setCustomId(`drop:list:${id}`)
-                .setLabel('Participantes')
-                .setStyle(ButtonStyle.Secondary)
-                .setEmoji('👥')
-        );
-        await msg.edit({ components: [row2] }).catch(() => {});
+        await msg.edit({ components: [joinRow(id, 0)] }).catch(() => {});
 
         const entry = {
             id,
@@ -276,19 +258,25 @@ module.exports = {
             const extras = drops.calcExtraEntries(member, drop);
             drops.joinDrop(dropId, interaction.user.id, interaction.user.tag, extras.total);
 
+            const fresh = drops.getDrop(dropId);
+            const count = drops.participantCount(fresh);
+
             try {
-                const fresh = drops.getDrop(dropId);
-                const count = drops.participantCount(fresh);
                 const emb = EmbedBuilder.from(interaction.message.embeds[0] || {});
                 emb.setFooter({
                     text: `Por ${drop.hostTag} · ${count} participante(s) · ${drops.totalTickets(fresh)} tickets`
                 });
-                await interaction.message.edit({ embeds: [emb] }).catch(() => {});
+                await interaction.message
+                    .edit({
+                        embeds: [emb],
+                        components: [joinRow(dropId, count)]
+                    })
+                    .catch(() => {});
             } catch (_) {}
 
             const extraTxt = extras.details.length ? `\nExtras: ${extras.details.join(', ')}` : '';
             return interaction.reply({
-                content: `✅ Entrou com **${extras.total}** entrada(s)!${extraTxt}`,
+                content: `✅ Entrou com **${extras.total}** entrada(s)!${extraTxt}\n👥 Total no drop: **${count}**`,
                 ephemeral: true
             });
         }
