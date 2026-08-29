@@ -1,47 +1,28 @@
 const { EmbedBuilder } = require('discord.js');
-const store = require('../utils/store');
+const daily = require('../utils/daily');
 const flocos = require('../utils/flocos');
-const xp = require('../utils/xp');
-const { getSettings } = require('../utils/settings');
-
-function todayKey() {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-}
 
 module.exports = {
     name: 'daily',
     aliases: ['diario'],
+    description: 'Coleta a recompensa diária',
     async execute(message) {
-        const all = store.load('daily.json', {});
-        const today = todayKey();
-        const info = all[message.author.id] || { last: null, streak: 0 };
-        if (info.last === today)
-            return message.reply('❄️ Daily já coletado. Volte após meia-noite BRT.');
-
-        const y = new Date();
-        y.setDate(y.getDate() - 1);
-        const yKey = y.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-        const streak = info.last === yKey ? (info.streak || 0) + 1 : 1;
-
-        const eco = getSettings(message.guild.id).economy;
-        const min = eco.dailyMin ?? 5000;
-        const max = eco.dailyMax ?? 50000;
-        let base = min + Math.floor(Math.random() * (max - min + 1));
-        const mult = xp.dailyMultiplier(xp.get(message.author.id).level);
-        const total = Math.floor(base * mult);
-
-        flocos.add(message.author.id, total);
-        all[message.author.id] = { last: today, streak };
-        store.save('daily.json', all);
+        const result = daily.claim(message.author.id, message.guild.id);
+        if (!result.ok) return message.reply(`❄️ ${result.error}`);
 
         await message.reply({
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xfbbf24)
-                    .setTitle('❄️ Daily')
+                    .setTitle('❄️ Daily coletado')
                     .setDescription(
-                        `+${flocos.format(total)}\n🔥 Sequência **${streak}** · ×${mult.toFixed(2)}`
+                        [
+                            `Você recebeu **${flocos.format(result.amount)}**`,
+                            `🔥 Sequência **${result.streak}** · multiplicador ×**${result.multiplier.toFixed(2)}**`,
+                            `💼 Saldo: ${flocos.format(result.balance)}`
+                        ].join('\n')
                     )
+                    .setFooter({ text: 'Também disponível no painel web · Daily' })
             ]
         });
     }

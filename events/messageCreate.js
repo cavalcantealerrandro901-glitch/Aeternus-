@@ -13,7 +13,6 @@ module.exports = {
     async execute(message, client) {
         if (!message.guild || message.author.bot) return;
 
-        // Anti-spam
         try {
             const spam = antispam.check(message);
             if (spam.block) {
@@ -54,17 +53,19 @@ module.exports = {
                         Math.floor(Math.random() * ((conf.max || 77) - (conf.min || 30) + 1));
                     const res = xp.addXp(message.author.id, gain);
                     if (res.leveled) {
-                        message.channel
+                        const lvlMsg = await message.channel
                             .send(
                                 `✨ ${message.author} nível **${res.level}** · +❄️ ${res.reward.toLocaleString('pt-BR')}`
                             )
-                            .catch(() => {});
+                            .catch(() => null);
+                        if (lvlMsg) {
+                            setTimeout(() => lvlMsg.delete().catch(() => {}), 7000);
+                        }
                     }
                 }
             }
         } catch (_) {}
 
-        // reroll 123456789 sem prefixo (staff)
         const plainReroll = message.content.trim().match(/^reroll\s+(\d{15,25})$/i);
         if (plainReroll) {
             if (
