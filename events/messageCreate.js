@@ -1,6 +1,8 @@
 const { getPrefix, getSettings } = require('../utils/settings');
 const xp = require('../utils/xp');
 const afk = require('../utils/afk');
+const msgStats = require('../utils/msgStats');
+const antispam = require('../utils/antispam');
 
 const xpCd = new Map();
 
@@ -8,6 +10,22 @@ module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
         if (!message.guild || message.author.bot) return;
+
+        // Anti-spam
+        try {
+            const spam = antispam.check(message);
+            if (spam.block) {
+                await antispam.apply(message, spam);
+                return;
+            }
+        } catch (_) {}
+
+        // Contador de mensagens (após anti-spam)
+        try {
+            if (message.content && message.content.length >= 1) {
+                msgStats.add(message.guild.id, message.author.id, 1);
+            }
+        } catch (_) {}
 
         try {
             if (afk.has(message.author.id)) {

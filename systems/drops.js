@@ -18,25 +18,8 @@ async function endDrop(client, dropId) {
         }
 
         const msg = await channel.messages.fetch(drop.messageId).catch(() => null);
-        let users = [];
-
-        if (msg) {
-            const reaction = msg.reactions.cache.get(drop.emoji) || msg.reactions.cache.find((r) => r.emoji.name === drop.emoji);
-            if (reaction) {
-                const fetched = await reaction.users.fetch().catch(() => null);
-                if (fetched) {
-                    users = [...fetched.values()].filter((u) => !u.bot && u.id !== drop.hostId);
-                }
-            }
-        }
-
-        // shuffle
-        for (let i = users.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [users[i], users[j]] = [users[j], users[i]];
-        }
-
-        const winners = users.slice(0, Math.max(1, drop.winners || 1));
+        const winners = drops.pickWinners(drop);
+        const totalP = drops.participantCount(drop);
 
         if (!winners.length) {
             const embed = new EmbedBuilder()
@@ -44,7 +27,7 @@ async function endDrop(client, dropId) {
                 .setTitle('🎁 Drop encerrado')
                 .setDescription(`Ninguém participou.\n**Prêmio:** ${drop.prize.label}`)
                 .setTimestamp();
-            if (msg) await msg.edit({ embeds: [embed] }).catch(() => {});
+            if (msg) await msg.edit({ embeds: [embed], components: [] }).catch(() => {});
             else await channel.send({ embeds: [embed] }).catch(() => {});
             drops.removeDrop(dropId);
             return;
@@ -55,8 +38,8 @@ async function endDrop(client, dropId) {
             const paid = drops.payPrize(w.id, drop.prize);
             lines.push(
                 paid
-                    ? `🏆 ${w} — recebeu automaticamente **${drop.prize.amount.toLocaleString('pt-BR')}** ${drop.prize.type}`
-                    : `🏆 ${w}`
+                    ? `🏆 <@${w.id}> — **${drop.prize.amount.toLocaleString('pt-BR')}** ${drop.prize.type}`
+                    : `🏆 <@${w.id}>`
             );
         }
 
@@ -66,7 +49,8 @@ async function endDrop(client, dropId) {
             .setDescription(
                 [
                     `**Prêmio:** ${drop.prize.label}`,
-                    `**Participantes:** ${users.length}`,
+                    `**Participantes:** ${totalP}`,
+                    `**Tickets:** ${drops.totalTickets(drop)}`,
                     '',
                     '**Vencedor(es)**',
                     ...lines
@@ -76,12 +60,18 @@ async function endDrop(client, dropId) {
             .setTimestamp();
 
         if (msg) {
-            await msg.edit({ embeds: [embed] }).catch(() => {});
-            await msg.reply({ content: winners.map((w) => `${w}`).join(' '), embeds: [embed] }).catch(() => {
-                channel.send({ content: winners.map((w) => `${w}`).join(' '), embeds: [embed] }).catch(() => {});
-            });
+            await msg.edit({ embeds: [embed], components: [] }).catch(() => {});
+            await msg
+                .reply({ content: winners.map((w) => `<@${w.id}>`).join(' '), embeds: [embed] })
+                .catch(() => {
+                    channel
+                        .send({ content: winners.map((w) => `<@${w.id}>`).join(' '), embeds: [embed] })
+                        .catch(() => {});
+                });
         } else {
-            await channel.send({ content: winners.map((w) => `${w}`).join(' '), embeds: [embed] }).catch(() => {});
+            await channel
+                .send({ content: winners.map((w) => `<@${w.id}>`).join(' '), embeds: [embed] })
+                .catch(() => {});
         }
     } catch (e) {
         console.error('[drops] end:', e.message);

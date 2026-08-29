@@ -5,7 +5,17 @@ const DEFAULT = {
     logs: { enabled: false, channelId: null, events: {} },
     welcome: { enabled: false, channelId: null, message: '', embed: true },
     leave: { enabled: false, channelId: null, message: '' },
-    automod: { enabled: false, antiSpam: true, antiLink: false, antiInvite: false, punish: 'warn' },
+    automod: {
+        enabled: true,
+        antiSpam: true,
+        antiLink: false,
+        antiInvite: true,
+        maxMessages: 6,
+        windowMs: 5000,
+        maxDuplicates: 3,
+        minLength: 0,
+        punish: 'delete'
+    },
     tickets: { enabled: false, categoryId: null, supportRoleId: null },
     music: { categoryId: null },
     economy: { dailyMin: 5000, dailyMax: 50000, robEnabled: true, workEnabled: true },
@@ -17,7 +27,21 @@ const DEFAULT = {
     autorole: { enabled: false, roleId: null },
     verification: { enabled: false, roleId: null, channelId: null },
     antinuke: { enabled: false },
-    drops: { enabled: true, channelId: null, emoji: '🎉' }
+    drops: {
+        enabled: true,
+        channelId: null,
+        requirements: {
+            minMessagesDay: 0,
+            minMessagesWeek: 0,
+            minMessagesMonth: 0,
+            requiredRoleIds: [],
+            minLevel: 0,
+            minInvites: 0,
+            minFlocos: 0,
+            minCristais: 0
+        },
+        extraEntries: []
+    }
 };
 
 function deepMerge(a, b) {
@@ -50,13 +74,33 @@ function getSettings(guildId) {
         autorole: { ...DEFAULT.autorole, ...(g.autorole || {}) },
         verification: { ...DEFAULT.verification, ...(g.verification || {}) },
         antinuke: { ...DEFAULT.antinuke, ...(g.antinuke || {}) },
-        drops: { ...DEFAULT.drops, ...(g.drops || {}) }
+        drops: {
+            ...DEFAULT.drops,
+            ...(g.drops || {}),
+            requirements: {
+                ...DEFAULT.drops.requirements,
+                ...((g.drops && g.drops.requirements) || {})
+            },
+            extraEntries: Array.isArray(g.drops?.extraEntries)
+                ? g.drops.extraEntries
+                : DEFAULT.drops.extraEntries
+        }
     };
 }
 
 function setSettings(guildId, patch) {
     const all = store.load('guilds.json', {});
     all[guildId] = deepMerge(all[guildId] || {}, patch);
+    // arrays de extraEntries / requiredRoleIds substituem por completo se enviados
+    if (patch.drops?.extraEntries) {
+        all[guildId].drops = all[guildId].drops || {};
+        all[guildId].drops.extraEntries = patch.drops.extraEntries;
+    }
+    if (patch.drops?.requirements?.requiredRoleIds) {
+        all[guildId].drops = all[guildId].drops || {};
+        all[guildId].drops.requirements = all[guildId].drops.requirements || {};
+        all[guildId].drops.requirements.requiredRoleIds = patch.drops.requirements.requiredRoleIds;
+    }
     store.save('guilds.json', all);
     return getSettings(guildId);
 }

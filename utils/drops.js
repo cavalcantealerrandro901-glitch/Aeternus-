@@ -1,6 +1,9 @@
 const store = require('./store');
 const flocos = require('./flocos');
 const cristais = require('./cristais');
+const msgStats = require('./msgStats');
+const { getSettings } = require('./settings');
+const xp = require('./xp');
 
 function all() {
     return store.load('drops.json', {});
@@ -10,10 +13,12 @@ function save(data) {
     store.save('drops.json', data);
 }
 
-/** Parse 30s | 5m | 1h | 2d | 10min */
 function parseDuration(str) {
     if (!str) return null;
-    const m = String(str).trim().toLowerCase().match(/^(\d+)\s*(s|sec|secs|m|min|mins|h|hr|hrs|d|dia|dias)?$/i);
+    const m = String(str)
+        .trim()
+        .toLowerCase()
+        .match(/^(\d+)\s*(s|sec|secs|m|min|mins|h|hr|hrs|d|dia|dias)?$/i);
     if (!m) return null;
     const n = parseInt(m[1], 10);
     if (!n || n < 1) return null;
@@ -21,7 +26,7 @@ function parseDuration(str) {
     if (u.startsWith('s')) return Math.min(n, 86400) * 1000;
     if (u.startsWith('h')) return Math.min(n, 168) * 3600 * 1000;
     if (u.startsWith('d')) return Math.min(n, 14) * 86400 * 1000;
-    return Math.min(n, 10080) * 60 * 1000; // minutos
+    return Math.min(n, 10080) * 60 * 1000;
 }
 
 function formatDuration(ms) {
@@ -32,7 +37,6 @@ function formatDuration(ms) {
     return `${Math.floor(s / 86400)}d`;
 }
 
-/** Detecta prêmio automático: "5000 flocos" | "100 cristais" | texto livre */
 function parsePrize(text) {
     const t = String(text || '').trim();
     const m = t.match(/^(\d+(?:[.,]\d+)?[km]?)\s*(flocos?|cristais?|❄️|💠)?$/i);
@@ -48,6 +52,7 @@ function parsePrize(text) {
 
 function createDrop(entry) {
     const data = all();
+    if (!entry.participants) entry.participants = {};
     data[entry.id] = entry;
     save(data);
     return entry;
@@ -55,6 +60,14 @@ function createDrop(entry) {
 
 function getDrop(id) {
     return all()[id] || null;
+}
+
+function updateDrop(id, patch) {
+    const data = all();
+    if (!data[id]) return null;
+    data[id] = { ...data[id], ...patch };
+    save(data);
+    return data[id];
 }
 
 function removeDrop(id) {
@@ -77,15 +90,188 @@ function payPrize(userId, prize) {
     return true;
 }
 
+/** Requisitos do painel + drop */
+function getRequirements(guildId, drop) {
+    const conf = getSettings(guildId).drops || {};
+    const base = conf.requirements || {};
+    const over = drop?.requirements || {};
+    return {
+        minMessagesDay: Number(over.minMessagesDay ?? base.minMessagesDay ?? 0),
+        minMessagesWeek: Number(over.minMessagesWeek ?? base.minMessagesWeek ?? 0),
+        minMessagesMonth: Number(over.minMessagesMonth ?? base.minMessagesMonth ?? 0),
+        requiredRoleIds: Array.isArray(over.requiredRoleIds)
+            ? over.requiredRoleIds
+            : Array.isArray(base.requiredRoleIds)
+              ? base.requiredRoleIds
+              : [],
+        minLevel: Number(over.minLevel ?? base.minLevel ?? 0),
+        minInvites: Number(over.minInvites ?? base.minInvites ?? 0),
+        minFlocos: Number(over.minFlocos ?? base.minFlocos ?? 0),
+        minCristais: Number(over.minCristais ?? base.minCristais ?? 0)
+    };
+}
+
+function checkRequirements(member, drop) {
+    const req = getRequirements(member.guild.id, drop);
+    const stats = msgStats.getUser(member.guild.id, member.id);
+    const fails = [];
+
+    if (req.minMessagesDay > 0 && stats.today < req.minMessagesDay)
+        fails.push(`mensagens hoje: ${stats.today}/${req.minMessagesDay}`);
+    if (req.minMessagesWeek > 0 && stats.week < req.minMessagesWeek)
+        fails.push(`mensagens na semana: ${stats.week}/${req.minMessagesWeek}`);
+    if (req.minMessagesMonth > 0 && stats.month < req.minMessagesMonth)
+        fails.push(`mensagens no mês: ${stats.month}/${req.minMessagesMonth}`);
+    if (req.minLevel > 0) {
+        const lv = xp.get?.(member.id)?.level ?? xp.level?.(member.id) ?? 0;
+        const level = typeof lv === 'object' ? lv.level || 0 : Number(lv) || 0;
+        if (level < req.minLevel) fails.push(`nível XP: ${level}/${req.minLevel}`);
+    }
+    if (req.minFlocos > 0 && flocos.get(member.id) < req.minFlocos)
+        fails.push(`flocos: ${flocos.get(member.id)}/${req.minFlocos}`);
+    if (req.minCristais > 0 && cristais.get(member.id) < req.minCristais)
+        fails.push(`cristais: ${cristais.get(member.id)}/${req.minCristais}`);
+
+    if (req.requiredRoleIds?.length) {
+        const has = req.requiredRoleIds.some((rid) => member.roles.cache.has(rid));
+        if (!has) fails.push('cargo exigido ausente');
+    }
+
+    if (req.minInvites > 0) {
+        try {
+            const inv = require('./invites');
+            const n = inv.get?.(member.guild.id, member.id) ?? inv.count?.(member.guild.id, member.id) ?? 0;
+            if (Number(n) < req.minInvites) fails.push(`convites: ${n}/${req.minInvites}`);
+        } catch (_) {}
+    }
+
+    return { ok: fails.length === 0, fails, req, stats };
+}
+
+/** Entradas extras configuradas no painel */
+function calcExtraEntries(member, drop) {
+    const conf = getSettings(member.guild.id).drops || {};
+    const list = Array.isArray(conf.extraEntries) ? conf.extraEntries : [];
+    const stats = msgStats.getUser(member.guild.id, member.id);
+    let bonus = 0;
+    const details = [];
+
+    for (const rule of list) {
+        if (!rule || !rule.bonus) continue;
+        const b = Math.max(0, Math.floor(Number(rule.bonus) || 0));
+        if (!b) continue;
+        const type = rule.type || 'role';
+
+        if (type === 'role' && rule.roleId && member.roles.cache.has(rule.roleId)) {
+            bonus += b;
+            details.push(`+${b} (${rule.name || 'cargo'})`);
+        } else if (type === 'messages_day' && stats.today >= Number(rule.value || 0)) {
+            bonus += b;
+            details.push(`+${b} (${rule.name || 'msgs dia'})`);
+        } else if (type === 'messages_week' && stats.week >= Number(rule.value || 0)) {
+            bonus += b;
+            details.push(`+${b} (${rule.name || 'msgs semana'})`);
+        } else if (type === 'messages_month' && stats.month >= Number(rule.value || 0)) {
+            bonus += b;
+            details.push(`+${b} (${rule.name || 'msgs mês'})`);
+        } else if (type === 'level') {
+            let level = 0;
+            try {
+                const d = xp.get?.(member.id);
+                level = typeof d === 'object' ? d.level || 0 : 0;
+            } catch (_) {}
+            if (level >= Number(rule.value || 0)) {
+                bonus += b;
+                details.push(`+${b} (${rule.name || 'nível'})`);
+            }
+        }
+    }
+
+    // extras definidos no próprio drop
+    if (Array.isArray(drop?.extraEntries)) {
+        for (const rule of drop.extraEntries) {
+            if (rule?.type === 'role' && rule.roleId && member.roles.cache.has(rule.roleId)) {
+                const b = Math.max(0, Math.floor(Number(rule.bonus) || 0));
+                bonus += b;
+                details.push(`+${b} (drop)`);
+            }
+        }
+    }
+
+    return { bonus, details, total: 1 + bonus };
+}
+
+function joinDrop(dropId, userId, tag, entries) {
+    const data = all();
+    const drop = data[dropId];
+    if (!drop || drop.ended) return null;
+    if (!drop.participants) drop.participants = {};
+    drop.participants[userId] = {
+        tag,
+        entries: Math.max(1, Math.floor(entries || 1)),
+        joinedAt: Date.now()
+    };
+    save(data);
+    return drop;
+}
+
+function leaveDrop(dropId, userId) {
+    const data = all();
+    const drop = data[dropId];
+    if (!drop?.participants?.[userId]) return null;
+    delete drop.participants[userId];
+    save(data);
+    return drop;
+}
+
+function participantCount(drop) {
+    return Object.keys(drop?.participants || {}).length;
+}
+
+function totalTickets(drop) {
+    return Object.values(drop?.participants || {}).reduce((a, p) => a + (p.entries || 1), 0);
+}
+
+/** Sorteio ponderado pelas entradas */
+function pickWinners(drop) {
+    const pool = [];
+    for (const [uid, p] of Object.entries(drop.participants || {})) {
+        const n = Math.max(1, p.entries || 1);
+        for (let i = 0; i < n; i++) pool.push({ id: uid, tag: p.tag });
+    }
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const winners = [];
+    const seen = new Set();
+    for (const p of pool) {
+        if (seen.has(p.id)) continue;
+        seen.add(p.id);
+        winners.push(p);
+        if (winners.length >= (drop.winners || 1)) break;
+    }
+    return winners;
+}
+
 module.exports = {
     parseDuration,
     formatDuration,
     parsePrize,
     createDrop,
     getDrop,
+    updateDrop,
     removeDrop,
     listActive,
     payPrize,
+    checkRequirements,
+    calcExtraEntries,
+    joinDrop,
+    leaveDrop,
+    participantCount,
+    totalTickets,
+    pickWinners,
+    getRequirements,
     all,
     save
 };
