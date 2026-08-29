@@ -1,34 +1,55 @@
 const { EmbedBuilder } = require('discord.js');
 const flocos = require('../utils/flocos');
 const bank = require('../utils/bank');
-const { parseAmount } = require('../utils/parseAmount');
+const { resolveBet } = require('../utils/parseAmount');
+
+function fmt(n) {
+    return Number(n || 0).toLocaleString('pt-BR');
+}
 
 module.exports = {
     name: 'sacar',
-    aliases: ['with', 'withdraw'],
-    description: 'Saca do banco',
+    aliases: ['with', 'withdraw', 'saque'],
+    description: 'Saca flocos do banco',
     async execute(message, args) {
-        let amount =
-            args[0]?.toLowerCase() === 'all' || args[0] === 'tudo'
-                ? bank.get(message.author.id)
-                : parseAmount(args[0]);
-        if (!amount || amount <= 0) return message.reply('Uso: `O.sacar <valor|all>`');
-        if (bank.get(message.author.id) < amount)
-            return message.reply({ embeds: [new EmbedBuilder().setColor(0xef4444).setDescription('❌ Banco insuficiente.')] });
+        const bet = resolveBet(args[0], bank.get(message.author.id), { label: '🏦' });
+        if (!bet.ok)
+            return message.reply(`❌ ${bet.error}\nUso: \`O.sacar <valor|all|half>\``);
 
-        bank.remove(message.author.id, amount);
-        flocos.add(message.author.id, amount);
+        bank.remove(message.author.id, bet.amount);
+        flocos.add(message.author.id, bet.amount);
 
         await message.reply({
             embeds: [
                 new EmbedBuilder()
                     .setColor(0x38bdf8)
-                    .setTitle('🏦 Saque')
-                    .addFields(
-                        { name: 'Valor', value: flocos.formatPlain(amount), inline: true },
-                        { name: 'Carteira', value: flocos.formatPlain(flocos.get(message.author.id)), inline: true },
-                        { name: 'Banco', value: flocos.formatPlain(bank.get(message.author.id)), inline: true }
+                    .setAuthor({
+                        name: 'Aeternus Bank · Saque',
+                        iconURL: message.client.user.displayAvatarURL({ size: 64 })
+                    })
+                    .setTitle('💸  Saque autorizado')
+                    .setDescription(
+                        [
+                            '```',
+                            '  COFRE  ──►  CARTEIRA',
+                            '```',
+                            `Valor liberado: ❄️ **${fmt(bet.amount)}**`
+                        ].join('\n')
                     )
+                    .addFields(
+                        {
+                            name: '💵 Carteira',
+                            value: `❄️ **${fmt(flocos.get(message.author.id))}**`,
+                            inline: true
+                        },
+                        {
+                            name: '🔒 Cofre',
+                            value: `❄️ **${fmt(bank.get(message.author.id))}**`,
+                            inline: true
+                        }
+                    )
+                    .setFooter({ text: 'Comprovante · Aeternus Bank' })
+                    .setTimestamp()
             ]
         });
     }
