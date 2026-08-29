@@ -90,7 +90,6 @@ function payPrize(userId, prize) {
     return true;
 }
 
-/** Requisitos do painel + drop */
 function getRequirements(guildId, drop) {
     const conf = getSettings(guildId).drops || {};
     const base = conf.requirements || {};
@@ -123,8 +122,7 @@ function checkRequirements(member, drop) {
     if (req.minMessagesMonth > 0 && stats.month < req.minMessagesMonth)
         fails.push(`mensagens no mês: ${stats.month}/${req.minMessagesMonth}`);
     if (req.minLevel > 0) {
-        const lv = xp.get?.(member.id)?.level ?? xp.level?.(member.id) ?? 0;
-        const level = typeof lv === 'object' ? lv.level || 0 : Number(lv) || 0;
+        const level = xp.get(member.id).level || 0;
         if (level < req.minLevel) fails.push(`nível XP: ${level}/${req.minLevel}`);
     }
     if (req.minFlocos > 0 && flocos.get(member.id) < req.minFlocos)
@@ -140,15 +138,14 @@ function checkRequirements(member, drop) {
     if (req.minInvites > 0) {
         try {
             const inv = require('./invites');
-            const n = inv.get?.(member.guild.id, member.id) ?? inv.count?.(member.guild.id, member.id) ?? 0;
-            if (Number(n) < req.minInvites) fails.push(`convites: ${n}/${req.minInvites}`);
+            const n = inv.getStats(member.guild.id, member.id).total || 0;
+            if (n < req.minInvites) fails.push(`convites: ${n}/${req.minInvites}`);
         } catch (_) {}
     }
 
     return { ok: fails.length === 0, fails, req, stats };
 }
 
-/** Entradas extras configuradas no painel */
 function calcExtraEntries(member, drop) {
     const conf = getSettings(member.guild.id).drops || {};
     const list = Array.isArray(conf.extraEntries) ? conf.extraEntries : [];
@@ -175,11 +172,7 @@ function calcExtraEntries(member, drop) {
             bonus += b;
             details.push(`+${b} (${rule.name || 'msgs mês'})`);
         } else if (type === 'level') {
-            let level = 0;
-            try {
-                const d = xp.get?.(member.id);
-                level = typeof d === 'object' ? d.level || 0 : 0;
-            } catch (_) {}
+            const level = xp.get(member.id).level || 0;
             if (level >= Number(rule.value || 0)) {
                 bonus += b;
                 details.push(`+${b} (${rule.name || 'nível'})`);
@@ -187,7 +180,6 @@ function calcExtraEntries(member, drop) {
         }
     }
 
-    // extras definidos no próprio drop
     if (Array.isArray(drop?.extraEntries)) {
         for (const rule of drop.extraEntries) {
             if (rule?.type === 'role' && rule.roleId && member.roles.cache.has(rule.roleId)) {
@@ -232,7 +224,6 @@ function totalTickets(drop) {
     return Object.values(drop?.participants || {}).reduce((a, p) => a + (p.entries || 1), 0);
 }
 
-/** Sorteio ponderado pelas entradas */
 function pickWinners(drop) {
     const pool = [];
     for (const [uid, p] of Object.entries(drop.participants || {})) {
