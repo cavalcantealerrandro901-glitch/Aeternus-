@@ -1,6 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const cristais = require('../utils/cristais');
-const { parseAmount } = require('../utils/parseAmount');
+const { resolveBet } = require('../utils/parseAmount');
+const { fmt, betFooter, C } = require('../utils/gameStyle');
 
 const SIZE = 5;
 const games = new Map();
@@ -18,10 +19,15 @@ function buttons(game, reveal = false) {
             const i = y * SIZE + x;
             const opened = game.opened.has(i);
             const bomb = game.bombs.has(i);
-            let label = '⬜';
+            let label = '·';
             let style = ButtonStyle.Secondary;
-            if (reveal && bomb) { label = '💣'; style = ButtonStyle.Danger; }
-            else if (opened) { label = '💎'; style = ButtonStyle.Success; }
+            if (reveal && bomb) {
+                label = '💣';
+                style = ButtonStyle.Danger;
+            } else if (opened) {
+                label = '💎';
+                style = ButtonStyle.Success;
+            }
             row.addComponents(
                 new ButtonBuilder()
                     .setCustomId(`minas:cell:${game.id}:${i}`)
@@ -49,6 +55,23 @@ function buttons(game, reveal = false) {
     return rows;
 }
 
+function boardEmbed(game, title, color) {
+    const m = mult(game.opened.size, game.bombCount);
+    const potential = Math.floor(game.amount * m);
+    return new EmbedBuilder()
+        .setColor(color)
+        .setTitle(title)
+        .setDescription(
+            [
+                `Aposta 💠 **${fmt(game.amount)}** · Bombas **${game.bombCount}**`,
+                `Casas abertas **${game.opened.size}** · Multiplicador **×${m}**`,
+                game.opened.size ? `Retirada agora: 💠 **${fmt(potential)}**` : '_Abra diamantes e retire quando quiser._'
+            ].join('\n')
+        )
+        .setFooter({ text: betFooter() })
+        .setTimestamp();
+}
+
 function makeGame(userId, amount, bombCount) {
     const id = `${userId}_${Date.now()}`;
     const bombs = new Set();
@@ -61,20 +84,17 @@ function makeGame(userId, amount, bombCount) {
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'mine'],
+    description: 'Campo minado 5×5',
     async execute(message, args) {
-        const amount = parseAmount(args[0]);
+        const bet = resolveBet(args[0], cristais.get(message.author.id), { label: '💠' });
+        if (!bet.ok)
+            return message.reply(`❌ ${bet.error}\nUso: \`O.minas <valor|all|half> [bombas]\``);
         const bombCount = Math.min(12, Math.max(3, parseInt(args[1], 10) || 5));
-        if (!amount) return message.reply('Uso: `O.minas <valor> [bombas]`');
-        if (cristais.get(message.author.id) < amount) return message.reply('💠 Insuficiente.');
-        cristais.remove(message.author.id, amount);
-        const game = makeGame(message.author.id, amount, bombCount);
+
+        cristais.remove(message.author.id, bet.amount);
+        const game = makeGame(message.author.id, bet.amount, bombCount);
         await message.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0x38bdf8)
-                    .setTitle('💎 Minas 5×5')
-                    .setDescription(`Aposta **${cristais.formatPlain(amount)}** · Bombas **${bombCount}**\nAbra casas e retire quando quiser.`)
-            ],
+            embeds: [boardEmbed(game, '💎  Minas 5×5', C.info)],
             components: buttons(game)
         });
     },
@@ -87,13 +107,13 @@ module.exports = {
             return interaction.reply({ content: 'Não é seu jogo.', ephemeral: true });
 
         if (action === 'again') {
-            if (cristais.get(game.userId) < game.amount)
-                return interaction.reply({ content: '💠 Sem cristais.', ephemeral: true });
-            cristais.remove(game.userId, game.amount);
-            const ng = makeGame(game.userId, game.amount, game.bombCount);
+            const bet = resolveBet(String(game.amount), cristais.get(game.userId), { label: '💠' });
+            if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
+            cristais.remove(game.userId, bet.amount);
+            const ng = makeGame(game.userId, bet.amount, game.bombCount);
             games.delete(parts[2]);
             return interaction.update({
-                embeds: [new EmbedBuilder().setColor(0x38bdf8).setTitle('💎 Minas 5×5').setDescription(`Nova rodada · **${cristais.formatPlain(ng.amount)}**`)],
+                embeds: [boardEmbed(ng, '💎  Minas 5×5 · Nova rodada', C.info)],
                 components: buttons(ng)
             });
         }
@@ -105,7 +125,15 @@ module.exports = {
             const win = Math.floor(game.amount * m);
             cristais.add(game.userId, win);
             return interaction.update({
-                embeds: [new EmbedBuilder().setColor(0x34d399).setTitle('💰 Retirou').setDescription(`×${m} → **${cristais.formatPlain(win)}** cristais`)],
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(C.win)
+                        .setTitle('💰  Retirou com sucesso')
+                        .setDescription(
+                            `×**${m}** → 💠 **${fmt(win)}**\nSaldo: 💠 **${fmt(cristais.get(game.userId))}**`
+                        )
+                        .setFooter({ text: betFooter() })
+                ],
                 components: buttons(game, true)
             });
         }
@@ -116,14 +144,21 @@ module.exports = {
             if (game.bombs.has(idx)) {
                 game.dead = true;
                 return interaction.update({
-                    embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('💥 Explodiu').setDescription(`Perdeu **${cristais.formatPlain(game.amount)}**`)],
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(C.lose)
+                            .setTitle('💥  Explodiu')
+                            .setDescription(
+                                `Perdeu 💠 **${fmt(game.amount)}**\nSaldo: 💠 **${fmt(cristais.get(game.userId))}**`
+                            )
+                            .setFooter({ text: betFooter() })
+                    ],
                     components: buttons(game, true)
                 });
             }
             game.opened.add(idx);
-            const m = mult(game.opened.size, game.bombCount);
             return interaction.update({
-                embeds: [new EmbedBuilder().setColor(0x38bdf8).setTitle('💎 Minas 5×5').setDescription(`Abertas **${game.opened.size}** · ×**${m}** · retirar **${cristais.formatPlain(Math.floor(game.amount * m))}**`)],
+                embeds: [boardEmbed(game, '💎  Minas 5×5', C.info)],
                 components: buttons(game)
             });
         }
