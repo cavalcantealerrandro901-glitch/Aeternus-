@@ -4,183 +4,393 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Painel · Aeternus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
-:root{--bg:#07070f;--side:#0c0c16;--card:#141422;--accent:#8b5cf6;--text:#e2e8f0;--muted:#94a3b8;--ok:#34d399;--border:#1e293b;--danger:#ef4444}
+:root{
+  --bg:#06060e;--side:#0a0a14;--card:rgba(18,18,32,.75);--card-solid:#121220;
+  --accent:#8b5cf6;--accent2:#22d3ee;--pink:#f472b6;
+  --text:#f1f5f9;--muted:#94a3b8;--border:rgba(255,255,255,.07);
+  --ok:#34d399;--danger:#f87171;--warn:#fbbf24;
+  --glow:0 0 40px rgba(139,92,246,.25);
+  --r:1rem;--side-w:272px
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
-aside{width:250px;background:var(--side);border-right:1px solid var(--border);padding:1rem;display:flex;flex-direction:column;gap:.35rem}
-aside h1{font-size:1.1rem;margin-bottom:.8rem}aside h1 span{color:var(--accent)}
-.nav-btn{background:0;border:0;color:var(--muted);text-align:left;padding:.55rem .7rem;border-radius:.6rem;cursor:pointer;font:inherit;width:100%}
-.nav-btn:hover,.nav-btn.active{background:#1e1b4b66;color:#fff}
-.nav-btn:disabled{opacity:.35;cursor:not-allowed}
-main{flex:1;padding:1.3rem;overflow:auto}
-.card{background:var(--card);border:1px solid var(--border);border-radius:.9rem;padding:1.1rem;margin-bottom:.9rem}
-.card h2{font-size:1.05rem;margin-bottom:.6rem}
-label{display:block;font-size:.82rem;color:var(--muted);margin:.5rem 0 .25rem}
-input,select{width:100%;background:#0b0b14;border:1px solid var(--border);color:var(--text);padding:.55rem .65rem;border-radius:.5rem;font:inherit}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-@media(max-width:700px){.row{grid-template-columns:1fr}}
-.switch{display:flex;align-items:center;gap:.5rem;margin:.4rem 0}
-.btn{background:var(--accent);color:#fff;border:0;padding:.6rem 1.1rem;border-radius:.55rem;font-weight:600;cursor:pointer;font:inherit;margin-top:.65rem}
-.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn.danger{background:var(--danger)}
-.guild{background:var(--card);border:1px solid var(--border);border-radius:.85rem;padding:.9rem;cursor:pointer;margin-bottom:.6rem}
-.guild:hover{border-color:var(--accent)}
-.muted{color:var(--muted);font-size:.88rem}
-.panel{display:none}.panel.active{display:block}
-.toast{position:fixed;bottom:1rem;right:1rem;background:var(--ok);color:#052e1c;padding:.65rem 1rem;border-radius:.5rem;font-weight:600;display:none;z-index:9}
-code{background:#1e1b4b;padding:.1rem .35rem;border-radius:.3rem;font-size:.85rem}
-.entry{display:flex;gap:.4rem;align-items:center;margin:.35rem 0;flex-wrap:wrap;background:#0b0b14;padding:.5rem;border-radius:.5rem;border:1px solid var(--border)}
-.entry select,.entry input{width:auto;flex:1;min-width:100px}
-.entry button{background:#334155;color:#fff;border:0;padding:.4rem .6rem;border-radius:.4rem;cursor:pointer}
+html,body{height:100%}
+body{font-family:'Outfit',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:
+  radial-gradient(ellipse 70% 40% at 0% 0%,rgba(139,92,246,.22),transparent 55%),
+  radial-gradient(ellipse 50% 35% at 100% 0%,rgba(34,211,238,.12),transparent 50%),
+  radial-gradient(ellipse 40% 30% at 80% 100%,rgba(244,114,182,.08),transparent);
+}
+
+/* SIDEBAR */
+.sidebar{position:relative;z-index:5;width:var(--side-w);flex-shrink:0;background:rgba(8,8,16,.85);border-right:1px solid var(--border);backdrop-filter:blur(20px);display:flex;flex-direction:column;padding:1.1rem .85rem;height:100vh}
+.brand{display:flex;align-items:center;gap:.65rem;padding:.4rem .55rem 1.1rem;border-bottom:1px solid var(--border);margin-bottom:.85rem}
+.brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#22d3ee);display:grid;place-items:center;font-weight:800;font-size:.95rem;box-shadow:var(--glow)}
+.brand h1{font-size:1.05rem;font-weight:700;letter-spacing:-.02em}
+.brand h1 span{background:linear-gradient(135deg,#c4b5fd,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand small{display:block;color:var(--muted);font-size:.7rem;font-weight:400}
+.nav-sec{font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;color:#64748b;padding:.5rem .65rem .25rem;font-weight:600}
+.nav-btn{display:flex;align-items:center;gap:.65rem;width:100%;background:0;border:0;color:var(--muted);text-align:left;padding:.6rem .7rem;border-radius:.7rem;cursor:pointer;font:inherit;font-size:.9rem;font-weight:500;transition:.2s;margin:.12rem 0}
+.nav-btn .ico{width:22px;text-align:center;font-size:1rem;opacity:.85}
+.nav-btn:hover{background:rgba(139,92,246,.1);color:#fff}
+.nav-btn.active{background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(34,211,238,.08));color:#fff;box-shadow:inset 0 0 0 1px rgba(139,92,246,.35)}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed}
+.side-foot{margin-top:auto;padding-top:.8rem;border-top:1px solid var(--border)}
+.user-chip{display:flex;align-items:center;gap:.6rem;padding:.55rem;border-radius:.7rem;background:rgba(255,255,255,.03)}
+.user-chip img{width:32px;height:32px;border-radius:50%;border:2px solid rgba(139,92,246,.4)}
+.user-chip .u-name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.user-chip .u-sub{font-size:.7rem;color:var(--muted)}
+.logout{display:block;text-align:center;color:var(--muted);text-decoration:none;font-size:.8rem;margin-top:.5rem;padding:.4rem;border-radius:.5rem}
+.logout:hover{color:var(--danger);background:rgba(248,113,113,.08)}
+
+/* MAIN */
+.shell{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;position:relative;z-index:1}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--border);background:rgba(6,6,14,.6);backdrop-filter:blur(12px)}
+.topbar h2{font-size:1.2rem;font-weight:700;letter-spacing:-.02em}
+.topbar .sub{color:var(--muted);font-size:.82rem;font-weight:400;margin-top:.15rem}
+.guild-pill{display:none;align-items:center;gap:.5rem;padding:.35rem .7rem .35rem .35rem;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--border);font-size:.8rem;cursor:pointer}
+.guild-pill img,.guild-pill .ph{width:24px;height:24px;border-radius:50%}
+.guild-pill .ph{background:linear-gradient(135deg,#7c3aed,#22d3ee);display:grid;place-items:center;font-size:.65rem;font-weight:700}
+.menu-btn{display:none;background:0;border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:.6rem;cursor:pointer;font-size:1.1rem}
+
+.content{flex:1;overflow:auto;padding:1.4rem 1.5rem 2.5rem}
+.panel{display:none;animation:fade .35s ease}.panel.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* GUILD GRID */
+.g-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem}
+.g-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:1.1rem;padding:1.15rem;cursor:pointer;transition:.3s;overflow:hidden;backdrop-filter:blur(10px)}
+.g-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(139,92,246,.12),transparent 60%);opacity:0;transition:.3s}
+.g-card:hover{border-color:rgba(139,92,246,.5);transform:translateY(-3px);box-shadow:0 16px 40px rgba(0,0,0,.35)}
+.g-card:hover::before{opacity:1}
+.g-top{display:flex;align-items:center;gap:.85rem;position:relative}
+.g-icon{width:52px;height:52px;border-radius:14px;object-fit:cover;border:2px solid rgba(139,92,246,.3)}
+.g-icon.ph{background:linear-gradient(135deg,#7c3aed,#22d3ee);display:grid;place-items:center;font-weight:800;font-size:1.1rem}
+.g-name{font-weight:700;font-size:1.02rem}
+.g-meta{color:var(--muted);font-size:.8rem;margin-top:.15rem}
+.g-arrow{margin-left:auto;color:var(--muted);font-size:1.2rem;opacity:.5}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.2rem}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:.9rem;padding:1rem;backdrop-filter:blur(8px)}
+.stat .lbl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.stat .val{font-size:1.35rem;font-weight:700;margin-top:.25rem;background:linear-gradient(135deg,#e2e8f0,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:1.1rem;padding:1.25rem 1.35rem;margin-bottom:1rem;backdrop-filter:blur(12px)}
+.card h3{font-size:1rem;font-weight:700;margin-bottom:.35rem;display:flex;align-items:center;gap:.5rem}
+.card .hint{color:var(--muted);font-size:.84rem;margin-bottom:.9rem;line-height:1.45;font-weight:300}
+label.f{display:block;font-size:.75rem;color:var(--muted);margin:.55rem 0 .28rem;font-weight:500;letter-spacing:.02em}
+input,select,textarea{width:100%;background:rgba(0,0,0,.35);border:1px solid var(--border);color:var(--text);padding:.65rem .75rem;border-radius:.65rem;font:inherit;font-size:.9rem;transition:.2s;outline:0}
+input:focus,select:focus,textarea:focus{border-color:rgba(139,92,246,.55);box-shadow:0 0 0 3px rgba(139,92,246,.15)}
+textarea{min-height:80px;resize:vertical}
+.row{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem}
+@media(max-width:800px){.row,.row3{grid-template-columns:1fr}}
+
+/* TOGGLE */
+.toggle{display:flex;align-items:center;justify-content:space-between;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.toggle:last-child{border-bottom:0}
+.toggle span{font-size:.9rem;font-weight:500}
+.sw{position:relative;width:44px;height:24px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw .sl{position:absolute;inset:0;background:#1e1e30;border-radius:999px;cursor:pointer;transition:.25s;border:1px solid var(--border)}
+.sw .sl::before{content:'';position:absolute;width:18px;height:18px;left:2px;top:2px;background:#94a3b8;border-radius:50%;transition:.25s}
+.sw input:checked+.sl{background:linear-gradient(135deg,#7c3aed,#8b5cf6);border-color:transparent}
+.sw input:checked+.sl::before{transform:translateX(20px);background:#fff}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:0;padding:.7rem 1.25rem;border-radius:.7rem;font-weight:600;cursor:pointer;font:inherit;font-size:.9rem;margin-top:.85rem;transition:.2s;box-shadow:0 4px 20px rgba(139,92,246,.3)}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(139,92,246,.45)}
+.btn.ghost{background:transparent;border:1px solid var(--border);box-shadow:none;color:var(--text)}
+.btn.ghost:hover{background:rgba(255,255,255,.05);box-shadow:none}
+.btn.sm{padding:.45rem .85rem;font-size:.8rem;margin-top:0}
+code{background:rgba(139,92,246,.15);padding:.12rem .4rem;border-radius:.35rem;font-size:.8rem;color:#c4b5fd}
+
+/* EXTRAS */
+.entry{display:grid;grid-template-columns:1.2fr 1fr 1fr .7fr auto;gap:.4rem;align-items:center;margin:.4rem 0;background:rgba(0,0,0,.25);padding:.55rem;border-radius:.7rem;border:1px solid var(--border)}
+@media(max-width:900px){.entry{grid-template-columns:1fr 1fr}}
+.entry button.x{background:rgba(248,113,113,.15);color:var(--danger);border:0;width:32px;height:32px;border-radius:.5rem;cursor:pointer;font-size:1rem}
+
+/* DROP LIST */
+.drop-item{display:flex;justify-content:space-between;align-items:center;padding:.7rem .85rem;background:rgba(0,0,0,.2);border-radius:.7rem;margin:.35rem 0;border:1px solid var(--border);font-size:.88rem}
+.drop-item .t{font-weight:600}
+.drop-item .m{color:var(--muted);font-size:.78rem}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;z-index:100;padding:.75rem 1.2rem;border-radius:.75rem;font-weight:600;font-size:.9rem;transform:translateY(120%);opacity:0;transition:.35s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+.toast.show{transform:none;opacity:1}
+.toast.ok{background:linear-gradient(135deg,#059669,#34d399);color:#052e1c;box-shadow:0 8px 30px rgba(52,211,153,.35)}
+.toast.err{background:linear-gradient(135deg,#dc2626,#f87171);color:#fff}
+
+/* EMPTY */
+.empty{text-align:center;padding:3rem 1rem;color:var(--muted)}
+.empty .big{font-size:2.5rem;margin-bottom:.6rem;opacity:.6}
+
+/* MOBILE */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:4}
+@media(max-width:860px){
+  .sidebar{position:fixed;left:0;top:0;transform:translateX(-105%);transition:.3s}
+  .sidebar.open{transform:none}
+  .overlay.show{display:block}
+  .menu-btn{display:grid;place-items:center}
+  .content{padding:1rem}
+}
 </style>
 </head>
 <body>
-<aside>
-  <h1>Ae<span>ternus</span></h1>
-  <button class="nav-btn active" data-panel="servers">Servidores</button>
-  <button class="nav-btn" data-panel="general" disabled>Geral</button>
-  <button class="nav-btn" data-panel="drops" disabled>🎁 Drops</button>
-  <button class="nav-btn" data-panel="automod" disabled>🛡️ Anti-spam</button>
-  <button class="nav-btn" data-panel="welcome" disabled>Boas-vindas</button>
-  <button class="nav-btn" data-panel="logs" disabled>Logs</button>
-  <button class="nav-btn" data-panel="economy" disabled>Economia</button>
-  <div style="flex:1"></div>
-  <a href="/logout" class="nav-btn" style="text-decoration:none">Sair</a>
+<div class="overlay" id="overlay" onclick="closeSide()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark">A</div>
+    <div>
+      <h1>Ae<span>ternus</span></h1>
+      <small>Control Center</small>
+    </div>
+  </div>
+
+  <div class="nav-sec">Navegação</div>
+  <button class="nav-btn active" data-panel="servers"><span class="ico">🏠</span> Servidores</button>
+  <button class="nav-btn" data-panel="overview" disabled><span class="ico">✨</span> Visão geral</button>
+
+  <div class="nav-sec">Módulos</div>
+  <button class="nav-btn" data-panel="general" disabled><span class="ico">⚙️</span> Geral</button>
+  <button class="nav-btn" data-panel="drops" disabled><span class="ico">🎁</span> Drops</button>
+  <button class="nav-btn" data-panel="automod" disabled><span class="ico">🛡️</span> Anti-spam</button>
+  <button class="nav-btn" data-panel="welcome" disabled><span class="ico">👋</span> Boas-vindas</button>
+  <button class="nav-btn" data-panel="logs" disabled><span class="ico">📜</span> Logs</button>
+  <button class="nav-btn" data-panel="economy" disabled><span class="ico">❄️</span> Economia</button>
+  <button class="nav-btn" data-panel="xp" disabled><span class="ico">⭐</span> XP / Níveis</button>
+
+  <div class="side-foot">
+    <div class="user-chip" id="userChip">
+      <div class="ph" style="width:32px;height:32px;border-radius:50%;background:#1e1b4b"></div>
+      <div><div class="u-name">…</div><div class="u-sub">carregando</div></div>
+    </div>
+    <a class="logout" href="/logout">Sair da conta</a>
+  </div>
 </aside>
-<main>
-  <h2 id="title">Servidores</h2>
-  <p class="muted" id="sub" style="margin-bottom:1rem">Escolha um servidor</p>
 
-  <section class="panel active" id="servers"><div id="guildList">Carregando…</div></section>
-
-  <section class="panel" id="general">
-    <div class="card">
-      <h2>Prefixo</h2>
-      <div id="meta" class="muted" style="margin-bottom:.6rem"></div>
-      <label>Prefixo do bot</label>
-      <input id="prefix" maxlength="5"/>
-      <button class="btn" onclick="save({prefix:val('prefix')})">Salvar</button>
-    </div>
-  </section>
-
-  <section class="panel" id="drops">
-    <div class="card">
-      <h2>🎁 Drops / Sorteios</h2>
-      <p class="muted" style="margin-bottom:.8rem">
-        Participação por <b>botão verde</b> (não reação).<br/>
-        <code>O.drop &lt;tempo&gt; &lt;vencedores&gt; &lt;prêmio&gt;</code><br/>
-        Ex: <code>O.drop 10m 1 5000 flocos</code>
-      </p>
-      <div class="switch"><input type="checkbox" id="dEnabled" checked/><label for="dEnabled">Sistema ativo</label></div>
-      <label>Canal padrão (vazio = canal do comando)</label>
-      <select id="dChannel"></select>
-      <button class="btn" onclick="saveDrops()">Salvar drops</button>
-    </div>
-
-    <div class="card">
-      <h2>📋 Requisitos para participar</h2>
-      <p class="muted">Se o membro não cumprir, o botão Participar é bloqueado.</p>
-      <div class="row">
-        <div><label>Msgs mín. hoje</label><input type="number" id="reqDay" min="0" value="0"/></div>
-        <div><label>Msgs mín. semana</label><input type="number" id="reqWeek" min="0" value="0"/></div>
-        <div><label>Msgs mín. mês</label><input type="number" id="reqMonth" min="0" value="0"/></div>
-        <div><label>Nível XP mínimo</label><input type="number" id="reqLevel" min="0" value="0"/></div>
-        <div><label>Convites mínimos</label><input type="number" id="reqInv" min="0" value="0"/></div>
-        <div><label>Flocos mínimos</label><input type="number" id="reqFlocos" min="0" value="0"/></div>
-        <div><label>Cristais mínimos</label><input type="number" id="reqCrist" min="0" value="0"/></div>
-        <div><label>Cargo obrigatório</label><select id="reqRole"></select></div>
+<div class="shell">
+  <header class="topbar">
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <button class="menu-btn" onclick="openSide()">☰</button>
+      <div>
+        <h2 id="title">Servidores</h2>
+        <div class="sub" id="sub">Selecione um servidor para configurar</div>
       </div>
-      <button class="btn" onclick="saveDrops()">Salvar requisitos</button>
     </div>
+    <div class="guild-pill" id="guildPill" onclick="show('servers')" title="Trocar servidor"></div>
+  </header>
 
-    <div class="card">
-      <h2>➕ Entradas extras</h2>
-      <p class="muted">Adicione quantas quiser. Cada regra cumprida soma entradas no sorteio.</p>
-      <div id="extraList"></div>
-      <button class="btn ghost" type="button" onclick="addExtra()">+ Adicionar regra</button>
-      <button class="btn" onclick="saveDrops()">Salvar entradas</button>
-    </div>
+  <div class="content">
+    <!-- SERVERS -->
+    <section class="panel active" id="servers">
+      <div class="empty" id="guildEmpty" style="display:none"><div class="big">🌌</div>Nenhum servidor encontrado.<br/>Adicione o bot e tenha permissão de Administrador.</div>
+      <div class="g-grid" id="guildList"></div>
+    </section>
 
-    <div class="card">
-      <h2>Drops ativos</h2>
-      <div id="activeDrops" class="muted">Nenhum</div>
-    </div>
-  </section>
-
-  <section class="panel" id="automod">
-    <div class="card">
-      <h2>🛡️ Anti-spam</h2>
-      <div class="switch"><input type="checkbox" id="amEnabled" checked/><label for="amEnabled">Ativar automod</label></div>
-      <div class="switch"><input type="checkbox" id="amSpam" checked/><label for="amSpam">Anti-spam (velocidade + repetição)</label></div>
-      <div class="switch"><input type="checkbox" id="amInvite" checked/><label for="amInvite">Bloquear convites Discord</label></div>
-      <div class="switch"><input type="checkbox" id="amLink"/><label for="amLink">Bloquear links</label></div>
-      <div class="row">
-        <div><label>Máx. msgs na janela</label><input type="number" id="amMax" min="2" value="6"/></div>
-        <div><label>Janela (ms)</label><input type="number" id="amWin" min="1000" value="5000"/></div>
-        <div><label>Máx. msgs iguais</label><input type="number" id="amDup" min="2" value="3"/></div>
-        <div><label>Punição</label>
-          <select id="amPunish">
-            <option value="delete">Só apagar</option>
-            <option value="timeout">Apagar + timeout 1 min</option>
-          </select>
+    <!-- OVERVIEW -->
+    <section class="panel" id="overview">
+      <div class="stats" id="ovStats"></div>
+      <div class="card">
+        <h3>🚀 Atalhos rápidos</h3>
+        <p class="hint">Configure os módulos mais usados com um clique.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+          <button class="btn sm" onclick="show('drops')">🎁 Drops</button>
+          <button class="btn sm ghost" onclick="show('automod')">🛡️ Anti-spam</button>
+          <button class="btn sm ghost" onclick="show('economy')">❄️ Economia</button>
+          <button class="btn sm ghost" onclick="show('welcome')">👋 Welcome</button>
         </div>
       </div>
-      <button class="btn" onclick="saveAutomod()">Salvar anti-spam</button>
-    </div>
-  </section>
+      <div class="card">
+        <h3>🎁 Drops ativos</h3>
+        <div id="ovDrops" class="hint">Nenhum</div>
+      </div>
+    </section>
 
-  <section class="panel" id="welcome">
-    <div class="card">
-      <h2>Boas-vindas</h2>
-      <div class="switch"><input type="checkbox" id="wEnabled"/><label for="wEnabled">Ativar</label></div>
-      <label>Canal</label><select id="wChannel"></select>
-      <label>Mensagem</label><input id="wMsg" placeholder="Bem-vindo {user} a {server}"/>
-      <button class="btn" onclick="save({welcome:{enabled:chk('wEnabled'),channelId:val('wChannel')||null,message:val('wMsg'),embed:true}})">Salvar</button>
-    </div>
-  </section>
+    <!-- GENERAL -->
+    <section class="panel" id="general">
+      <div class="card">
+        <h3>⚙️ Configurações gerais</h3>
+        <p class="hint" id="meta"></p>
+        <label class="f">Prefixo dos comandos</label>
+        <input id="prefix" maxlength="8" placeholder="O."/>
+        <button class="btn" onclick="save({prefix:val('prefix')||'O.'})">Salvar prefixo</button>
+      </div>
+    </section>
 
-  <section class="panel" id="logs">
-    <div class="card">
-      <h2>Logs</h2>
-      <div class="switch"><input type="checkbox" id="logEnabled"/><label for="logEnabled">Ativar</label></div>
-      <label>Canal</label><select id="logChannel"></select>
-      <button class="btn" onclick="save({logs:{enabled:chk('logEnabled'),channelId:val('logChannel')||null,events:{}}})">Salvar</button>
-    </div>
-  </section>
+    <!-- DROPS -->
+    <section class="panel" id="drops">
+      <div class="card">
+        <h3>🎁 Sistema de drops</h3>
+        <p class="hint">Participação por botão verde. Comando: <code>O.drop &lt;tempo&gt; &lt;vencedores&gt; &lt;prêmio&gt; [req …] [autopix]</code></p>
+        <div class="toggle"><span>Sistema ativo</span><label class="sw"><input type="checkbox" id="dEnabled" checked/><span class="sl"></span></label></div>
+        <label class="f">Canal padrão</label>
+        <select id="dChannel"></select>
+        <button class="btn" onclick="saveDrops()">Salvar</button>
+      </div>
+      <div class="card">
+        <h3>📋 Requisitos padrão</h3>
+        <p class="hint">Aplicados a todo drop (podem ser sobrescritos com <code>req</code> no comando).</p>
+        <div class="row3">
+          <div><label class="f">Msgs hoje</label><input type="number" id="reqDay" min="0" value="0"/></div>
+          <div><label class="f">Msgs semana</label><input type="number" id="reqWeek" min="0" value="0"/></div>
+          <div><label class="f">Msgs mês</label><input type="number" id="reqMonth" min="0" value="0"/></div>
+          <div><label class="f">Nível XP</label><input type="number" id="reqLevel" min="0" value="0"/></div>
+          <div><label class="f">Convites</label><input type="number" id="reqInv" min="0" value="0"/></div>
+          <div><label class="f">Flocos mín.</label><input type="number" id="reqFlocos" min="0" value="0"/></div>
+          <div><label class="f">Cristais mín.</label><input type="number" id="reqCrist" min="0" value="0"/></div>
+          <div><label class="f">Cargo obrigatório</label><select id="reqRole"></select></div>
+        </div>
+        <button class="btn" onclick="saveDrops()">Salvar requisitos</button>
+      </div>
+      <div class="card">
+        <h3>➕ Entradas extras</h3>
+        <p class="hint">Cada regra cumprida soma tickets no sorteio.</p>
+        <div id="extraList"></div>
+        <button class="btn ghost sm" type="button" onclick="addExtra()" style="margin-top:.6rem">+ Nova regra</button>
+        <button class="btn" onclick="saveDrops()">Salvar entradas</button>
+      </div>
+      <div class="card">
+        <h3>Ao vivo</h3>
+        <div id="activeDrops" class="hint">Nenhum drop ativo</div>
+      </div>
+    </section>
 
-  <section class="panel" id="economy">
-    <div class="card">
-      <h2>Economia / Daily</h2>
-      <label>Daily mínimo</label><input type="number" id="dMin"/>
-      <label>Daily máximo</label><input type="number" id="dMax"/>
-      <button class="btn" onclick="save({economy:{dailyMin:+val('dMin'),dailyMax:+val('dMax')}})">Salvar</button>
-    </div>
-  </section>
-</main>
-<div class="toast" id="toast">Salvo!</div>
+    <!-- AUTOMOD -->
+    <section class="panel" id="automod">
+      <div class="card">
+        <h3>🛡️ Anti-spam & automod</h3>
+        <p class="hint">Protege o chat em tempo real.</p>
+        <div class="toggle"><span>Automod ativo</span><label class="sw"><input type="checkbox" id="amEnabled" checked/><span class="sl"></span></label></div>
+        <div class="toggle"><span>Anti-spam (velocidade + repetição)</span><label class="sw"><input type="checkbox" id="amSpam" checked/><span class="sl"></span></label></div>
+        <div class="toggle"><span>Bloquear convites Discord</span><label class="sw"><input type="checkbox" id="amInvite" checked/><span class="sl"></span></label></div>
+        <div class="toggle"><span>Bloquear links</span><label class="sw"><input type="checkbox" id="amLink"/><span class="sl"></span></label></div>
+        <div class="row" style="margin-top:.8rem">
+          <div><label class="f">Máx. msgs na janela</label><input type="number" id="amMax" min="2" value="6"/></div>
+          <div><label class="f">Janela (ms)</label><input type="number" id="amWin" min="1000" value="5000"/></div>
+          <div><label class="f">Máx. mensagens iguais</label><input type="number" id="amDup" min="2" value="3"/></div>
+          <div><label class="f">Punição</label>
+            <select id="amPunish">
+              <option value="delete">Só apagar</option>
+              <option value="timeout">Apagar + timeout 1 min</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn" onclick="saveAutomod()">Salvar anti-spam</button>
+      </div>
+    </section>
+
+    <!-- WELCOME -->
+    <section class="panel" id="welcome">
+      <div class="card">
+        <h3>👋 Boas-vindas</h3>
+        <p class="hint">Variáveis: <code>{user}</code> <code>{username}</code> <code>{server}</code> <code>{memberCount}</code></p>
+        <div class="toggle"><span>Ativar boas-vindas</span><label class="sw"><input type="checkbox" id="wEnabled"/><span class="sl"></span></label></div>
+        <label class="f">Canal</label><select id="wChannel"></select>
+        <label class="f">Mensagem</label>
+        <textarea id="wMsg" placeholder="Bem-vindo {user} a {server}! Somos {memberCount} membros."></textarea>
+        <button class="btn" onclick="save({welcome:{enabled:document.getElementById('wEnabled').checked,channelId:val('wChannel')||null,message:val('wMsg'),embed:true}})">Salvar</button>
+      </div>
+    </section>
+
+    <!-- LOGS -->
+    <section class="panel" id="logs">
+      <div class="card">
+        <h3>📜 Canal de logs</h3>
+        <p class="hint">Registros de moderação e eventos do servidor.</p>
+        <div class="toggle"><span>Logs ativos</span><label class="sw"><input type="checkbox" id="logEnabled"/><span class="sl"></span></label></div>
+        <label class="f">Canal</label><select id="logChannel"></select>
+        <button class="btn" onclick="save({logs:{enabled:document.getElementById('logEnabled').checked,channelId:val('logChannel')||null,events:{}}})">Salvar</button>
+      </div>
+    </section>
+
+    <!-- ECONOMY -->
+    <section class="panel" id="economy">
+      <div class="card">
+        <h3>❄️ Economia · Daily</h3>
+        <p class="hint">Faixa de flocos do daily (multiplicadores de nível aplicam em cima).</p>
+        <div class="row">
+          <div><label class="f">Daily mínimo</label><input type="number" id="dMin"/></div>
+          <div><label class="f">Daily máximo</label><input type="number" id="dMax"/></div>
+        </div>
+        <button class="btn" onclick="save({economy:{dailyMin:+val('dMin'),dailyMax:+val('dMax')}})">Salvar economia</button>
+      </div>
+    </section>
+
+    <!-- XP -->
+    <section class="panel" id="xp">
+      <div class="card">
+        <h3>⭐ Sistema de XP</h3>
+        <p class="hint">XP por mensagem no chat (anti-spam de XP incluso).</p>
+        <div class="toggle"><span>XP ativo</span><label class="sw"><input type="checkbox" id="xpEnabled" checked/><span class="sl"></span></label></div>
+        <div class="row3">
+          <div><label class="f">XP mínimo</label><input type="number" id="xpMin" value="30"/></div>
+          <div><label class="f">XP máximo</label><input type="number" id="xpMax" value="77"/></div>
+          <div><label class="f">Cooldownoldown (s)</label><input type="number" id="xpCd" value="45"/></div>
+        </div>
+        <button class="btn" onclick="save({xp:{enabled:document.getElementById('xpEnabled').checked,min:+val('xpMin'),max:+val('xpMax'),cooldownSec:+val('xpCd')}})">Salvar XP</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
-let gid=null, data=null, extras=[];
-const val=id=>document.getElementById(id).value;
-const chk=id=>document.getElementById(id).checked;
-function toast(m){const t=document.getElementById('toast');t.textContent=m||'Salvo!';t.style.display='block';setTimeout(()=>t.style.display='none',2000)}
+let gid=null, data=null, extras=[], me=null;
+const val=id=>document.getElementById(id)?.value??'';
+const $ = id => document.getElementById(id);
+
+function toast(m, ok=true){
+  const t=$('toast');
+  t.textContent=m||'Salvo!';
+  t.className='toast show '+(ok?'ok':'err');
+  setTimeout(()=>t.className='toast',2800);
+}
+function openSide(){ $('sidebar').classList.add('open'); $('overlay').classList.add('show'); }
+function closeSide(){ $('sidebar').classList.remove('open'); $('overlay').classList.remove('show'); }
+
 function show(id){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  const panel=$(id); if(panel) panel.classList.add('active');
   const b=[...document.querySelectorAll('.nav-btn')].find(x=>x.dataset.panel===id);
   if(b) b.classList.add('active');
-  document.getElementById('title').textContent=b?b.textContent.trim():id;
+  const titles={
+    servers:['Servidores','Escolha um servidor para gerenciar'],
+    overview:['Visão geral','Resumo rápido deste servidor'],
+    general:['Geral','Prefixo e identidade'],
+    drops:['Drops','Sorteios, requisitos e entradas'],
+    automod:['Anti-spam','Proteção do chat'],
+    welcome:['Boas-vindas','Mensagem de entrada'],
+    logs:['Logs','Auditoria do servidor'],
+    economy:['Economia','Daily e recompensas'],
+    xp:['XP / Níveis','Progressão por mensagem']
+  };
+  const t=titles[id]||[id,''];
+  $('title').textContent=t[0];
+  $('sub').textContent=t[1];
+  closeSide();
 }
-document.querySelectorAll('.nav-btn[data-panel]').forEach(b=>b.addEventListener('click',()=>{if(!b.disabled)show(b.dataset.panel)}));
-function fill(sel,items,ph){sel.innerHTML=`<option value="">${ph||'…'}</option>`+(items||[]).map(i=>`<option value="${i.id}">${i.name||('#'+i.id)}</option>`).join('')}
+document.querySelectorAll('.nav-btn[data-panel]').forEach(b=>b.addEventListener('click',()=>{ if(!b.disabled) show(b.dataset.panel); }));
 
+function fill(sel, items, ph){
+  sel.innerHTML=`<option value="">${ph||'Selecionar…'}</option>`+(items||[]).map(i=>`<option value="${i.id}">${i.name||i.id}</option>`).join('');
+}
+function roleOptions(selected){
+  return `<option value="">Cargo…</option>`+(data?.roles||[]).map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>@${r.name}</option>`).join('');
+}
 function renderExtras(){
-  const el=document.getElementById('extraList');
-  if(!extras.length){el.innerHTML='<p class="muted">Nenhuma regra ainda.</p>';return;}
+  const el=$('extraList');
+  if(!extras.length){ el.innerHTML='<p class="hint" style="margin:0">Nenhuma regra de entrada extra.</p>'; return; }
   el.innerHTML=extras.map((e,i)=>`
     <div class="entry">
-      <input placeholder="Nome" value="${e.name||''}" onchange="extras[${i}].name=this.value"/>
+      <input placeholder="Nome" value="${(e.name||'').replace(/"/g,'&quot;')}" onchange="extras[${i}].name=this.value"/>
       <select onchange="extras[${i}].type=this.value;renderExtras()">
         <option value="role" ${e.type==='role'?'selected':''}>Cargo</option>
         <option value="messages_day" ${e.type==='messages_day'?'selected':''}>Msgs hoje ≥</option>
@@ -190,81 +400,129 @@ function renderExtras(){
       </select>
       ${e.type==='role'
         ? `<select onchange="extras[${i}].roleId=this.value">${roleOptions(e.roleId)}</select>`
-        : `<input type="number" min="0" value="${e.value||0}" onchange="extras[${i}].value=+this.value" placeholder="Valor"/>`}
-      <input type="number" min="1" value="${e.bonus||1}" style="max-width:80px" onchange="extras[${i}].bonus=+this.value" title="Entradas extras"/>
-      <button type="button" onclick="extras.splice(${i},1);renderExtras()">✕</button>
+        : `<input type="number" min="0" value="${e.value||0}" onchange="extras[${i}].value=+this.value"/>`}
+      <input type="number" min="1" value="${e.bonus||1}" onchange="extras[${i}].bonus=+this.value" title="Bonus entradas"/>
+      <button type="button" class="x" onclick="extras.splice(${i},1);renderExtras()">×</button>
     </div>`).join('');
 }
-function roleOptions(selected){
-  const roles=data?.roles||[];
-  return `<option value="">Cargo…</option>`+roles.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>@${r.name}</option>`).join('');
+function addExtra(){ extras.push({name:'',type:'role',roleId:'',value:10,bonus:1}); renderExtras(); }
+
+function dropHtml(list){
+  if(!list?.length) return '<span class="hint">Nenhum drop ativo</span>';
+  return list.map(d=>`<div class="drop-item"><div><div class="t">${d.prize||'Prêmio'}</div><div class="m">${d.winners} vencedor(es)</div></div><div class="m">${new Date(d.endsAt).toLocaleString('pt-BR')}</div></div>`).join('');
 }
-function addExtra(){
-  extras.push({name:'',type:'role',roleId:'',value:10,bonus:1});
-  renderExtras();
+
+async function loadMe(){
+  try{
+    const r=await fetch('/api/me');
+    if(r.status===401) return location.href='/login';
+    const j=await r.json(); me=j.user;
+    const av=me.avatar?`https://cdn.discordapp.com/avatars/${me.id}/${me.avatar}.png?size=64`:`https://cdn.discordapp.com/embed/avatars/0.png`;
+    $('userChip').innerHTML=`<img src="${av}" alt=""/><div><div class="u-name">${me.global_name||me.username}</div><div class="u-sub">@${me.username}</div></div>`;
+  }catch(_){}
 }
 
 async function loadGuilds(){
-  const r=await fetch('/api/guilds'); if(r.status===401) return location.href='/login';
-  const j=await r.json(); const el=document.getElementById('guildList');
-  if(!j.guilds?.length){el.innerHTML='<p class="muted">Nenhum servidor.</p>';return;}
-  el.innerHTML=j.guilds.map(g=>`<div class="guild" onclick="sel('${g.id}')"><b>${g.name}</b><br/><span class="muted">${g.memberCount} membros</span></div>`).join('');
+  const r=await fetch('/api/guilds');
+  if(r.status===401) return location.href='/login';
+  const j=await r.json();
+  const el=$('guildList');
+  if(!j.guilds?.length){
+    $('guildEmpty').style.display='block';
+    el.innerHTML='';
+    return;
+  }
+  $('guildEmpty').style.display='none';
+  el.innerHTML=j.guilds.map(g=>{
+    const icon=g.icon?`<img class="g-icon" src="${g.icon}" alt=""/>`:`<div class="g-icon ph">${(g.name||'?')[0]}</div>`;
+    return `<div class="g-card" onclick="sel('${g.id}')"><div class="g-top">${icon}<div><div class="g-name">${g.name}</div><div class="g-meta">${g.memberCount} membros</div></div><div class="g-arrow">→</div></div></div>`;
+  }).join('');
 }
-async function sel(id){
-  gid=id; const r=await fetch('/api/guild/'+id); data=await r.json();
-  if(data.error) return toast(data.error);
-  document.querySelectorAll('.nav-btn[data-panel]').forEach(b=>{if(b.dataset.panel!=='servers')b.disabled=false});
-  const s=data.settings, ch=data.channels||[], roles=data.roles||[];
-  document.getElementById('meta').innerHTML=`<b>${data.name}</b> · ${id}`;
-  document.getElementById('prefix').value=s.prefix||'O.';
-  fill(document.getElementById('dChannel'),ch,'Canal do comando');
-  fill(document.getElementById('wChannel'),ch,'Canal');
-  fill(document.getElementById('logChannel'),ch,'Canal');
-  fill(document.getElementById('reqRole'),roles,'Nenhum');
 
-  dEnabled.checked=s.drops?.enabled!==false;
-  dChannel.value=s.drops?.channelId||'';
+async function sel(id){
+  gid=id;
+  toast('Carregando…');
+  const r=await fetch('/api/guild/'+id);
+  data=await r.json();
+  if(data.error) return toast(data.error,false);
+
+  document.querySelectorAll('.nav-btn[data-panel]').forEach(b=>{ if(b.dataset.panel!=='servers') b.disabled=false; });
+
+  const s=data.settings, ch=data.channels||[], roles=data.roles||[];
+  const pill=$('guildPill');
+  pill.style.display='flex';
+  const ic=data.icon||null;
+  // icon may not be on guild api - use first letter
+  pill.innerHTML=`<div class="ph">${(data.name||'?')[0]}</div><span>${data.name}</span>`;
+
+  $('meta').textContent=`${data.name} · ID ${data.id}`;
+  $('prefix').value=s.prefix||'O.';
+
+  fill($('dChannel'),ch,'Canal do comando');
+  fill($('wChannel'),ch,'Canal');
+  fill($('logChannel'),ch,'Canal');
+  fill($('reqRole'),roles,'Nenhum');
+
+  $('dEnabled').checked=s.drops?.enabled!==false;
+  $('dChannel').value=s.drops?.channelId||'';
   const rq=s.drops?.requirements||{};
-  reqDay.value=rq.minMessagesDay||0;
-  reqWeek.value=rq.minMessagesWeek||0;
-  reqMonth.value=rq.minMessagesMonth||0;
-  reqLevel.value=rq.minLevel||0;
-  reqInv.value=rq.minInvites||0;
-  reqFlocos.value=rq.minFlocos||0;
-  reqCrist.value=rq.minCristais||0;
-  reqRole.value=(rq.requiredRoleIds&&rq.requiredRoleIds[0])||'';
+  $('reqDay').value=rq.minMessagesDay||0;
+  $('reqWeek').value=rq.minMessagesWeek||0;
+  $('reqMonth').value=rq.minMessagesMonth||0;
+  $('reqLevel').value=rq.minLevel||0;
+  $('reqInv').value=rq.minInvites||0;
+  $('reqFlocos').value=rq.minFlocos||0;
+  $('reqCrist').value=rq.minCristais||0;
+  $('reqRole').value=(rq.requiredRoleIds&&rq.requiredRoleIds[0])||'';
   extras=Array.isArray(s.drops?.extraEntries)?JSON.parse(JSON.stringify(s.drops.extraEntries)):[];
   renderExtras();
 
   const am=s.automod||{};
-  amEnabled.checked=am.enabled!==false;
-  amSpam.checked=am.antiSpam!==false;
-  amInvite.checked=!!am.antiInvite;
-  amLink.checked=!!am.antiLink;
-  amMax.value=am.maxMessages??6;
-  amWin.value=am.windowMs??5000;
-  amDup.value=am.maxDuplicates??3;
-  amPunish.value=am.punish||'delete';
+  $('amEnabled').checked=am.enabled!==false;
+  $('amSpam').checked=am.antiSpam!==false;
+  $('amInvite').checked=!!am.antiInvite;
+  $('amLink').checked=!!am.antiLink;
+  $('amMax').value=am.maxMessages??6;
+  $('amWin').value=am.windowMs??5000;
+  $('amDup').value=am.maxDuplicates??3;
+  $('amPunish').value=am.punish||'delete';
 
-  wEnabled.checked=!!s.welcome?.enabled; wChannel.value=s.welcome?.channelId||''; wMsg.value=s.welcome?.message||'';
-  logEnabled.checked=!!s.logs?.enabled; logChannel.value=s.logs?.channelId||'';
-  dMin.value=s.economy?.dailyMin??5000; dMax.value=s.economy?.dailyMax??50000;
+  $('wEnabled').checked=!!s.welcome?.enabled;
+  $('wChannel').value=s.welcome?.channelId||'';
+  $('wMsg').value=s.welcome?.message||'';
+  $('logEnabled').checked=!!s.logs?.enabled;
+  $('logChannel').value=s.logs?.channelId||'';
+  $('dMin').value=s.economy?.dailyMin??5000;
+  $('dMax').value=s.economy?.dailyMax??50000;
+  $('xpEnabled').checked=s.xp?.enabled!==false;
+  $('xpMin').value=s.xp?.min??30;
+  $('xpMax').value=s.xp?.max??77;
+  $('xpCd').value=s.xp?.cooldownSec??45;
+
   const ad=data.activeDrops||[];
-  document.getElementById('activeDrops').innerHTML=ad.length
-    ? ad.map(d=>`• <b>${d.prize}</b> — ${d.winners} vencedor(es) — ${new Date(d.endsAt).toLocaleString('pt-BR')}`).join('<br/>')
-    : 'Nenhum drop ativo.';
-  show('drops');
+  $('activeDrops').innerHTML=dropHtml(ad);
+  $('ovDrops').innerHTML=dropHtml(ad);
+  $('ovStats').innerHTML=`
+    <div class="stat"><div class="lbl">Prefixo</div><div class="val">${s.prefix||'O.'}</div></div>
+    <div class="stat"><div class="lbl">Drops ativos</div><div class="val">${ad.length}</div></div>
+    <div class="stat"><div class="lbl">Canais</div><div class="val">${ch.length}</div></div>
+    <div class="stat"><div class="lbl">Cargos</div><div class="val">${roles.length}</div></div>`;
+
+  show('overview');
+  toast('Servidor carregado');
 }
+
 async function save(patch){
-  if(!gid)return;
+  if(!gid) return toast('Selecione um servidor',false);
   const r=await fetch('/api/guild/'+gid+'/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
-  const j=await r.json(); toast(j.ok?'Salvo!':(j.error||'Erro'));
+  const j=await r.json();
+  toast(j.ok?'Configuração salva!':(j.error||'Erro'), !!j.ok);
 }
 function saveDrops(){
   const role=val('reqRole');
   save({
     drops:{
-      enabled:chk('dEnabled'),
+      enabled:$('dEnabled').checked,
       channelId:val('dChannel')||null,
       requirements:{
         minMessagesDay:+val('reqDay')||0,
@@ -274,14 +532,11 @@ function saveDrops(){
         minInvites:+val('reqInv')||0,
         minFlocos:+val('reqFlocos')||0,
         minCristais:+val('reqCrist')||0,
-        requiredRoleIds: role ? [role] : []
+        requiredRoleIds: role?[role]:[]
       },
       extraEntries: extras.map(e=>({
-        name:e.name||'',
-        type:e.type||'role',
-        roleId:e.roleId||null,
-        value:+e.value||0,
-        bonus:Math.max(1,+e.bonus||1)
+        name:e.name||'', type:e.type||'role', roleId:e.roleId||null,
+        value:+e.value||0, bonus:Math.max(1,+e.bonus||1)
       }))
     }
   });
@@ -289,10 +544,10 @@ function saveDrops(){
 function saveAutomod(){
   save({
     automod:{
-      enabled:chk('amEnabled'),
-      antiSpam:chk('amSpam'),
-      antiInvite:chk('amInvite'),
-      antiLink:chk('amLink'),
+      enabled:$('amEnabled').checked,
+      antiSpam:$('amSpam').checked,
+      antiInvite:$('amInvite').checked,
+      antiLink:$('amLink').checked,
       maxMessages:+val('amMax')||6,
       windowMs:+val('amWin')||5000,
       maxDuplicates:+val('amDup')||3,
@@ -300,6 +555,8 @@ function saveAutomod(){
     }
   });
 }
+
+loadMe();
 loadGuilds();
 </script>
 </body>

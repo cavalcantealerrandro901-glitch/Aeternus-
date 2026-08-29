@@ -29,16 +29,7 @@ function setup(client) {
     }
 
     app.get('/', (req, res) => {
-        res.type('html').send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Aeternus</title></head>
-<body style="font-family:system-ui;background:#07070f;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0">
-<div style="text-align:center;padding:2rem">
-<h1 style="font-size:2.4rem;margin:0 0 .5rem">Ae<span style="color:#8b5cf6">ternus</span></h1>
-<p style="color:#94a3b8">Bot + painel · drops, economia, moderação</p>
-<p style="margin-top:1.5rem">
-<a href="/login" style="background:#8b5cf6;color:#fff;padding:.7rem 1.4rem;border-radius:999px;text-decoration:none;font-weight:600;margin-right:.5rem">Entrar</a>
-<a href="/dashboard" style="border:1px solid #334155;color:#e2e8f0;padding:.7rem 1.4rem;border-radius:999px;text-decoration:none">Dashboard</a>
-</p></div></body></html>`);
+        res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
     });
 
     app.get('/login', (req, res) => {
@@ -81,7 +72,7 @@ function setup(client) {
             ).json();
             const sid = crypto.randomBytes(16).toString('hex');
             sessions.set(sid, { user, guilds: Array.isArray(guilds) ? guilds : [] });
-            res.cookie('sid', sid, { httpOnly: true, maxAge: 7 * 864e5 });
+            res.cookie('sid', sid, { httpOnly: true, maxAge: 7 * 864e5, sameSite: 'lax' });
             res.redirect('/dashboard');
         } catch (e) {
             console.error(e);
@@ -98,7 +89,16 @@ function setup(client) {
     app.get('/api/me', (req, res) => {
         const s = sessionUser(req);
         if (!s) return res.status(401).json({ error: 'auth' });
-        res.json({ user: s.user });
+        res.json({
+            user: s.user,
+            bot: client.user
+                ? {
+                      tag: client.user.tag,
+                      id: client.user.id,
+                      avatar: client.user.displayAvatarURL({ size: 128 })
+                  }
+                : null
+        });
     });
 
     app.get('/api/guilds', (req, res) => {
@@ -107,12 +107,17 @@ function setup(client) {
         const list = (s.guilds || [])
             .filter((g) => (BigInt(g.permissions || 0) & 8n) === 8n || g.owner)
             .filter((g) => client.guilds.cache.has(g.id))
-            .map((g) => ({
-                id: g.id,
-                name: g.name,
-                icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64` : null,
-                memberCount: client.guilds.cache.get(g.id)?.memberCount || 0
-            }));
+            .map((g) => {
+                const botG = client.guilds.cache.get(g.id);
+                return {
+                    id: g.id,
+                    name: g.name,
+                    icon: g.icon
+                        ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=128`
+                        : null,
+                    memberCount: botG?.memberCount || 0
+                };
+            });
         res.json({ guilds: list });
     });
 
@@ -128,22 +133,27 @@ function setup(client) {
                 prize: d.prize?.label,
                 winners: d.winners,
                 endsAt: d.endsAt,
-                channelId: d.channelId
+                channelId: d.channelId,
+                autopix: !!d.autopix
             }));
         res.json({
             id: guild.id,
             name: guild.name,
+            icon: guild.iconURL({ size: 128 }),
+            memberCount: guild.memberCount,
             settings: getSettings(guild.id),
             activeDrops,
-            channels: guild.channels.cache
+            channels: [...guild.channels.cache.values()]
                 .filter((c) => c.isTextBased() && !c.isThread())
+                .sort((a, b) => a.rawPosition - b.rawPosition)
                 .map((c) => ({ id: c.id, name: c.name })),
-            categories: guild.channels.cache
+            categories: [...guild.channels.cache.values()]
                 .filter((c) => c.type === 4)
                 .map((c) => ({ id: c.id, name: c.name })),
-            roles: guild.roles.cache
+            roles: [...guild.roles.cache.values()]
                 .filter((r) => r.id !== guild.id)
-                .map((r) => ({ id: r.id, name: r.name }))
+                .sort((a, b) => b.position - a.position)
+                .map((r) => ({ id: r.id, name: r.name, color: r.hexColor }))
         });
     });
 
