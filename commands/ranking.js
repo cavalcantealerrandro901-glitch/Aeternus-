@@ -3,13 +3,19 @@ const msgStats = require('../utils/msgStats');
 
 module.exports = {
     name: 'ranking',
-    aliases: ['rankmsg', 'msgs', 'mensagens', 'oranking'],
+    aliases: ['rankmsg', 'topmsg', 'topmensagens'],
     description: 'Ranking de mensagens (hoje / semana / mês)',
     async execute(message, args) {
         const periodArg = (args[0] || 'hoje').toLowerCase();
         let period = 'today';
         let label = 'hoje';
-        if (['semana', 'week', '7d', 'semanal'].includes(periodArg)) {
+
+        // se o primeiro arg for menção, período = hoje
+        const mentionFirst = message.mentions.users.first();
+        if (mentionFirst && !['hoje', 'semana', 'week', '7d', 'mes', 'mês', 'month', '30d', 'total', 'all', 'semanal', 'mensal'].includes(periodArg)) {
+            period = 'today';
+            label = 'hoje';
+        } else if (['semana', 'week', '7d', 'semanal'].includes(periodArg)) {
             period = 'week';
             label = 'últimos 7 dias';
         } else if (['mes', 'mês', 'month', '30d', 'mensal'].includes(periodArg)) {
@@ -20,7 +26,7 @@ module.exports = {
             label = 'total';
         }
 
-        const target = message.mentions.users.first() || message.author;
+        const target = mentionFirst || message.author;
         const mine = msgStats.getUser(message.guild.id, target.id);
         const board = msgStats.leaderboard(message.guild.id, period, 15);
 
@@ -45,7 +51,7 @@ module.exports = {
                     `♾️ Total: **${mine.total}**`
                 ].join('\n')
             })
-            .setFooter({ text: 'O.ranking [hoje|semana|mes|total] [@user]' });
+            .setFooter({ text: 'O.ranking [hoje|semana|mes|total] · O.msg [@user]' });
 
         await message.reply({ embeds: [embed] });
     }
