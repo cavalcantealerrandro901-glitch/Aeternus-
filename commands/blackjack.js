@@ -28,6 +28,21 @@ function controls(userId) {
             .setEmoji('🛑')
     );
 }
+function againRow(userId, amount) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`blackjack:again:${userId}:${amount}`)
+            .setLabel('Tentar novamente')
+            .setEmoji('🔁')
+            .setStyle(ButtonStyle.Primary)
+    );
+}
+
+function mood(result) {
+    if (result === 'win') return '🎉 **Que vitória!** As cartas sorriram para você!';
+    if (result === 'push') return '🤝 **Empate.** A casa devolveu sua aposta.';
+    return '😢 **Que tristeza…** O dealer levou esta. Tente de novo!';
+}
 
 module.exports = {
     name: 'blackjack',
@@ -43,9 +58,9 @@ module.exports = {
         const dealer = [draw(), draw()];
         games.set(message.author.id, { amount: bet.amount, player, dealer });
 
-        // natural 21
         if (total(player) === 21) {
-            cristais.add(message.author.id, Math.floor(bet.amount * 2.5));
+            const pay = Math.floor(bet.amount * 2.5);
+            cristais.add(message.author.id, pay);
             games.delete(message.author.id);
             return message.reply({
                 embeds: [
@@ -53,10 +68,17 @@ module.exports = {
                         .setColor(C.win)
                         .setTitle('🃏  Blackjack natural!')
                         .setDescription(
-                            `👤 ${handStr(player)}\n✨ +💠 **${fmt(Math.floor(bet.amount * 2.5))}**\nSaldo: 💠 **${fmt(cristais.get(message.author.id))}**`
+                            [
+                                mood('win'),
+                                '',
+                                `👤 ${handStr(player)}`,
+                                `✨ +💠 **${fmt(pay)}**`,
+                                `Saldo: 💠 **${fmt(cristais.get(message.author.id))}**`
+                            ].join('\n')
                         )
                         .setFooter({ text: betFooter() })
-                ]
+                ],
+                components: [againRow(message.author.id, bet.amount)]
             });
         }
 
@@ -82,13 +104,63 @@ module.exports = {
 
     async handleComponent(interaction) {
         const parts = interaction.customId.split(':');
-        // blackjack:hit:userId  OR  bj:hit:userId (legado)
         const action = parts[1];
         const id = parts[2];
+
         if (interaction.user.id !== id)
             return interaction.reply({ content: 'Não é seu jogo.', ephemeral: true });
+
+        if (action === 'again') {
+            const amount = parseInt(parts[3], 10);
+            const bet = resolveBet(String(amount), cristais.get(id), { label: '💠' });
+            if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
+            if (games.has(id)) games.delete(id);
+
+            cristais.remove(id, bet.amount);
+            const player = [draw(), draw()];
+            const dealer = [draw(), draw()];
+            games.set(id, { amount: bet.amount, player, dealer });
+
+            if (total(player) === 21) {
+                const pay = Math.floor(bet.amount * 2.5);
+                cristais.add(id, pay);
+                games.delete(id);
+                return interaction.update({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(C.win)
+                            .setTitle('🃏  Blackjack natural!')
+                            .setDescription(
+                                [
+                                    mood('win'),
+                                    '',
+                                    `👤 ${handStr(player)}`,
+                                    `✨ +💠 **${fmt(pay)}**`,
+                                    `Saldo: 💠 **${fmt(cristais.get(id))}**`
+                                ].join('\n')
+                            )
+                            .setFooter({ text: betFooter() })
+                    ],
+                    components: [againRow(id, bet.amount)]
+                });
+            }
+
+            return interaction.update({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(C.info)
+                        .setTitle('🃏  Blackjack')
+                        .setDescription(
+                            `Aposta: 💠 **${fmt(bet.amount)}**\n\n👤 Você → ${handStr(player)}\n🏠 Dealer → **${dealer[0]}** · ?`
+                        )
+                        .setFooter({ text: betFooter() })
+                ],
+                components: [controls(id)]
+            });
+        }
+
         const g = games.get(id);
-        if (!g) return interaction.reply({ content: 'Jogo expirado. Inicie outro com o comando.', ephemeral: true });
+        if (!g) return interaction.reply({ content: 'Jogo expirado.', ephemeral: true });
 
         if (action === 'hit') {
             g.player.push(draw());
@@ -100,11 +172,17 @@ module.exports = {
                             .setColor(C.lose)
                             .setTitle('💥  Estourou')
                             .setDescription(
-                                `Você: ${handStr(g.player)}\n−💠 **${fmt(g.amount)}**\nSaldo: 💠 **${fmt(cristais.get(id))}**`
+                                [
+                                    mood('lose'),
+                                    '',
+                                    `Você: ${handStr(g.player)}`,
+                                    `−💠 **${fmt(g.amount)}**`,
+                                    `Saldo: 💠 **${fmt(cristais.get(id))}**`
+                                ].join('\n')
                             )
                             .setFooter({ text: betFooter() })
                     ],
-                    components: []
+                    components: [againRow(id, g.amount)]
                 });
             }
             return interaction.update({
@@ -131,6 +209,7 @@ module.exports = {
 
             if (result === 'win') cristais.add(id, g.amount * 2);
             else if (result === 'push') cristais.add(id, g.amount);
+            const amount = g.amount;
             games.delete(id);
 
             return interaction.update({
@@ -146,20 +225,22 @@ module.exports = {
                         )
                         .setDescription(
                             [
+                                mood(result),
+                                '',
                                 `👤 Você → ${handStr(g.player)}`,
                                 `🏠 Dealer → ${handStr(g.dealer)}`,
                                 '',
                                 result === 'win'
-                                    ? `✨ +💠 **${fmt(g.amount * 2)}**`
+                                    ? `✨ +💠 **${fmt(amount * 2)}**`
                                     : result === 'push'
                                       ? 'Aposta devolvida'
-                                      : `💫 −💠 **${fmt(g.amount)}**`,
+                                      : `💫 −💠 **${fmt(amount)}**`,
                                 `💼 Saldo: 💠 **${fmt(cristais.get(id))}**`
                             ].join('\n')
                         )
                         .setFooter({ text: betFooter() })
                 ],
-                components: []
+                components: [againRow(id, amount)]
             });
         }
     }

@@ -8,7 +8,6 @@ const cristais = require('../utils/cristais');
 const { resolveBet } = require('../utils/parseAmount');
 const { fmt, betFooter, C } = require('../utils/gameStyle');
 
-/** 5 colunas × 4 linhas = 20 casas */
 const COLS = 5;
 const ROWS = 4;
 const TOTAL = COLS * ROWS;
@@ -24,6 +23,18 @@ function mult(opened, bombs) {
 function potential(game) {
     if (game.fun || !game.amount) return 0;
     return Math.floor(game.amount * mult(game.opened.size, game.bombCount));
+}
+
+function endMessage(game, win) {
+    if (game.fun) {
+        return win
+            ? '🎉 **Parabéns!** Você limpou o campo no modo diversão!'
+            : '😢 **Que pena…** Uma mina no caminho. Tente de novo!';
+    }
+    if (win) {
+        return `🎉 **Incrível!** Você saiu no lucro — que sorte!\n💵 💠 **${fmt(potential(game) || game._lastWin || 0)}**`;
+    }
+    return '😢 **Que azar…** A mina falou mais alto. Respire e tente outra vez!';
 }
 
 function panelEmbed(game, extra) {
@@ -42,8 +53,8 @@ function panelEmbed(game, extra) {
     let cashLine = '_Abra casas ou use **Aleatório**._';
     if (game.opened.size > 0 && !game.dead && !game.cashed) {
         cashLine = game.fun
-            ? '_Modo diversão · use **Encerrar** quando quiser._'
-            : `💵 Saque disponível: 💠 **${fmt(pot)}** · ×**${m}**`;
+            ? '_Modo diversão · **Encerrar** quando quiser._'
+            : `💵 Saque: 💠 **${fmt(pot)}** · ×**${m}**`;
     }
 
     return new EmbedBuilder()
@@ -54,7 +65,7 @@ function panelEmbed(game, extra) {
                 `**MINES PANEL** · ${status}`,
                 '',
                 modeLine,
-                `💣 Minas **${game.bombCount}** · 💎 Abertas **${game.opened.size}** · Seguras restantes **${Math.max(0, safeLeft)}**`,
+                `💣 Minas **${game.bombCount}** · 💎 Abertas **${game.opened.size}** · Seguras **${Math.max(0, safeLeft)}**`,
                 !game.fun ? `📈 Multiplicador **×${m}**` : null,
                 cashLine,
                 extra ? `\n${extra}` : null
@@ -64,7 +75,7 @@ function panelEmbed(game, extra) {
         )
         .setFooter({
             text: game.fun
-                ? 'Diversão · O.mines <1-18>  |  Apostas · O.mines <bombas> <valor>'
+                ? 'Diversão · O.mines <1-18>'
                 : betFooter()
         })
         .setTimestamp();
@@ -133,19 +144,36 @@ function controlRow(game) {
             .setCustomId(`minas:refresh:${game.id}`)
             .setLabel('Atualizar')
             .setEmoji('🔄')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(false),
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`minas:cash:${game.id}`)
             .setLabel(cashLabel.slice(0, 80))
             .setEmoji(game.fun ? '🏁' : '💵')
             .setStyle(ButtonStyle.Success)
-            .setDisabled(!canCash && !game.fun ? true : ended)
+            .setDisabled(ended || (!game.fun && !canCash))
+    );
+}
+
+function againRow(game) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`minas:again:${game.id}`)
+            .setLabel('Tentar novamente')
+            .setEmoji('🔁')
+            .setStyle(ButtonStyle.Primary)
     );
 }
 
 function fullComponents(game, reveal = false) {
-    return [...boardRows(game, { reveal }), controlRow(game)];
+    const ended = game.dead || game.cashed || reveal;
+    const rows = [...boardRows(game, { reveal: ended }), controlRow(game)];
+    if (ended) rows.push(againRow(game));
+    // Discord max 5 rows — board 4 + control 1 = 5; if ended we need again instead of control disabled board
+    if (ended) {
+        // 4 board + again only (drop mid controls to fit)
+        return [...boardRows(game, { reveal: true }), againRow(game)];
+    }
+    return rows;
 }
 
 function makeGame(userId, amount, bombCount, fun) {
@@ -162,7 +190,8 @@ function makeGame(userId, amount, bombCount, fun) {
         bombs,
         opened: new Set(),
         dead: false,
-        cashed: false
+        cashed: false,
+        _lastWin: 0
     };
     games.set(id, g);
     return g;
@@ -180,6 +209,7 @@ function openCell(game, idx) {
         let win = 0;
         if (!game.fun && game.amount > 0) {
             win = potential(game);
+            game._lastWin = win;
             cristais.add(game.userId, win);
         }
         return { ok: true, bomb: false, autoWin: true, win };
@@ -200,37 +230,37 @@ function pickRandom(game) {
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
+function endPayload(game, win, note) {
+    return {
+        embeds: [
+            panelEmbed(
+                game,
+                [endMessage(game, win), note].filter(Boolean).join('\n')
+            )
+        ],
+        components: fullComponents(game, true)
+    };
+}
+
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'mine', 'campo'],
-    description: 'Mines 5×4 — bombas primeiro; só número = diversão',
+    description: 'Mines 5×4',
     async execute(message, args) {
-        /*
-          Uso:
-            O.mines <1-18>              → diversão (sem aposta)
-            O.mines <1-18> <valor|all|half> → aposta
-        */
         const bombsRaw = parseInt(args[0], 10);
         if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
             return message.reply(
                 [
                     '💣 **Mines 5×4**',
-                    '',
-                    '🎮 Diversão (sem aposta):',
-                    '`O.mines <1-18>`',
-                    '',
-                    '💠 Com aposta:',
-                    '`O.mines <bombas 1-18> <valor|all|half|k|m>`',
-                    '',
-                    'Ex.: `O.mines 5` · `O.mines 7 10k` · `O.mines 3 half`'
+                    '🎮 `O.mines <1-18>` — diversão',
+                    '💠 `O.mines <bombas> <valor|all|half>` — aposta'
                 ].join('\n')
             );
         }
 
-        const bombCount = Math.min(MAX_BOMBS, bombsRaw);
+        const bombCount = bombsRaw;
         const amountArg = args[1];
 
-        // só bombas → diversão
         if (amountArg == null || amountArg === '') {
             const game = makeGame(message.author.id, 0, bombCount, true);
             return message.reply({
@@ -266,56 +296,57 @@ module.exports = {
             return interaction.reply({ content: 'Não é o seu Mines.', ephemeral: true });
         }
 
+        if (action === 'again') {
+            if (game.fun) {
+                const ng = makeGame(game.userId, 0, game.bombCount, true);
+                return interaction.update({
+                    embeds: [panelEmbed(ng, '_Nova rodada · diversão!_')],
+                    components: fullComponents(ng)
+                });
+            }
+            const bet = resolveBet(String(game.amount), cristais.get(game.userId), { label: '💠' });
+            if (!bet.ok) {
+                return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
+            }
+            cristais.remove(game.userId, bet.amount);
+            const ng = makeGame(game.userId, bet.amount, game.bombCount, false);
+            games.delete(parts[2]);
+            return interaction.update({
+                embeds: [panelEmbed(ng, '_Nova tentativa!_')],
+                components: fullComponents(ng)
+            });
+        }
+
         if (action === 'refresh') {
             const reveal = game.dead || game.cashed;
             return interaction.update({
-                embeds: [panelEmbed(game, reveal ? null : '_Painel atualizado._')],
+                embeds: [panelEmbed(game, reveal ? null : '_Atualizado._')],
                 components: fullComponents(game, reveal)
             });
         }
 
         if (action === 'random') {
-            if (game.dead || game.cashed) {
+            if (game.dead || game.cashed)
                 return interaction.reply({ content: 'Jogo encerrado.', ephemeral: true });
-            }
             const idx = pickRandom(game);
-            if (idx == null) {
-                return interaction.reply({ content: 'Nenhuma casa disponível.', ephemeral: true });
-            }
+            if (idx == null)
+                return interaction.reply({ content: 'Nenhuma casa.', ephemeral: true });
             const res = openCell(game, idx);
-            if (res.bomb) {
-                return interaction.update({
-                    embeds: [panelEmbed(game, `Aleatório · casa **#${idx + 1}** era mina.`)],
-                    components: fullComponents(game, true)
-                });
-            }
-            if (res.autoWin) {
-                const msg = game.fun
-                    ? 'Campo limpo · modo diversão!'
-                    : `Campo limpo! +💠 **${fmt(res.win)}**`;
-                return interaction.update({
-                    embeds: [panelEmbed(game, msg)],
-                    components: fullComponents(game, true)
-                });
-            }
+            if (res.bomb) return interaction.update(endPayload(game, false, `Casa **#${idx + 1}** era mina.`));
+            if (res.autoWin) return interaction.update(endPayload(game, true, `Aleatório limpou o campo.`));
             return interaction.update({
-                embeds: [panelEmbed(game, `Aleatório abriu **#${idx + 1}**.`)],
+                embeds: [panelEmbed(game, `Aleatório · **#${idx + 1}**`)],
                 components: fullComponents(game)
             });
         }
 
         if (action === 'cash') {
-            if (game.dead || game.cashed) {
+            if (game.dead || game.cashed)
                 return interaction.reply({ content: 'Indisponível.', ephemeral: true });
-            }
 
-            // diversão: pode encerrar a qualquer momento (ou com casas abertas)
             if (game.fun) {
                 game.cashed = true;
-                return interaction.update({
-                    embeds: [panelEmbed(game, 'Partida de diversão encerrada.')],
-                    components: fullComponents(game, true)
-                });
+                return interaction.update(endPayload(game, true, 'Partida de diversão encerrada.'));
             }
 
             if (!game.opened.size) {
@@ -326,42 +357,27 @@ module.exports = {
             }
             game.cashed = true;
             const win = potential(game);
+            game._lastWin = win;
             cristais.add(game.userId, win);
-            return interaction.update({
-                embeds: [
-                    panelEmbed(
-                        game,
-                        `Saque de 💠 **${fmt(win)}** · Saldo: 💠 **${fmt(cristais.get(game.userId))}**`
-                    )
-                ],
-                components: fullComponents(game, true)
-            });
+            return interaction.update(
+                endPayload(
+                    game,
+                    true,
+                    `Saque 💠 **${fmt(win)}** · Saldo **${fmt(cristais.get(game.userId))}**`
+                )
+            );
         }
 
         if (action === 'cell') {
             if (game.dead || game.cashed) return interaction.deferUpdate().catch(() => {});
             const idx = parseInt(parts[3], 10);
-            if (Number.isNaN(idx) || idx < 0 || idx >= TOTAL) {
+            if (Number.isNaN(idx) || idx < 0 || idx >= TOTAL)
                 return interaction.reply({ content: 'Casa inválida.', ephemeral: true });
-            }
             if (game.opened.has(idx)) return interaction.deferUpdate().catch(() => {});
 
             const res = openCell(game, idx);
-            if (res.bomb) {
-                return interaction.update({
-                    embeds: [panelEmbed(game, `Casa **#${idx + 1}** era mina.`)],
-                    components: fullComponents(game, true)
-                });
-            }
-            if (res.autoWin) {
-                const msg = game.fun
-                    ? 'Campo limpo · modo diversão!'
-                    : `Campo limpo! +💠 **${fmt(res.win)}**`;
-                return interaction.update({
-                    embeds: [panelEmbed(game, msg)],
-                    components: fullComponents(game, true)
-                });
-            }
+            if (res.bomb) return interaction.update(endPayload(game, false, `Casa **#${idx + 1}** era mina.`));
+            if (res.autoWin) return interaction.update(endPayload(game, true));
             return interaction.update({
                 embeds: [panelEmbed(game)],
                 components: fullComponents(game)
