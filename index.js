@@ -4,10 +4,21 @@ const { loadCommands, loadEvents, loadSystems } = require('./bot/loaders');
 const startWeb = require('./web/server');
 const { connect } = require('./utils/mongo');
 const store = require('./utils/store');
+const { getToken } = require('./utils/env');
 
 async function main() {
     await connect();
     await store.hydrate();
+
+    const token = getToken();
+    if (!token) {
+        console.error(
+            '❌ Token do Discord não encontrado.\n' +
+                'No .env ou no Render use uma destas variáveis:\n' +
+                '  TOKEN\n  DISCORD_TOKEN\n  BOT_TOKEN'
+        );
+        process.exit(1);
+    }
 
     const client = new Client({
         intents: [
@@ -32,7 +43,7 @@ async function main() {
     loadSystems(client);
     startWeb(client);
 
-    await client.login(process.env.TOKEN);
+    await client.login(token);
 }
 
 main().catch((e) => {

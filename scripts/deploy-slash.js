@@ -1,17 +1,18 @@
 /**
- * Uso no Termux / PC (uma vez ou quando quiser forçar):
+ * Termux / PC:
+ *   node scripts/deploy-slash.js
+ *   node scripts/deploy-slash.js --wipe
  *
- *   cd ~/Aeternus
- *   node scripts/deploy-slash.js          # limpa + registra
- *   node scripts/deploy-slash.js --wipe   # só apaga tudo
- *
- * Precisa de .env com TOKEN e CLIENT_ID
+ * Env aceitos:
+ *   TOKEN | DISCORD_TOKEN | BOT_TOKEN
+ *   CLIENT_ID | DISCORD_CLIENT_ID | APPLICATION_ID
  */
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { registerSlash, wipeSlash } = require('../utils/registerSlash');
+const { getToken, getClientId } = require('../utils/env');
 
 async function loadCommandsInto(client) {
     const dir = path.join(__dirname, '..', 'commands');
@@ -35,27 +36,31 @@ async function loadCommandsInto(client) {
 
 async function main() {
     const wipeOnly = process.argv.includes('--wipe');
+    const token = getToken();
 
-    if (!process.env.TOKEN || !process.env.CLIENT_ID) {
-        console.error('Defina TOKEN e CLIENT_ID no .env');
+    if (!token) {
+        console.error(
+            'Token ausente. No .env coloque:\nTOKEN=...\nou\nDISCORD_TOKEN=...'
+        );
         process.exit(1);
     }
 
-    const client = new Client({
-        intents: [GatewayIntentBits.Guilds]
-    });
+    const client = new Client({ intents: [GatewayIntentBits.Guilds] });
     client.commands = new Collection();
     client.slash = new Collection();
 
-    console.log('📦 Carregando comandos…');
+    console.log('📦 Comandos…');
     await loadCommandsInto(client);
 
     console.log('🔐 Login…');
-    await client.login(process.env.TOKEN);
-
-    await new Promise((r) => client.once('clientReady', r).once('ready', r));
+    await client.login(token);
+    await new Promise((r) => {
+        client.once('clientReady', r);
+        client.once('ready', r);
+    });
 
     console.log(`🤖 ${client.user.tag}`);
+    console.log(`🆔 Application ID usado: ${getClientId(client)}`);
 
     if (wipeOnly) {
         await wipeSlash(client);
