@@ -37,23 +37,22 @@ module.exports = {
                     '✦ **Anti-spam** · Welcome · Logs',
                     '✦ **Economia & XP** — configure o servidor',
                     '',
-                    `_Entre com Discord e escolha um servidor onde você é admin._`
+                    '_Entre com Discord e escolha um servidor onde você é admin._'
                 ].join('\n')
             )
             .setThumbnail(avatar)
-            .setImage(
-                bot.banner
-                    ? bot.bannerURL({ size: 512 })
-                    : null
-            )
             .setFooter({
                 text: 'Aeternus · overpowered by design',
                 iconURL: avatar
             })
             .setTimestamp();
 
-        // banner null remove field
-        if (!bot.banner) embed.setImage(null);
+        try {
+            if (typeof bot.bannerURL === 'function') {
+                const banner = bot.bannerURL({ size: 512 });
+                if (banner) embed.setImage(banner);
+            }
+        } catch (_) {}
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
