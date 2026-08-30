@@ -27,14 +27,17 @@ function resultEmbed({ title, win, lines = [], footer, user }) {
     if (user) {
         emb.setAuthor({
             name: user.username || user.globalName || 'Jogador',
-            iconURL: typeof user.displayAvatarURL === 'function' ? user.displayAvatarURL({ size: 64 }) : undefined
+            iconURL:
+                typeof user.displayAvatarURL === 'function'
+                    ? user.displayAvatarURL({ size: 64 })
+                    : undefined
         });
     }
     return emb;
 }
 
 function betFooter() {
-    return '💠 Apostas: 1k · 2.5m · all · half';
+    return '❄️ Apostas: 1k · 2.5m · all · half';
 }
 
 function againRow(customId, label = 'Jogar de novo') {
@@ -47,25 +50,22 @@ function againRow(customId, label = 'Jogar de novo') {
     );
 }
 
-/**
- * @param {object} opts
- * @param {true|false|'draw'} opts.win
- */
+/** Resultado padrão dos jogos (flocos) */
 function crystalResult({ title, win, amount, payout, balance, extra, user }) {
     let moneyLine;
     if (win === true) {
-        moneyLine = `✨ **Ganhou** +💠 **${fmt(payout)}**`;
+        moneyLine = `✨ **Ganhou** +❄️ **${fmt(payout)}**`;
     } else if (win === 'draw') {
-        moneyLine = `🤝 **Empate** · aposta devolvida 💠 **${fmt(amount)}**`;
+        moneyLine = `🤝 **Empate** · aposta devolvida ❄️ **${fmt(amount)}**`;
     } else {
-        moneyLine = `💫 **Perdeu** −💠 **${fmt(amount)}**`;
+        moneyLine = `💫 **Perdeu** −❄️ **${fmt(amount)}**`;
     }
 
     return resultEmbed({
         title,
         win,
         user,
-        lines: [extra || '', '', moneyLine, `💼 Saldo: 💠 **${fmt(balance)}**`],
+        lines: [extra || '', '', moneyLine, `💼 Saldo: ❄️ **${fmt(balance)}**`],
         footer: betFooter()
     });
 }

@@ -1,51 +1,44 @@
-const cristais = require('../utils/cristais');
+const flocos = require('../utils/flocos');
 const { resolveBet } = require('../utils/parseAmount');
 const { crystalResult, againRow } = require('../utils/gameStyle');
 
 const OPTS = ['pedra', 'papel', 'tesoura'];
-const ICON = { pedra: '🪨', papel: '📄', tesoura: '✂️' };
-const WIN = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
-
-function normalize(c) {
-    c = (c || '').toLowerCase();
-    if (['rock', 'pedra', 'stone'].includes(c)) return 'pedra';
-    if (['paper', 'papel'].includes(c)) return 'papel';
-    if (['scissors', 'tesoura', 'tesoura'].includes(c)) return 'tesoura';
-    return null;
-}
+const BEATS = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
 
 function play(choice, amount, userId) {
-    cristais.remove(userId, amount);
+    flocos.remove(userId, amount, { reason: 'ppt' });
     const bot = OPTS[Math.floor(Math.random() * 3)];
     let state = 'lose';
-    if (choice === bot) state = 'draw';
-    else if (WIN[choice] === bot) state = 'win';
-
     let payout = 0;
-    if (state === 'win') {
-        payout = amount * 2;
-        cristais.add(userId, payout);
-    } else if (state === 'draw') {
+    if (choice === bot) {
+        state = 'draw';
         payout = amount;
-        cristais.add(userId, amount);
+        flocos.add(userId, amount, { reason: 'ppt draw' });
+    } else if (BEATS[choice] === bot) {
+        state = 'win';
+        payout = amount * 2;
+        flocos.add(userId, payout, { reason: 'ppt win' });
     }
     return { bot, state, payout };
 }
 
 function payload(r, choice, amount, user, userId) {
-    const winFlag = r.state === 'win' ? true : r.state === 'draw' ? 'draw' : false;
-    const title =
-        r.state === 'win' ? '✊  PPT · Vitória' : r.state === 'draw' ? '✊  PPT · Empate' : '✊  PPT · Derrota';
+    const win = r.state === 'win' ? true : r.state === 'draw' ? 'draw' : false;
     return {
         embeds: [
             crystalResult({
-                title,
-                win: winFlag,
+                title:
+                    r.state === 'win'
+                        ? '✊  PPT · Vitória'
+                        : r.state === 'draw'
+                          ? '✊  PPT · Empate'
+                          : '✊  PPT · Derrota',
+                win,
                 amount,
                 payout: r.payout,
-                balance: cristais.get(userId),
+                balance: flocos.get(userId),
                 user,
-                extra: `${ICON[choice]} Você **${choice}**  ×  ${ICON[r.bot]} Bot **${r.bot}**`
+                extra: `Você **${choice}** · Bot **${r.bot}**`
             })
         ],
         components: [againRow(`ppt:again:${choice}:${amount}:${userId}`)]
@@ -55,11 +48,12 @@ function payload(r, choice, amount, user, userId) {
 module.exports = {
     name: 'ppt',
     aliases: ['jokenpo', 'rps'],
-    description: 'Pedra, papel ou tesoura',
+    description: 'Pedra papel tesoura (flocos)',
     async execute(message, args) {
-        const choice = normalize(args[0]);
-        if (!choice) return message.reply('Uso: `O.ppt <pedra|papel|tesoura> <valor|all|half>`');
-        const bet = resolveBet(args[1], cristais.get(message.author.id), { label: '💠' });
+        const choice = (args[0] || '').toLowerCase();
+        if (!OPTS.includes(choice))
+            return message.reply('Uso: `O.ppt <pedra|papel|tesoura> <valor|all|half>`');
+        const bet = resolveBet(args[1], flocos.get(message.author.id), { label: '❄️' });
         if (!bet.ok) return message.reply(`❌ ${bet.error}`);
         const r = play(choice, bet.amount, message.author.id);
         await message.reply(payload(r, choice, bet.amount, message.author, message.author.id));
@@ -67,10 +61,8 @@ module.exports = {
     async handleComponent(interaction) {
         const [, , choice, amountStr, owner] = interaction.customId.split(':');
         if (interaction.user.id !== owner)
-            return interaction.reply({ content: 'Não é sua jogada.', ephemeral: true });
-        if (!normalize(choice))
-            return interaction.reply({ content: 'Dados inválidos.', ephemeral: true });
-        const bet = resolveBet(amountStr, cristais.get(owner), { label: '💠' });
+            return interaction.reply({ content: 'Não é sua partida.', ephemeral: true });
+        const bet = resolveBet(amountStr, flocos.get(owner), { label: '❄️' });
         if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
         const r = play(choice, bet.amount, owner);
         await interaction.update(payload(r, choice, bet.amount, interaction.user, owner));
