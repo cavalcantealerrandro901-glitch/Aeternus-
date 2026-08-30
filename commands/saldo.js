@@ -6,7 +6,14 @@ module.exports = {
     name: 'saldo',
     aliases: ['bal', 'atm', 'balance', 'carteira'],
     description: 'Mostra flocos e cristais',
-    async execute(message) {
+    async execute(message, args) {
+        // O.saldo bloqueado  →  redireciona
+        const sub = (args[0] || '').toLowerCase();
+        if (['bloqueado', 'locked', 'liquidacao', 'liquidação', 'vault', 'pending'].includes(sub)) {
+            const cmd = message.client.commands.get('saldo-bloqueado');
+            if (cmd?.execute) return cmd.execute(message, args.slice(1));
+        }
+
         const user = message.mentions.users.first() || message.author;
         const f = flocos.get(user.id);
         const c = cristais.get(user.id);
@@ -25,7 +32,8 @@ module.exports = {
                             `❄️ **${flocos.formatPlain(f)}** flocos`,
                             `💠 **${cristais.formatPlain(c)}** cristais`,
                             '',
-                            '🛒 Você pode usar o comando **`/loja cristais`** para comprar itens.'
+                            '🔒 Saldo bloqueado: `O.saldo bloqueado` ou `O.bloqueado`',
+                            '🛒 Loja: **`/loja cristais`**'
                         ].join('\n')
                     )
                     .setThumbnail(user.displayAvatarURL({ size: 128 }))

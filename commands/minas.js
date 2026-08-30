@@ -8,85 +8,95 @@ const cristais = require('../utils/cristais');
 const { resolveBet } = require('../utils/parseAmount');
 const { fmt, betFooter, C } = require('../utils/gameStyle');
 
+/** 5 colunas × 4 linhas (Discord max 5 rows = 4 grade + 1 controle) */
 const COLS = 5;
 const ROWS = 4;
-const TOTAL = COLS * ROWS;
+const TOTAL = COLS * ROWS; // 20
 const MAX_BOMBS = 18;
+const HOUSE = 0.97; // margem da casa no multi
+
 const games = new Map();
 
-function mult(opened, bombs) {
+/** Multiplicador realista estilo mines: produto das probabilidades */
+function multAt(opened, bombs) {
     if (opened <= 0) return 1;
-    return Number((1 + opened * (0.28 + bombs * 0.035)).toFixed(2));
+    let m = 1;
+    for (let i = 0; i < opened; i++) {
+        const safeLeft = TOTAL - bombs - i;
+        const tilesLeft = TOTAL - i;
+        if (safeLeft <= 0 || tilesLeft <= 0) break;
+        m *= tilesLeft / safeLeft;
+    }
+    return Number(Math.max(1, m * HOUSE).toFixed(2));
 }
 
-function potential(game) {
-    if (game.fun || !game.amount) return 0;
-    return Math.floor(game.amount * mult(game.opened.size, game.bombCount));
+function potentialAt(amount, opened, bombs) {
+    if (!amount) return 0;
+    return Math.floor(amount * multAt(opened, bombs));
 }
 
 function panelEmbed(game, extra) {
-    const m = mult(game.opened.size, game.bombCount);
-    const pot = potential(game);
-    const safeLeft = Math.max(0, TOTAL - game.bombCount - game.opened.size);
+    const opened = game.opened.size;
+    const bombs = game.bombCount;
+    const safeTotal = TOTAL - bombs;
+    const freeLeft = Math.max(0, safeTotal - opened);
+    const curM = multAt(opened, bombs);
+    const nextM = opened < safeTotal ? multAt(opened + 1, bombs) : curM;
+    const curPay = potentialAt(game.amount, opened, bombs);
+    const nextPay = potentialAt(game.amount, opened + 1, bombs);
 
     let status = '🟢 Em jogo';
-    let color = C.info;
+    let color = 0x38bdf8;
+    let phrase = '_Escolha uma casa com cuidado. Cada gema aumenta o risco e o prêmio._';
+
     if (game.dead) {
         status = '💥 Explodiu';
         color = C.lose;
+        phrase = '😢 **Mina encontrada.** A rodada acabou — tente de novo.';
     } else if (game.cashed) {
         status = game.fun ? '🏁 Encerrado' : '💰 Sacado';
         color = C.win;
+        phrase = game.fun
+            ? '🏁 Campo de diversão finalizado.'
+            : `🎉 **Saque confirmado!** +💠 **${fmt(game._lastWin || curPay)}**`;
     }
 
-    const fields = [
-        { name: '📊 Status', value: status, inline: true },
-        { name: '💣 Minas', value: `**${game.bombCount}**`, inline: true },
-        {
-            name: '💎 Abertas',
-            value: `**${game.opened.size}** / ${TOTAL - game.bombCount}`,
-            inline: true
-        }
-    ];
+    const modeLine = game.fun
+        ? '🎮 **Modo diversão** · sem aposta'
+        : `💠 **Aposta** ${fmt(game.amount)}`;
 
-    if (game.fun) {
-        fields.push(
-            { name: '🎮 Modo', value: 'Diversão', inline: true },
-            { name: '🟩 Seguras', value: `**${safeLeft}**`, inline: true },
-            { name: '\u200b', value: '\u200b', inline: true }
-        );
-    } else {
-        fields.push(
-            { name: '💠 Aposta', value: `**${fmt(game.amount)}**`, inline: true },
-            { name: '📈 Multi', value: `**×${m}**`, inline: true },
-            {
-                name: '💵 Saque',
-                value:
-                    game.opened.size > 0 && !game.dead && !game.cashed
-                        ? `**${fmt(pot)}**`
-                        : '—',
-                inline: true
-            }
-        );
-    }
+    const multiBlock = game.fun
+        ? null
+        : [
+              `📈 **Multiplicador atual** · ×**${curM}**${opened > 0 ? ` → 💠 **${fmt(curPay)}**` : ''}`,
+              opened < safeTotal && !game.dead && !game.cashed
+                  ? `⏭️ **Próximo multi** · ×**${nextM}** → 💠 **${fmt(nextPay)}** _(se abrir +1)_`
+                  : null
+          ]
+              .filter(Boolean)
+              .join('\n');
 
-    let desc = 'Toque nas casas · **Aleatório** abre uma segura · **Sacar** finaliza.';
-    if (game.dead) {
-        desc = '😢 **Que azar…** Você acertou uma mina.\nUse **Tentar novamente** abaixo.';
-    } else if (game.cashed && !game.fun) {
-        desc = `🎉 **Ótimo jogo!** Lucro garantido.\n💠 **${fmt(game._lastWin || pot)}** creditados.`;
-    } else if (game.cashed && game.fun) {
-        desc = '🏁 Partida de diversão encerrada.';
-    }
-    if (extra) desc += `\n\n${extra}`;
+    const desc = [
+        `**${status}**`,
+        phrase,
+        '',
+        modeLine,
+        `💎 **Abertas** ${opened}/${safeTotal}  ·  💣 **Minas** ${bombs}`,
+        `🟩 **Livres** ${freeLeft}/${safeTotal}  ·  📦 **Casas** ${TOTAL}`,
+        multiBlock,
+        extra ? `\n${extra}` : null
+    ]
+        .filter((x) => x != null && x !== '')
+        .join('\n');
 
     return new EmbedBuilder()
         .setColor(color)
         .setTitle('💎  Mines · 5×4')
         .setDescription(desc)
-        .addFields(fields)
         .setFooter({
-            text: game.fun ? 'O.mines <1-18> · diversão' : betFooter()
+            text: game.fun
+                ? 'O.mines <1-18> · diversão'
+                : `Multi sobe a cada gema · ${betFooter()}`
         })
         .setTimestamp();
 }
@@ -101,8 +111,10 @@ function boardRows(game, reveal = false) {
             const num = String(i + 1);
             const opened = game.opened.has(i);
             const bomb = game.bombs.has(i);
+
             let label = '·';
             let style = ButtonStyle.Secondary;
+
             if (ended) {
                 if (bomb) {
                     label = `💣${num}`;
@@ -117,6 +129,7 @@ function boardRows(game, reveal = false) {
                 label = '💎';
                 style = ButtonStyle.Success;
             }
+
             row.addComponents(
                 new ButtonBuilder()
                     .setCustomId(`minas:cell:${game.id}:${i}`)
@@ -132,10 +145,12 @@ function boardRows(game, reveal = false) {
 
 function controlRow(game) {
     const ended = game.dead || game.cashed;
-    const pot = potential(game);
+    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
     const canCash = game.opened.size > 0 && !ended;
+
     let cashLabel = game.fun ? 'Encerrar' : 'Sacar';
     if (canCash && !game.fun) cashLabel = `Sacar ${fmt(pot)}`;
+
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`minas:random:${game.id}`)
@@ -205,7 +220,7 @@ function openCell(game, idx) {
         game.cashed = true;
         let win = 0;
         if (!game.fun && game.amount > 0) {
-            win = potential(game);
+            win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
             cristais.add(game.userId, win);
         }
@@ -236,7 +251,7 @@ function endPayload(game, note) {
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'mine', 'campo'],
-    description: 'Mines 5×4',
+    description: 'Mines 5×4 realista',
 
     async execute(message, args) {
         const bombsRaw = parseInt(args[0], 10);
@@ -245,7 +260,8 @@ module.exports = {
                 [
                     '💎 **Mines 5×4**',
                     '🎮 `O.mines <1-18>` — diversão',
-                    '💠 `O.mines <bombas> <valor|all|half>` — aposta'
+                    '💠 `O.mines <bombas> <valor|all|half>` — aposta',
+                    'Multi sobe a cada gema segura (fórmula de probabilidade).'
                 ].join('\n')
             );
         }
@@ -328,7 +344,7 @@ module.exports = {
             }
             if (res.autoWin) return interaction.update(endPayload(game));
             return interaction.update({
-                embeds: [panelEmbed(game, `🎲 Aleatório abriu **#${idx + 1}**`)],
+                embeds: [panelEmbed(game, `🎲 Abriu **#${idx + 1}**`)],
                 components: fullComponents(game)
             });
         }
@@ -348,7 +364,7 @@ module.exports = {
                 });
             }
             game.cashed = true;
-            const win = potential(game);
+            const win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
             cristais.add(game.userId, win);
             return interaction.update(
