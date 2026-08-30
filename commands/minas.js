@@ -8,16 +8,16 @@ const cristais = require('../utils/cristais');
 const { resolveBet } = require('../utils/parseAmount');
 const { fmt, betFooter, C } = require('../utils/gameStyle');
 
-/** 5 colunas × 4 linhas (Discord max 5 rows = 4 grade + 1 controle) */
-const COLS = 5;
+/** 4×4 = 16 casas · 4 rows grade + 1 row controles */
+const COLS = 4;
 const ROWS = 4;
-const TOTAL = COLS * ROWS; // 20
-const MAX_BOMBS = 18;
-const HOUSE = 0.97; // margem da casa no multi
+const TOTAL = COLS * ROWS;
+const MAX_BOMBS = 15;
+const HOUSE = 0.96;
+const IDLE_MS = 7 * 60 * 1000;
 
 const games = new Map();
 
-/** Multiplicador realista estilo mines: produto das probabilidades */
 function multAt(opened, bombs) {
     if (opened <= 0) return 1;
     let m = 1;
@@ -31,8 +31,65 @@ function multAt(opened, bombs) {
 }
 
 function potentialAt(amount, opened, bombs) {
-    if (!amount) return 0;
+    if (!amount || opened <= 0) return 0;
     return Math.floor(amount * multAt(opened, bombs));
+}
+
+function clearTimer(game) {
+    if (game._timer) {
+        clearTimeout(game._timer);
+        game._timer = null;
+    }
+}
+
+function touch(game, client) {
+    clearTimer(game);
+    game._last = Date.now();
+    game._timer = setTimeout(() => autoEnd(game, client).catch(() => {}), IDLE_MS);
+}
+
+async function autoEnd(game, client) {
+    if (!games.has(game.id)) return;
+    if (game.dead || game.cashed) {
+        games.delete(game.id);
+        return;
+    }
+
+    let note = '⏱️ **7 min sem interação** — partida encerrada.';
+
+    if (game.opened.size > 0 && !game.fun && game.amount > 0) {
+        const win = potentialAt(game.amount, game.opened.size, game.bombCount);
+        game.cashed = true;
+        game._lastWin = win;
+        cristais.add(game.userId, win);
+        note += `\n💵 Saque automático: 💠 **${fmt(win)}**`;
+    } else if (game.opened.size > 0 && game.fun) {
+        game.cashed = true;
+        note += '\n🏁 Diversão encerrada automaticamente.';
+    } else {
+        game.dead = true;
+        note += game.fun
+            ? ''
+            : '\nNenhuma casa aberta — aposta perdida.';
+    }
+
+    clearTimer(game);
+
+    try {
+        const ch = await client.channels.fetch(game.channelId).catch(() => null);
+        if (!ch?.isTextBased()) {
+            games.delete(game.id);
+            return;
+        }
+        const msg = await ch.messages.fetch(game.messageId).catch(() => null);
+        if (msg) {
+            await msg.edit({
+                content: `<@${game.userId}>`,
+                embeds: [panelEmbed(game, note)],
+                components: fullComponents(game, true)
+            }).catch(() => {});
+        }
+    } catch (_) {}
 }
 
 function panelEmbed(game, extra) {
@@ -47,56 +104,50 @@ function panelEmbed(game, extra) {
 
     let status = '🟢 Em jogo';
     let color = 0x38bdf8;
-    let phrase = '_Escolha uma casa com cuidado. Cada gema aumenta o risco e o prêmio._';
+    let phrase = 'Escolha com calma. Cada gema sobe o multi — e o risco.';
 
     if (game.dead) {
         status = '💥 Explodiu';
         color = C.lose;
-        phrase = '😢 **Mina encontrada.** A rodada acabou — tente de novo.';
+        phrase = 'Mina no caminho. A mesa fechou.';
     } else if (game.cashed) {
         status = game.fun ? '🏁 Encerrado' : '💰 Sacado';
         color = C.win;
         phrase = game.fun
-            ? '🏁 Campo de diversão finalizado.'
-            : `🎉 **Saque confirmado!** +💠 **${fmt(game._lastWin || curPay)}**`;
+            ? 'Partida de diversão finalizada.'
+            : `Lucro garantido: 💠 **${fmt(game._lastWin || curPay)}**.`;
     }
 
-    const modeLine = game.fun
-        ? '🎮 **Modo diversão** · sem aposta'
-        : `💠 **Aposta** ${fmt(game.amount)}`;
-
-    const multiBlock = game.fun
-        ? null
-        : [
-              `📈 **Multiplicador atual** · ×**${curM}**${opened > 0 ? ` → 💠 **${fmt(curPay)}**` : ''}`,
-              opened < safeTotal && !game.dead && !game.cashed
-                  ? `⏭️ **Próximo multi** · ×**${nextM}** → 💠 **${fmt(nextPay)}** _(se abrir +1)_`
-                  : null
-          ]
-              .filter(Boolean)
-              .join('\n');
-
-    const desc = [
+    const lines = [
         `**${status}**`,
-        phrase,
         '',
-        modeLine,
-        `💎 **Abertas** ${opened}/${safeTotal}  ·  💣 **Minas** ${bombs}`,
-        `🟩 **Livres** ${freeLeft}/${safeTotal}  ·  📦 **Casas** ${TOTAL}`,
-        multiBlock,
-        extra ? `\n${extra}` : null
-    ]
-        .filter((x) => x != null && x !== '')
-        .join('\n');
+        game.fun ? '🎮 Modo diversão · sem aposta' : `💠 Aposta **${fmt(game.amount)}**`,
+        `💎 Abertas **${opened}** / **${safeTotal}**  ·  💣 Minas **${bombs}**`,
+        `🟩 Livres **${freeLeft}** / **${safeTotal}**  ·  📦 Casas **${TOTAL}**`
+    ];
+
+    if (!game.fun) {
+        lines.push(
+            `📈 Multi atual **×${curM}**${opened > 0 ? ` → 💠 **${fmt(curPay)}**` : ''}`,
+            opened < safeTotal && !game.dead && !game.cashed
+                ? `⏭️ Próximo multi **×${nextM}** → 💠 **${fmt(nextPay)}** _(abrir +1)_`
+                : null
+        );
+    }
+
+    // frase depois da área dos botões (instrução / humor)
+    lines.push('', `💬 ${phrase}`);
+
+    if (extra) lines.push('', extra);
 
     return new EmbedBuilder()
         .setColor(color)
-        .setTitle('💎  Mines · 5×4')
-        .setDescription(desc)
+        .setTitle('💎  Mines · 4×4')
+        .setDescription(lines.filter((x) => x != null).join('\n'))
         .setFooter({
             text: game.fun
-                ? 'O.mines <1-18> · diversão'
-                : `Multi sobe a cada gema · ${betFooter()}`
+                ? 'O.mines <1-15> · diversão · AFK 7 min'
+                : `Multi por probabilidade · AFK 7 min · ${betFooter()}`
         })
         .setTimestamp();
 }
@@ -143,13 +194,18 @@ function boardRows(game, reveal = false) {
     return rows;
 }
 
+/**
+ * Linha de controles:
+ *  Aleatório | Atualizar | Sacar/Encerrar (valor se parar)
+ */
 function controlRow(game) {
     const ended = game.dead || game.cashed;
     const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
     const canCash = game.opened.size > 0 && !ended;
 
     let cashLabel = game.fun ? 'Encerrar' : 'Sacar';
-    if (canCash && !game.fun) cashLabel = `Sacar ${fmt(pot)}`;
+    if (!game.fun && canCash) cashLabel = `Sacar ${fmt(pot)}`;
+    else if (!game.fun && !canCash) cashLabel = 'Sacar';
 
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -188,7 +244,7 @@ function fullComponents(game, reveal = false) {
     return [...boardRows(game, false), controlRow(game)];
 }
 
-function makeGame(userId, amount, bombCount, fun) {
+function makeGame(userId, amount, bombCount, fun, meta = {}) {
     const id = `${userId}_${Date.now()}`;
     const bombs = new Set();
     const maxBombs = Math.min(Math.max(1, bombCount), MAX_BOMBS, TOTAL - 1);
@@ -203,7 +259,11 @@ function makeGame(userId, amount, bombCount, fun) {
         opened: new Set(),
         dead: false,
         cashed: false,
-        _lastWin: 0
+        _lastWin: 0,
+        channelId: meta.channelId || null,
+        messageId: meta.messageId || null,
+        _timer: null,
+        _last: Date.now()
     };
     games.set(id, g);
     return g;
@@ -213,11 +273,13 @@ function openCell(game, idx) {
     if (game.dead || game.cashed || game.opened.has(idx)) return { ok: false };
     if (game.bombs.has(idx)) {
         game.dead = true;
+        clearTimer(game);
         return { ok: true, bomb: true };
     }
     game.opened.add(idx);
     if (game.opened.size >= TOTAL - game.bombCount) {
         game.cashed = true;
+        clearTimer(game);
         let win = 0;
         if (!game.fun && game.amount > 0) {
             win = potentialAt(game.amount, game.opened.size, game.bombCount);
@@ -242,6 +304,7 @@ function pickRandom(game) {
 }
 
 function endPayload(game, note) {
+    clearTimer(game);
     return {
         embeds: [panelEmbed(game, note || null)],
         components: fullComponents(game, true)
@@ -251,45 +314,46 @@ function endPayload(game, note) {
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'mine', 'campo'],
-    description: 'Mines 5×4 realista',
+    description: 'Mines 4×4',
 
-    async execute(message, args) {
+    async execute(message, args, client) {
         const bombsRaw = parseInt(args[0], 10);
         if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
             return message.reply(
                 [
-                    '💎 **Mines 5×4**',
-                    '🎮 `O.mines <1-18>` — diversão',
+                    '💎 **Mines 4×4**',
+                    '🎮 `O.mines <1-15>` — diversão',
                     '💠 `O.mines <bombas> <valor|all|half>` — aposta',
-                    'Multi sobe a cada gema segura (fórmula de probabilidade).'
+                    '⏱️ Sem interação por **7 min** → saque automático se houver gemas.'
                 ].join('\n')
             );
         }
 
+        let game;
         if (args[1] == null || args[1] === '') {
-            const game = makeGame(message.author.id, 0, bombsRaw, true);
-            return message.reply({
-                embeds: [panelEmbed(game)],
-                components: fullComponents(game)
-            });
+            game = makeGame(message.author.id, 0, bombsRaw, true);
+        } else {
+            const bet = resolveBet(args[1], cristais.get(message.author.id), { label: '💠' });
+            if (!bet.ok) return message.reply(`❌ ${bet.error}`);
+            cristais.remove(message.author.id, bet.amount);
+            game = makeGame(message.author.id, bet.amount, bombsRaw, false);
         }
 
-        const bet = resolveBet(args[1], cristais.get(message.author.id), { label: '💠' });
-        if (!bet.ok) return message.reply(`❌ ${bet.error}`);
-
-        cristais.remove(message.author.id, bet.amount);
-        const game = makeGame(message.author.id, bet.amount, bombsRaw, false);
-
-        await message.reply({
+        const msg = await message.reply({
             embeds: [panelEmbed(game)],
             components: fullComponents(game)
         });
+
+        game.channelId = msg.channel.id;
+        game.messageId = msg.id;
+        touch(game, client || message.client);
     },
 
     async handleComponent(interaction) {
         const parts = interaction.customId.split(':');
         const action = parts[1];
         const game = games.get(parts[2]);
+        const client = interaction.client;
 
         if (!game) {
             return interaction.reply({
@@ -301,26 +365,47 @@ module.exports = {
             return interaction.reply({ content: 'Não é o seu Mines.', ephemeral: true });
         }
 
+        // ── Tentar novamente → nova partida + menção ───────────────
         if (action === 'again') {
+            let ng;
             if (game.fun) {
-                const ng = makeGame(game.userId, 0, game.bombCount, true);
-                return interaction.update({
-                    embeds: [panelEmbed(ng)],
-                    components: fullComponents(ng)
+                ng = makeGame(game.userId, 0, game.bombCount, true, {
+                    channelId: interaction.channelId
+                });
+            } else {
+                const bet = resolveBet(String(game.amount), cristais.get(game.userId), {
+                    label: '💠'
+                });
+                if (!bet.ok) {
+                    return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
+                }
+                cristais.remove(game.userId, bet.amount);
+                ng = makeGame(game.userId, bet.amount, game.bombCount, false, {
+                    channelId: interaction.channelId
                 });
             }
-            const bet = resolveBet(String(game.amount), cristais.get(game.userId), { label: '💠' });
-            if (!bet.ok) {
-                return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
-            }
-            cristais.remove(game.userId, bet.amount);
+            clearTimer(game);
             games.delete(parts[2]);
-            const ng = makeGame(game.userId, bet.amount, game.bombCount, false);
-            return interaction.update({
+
+            await interaction.update({
+                content: `<@${game.userId}> · nova mesa`,
                 embeds: [panelEmbed(ng)],
                 components: fullComponents(ng)
             });
+
+            ng.messageId = interaction.message.id;
+            ng.channelId = interaction.channelId;
+            touch(ng, client);
+            return;
         }
+
+        if (game.dead || game.cashed) {
+            if (action !== 'refresh') {
+                return interaction.reply({ content: 'Jogo já encerrado.', ephemeral: true });
+            }
+        }
+
+        touch(game, client);
 
         if (action === 'refresh') {
             const ended = game.dead || game.cashed;
@@ -355,7 +440,7 @@ module.exports = {
             }
             if (game.fun) {
                 game.cashed = true;
-                return interaction.update(endPayload(game));
+                return interaction.update(endPayload(game, 'Partida de diversão encerrada.'));
             }
             if (!game.opened.size) {
                 return interaction.reply({
