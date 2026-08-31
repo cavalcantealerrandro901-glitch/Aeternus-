@@ -46,6 +46,10 @@ function setup(client) {
         res.sendFile(path.join(__dirname, '..', 'public', 'itens.html'));
     });
 
+    app.get('/efeitos', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'efeitos.html'));
+    });
+
     app.get('/login', (req, res) => {
         if (!CLIENT_ID) return res.status(500).send('CLIENT_ID missing');
         const url = new URL('https://discord.com/api/oauth2/authorize');
@@ -143,6 +147,7 @@ function setup(client) {
             },
             inventory: shop.getInv(uid),
             equippedDecoration: shop.getEquippedDecoration(uid),
+            equippedEffect: shop.getEquippedEffect(uid),
             snapshot: snap,
             bot: client.user
                 ? {
@@ -182,6 +187,15 @@ function setup(client) {
         });
     });
 
+    app.get('/api/shop/effects', (req, res) => {
+        const s = sessionUser(req);
+        res.json({
+            items: shop.effects(),
+            owned: s ? shop.getInv(s.user.id).owned : [],
+            equipped: s ? shop.getInv(s.user.id).equipped : null
+        });
+    });
+
     app.post('/api/shop/buy', (req, res) => {
         const s = sessionUser(req);
         if (!s) return res.status(401).json({ error: 'Faça login no Discord.' });
@@ -202,7 +216,8 @@ function setup(client) {
                 flocos: flocos.get(s.user.id),
                 cristais: cristais.get(s.user.id)
             },
-            equipped: shop.getEquippedDecoration(s.user.id)
+            equipped: shop.getEquippedDecoration(s.user.id),
+            equippedEffect: shop.getEquippedEffect(s.user.id)
         });
     });
 
