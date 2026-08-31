@@ -10,8 +10,8 @@ const { fmt, betFooter, C } = require('../utils/gameStyle');
 
 /**
  * 4 colunas × 4 linhas = 16 casas
- * row4: Aleatório | Atualizar
- * row5: Sacar / Encerrar
+ * row4: Aleatório | Atualizar | Sacar
+ * row5: Tentar novamente (quando termina)
  * (Discord max 5 ActionRows; texto entre botões só no embed)
  */
 const COLS = 4;
@@ -211,8 +211,14 @@ function boardRows(game, reveal = false) {
     return rows;
 }
 
-function topControls(game) {
+function controlsRow(game) {
     const ended = game.dead || game.cashed;
+    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
+    const canCash = game.opened.size > 0 && !ended;
+
+    let cashLabel = game.fun ? 'Encerrar' : 'Sacar';
+    if (!game.fun && canCash) cashLabel = `Sacar ❄️ ${fmt(pot)}`;
+
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(`minas:random:${game.id}`)
@@ -224,22 +230,10 @@ function topControls(game) {
             .setCustomId(`minas:refresh:${game.id}`)
             .setLabel('Atualizar')
             .setEmoji('🔄')
-            .setStyle(ButtonStyle.Secondary)
-    );
-}
-
-function cashRow(game) {
-    const ended = game.dead || game.cashed;
-    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
-    const canCash = game.opened.size > 0 && !ended;
-
-    let label = game.fun ? 'Encerrar' : 'Sacar';
-    if (!game.fun && canCash) label = `Sacar ❄️ ${fmt(pot)}`;
-
-    return new ActionRowBuilder().addComponents(
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId(`minas:cash:${game.id}`)
-            .setLabel(label.slice(0, 80))
+            .setLabel(cashLabel.slice(0, 80))
             .setEmoji(game.fun ? '🏁' : '💵')
             .setStyle(ButtonStyle.Success)
             .setDisabled(ended || (!game.fun && !canCash))
@@ -262,8 +256,8 @@ function fullComponents(game, reveal = false) {
         // tabuleiro revelado + tentar novamente
         return [...boardRows(game, true), againRow(game)];
     }
-    // grade + aleatório/atualizar + sacar
-    return [...boardRows(game, false), topControls(game), cashRow(game)];
+    // grade + controles (aleatório/atualizar/sacar em uma única row)
+    return [...boardRows(game, false), controlsRow(game)];
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
