@@ -40,7 +40,7 @@ function buttons(guildId, isOwner) {
     ];
 }
 
-async function buildCardBuffer(target) {
+async function buildAttachment(target) {
     const x = xp.get(target.id);
     const dec = shop.getEquippedDecoration(target.id);
     const p = profile.get(target.id);
@@ -49,7 +49,7 @@ async function buildCardBuffer(target) {
     for (let lv = 0; lv < x.level; lv++) remain -= xp.xpForLevel(lv);
     if (remain < 0) remain = 0;
 
-    return profileCard.render({
+    const { buffer, name } = await profileCard.render({
         userId: target.id,
         username: target.username,
         avatarURL: target.displayAvatarURL({ extension: 'png', size: 256 }),
@@ -60,43 +60,14 @@ async function buildCardBuffer(target) {
         bgImage: dec?.image || null,
         love: profileCard.loveTypeFor(target.id)
     });
-}
 
-async function showProfile(ctx, target) {
-    const isSlash = Boolean(ctx.isChatInputCommand && ctx.isChatInputCommand());
-    const viewer = ctx.user || ctx.author;
-    const isOwner = viewer.id === target.id;
-
-    snapshot.captureFromLive(target.id, {
-        username: target.username,
-        avatarURL: target.displayAvatarURL({ extension: 'png', size: 128 })
-    });
-
-    if (isSlash && !ctx.deferred && !ctx.replied) {
-        await ctx.deferReply().catch(() => {});
-    }
-
-    const buf = await buildCardBuffer(target);
-    const file = new AttachmentBuilder(buf, { name: 'perfil.svg' });
-
-    // SEM embed — só a imagem/card + botões
-    const payload = {
-        content: '',
-        files: [file],
-        components: buttons(ctx.guild?.id, isOwner)
-    };
-
-    if (isSlash) {
-        if (ctx.deferred || ctx.replied) return ctx.editReply(payload);
-        return ctx.reply(payload);
-    }
-    return ctx.reply(payload);
+    return new AttachmentBuilder(buffer, { name });
 }
 
 module.exports = {
     name: 'perfil',
     aliases: ['profile', 'eu'],
-    description: 'Card de perfil (só imagem)',
+    description: 'Card de perfil em imagem PNG',
     data: new SlashCommandBuilder()
         .setName('perfil')
         .setDescription('Mostra o perfil em card')
@@ -106,14 +77,13 @@ module.exports = {
 
     async execute(message) {
         const target = message.mentions.users.first() || message.author;
-        const wait = await message.reply('🖼️ Montando card…');
+        const wait = await message.reply('🖼️ Gerando perfil…');
         try {
             snapshot.captureFromLive(target.id, {
                 username: target.username,
                 avatarURL: target.displayAvatarURL({ extension: 'png', size: 128 })
             });
-            const buf = await buildCardBuffer(target);
-            const file = new AttachmentBuilder(buf, { name: 'perfil.svg' });
+            const file = await buildAttachment(target);
             const isOwner = message.author.id === target.id;
             await wait.edit({
                 content: null,
@@ -122,15 +92,29 @@ module.exports = {
             });
         } catch (e) {
             console.error('[perfil]', e);
-            await wait.edit('❌ Não consegui gerar o card.').catch(() => {});
+            await wait.edit('❌ Não consegui gerar o card. Rode `npm i sharp`.').catch(() => {});
         }
     },
 
     async executeSlash(interaction) {
-        await showProfile(
-            interaction,
-            interaction.options.getUser('usuario') || interaction.user
-        );
+        const target = interaction.options.getUser('usuario') || interaction.user;
+        await interaction.deferReply().catch(() => {});
+        try {
+            snapshot.captureFromLive(target.id, {
+                username: target.username,
+                avatarURL: target.displayAvatarURL({ extension: 'png', size: 128 })
+            });
+            const file = await buildAttachment(target);
+            const isOwner = interaction.user.id === target.id;
+            await interaction.editReply({
+                content: null,
+                files: [file],
+                components: buttons(interaction.guild?.id, isOwner)
+            });
+        } catch (e) {
+            console.error('[perfil]', e);
+            await interaction.editReply('❌ Não consegui gerar o card. Rode `npm i sharp`.').catch(() => {});
+        }
     },
 
     async handleComponent(interaction) {
@@ -181,9 +165,8 @@ module.exports = {
             if (!result.ok) {
                 return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
             }
-            await interaction.update({ content: '✅ Background equipado! Gerando card…', components: [] });
-            const buf = await buildCardBuffer(interaction.user);
-            const file = new AttachmentBuilder(buf, { name: 'perfil.svg' });
+            await interaction.update({ content: '✅ Gerando card…', components: [] });
+            const file = await buildAttachment(interaction.user);
             return interaction.followUp({
                 files: [file],
                 components: buttons(interaction.guild?.id, true)
@@ -201,8 +184,7 @@ module.exports = {
         });
 
         await interaction.deferReply({ ephemeral: true });
-        const buf = await buildCardBuffer(interaction.user);
-        const file = new AttachmentBuilder(buf, { name: 'perfil.svg' });
+        const file = await buildAttachment(interaction.user);
         await interaction.editReply({
             content: '✅ Sobre Mim atualizado!',
             files: [file]
