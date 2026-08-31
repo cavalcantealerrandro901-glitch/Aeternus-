@@ -96,6 +96,90 @@ const DECORATIONS = [
     }
 ];
 
+/** Efeitos visuais do card de perfil */
+const EFFECTS = [
+    {
+        id: 'fx_brilho',
+        type: 'effect',
+        name: 'Brilho Suave',
+        desc: 'Halo luminoso ao redor do avatar',
+        price: 2500,
+        currency: 'cristais',
+        style: 'glow',
+        icon: '✨'
+    },
+    {
+        id: 'fx_neon',
+        type: 'effect',
+        name: 'Aura Neon',
+        desc: 'Moldura neon rosa/azul',
+        price: 4200,
+        currency: 'cristais',
+        style: 'neon',
+        icon: '💜'
+    },
+    {
+        id: 'fx_ouro',
+        type: 'effect',
+        name: 'Moldura de Ouro',
+        desc: 'Borda dourada premium',
+        price: 5500,
+        currency: 'cristais',
+        style: 'gold',
+        icon: '🥇'
+    },
+    {
+        id: 'fx_estrelas',
+        type: 'effect',
+        name: 'Chuva de Estrelas',
+        desc: 'Partículas brilhantes no card',
+        price: 3800,
+        currency: 'cristais',
+        style: 'stars',
+        icon: '🌟'
+    },
+    {
+        id: 'fx_fogo',
+        type: 'effect',
+        name: 'Chamas',
+        desc: 'Bordas em tom de fogo',
+        price: 4800,
+        currency: 'cristais',
+        style: 'fire',
+        icon: '🔥'
+    },
+    {
+        id: 'fx_gelo',
+        type: 'effect',
+        name: 'Cristal de Gelo',
+        desc: 'Aura gelada azul-ciano',
+        price: 3600,
+        currency: 'cristais',
+        style: 'ice',
+        icon: '❄️'
+    },
+    {
+        id: 'fx_arcoiris',
+        type: 'effect',
+        name: 'Arco-íris',
+        desc: 'Moldura multicolor',
+        price: 6000,
+        currency: 'cristais',
+        style: 'rainbow',
+        icon: '🌈'
+    },
+    {
+        id: 'fx_sombra',
+        type: 'effect',
+        name: 'Sombra Real',
+        desc: 'Sombra dramática no avatar',
+        price: 2000,
+        currency: 'cristais',
+        style: 'shadow',
+        icon: '🌑'
+    }
+];
+
 const ITEMS = [
     {
         id: 'item_titulo_lenda',
@@ -172,7 +256,7 @@ const ITEMS = [
     }
 ];
 
-const GLOBAL_ITEMS = [...DECORATIONS, ...ITEMS];
+const GLOBAL_ITEMS = [...DECORATIONS, ...ITEMS, ...EFFECTS];
 
 function imageUrl(item) {
     if (!item?.prompt) return null;
@@ -196,7 +280,7 @@ function getInv(userId) {
     const d = invAll()[userId] || {};
     return {
         owned: Array.isArray(d.owned) ? d.owned : [],
-        equipped: d.equipped || { decoration: null, title: null },
+        equipped: d.equipped || { decoration: null, title: null, effect: null },
         effects: d.effects || {}
     };
 }
@@ -227,6 +311,10 @@ function guildVips(guildId) {
 
 function decorations() {
     return withImages(DECORATIONS);
+}
+
+function effects() {
+    return EFFECTS.map((e) => ({ ...e }));
 }
 
 function items(guildId) {
@@ -285,9 +373,11 @@ function buy(userId, guildId, itemId) {
     }
 
     if (!inv.owned.includes(itemId)) inv.owned.push(itemId);
+    if (!inv.equipped) inv.equipped = { decoration: null, title: null, effect: null };
 
     if (item.type === 'decoration') inv.equipped.decoration = itemId;
     if (item.title) inv.equipped.title = itemId;
+    if (item.type === 'effect') inv.equipped.effect = itemId;
 
     saveInv(userId, inv);
     return { ok: true, item, inv };
@@ -298,8 +388,10 @@ function equip(userId, itemId) {
     if (!inv.owned.includes(itemId)) return { ok: false, error: 'Você não possui este item.' };
     const item = GLOBAL_ITEMS.find((i) => i.id === itemId);
     if (!item) return { ok: false, error: 'Item inválido.' };
+    if (!inv.equipped) inv.equipped = { decoration: null, title: null, effect: null };
     if (item.type === 'decoration') inv.equipped.decoration = itemId;
     if (item.title) inv.equipped.title = itemId;
+    if (item.type === 'effect') inv.equipped.effect = itemId;
     saveInv(userId, inv);
     return { ok: true, inv, item: { ...item, image: imageUrl(item) } };
 }
@@ -320,9 +412,21 @@ function getEquippedTitle(userId) {
     return item?.title || null;
 }
 
+function getEquippedEffect(userId) {
+    const inv = getInv(userId);
+    const id = inv.equipped?.effect;
+    if (!id) return null;
+    return EFFECTS.find((e) => e.id === id) || null;
+}
+
 function ownedDecorations(userId) {
     const inv = getInv(userId);
     return decorations().filter((d) => inv.owned.includes(d.id));
+}
+
+function ownedEffects(userId) {
+    const inv = getInv(userId);
+    return effects().filter((e) => inv.owned.includes(e.id));
 }
 
 function getDailyBoost(userId) {
@@ -352,6 +456,11 @@ function itemsPanelUrl(guildId) {
     return guildId ? `${base}/itens?guild=${guildId}` : `${base}/itens`;
 }
 
+function effectsPanelUrl(guildId) {
+    const base = panelBase();
+    return guildId ? `${base}/efeitos?guild=${guildId}` : `${base}/efeitos`;
+}
+
 function shopPanelUrl(guildId) {
     return itemsPanelUrl(guildId);
 }
@@ -360,8 +469,10 @@ module.exports = {
     GLOBAL_ITEMS,
     DECORATIONS,
     ITEMS,
+    EFFECTS,
     catalog,
     decorations,
+    effects,
     items,
     findItem,
     buy,
@@ -369,12 +480,15 @@ module.exports = {
     getInv,
     getEquippedDecoration,
     getEquippedTitle,
+    getEquippedEffect,
     ownedDecorations,
+    ownedEffects,
     getDailyBoost,
     guildVips,
     imageUrl,
     decorPanelUrl,
     itemsPanelUrl,
+    effectsPanelUrl,
     shopPanelUrl,
     panelBase
 };
