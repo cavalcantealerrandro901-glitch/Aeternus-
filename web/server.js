@@ -42,6 +42,10 @@ function setup(client) {
         res.sendFile(path.join(__dirname, '..', 'public', 'decoracoes.html'));
     });
 
+    app.get('/itens', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'itens.html'));
+    });
+
     app.get('/login', (req, res) => {
         if (!CLIENT_ID) return res.status(500).send('CLIENT_ID missing');
         const url = new URL('https://discord.com/api/oauth2/authorize');
@@ -81,7 +85,6 @@ function setup(client) {
                 })
             ).json();
 
-            // snapshot automático no login (10 dias)
             try {
                 const avatarURL = user.avatar
                     ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
@@ -118,7 +121,6 @@ function setup(client) {
         if (!s) return res.status(401).json({ error: 'auth' });
         const uid = s.user.id;
 
-        // atualiza snapshot sempre que o painel pede /api/me
         let snap;
         try {
             const avatarURL = s.user.avatar
@@ -169,6 +171,17 @@ function setup(client) {
         });
     });
 
+    app.get('/api/shop/items', (req, res) => {
+        const s = sessionUser(req);
+        const guildId = req.query.guild || null;
+        const items = shop.items(guildId);
+        res.json({
+            items,
+            owned: s ? shop.getInv(s.user.id).owned : [],
+            equipped: s ? shop.getInv(s.user.id).equipped : null
+        });
+    });
+
     app.post('/api/shop/buy', (req, res) => {
         const s = sessionUser(req);
         if (!s) return res.status(401).json({ error: 'Faça login no Discord.' });
@@ -182,6 +195,9 @@ function setup(client) {
         res.json({
             ok: true,
             item: result.item,
+            gain: result.gain,
+            gainCristais: result.gainCristais,
+            boost: result.boost,
             balance: {
                 flocos: flocos.get(s.user.id),
                 cristais: cristais.get(s.user.id)
