@@ -1,18 +1,66 @@
+const { Collection } = require('discord.js');
+
+/** Ponte slash → execute de prefixo (args em opção string) */
+async function bridgeSlashToPrefix(interaction, cmd, client) {
+    const raw = interaction.options?.getString?.('args') || '';
+    const args = raw.trim() ? raw.trim().split(/\s+/) : [];
+
+    // menções em args: <@id>
+    const mentionUsers = new Collection();
+    for (const a of args) {
+        const m = a.match(/^<@!?(\d+)>$/);
+        if (m) {
+            const u = await client.users.fetch(m[1]).catch(() => null);
+            if (u) mentionUsers.set(u.id, u);
+        }
+    }
+
+    let replied = false;
+    const fakeMessage = {
+        author: interaction.user,
+        member: interaction.member,
+        guild: interaction.guild,
+        channel: interaction.channel,
+        client,
+        content: raw,
+        mentions: {
+            users: mentionUsers,
+            members: interaction.guild?.members?.cache || new Collection(),
+            has: () => false
+        },
+        async reply(payload) {
+            if (!replied && !interaction.replied && !interaction.deferred) {
+                replied = true;
+                return interaction.reply(payload);
+            }
+            if (interaction.deferred && !interaction.replied) {
+                replied = true;
+                return interaction.editReply(payload);
+            }
+            return interaction.followUp(payload);
+        }
+    };
+
+    await cmd.execute(fakeMessage, args, client);
+
+    if (!replied && !interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '✅', ephemeral: true }).catch(() => {});
+    }
+}
+
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
         try {
             if (interaction.isChatInputCommand()) {
                 const name = interaction.commandName;
-                const cmd =
-                    client.slash.get(name) ||
-                    client.commands.get(name);
+                const cmd = client.slash.get(name) || client.commands.get(name);
 
                 if (!cmd) {
                     return interaction
                         .reply({
                             content:
-                                '❌ Este slash não existe mais no bot. Aguarde a sincronização ou rode `node scripts/deploy-slash.js`.',
+                                '❌ Este slash não existe mais. Aguarde a sincronização.',
                             ephemeral: true
                         })
                         .catch(() => {});
@@ -23,13 +71,8 @@ module.exports = {
                     return;
                 }
 
-                // fallback: alguns comandos só têm execute (prefixo)
                 if (typeof cmd.execute === 'function') {
-                    await interaction.reply({
-                        content:
-                            'Este comando é de **prefixo**. Use no chat, não como slash.',
-                        ephemeral: true
-                    }).catch(() => {});
+                    await bridgeSlashToPrefix(interaction, cmd, client);
                     return;
                 }
 
@@ -57,7 +100,8 @@ module.exports = {
             console.error('[interaction]', e);
             const payload = { content: '❌ Erro na interação.', ephemeral: true };
             try {
-                if (interaction.replied || interaction.deferred) await interaction.followUp(payload);
+                if (interaction.replied || interaction.deferred)
+                    await interaction.followUp(payload);
                 else await interaction.reply(payload);
             } catch (_) {}
         }

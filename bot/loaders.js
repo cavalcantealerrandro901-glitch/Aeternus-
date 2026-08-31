@@ -1,5 +1,34 @@
 const fs = require('fs');
 const path = require('path');
+const { SlashCommandBuilder } = require('discord.js');
+
+function sanitizeSlashName(name) {
+    return String(name || '')
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9_-]/g, '')
+        .slice(0, 32);
+}
+
+function ensureSlashData(cmd) {
+    if (cmd.data) return;
+    const n = sanitizeSlashName(cmd.name);
+    if (!n || n.length < 1) return;
+
+    try {
+        cmd.data = new SlashCommandBuilder()
+            .setName(n)
+            .setDescription(String(cmd.description || cmd.name || n).slice(0, 100))
+            .addStringOption((o) =>
+                o
+                    .setName('args')
+                    .setDescription('Argumentos do comando (opcional)')
+                    .setRequired(false)
+            );
+    } catch (e) {
+        // nome inválido para slash — ignora
+    }
+}
 
 function loadCommands(client) {
     const dir = path.join(__dirname, '..', 'commands');
@@ -11,12 +40,13 @@ function loadCommands(client) {
             const cmd = require(full);
             if (!cmd?.name) continue;
 
+            ensureSlashData(cmd);
+
             client.commands.set(cmd.name, cmd);
             if (Array.isArray(cmd.aliases)) {
                 for (const a of cmd.aliases) client.commands.set(String(a).toLowerCase(), cmd);
             }
 
-            // slash oficial
             if (cmd.data?.name) {
                 client.slash.set(cmd.data.name, cmd);
                 console.log(`⚡ [SLASH] /${cmd.data.name}`);

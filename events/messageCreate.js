@@ -1,10 +1,10 @@
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getPrefix, getSettings } = require('../utils/settings');
 const xp = require('../utils/xp');
 const afk = require('../utils/afk');
 const msgStats = require('../utils/msgStats');
 const antispam = require('../utils/antispam');
 const pending = require('../utils/converterPending');
-const { PermissionFlagsBits } = require('discord.js');
 const { rerollDrop } = require('../systems/drops');
 
 const xpCd = new Map();
@@ -23,7 +23,6 @@ module.exports = {
             }
         } catch (_) {}
 
-        // liquidação de câmbio (1x a cada 2 min por user)
         try {
             const now = Date.now();
             const last = pendingPing.get(message.author.id) || 0;
@@ -31,7 +30,9 @@ module.exports = {
                 pendingPing.set(message.author.id, now);
                 const rel = pending.releaseDue(message.author.id);
                 if (rel.length) {
-                    const sum = rel.map((r) => `• ${Number(r.amount).toLocaleString('pt-BR')} → ${r.deposited}`).join('\n');
+                    const sum = rel
+                        .map((r) => `• ${Number(r.amount).toLocaleString('pt-BR')} → ${r.deposited}`)
+                        .join('\n');
                     message.channel
                         .send(`${message.author} 💼 **Câmbio liberado após 1 dia:**\n${sum}`)
                         .catch(() => {});
@@ -54,6 +55,52 @@ module.exports = {
                 if (afk.has(id)) {
                     const d = afk.get(id);
                     message.reply(`💤 <@${id}> está AFK: **${d.reason}**`).catch(() => {});
+                }
+            }
+        } catch (_) {}
+
+        // ── Menção ao bot → apresentação + prefixo do servidor ──────
+        try {
+            if (message.mentions.has(client.user) && !message.mentions.everyone) {
+                const onlyMention =
+                    message.content.replace(/<@!?\d+>/g, '').trim().length === 0 ||
+                    /^(ol[aá]|oi|hey|help|ajuda)\s*$/i.test(
+                        message.content.replace(/<@!?\d+>/g, '').trim()
+                    );
+
+                if (onlyMention || message.mentions.users.has(client.user.id)) {
+                    // evita responder se for comando com menção no meio
+                    const prefix = getPrefix(message.guild.id);
+                    const startsWithPrefix = message.content
+                        .toLowerCase()
+                        .startsWith(prefix.toLowerCase());
+
+                    if (!startsWithPrefix) {
+                        const embed = new EmbedBuilder()
+                            .setColor(0xa78bfa)
+                            .setAuthor({
+                                name: client.user.username,
+                                iconURL: client.user.displayAvatarURL({ size: 64 })
+                            })
+                            .setTitle(`Olá, ${message.author.username}`)
+                            .setDescription(
+                                [
+                                    `Eu sou o **${client.user.username}** — economia, jogos e utilidades para o seu servidor.`,
+                                    '',
+                                    `**Prefixo neste servidor:** \`${prefix}\``,
+                                    `**Exemplos:** \`${prefix}ajuda\` · \`${prefix}saldo\` · \`${prefix}daily\``,
+                                    '',
+                                    'Também respondo a comandos **/** (slash).',
+                                    `Digite \`${prefix}ajuda\` para a central completa.`
+                                ].join('\n')
+                            )
+                            .setThumbnail(client.user.displayAvatarURL({ size: 128 }))
+                            .setFooter({ text: `${message.guild.name} · Aeternus` })
+                            .setTimestamp();
+
+                        await message.reply({ embeds: [embed] }).catch(() => {});
+                        return;
+                    }
                 }
             }
         } catch (_) {}
