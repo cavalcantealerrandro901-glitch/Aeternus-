@@ -12,7 +12,6 @@ const cristais = require('../utils/cristais');
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
-
 function coin(c) {
     return c === 'flocos' ? '❄️' : '💠';
 }
@@ -28,6 +27,9 @@ function parseCat(raw) {
         return 'decoracao';
     }
     if (['item', 'itens', 'items', 'titulo', 'titulos'].includes(a)) return 'itens';
+    if (['efeito', 'efeitos', 'fx', 'effect', 'effects', 'especial', 'especiais'].includes(a)) {
+        return 'efeitos';
+    }
     return 'menu';
 }
 
@@ -50,12 +52,13 @@ function menuEmbed(user) {
                 '👑 **`loja vip`** — cargos VIP deste servidor',
                 '🎨 **`loja decoração`** — fundos de perfil (painel)',
                 '🎁 **`loja itens`** — títulos, boosts e caixas (painel)',
+                '✨ **`loja efeitos`** — efeitos especiais no perfil (painel)',
                 '',
                 '_VIPs são configurados no painel de confirmação do servidor._'
             ].join('\n')
         )
         .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'O.loja vip · O.loja decoração · O.loja itens' })
+        .setFooter({ text: 'O.loja vip · decoração · itens · efeitos' })
         .setTimestamp();
 }
 
@@ -76,7 +79,12 @@ function menuRows(guildId) {
                 .setLabel('Itens')
                 .setEmoji('🎁')
                 .setStyle(ButtonStyle.Link)
-                .setURL(shop.itemsPanelUrl(guildId))
+                .setURL(shop.itemsPanelUrl(guildId)),
+            new ButtonBuilder()
+                .setLabel('Efeitos')
+                .setEmoji('✨')
+                .setStyle(ButtonStyle.Link)
+                .setURL(shop.effectsPanelUrl(guildId))
         )
     ];
 }
@@ -91,7 +99,7 @@ function vipEmbed(user, guild) {
         : [
               '_Nenhum VIP à venda neste servidor._',
               '',
-              'Um administrador pode adicionar VIPs no **painel** → configurações da loja / confirmação.'
+              'Um administrador pode adicionar VIPs no **painel**.'
           ];
 
     return new EmbedBuilder()
@@ -99,21 +107,10 @@ function vipEmbed(user, guild) {
         .setAuthor({ name: 'Aeternus · VIP' })
         .setTitle(`👑  VIP · ${guild?.name || 'Servidor'}`)
         .setDescription(
-            [
-                `👤 ${user}`,
-                balLine(user),
-                '',
-                ...lines,
-                '',
-                list.length
-                    ? 'Compre no **painel de itens** (VIPs do servidor aparecem lá) ou peça a um adm o fluxo configurado.'
-                    : ''
-            ]
-                .filter(Boolean)
-                .join('\n')
+            [`👤 ${user}`, balLine(user), '', ...lines].join('\n')
         )
         .setThumbnail(guild?.iconURL?.({ size: 128 }) || user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'VIPs vêm do painel de confirmação deste servidor' })
+        .setFooter({ text: 'VIPs do painel de confirmação' })
         .setTimestamp();
 }
 
@@ -121,7 +118,7 @@ function vipRows(guildId) {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel('Abrir loja de itens (VIP)')
+                .setLabel('Abrir loja de itens')
                 .setEmoji('👑')
                 .setStyle(ButtonStyle.Link)
                 .setURL(shop.itemsPanelUrl(guildId)),
@@ -143,18 +140,13 @@ function decorEmbed(user) {
                 `👤 ${user}`,
                 balLine(user),
                 '',
-                '✨ **Fundos exclusivos** para o seu card de perfil.',
-                '🖼️ Cada arte é única — preços em **cristais**.',
-                '⚡ Ao comprar, o background **vai direto** para o `O.perfil`.',
+                '✨ Fundos exclusivos para o card de perfil.',
+                '🖼️ Ao comprar, o background vai direto para o `O.perfil`.',
                 '',
-                'Abra o painel, escolha a imagem que mais combina com você',
-                'e transforme seu perfil num cartão de outro nível.',
-                '',
-                '_Dica: use o menu ☰ no canto superior direito para trocar para Itens._'
+                'Abra o painel e escolha a arte que combina com você.'
             ].join('\n')
         )
         .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'Compras no painel web · sincronizado com o bot' })
         .setTimestamp();
 }
 
@@ -166,11 +158,6 @@ function decorRows(guildId) {
                 .setEmoji('🎨')
                 .setStyle(ButtonStyle.Link)
                 .setURL(shop.decorPanelUrl(guildId)),
-            new ButtonBuilder()
-                .setLabel('Itens')
-                .setEmoji('🎁')
-                .setStyle(ButtonStyle.Link)
-                .setURL(shop.itemsPanelUrl(guildId)),
             new ButtonBuilder()
                 .setCustomId('loja:show:menu')
                 .setLabel('Menu')
@@ -189,19 +176,12 @@ function itensEmbed(user) {
                 `👤 ${user}`,
                 balLine(user),
                 '',
-                '👑 **Títulos** — aparecem no seu `O.perfil` na hora',
-                '⚡ **Boosts** — daily e bônus temporários',
-                '📦 **Caixas** — recompensas instantâneas',
-                '💎 **VIP do servidor** — se o adm configurou no painel',
+                '👑 Títulos · ⚡ Boosts · 📦 Caixas · 💎 VIP',
                 '',
-                'Tudo é comprado no **painel**. Seu saldo de flocos e cristais',
-                'é o mesmo do bot — seguro e sincronizado.',
-                '',
-                '_Após comprar um título, use `O.perfil` para ver a mudança._'
+                'Títulos aparecem no `O.perfil` na hora da compra.'
             ].join('\n')
         )
         .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'Painel · Itens & Títulos' })
         .setTimestamp();
 }
 
@@ -214,10 +194,50 @@ function itensRows(guildId) {
                 .setStyle(ButtonStyle.Link)
                 .setURL(shop.itemsPanelUrl(guildId)),
             new ButtonBuilder()
-                .setLabel('Decorações')
-                .setEmoji('🎨')
+                .setCustomId('loja:show:menu')
+                .setLabel('Menu')
+                .setStyle(ButtonStyle.Secondary)
+        )
+    ];
+}
+
+function efeitosEmbed(user) {
+    const list = shop.effects();
+    const preview = list
+        .slice(0, 6)
+        .map((e) => `${e.icon || '✨'} **${e.name}** — ${coin(e.currency)} **${fmt(e.price)}**`)
+        .join('\n');
+
+    return new EmbedBuilder()
+        .setColor(0xf0abfc)
+        .setAuthor({ name: 'Aeternus · Efeitos' })
+        .setTitle('✨  Efeitos Especiais do Perfil')
+        .setDescription(
+            [
+                `👤 ${user}`,
+                balLine(user),
+                '',
+                'Efeitos visuais no **card** do perfil:',
+                'molduras neon, ouro, estrelas, fogo, gelo…',
+                '',
+                preview || '_Catálogo no painel._',
+                '',
+                'Compre no painel — o efeito **ativa na hora** no `O.perfil`.'
+            ].join('\n')
+        )
+        .setThumbnail(user.displayAvatarURL({ size: 128 }))
+        .setFooter({ text: 'O.loja efeitos · painel /efeitos' })
+        .setTimestamp();
+}
+
+function efeitosRows(guildId) {
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Abrir Efeitos')
+                .setEmoji('✨')
                 .setStyle(ButtonStyle.Link)
-                .setURL(shop.decorPanelUrl(guildId)),
+                .setURL(shop.effectsPanelUrl(guildId)),
             new ButtonBuilder()
                 .setCustomId('loja:show:menu')
                 .setLabel('Menu')
@@ -228,35 +248,31 @@ function itensRows(guildId) {
 
 function build(cat, user, guild) {
     const gid = guild?.id;
-    if (cat === 'vip') {
-        return { embeds: [vipEmbed(user, guild)], components: vipRows(gid) };
-    }
-    if (cat === 'decoracao') {
-        return { embeds: [decorEmbed(user)], components: decorRows(gid) };
-    }
-    if (cat === 'itens') {
-        return { embeds: [itensEmbed(user)], components: itensRows(gid) };
-    }
+    if (cat === 'vip') return { embeds: [vipEmbed(user, guild)], components: vipRows(gid) };
+    if (cat === 'decoracao') return { embeds: [decorEmbed(user)], components: decorRows(gid) };
+    if (cat === 'itens') return { embeds: [itensEmbed(user)], components: itensRows(gid) };
+    if (cat === 'efeitos') return { embeds: [efeitosEmbed(user)], components: efeitosRows(gid) };
     return { embeds: [menuEmbed(user)], components: menuRows(gid) };
 }
 
 module.exports = {
     name: 'loja',
     aliases: ['shop', 'store', 'buy'],
-    description: 'Loja: vip · decoração · itens',
+    description: 'Loja: vip · decoração · itens · efeitos',
     data: new SlashCommandBuilder()
         .setName('loja')
         .setDescription('Abre a loja Aeternus')
         .addStringOption((o) =>
             o
                 .setName('categoria')
-                .setDescription('vip | decoracao | itens')
+                .setDescription('vip | decoracao | itens | efeitos')
                 .setRequired(false)
                 .addChoices(
                     { name: 'Menu', value: 'menu' },
                     { name: 'VIP', value: 'vip' },
                     { name: 'Decoração', value: 'decoracao' },
-                    { name: 'Itens', value: 'itens' }
+                    { name: 'Itens', value: 'itens' },
+                    { name: 'Efeitos', value: 'efeitos' }
                 )
         ),
 
@@ -273,9 +289,7 @@ module.exports = {
     async handleComponent(interaction) {
         const id = interaction.customId;
         if (!id.startsWith('loja:show:')) return;
-
         const cat = id.split(':')[2] || 'menu';
-        const payload = build(cat, interaction.user, interaction.guild);
-        return interaction.update(payload);
+        return interaction.update(build(cat, interaction.user, interaction.guild));
     }
 };
