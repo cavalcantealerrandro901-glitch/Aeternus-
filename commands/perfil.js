@@ -7,7 +7,6 @@ const {
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
-    AttachmentBuilder,
     SlashCommandBuilder
 } = require('discord.js');
 const flocos = require('../utils/flocos');
@@ -16,8 +15,19 @@ const bank = require('../utils/bank');
 const xp = require('../utils/xp');
 const shop = require('../utils/shop');
 const profile = require('../utils/profile');
-const profileCard = require('../utils/profileCard');
 const snapshot = require('../utils/userSnapshot');
+
+function fmt(n) {
+    return Number(n || 0).toLocaleString('pt-BR');
+}
+
+/** Banner padrão (imagem real, URL pública — Discord carrega) */
+function defaultBanner() {
+    const q = encodeURIComponent(
+        'aesthetic blue purple gradient soft abstract waves profile banner no text high quality'
+    );
+    return `https://image.pollinations.ai/prompt/${q}?width=960&height=360&nologo=true&seed=77&model=flux`;
+}
 
 function buttons(guildId, isOwner) {
     const decorUrl = shop.decorPanelUrl(guildId);
@@ -44,28 +54,89 @@ function buttons(guildId, isOwner) {
     ];
 }
 
-function buildCardData(target) {
+function buildEmbed(target, guild) {
     const x = xp.get(target.id);
+    const inv = shop.getInv(target.id);
     const dec = shop.getEquippedDecoration(target.id);
+    const title = shop.getEquippedTitle(target.id);
     const p = profile.get(target.id);
+
     let remain = x.xp;
     for (let lv = 0; lv < x.level; lv++) remain -= xp.xpForLevel(lv);
     if (remain < 0) remain = 0;
+    const xpNeed = xp.xpForLevel(x.level);
 
-    return {
-        username: target.username,
-        avatarURL: target.displayAvatarURL({ extension: 'png', size: 128 }),
-        title: shop.getEquippedTitle(target.id) || 'Membro',
-        aboutMe: p.aboutMe || 'Ainda sem biografia… Use Alterar Sobre Mim.',
-        level: x.level,
-        xpRemain: Math.floor(remain),
-        xpNeed: xp.xpForLevel(x.level),
-        flocos: flocos.get(target.id),
-        cristais: cristais.get(target.id),
-        bank: bank.get(target.id),
-        bgImage: dec?.image || null,
-        decorationName: dec?.name || 'Padrão'
-    };
+    const about =
+        p.aboutMe?.trim() ||
+        'Ainda sem biografia… Use **Alterar Sobre Mim**.';
+
+    // Imagem de fundo = decoração comprada (URL pública) — assim o Discord mostra
+    const banner = dec?.image || defaultBanner();
+
+    const embed = new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setAuthor({
+            name: target.username,
+            iconURL: target.displayAvatarURL({ size: 128 })
+        })
+        .setTitle(title ? `👑 ${title}` : '✨ Perfil Aeternus')
+        .setDescription(
+            [
+                dec ? `🖼️ **Background:** ${dec.name}` : '🖼️ Background padrão',
+                guild ? `🏠 **${guild.name}**` : null,
+                '',
+                '━━━━━━━━━━━━━━━━━━━━',
+                '**📝 Sobre Mim**',
+                about,
+                '━━━━━━━━━━━━━━━━━━━━'
+            ]
+                .filter(Boolean)
+                .join('\n')
+        )
+        // “cards” separados — cada field é um bloco
+        .addFields(
+            {
+                name: '⭐ Nível',
+                value: `**${x.level}**\n\`${Math.floor(remain)} / ${xpNeed} XP\``,
+                inline: true
+            },
+            {
+                name: '❄️ Flocos',
+                value: `**${fmt(flocos.get(target.id))}**\ncarteira`,
+                inline: true
+            },
+            {
+                name: '💠 Cristais',
+                value: `**${fmt(cristais.get(target.id))}**\npremium`,
+                inline: true
+            },
+            {
+                name: '🏦 Banco',
+                value: `**${fmt(bank.get(target.id))}**\nguardado`,
+                inline: true
+            },
+            {
+                name: '🎒 Coleção',
+                value: `**${inv.owned.length}** itens`,
+                inline: true
+            },
+            {
+                name: '🎨 Decoração',
+                value: dec ? `**${dec.name}**` : '_nenhuma_',
+                inline: true
+            }
+        )
+        .setThumbnail(target.displayAvatarURL({ size: 256 }))
+        // FUNDO / BANNER — imagem real na mensagem
+        .setImage(banner)
+        .setFooter({
+            text: dec
+                ? `Background equipado · ${dec.name}`
+                : 'Compre backgrounds em Decorações · O.loja'
+        })
+        .setTimestamp();
+
+    return embed;
 }
 
 async function showProfile(ctx, target) {
@@ -73,27 +144,13 @@ async function showProfile(ctx, target) {
     const viewer = ctx.user || ctx.author;
     const isOwner = viewer.id === target.id;
 
-    // snapshot 10 dias (Mongo/arquivo) — painel e pós-deploy
     snapshot.captureFromLive(target.id, {
         username: target.username,
         avatarURL: target.displayAvatarURL({ extension: 'png', size: 128 })
     });
 
-    const data = buildCardData(target);
-    const buf = profileCard.render(data);
-    const file = new AttachmentBuilder(buf, { name: 'perfil.png' });
-    // Discord aceita SVG como attachment; extensão .png às vezes ajuda no mobile
-    // preferir .svg para fidelidade
-    const fileSvg = new AttachmentBuilder(buf, { name: 'perfil.svg' });
-
-    const embed = new EmbedBuilder()
-        .setColor(0x6366f1)
-        .setImage('attachment://perfil.svg')
-        .setFooter({ text: 'Card com fundo + seções · dados salvos 10 dias' });
-
     const payload = {
-        embeds: [embed],
-        files: [fileSvg],
+        embeds: [buildEmbed(target, ctx.guild)],
         components: buttons(ctx.guild?.id, isOwner)
     };
 
@@ -107,10 +164,10 @@ async function showProfile(ctx, target) {
 module.exports = {
     name: 'perfil',
     aliases: ['profile', 'eu'],
-    description: 'Perfil em card com fundo e seções',
+    description: 'Perfil com banner e cards de info',
     data: new SlashCommandBuilder()
         .setName('perfil')
-        .setDescription('Mostra o perfil em card')
+        .setDescription('Mostra o perfil')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Usuário').setRequired(false)
         ),
@@ -178,9 +235,11 @@ module.exports = {
                 username: interaction.user.username,
                 avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 })
             });
+            // mostra o perfil atualizado já com a nova imagem
             return interaction.update({
-                content: `✅ Background **${result.item.name}** equipado! Use \`O.perfil\`.`,
-                components: []
+                content: null,
+                embeds: [buildEmbed(interaction.user, interaction.guild)],
+                components: buttons(interaction.guild?.id, true)
             });
         }
     },
@@ -195,7 +254,9 @@ module.exports = {
             aboutMe: text
         });
         await interaction.reply({
-            content: '✅ Sobre Mim salvo (10 dias no banco). Use `O.perfil` para ver o card.',
+            content: '✅ **Sobre Mim** atualizado!',
+            embeds: [buildEmbed(interaction.user, interaction.guild)],
+            components: buttons(interaction.guild?.id, true),
             ephemeral: true
         });
         return true;
