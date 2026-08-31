@@ -6,97 +6,401 @@
   <title>Aeternus · Decorações</title>
   <style>
     :root {
-      --bg: #0b0f1a;
-      --card: #121826;
-      --accent: #a78bfa;
-      --text: #e2e8f0;
+      --bg: #070a12;
+      --card: rgba(18, 24, 38, 0.85);
+      --accent: #c4b5fd;
+      --accent2: #f0abfc;
+      --text: #f1f5f9;
       --muted: #94a3b8;
+      --ok: #34d399;
+      --glow: 0 0 40px rgba(167, 139, 250, 0.35);
     }
     * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
     body {
-      margin: 0;
       font-family: "Segoe UI", system-ui, sans-serif;
-      background: radial-gradient(1200px 600px at 10% -10%, #2e1065 0%, transparent 50%), var(--bg);
       color: var(--text);
-      min-height: 100vh;
+      background: #070a12;
+      overflow-x: hidden;
     }
+
+    /* fundo animado */
+    .bg-layer {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(900px 500px at 15% -5%, rgba(88, 28, 135, 0.55), transparent 55%),
+        radial-gradient(700px 400px at 90% 10%, rgba(219, 39, 119, 0.25), transparent 50%),
+        radial-gradient(600px 500px at 50% 100%, rgba(30, 64, 175, 0.2), transparent 55%),
+        #070a12;
+      animation: bgPulse 12s ease-in-out infinite alternate;
+    }
+    @keyframes bgPulse {
+      0% { filter: hue-rotate(0deg) brightness(1); }
+      100% { filter: hue-rotate(18deg) brightness(1.08); }
+    }
+    #particles {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    }
+    .particle {
+      position: absolute;
+      width: 3px; height: 3px;
+      background: var(--accent);
+      border-radius: 50%;
+      opacity: 0.35;
+      animation: float linear infinite;
+    }
+    @keyframes float {
+      0% { transform: translateY(100vh) scale(0.4); opacity: 0; }
+      10% { opacity: 0.5; }
+      90% { opacity: 0.35; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    .wrap { position: relative; z-index: 1; }
+
     header {
-      padding: 28px 20px 12px;
+      padding: 36px 20px 10px;
       text-align: center;
     }
-    header h1 { margin: 0; font-size: 1.6rem; letter-spacing: 0.04em; }
-    header p { color: var(--muted); margin: 8px 0 0; }
-    .bal {
-      display: inline-flex; gap: 16px; margin-top: 12px;
-      background: var(--card); padding: 10px 18px; border-radius: 999px;
-      border: 1px solid #1e293b;
+    header h1 {
+      margin: 0;
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #e9d5ff, #f0abfc, #a5b4fc, #e9d5ff);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: shine 4s linear infinite;
     }
+    @keyframes shine {
+      to { background-position: 200% center; }
+    }
+    header p { color: var(--muted); margin: 10px 0 0; max-width: 520px; margin-inline: auto; }
+
+    .bal {
+      display: inline-flex; gap: 18px; margin-top: 16px;
+      padding: 12px 22px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(167, 139, 250, 0.35);
+      box-shadow: var(--glow);
+      backdrop-filter: blur(12px);
+      animation: balIn 0.6s ease;
+    }
+    @keyframes balIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .top {
+      display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
+      padding: 8px 16px 4px;
+    }
+    a.btn, button.btn {
+      background: linear-gradient(135deg, #1e1b4b, #312e81);
+      color: var(--text);
+      border: 1px solid rgba(167, 139, 250, 0.4);
+      padding: 9px 16px;
+      border-radius: 12px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .2s, border-color .2s;
+    }
+    a.btn:hover, button.btn:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent2);
+      box-shadow: 0 8px 24px rgba(192, 132, 252, 0.25);
+    }
+
+    .msg {
+      text-align: center;
+      padding: 14px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 18px;
-      padding: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 22px;
+      padding: 12px 20px 48px;
       max-width: 1200px;
-      margin: 0 auto 40px;
+      margin: 0 auto;
     }
+
     .card {
+      position: relative;
       background: var(--card);
-      border: 1px solid #1e293b;
-      border-radius: 16px;
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      border-radius: 18px;
       overflow: hidden;
-      transition: transform .15s, border-color .15s;
       cursor: pointer;
+      backdrop-filter: blur(10px);
+      opacity: 0;
+      transform: translateY(18px);
+      animation: cardIn 0.55s ease forwards;
+      transition: transform .25s ease, border-color .25s, box-shadow .25s;
     }
-    .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+    .card:hover {
+      transform: translateY(-8px) scale(1.02);
+      border-color: rgba(192, 132, 252, 0.75);
+      box-shadow: 0 16px 40px rgba(124, 58, 237, 0.35);
+    }
+    @keyframes cardIn {
+      to { opacity: 1; transform: none; }
+    }
+
+    .card .img-wrap {
+      position: relative;
+      height: 168px;
+      overflow: hidden;
+    }
     .card img {
       width: 100%;
-      height: 150px;
+      height: 100%;
       object-fit: cover;
       display: block;
       background: #0f172a;
+      transition: transform .45s ease;
     }
+    .card:hover img { transform: scale(1.08); }
+
+    /* brilho passando */
+    .card .img-wrap::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        transparent 40%,
+        rgba(255, 255, 255, 0.18) 50%,
+        transparent 60%
+      );
+      transform: translateX(-120%);
+      transition: none;
+    }
+    .card:hover .img-wrap::after {
+      animation: sweep 0.9s ease;
+    }
+    @keyframes sweep {
+      to { transform: translateX(120%); }
+    }
+
+    .badge {
+      position: absolute;
+      top: 10px; right: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(8px);
+      z-index: 2;
+    }
+    .badge.owned {
+      background: rgba(16, 185, 129, 0.25);
+      color: #6ee7b7;
+      border: 1px solid rgba(52, 211, 153, 0.45);
+    }
+    .badge.equipped {
+      background: rgba(167, 139, 250, 0.3);
+      color: #e9d5ff;
+      border: 1px solid rgba(196, 181, 253, 0.5);
+      box-shadow: 0 0 16px rgba(167, 139, 250, 0.4);
+    }
+
     .card .body { padding: 14px 16px 16px; }
-    .card h3 { margin: 0 0 6px; font-size: 1.05rem; }
-    .card .desc { color: var(--muted); font-size: 0.88rem; margin: 0 0 10px; }
-    .price { color: var(--accent); font-weight: 700; }
-    .owned { color: #34d399; font-size: 0.85rem; }
-    .msg {
-      text-align: center; padding: 12px; color: var(--muted);
+    .card h3 { margin: 0 0 6px; font-size: 1.08rem; }
+    .card .desc { color: var(--muted); font-size: 0.88rem; margin: 0 0 12px; line-height: 1.35; }
+    .price {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 1.05rem;
+      text-shadow: 0 0 18px rgba(196, 181, 253, 0.45);
     }
-    .top {
-      display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
-      padding: 0 16px 8px;
+
+    /* modal */
+    .modal-bg {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      opacity: 0;
+      transition: opacity .2s;
     }
-    a.btn, button.btn {
-      background: #1e1b4b; color: var(--text); border: 1px solid #312e81;
-      padding: 8px 14px; border-radius: 10px; text-decoration: none; cursor: pointer;
+    .modal-bg.open { display: flex; opacity: 1; }
+    .modal {
+      width: min(440px, 100%);
+      background: linear-gradient(160deg, rgba(30, 27, 75, 0.95), rgba(15, 23, 42, 0.98));
+      border: 1px solid rgba(167, 139, 250, 0.45);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(88, 28, 135, 0.55), var(--glow);
+      transform: scale(0.92);
+      transition: transform .22s ease;
     }
-    a.btn:hover, button.btn:hover { border-color: var(--accent); }
+    .modal-bg.open .modal { transform: scale(1); }
+    .modal img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+    }
+    .modal .mbody { padding: 18px 20px 22px; }
+    .modal h2 { margin: 0 0 6px; font-size: 1.35rem; }
+    .modal p { margin: 0 0 14px; color: var(--muted); font-size: 0.95rem; }
+    .modal .mprice {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--accent2);
+      margin-bottom: 16px;
+      text-shadow: 0 0 20px rgba(240, 171, 252, 0.4);
+    }
+    .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .modal-actions button {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .12s, filter .12s;
+    }
+    .modal-actions button:hover { transform: translateY(-1px); filter: brightness(1.08); }
+    .btn-buy {
+      background: linear-gradient(135deg, #7c3aed, #db2777);
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+    }
+    .btn-cancel {
+      background: rgba(51, 65, 85, 0.7);
+      color: var(--text);
+      border: 1px solid #475569 !important;
+    }
+
     #toast {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      background: #1e293b; color: #fff; padding: 12px 18px; border-radius: 12px;
-      opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9;
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: linear-gradient(135deg, #1e1b4b, #312e81);
+      border: 1px solid rgba(196, 181, 253, 0.5);
+      color: #fff;
+      padding: 14px 22px;
+      border-radius: 14px;
+      opacity: 0;
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+      z-index: 60;
+      box-shadow: var(--glow);
+      font-weight: 600;
     }
-    #toast.show { opacity: 1; }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .ring {
+      position: absolute;
+      inset: -1px;
+      border-radius: 18px;
+      padding: 1px;
+      background: linear-gradient(120deg, transparent, rgba(240, 171, 252, 0.6), transparent);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity .25s;
+      pointer-events: none;
+    }
+    .card:hover .ring { opacity: 1; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>🎨 Decorações</h1>
-    <p>Clique em uma imagem para ver o preço e comprar. Ela vai direto no seu perfil.</p>
-    <div class="bal" id="bal">Carregando saldo…</div>
-  </header>
-  <div class="top">
-    <a class="btn" href="/dashboard">Painel</a>
-    <a class="btn" href="/login">Login Discord</a>
+  <div class="bg-layer"></div>
+  <canvas id="particles"></canvas>
+
+  <div class="wrap">
+    <header>
+      <h1>✦ Decorações ✦</h1>
+      <p>Clique em uma arte para ver o preço. A imagem vai direto para o seu perfil.</p>
+      <div class="bal" id="bal">Carregando saldo…</div>
+    </header>
+
+    <div class="top">
+      <a class="btn" href="/dashboard">Painel</a>
+      <a class="btn" href="/login">Login Discord</a>
+    </div>
+
+    <div class="msg" id="status">Carregando catálogo…</div>
+    <div class="grid" id="grid"></div>
   </div>
-  <div class="msg" id="status">Carregando catálogo…</div>
-  <div class="grid" id="grid"></div>
+
+  <div class="modal-bg" id="modalBg">
+    <div class="modal" id="modal">
+      <img id="mImg" alt="" />
+      <div class="mbody">
+        <h2 id="mName"></h2>
+        <p id="mDesc"></p>
+        <div class="mprice" id="mPrice"></div>
+        <div class="modal-actions">
+          <button class="btn-buy" id="mBuy">Comprar</button>
+          <button class="btn-cancel" id="mCancel">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <script>
     const params = new URLSearchParams(location.search);
     const guildId = params.get('guild') || '';
+    let current = null;
+    let currentOwned = false;
+
+    /* partículas leves */
+    (function particles() {
+      const c = document.getElementById('particles');
+      const ctx = c.getContext('2d');
+      let w, h, dots;
+      function resize() {
+        w = c.width = innerWidth;
+        h = c.height = innerHeight;
+        dots = Array.from({ length: Math.min(55, Math.floor(w / 28)) }, () => ({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: Math.random() * 1.8 + 0.4,
+          s: Math.random() * 0.35 + 0.1,
+          a: Math.random() * 0.4 + 0.1
+        }));
+      }
+      function tick() {
+        ctx.clearRect(0, 0, w, h);
+        for (const d of dots) {
+          d.y -= d.s;
+          if (d.y < -4) { d.y = h + 4; d.x = Math.random() * w; }
+          ctx.beginPath();
+          ctx.fillStyle = `rgba(196,181,253,${d.a})`;
+          ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        requestAnimationFrame(tick);
+      }
+      resize();
+      addEventListener('resize', resize);
+      tick();
+    })();
 
     function toast(t) {
       const el = document.getElementById('toast');
@@ -109,8 +413,63 @@
       return Number(n || 0).toLocaleString('pt-BR');
     }
 
+    function openModal(item, owned) {
+      current = item;
+      currentOwned = owned;
+      document.getElementById('mImg').src = item.image;
+      document.getElementById('mName').textContent = item.name;
+      document.getElementById('mDesc').textContent = item.desc || '';
+      document.getElementById('mPrice').textContent = owned
+        ? 'Já na sua coleção'
+        : `💠 ${fmt(item.price)}`;
+      document.getElementById('mBuy').textContent = owned ? 'Equipar no perfil' : 'Comprar agora';
+      const bg = document.getElementById('modalBg');
+      bg.classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modalBg').classList.remove('open');
+      current = null;
+    }
+
+    document.getElementById('mCancel').onclick = closeModal;
+    document.getElementById('modalBg').onclick = (e) => {
+      if (e.target.id === 'modalBg') closeModal();
+    };
+
+    document.getElementById('mBuy').onclick = async () => {
+      if (!current) return;
+      const item = current;
+      const owned = currentOwned;
+      closeModal();
+
+      if (owned) {
+        const res = await fetch('/api/shop/equip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: item.id })
+        }).then((r) => r.json());
+        toast(res.ok ? '✨ Equipado no perfil!' : (res.error || 'Erro'));
+        if (res.ok) load();
+        return;
+      }
+
+      const res = await fetch('/api/shop/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: item.id, guildId })
+      }).then((r) => r.json());
+
+      if (!res.ok) {
+        toast(res.error || 'Falha na compra');
+        return;
+      }
+      toast('✨ Comprado e aplicado no perfil!');
+      load();
+    };
+
     async function load() {
-      const me = await fetch('/api/me').then(r => r.ok ? r.json() : null).catch(() => null);
+      const me = await fetch('/api/me').then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (!me) {
         document.getElementById('status').textContent = 'Faça login no Discord para comprar.';
         document.getElementById('bal').textContent = 'Não autenticado';
@@ -120,7 +479,7 @@
       }
 
       const url = guildId ? `/api/shop/decorations?guild=${guildId}` : '/api/shop/decorations';
-      const data = await fetch(url).then(r => r.json()).catch(() => null);
+      const data = await fetch(url).then((r) => r.json()).catch(() => null);
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
 
@@ -130,54 +489,31 @@
       }
 
       document.getElementById('status').textContent =
-        `${data.items.length} imagens · preços variam por arte`;
+        `${data.items.length} artes · preços variam por imagem`;
 
       const owned = new Set(data.owned || []);
+      const equipped = data.equipped?.decoration || null;
 
-      for (const item of data.items) {
+      data.items.forEach((item, i) => {
+        const isOwned = owned.has(item.id);
+        const isEq = equipped === item.id;
         const card = document.createElement('div');
         card.className = 'card';
+        card.style.animationDelay = `${i * 0.05}s`;
         card.innerHTML = `
-          <img src="${item.image}" alt="${item.name}" loading="lazy" />
+          <div class="ring"></div>
+          <div class="img-wrap">
+            ${isEq ? '<span class="badge equipped">EQUIPADA</span>' : isOwned ? '<span class="badge owned">NA COLEÇÃO</span>' : ''}
+            <img src="${item.image}" alt="${item.name}" loading="lazy" />
+          </div>
           <div class="body">
             <h3>${item.name}</h3>
             <p class="desc">${item.desc || ''}</p>
             <div class="price">💠 ${fmt(item.price)}</div>
-            ${owned.has(item.id) ? '<div class="owned">✓ Já possui</div>' : ''}
           </div>`;
-        card.onclick = () => buy(item, owned.has(item.id));
+        card.onclick = () => openModal(item, isOwned);
         grid.appendChild(card);
-      }
-    }
-
-    async function buy(item, already) {
-      if (already) {
-        const ok = confirm(`Você já tem "${item.name}". Equipar no perfil?`);
-        if (!ok) return;
-        const res = await fetch('/api/shop/equip', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ itemId: item.id })
-        }).then(r => r.json());
-        toast(res.ok ? 'Equipado no perfil!' : (res.error || 'Erro'));
-        return;
-      }
-
-      const ok = confirm(`Comprar "${item.name}" por 💠 ${fmt(item.price)}?\nA imagem vai para o perfil na hora.`);
-      if (!ok) return;
-
-      const res = await fetch('/api/shop/buy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: item.id, guildId })
-      }).then(r => r.json());
-
-      if (!res.ok) {
-        toast(res.error || 'Falha na compra');
-        return;
-      }
-      toast('Comprado e equipado no perfil!');
-      load();
+      });
     }
 
     load();
