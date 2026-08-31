@@ -3,10 +3,6 @@ const flocos = require('./flocos');
 const cristais = require('./cristais');
 const { getSettings } = require('./settings');
 
-/**
- * Decorações = imagens geradas (Pollinations) com preços variados.
- * Não altera cor do embed — só a imagem do perfil.
- */
 const DECORATIONS = [
     {
         id: 'dec_aurora',
@@ -108,7 +104,8 @@ const ITEMS = [
         desc: 'Título «Lenda» no perfil',
         price: 15000,
         currency: 'flocos',
-        title: 'Lenda'
+        title: 'Lenda',
+        icon: '👑'
     },
     {
         id: 'item_titulo_astro',
@@ -117,7 +114,8 @@ const ITEMS = [
         desc: 'Título «Astro» no perfil',
         price: 25000,
         currency: 'flocos',
-        title: 'Astro'
+        title: 'Astro',
+        icon: '⭐'
     },
     {
         id: 'item_titulo_soberano',
@@ -126,7 +124,8 @@ const ITEMS = [
         desc: 'Título «Soberano» no perfil',
         price: 8000,
         currency: 'cristais',
-        title: 'Soberano'
+        title: 'Soberano',
+        icon: '🏰'
     },
     {
         id: 'item_boost_daily',
@@ -136,7 +135,8 @@ const ITEMS = [
         price: 4000,
         currency: 'cristais',
         consumable: true,
-        effect: 'daily_boost_20'
+        effect: 'daily_boost_20',
+        icon: '⚡'
     },
     {
         id: 'item_caixa_flocos',
@@ -146,7 +146,29 @@ const ITEMS = [
         price: 3000,
         currency: 'cristais',
         consumable: true,
-        effect: 'box_flocos'
+        effect: 'box_flocos',
+        icon: '📦'
+    },
+    {
+        id: 'item_titulo_eterno',
+        type: 'item',
+        name: 'Título: Eterno',
+        desc: 'Título «Eterno» no perfil',
+        price: 12000,
+        currency: 'cristais',
+        title: 'Eterno',
+        icon: '♾️'
+    },
+    {
+        id: 'item_caixa_cristal',
+        type: 'item',
+        name: 'Caixa de Cristais',
+        desc: '800–2500 cristais na hora',
+        price: 18000,
+        currency: 'flocos',
+        consumable: true,
+        effect: 'box_cristais',
+        icon: '💎'
     }
 ];
 
@@ -155,7 +177,6 @@ const GLOBAL_ITEMS = [...DECORATIONS, ...ITEMS];
 function imageUrl(item) {
     if (!item?.prompt) return null;
     const q = encodeURIComponent(item.prompt);
-    // seed fixo por id → mesma imagem sempre
     const seed = [...String(item.id)].reduce((a, c) => a + c.charCodeAt(0), 0);
     return `https://image.pollinations.ai/prompt/${q}?width=960&height=540&nologo=true&seed=${seed}&model=flux`;
 }
@@ -199,12 +220,17 @@ function guildVips(guildId) {
             price: Math.max(0, Math.floor(Number(v.price) || 0)),
             currency: v.currency === 'flocos' ? 'flocos' : 'cristais',
             roleId: String(v.roleId),
-            durationDays: Math.max(0, Math.floor(Number(v.durationDays) || 0))
+            durationDays: Math.max(0, Math.floor(Number(v.durationDays) || 0)),
+            icon: '👑'
         }));
 }
 
 function decorations() {
     return withImages(DECORATIONS);
+}
+
+function items(guildId) {
+    return [...ITEMS.map((i) => ({ ...i })), ...guildVips(guildId || null)];
 }
 
 function catalog(guildId) {
@@ -244,6 +270,11 @@ function buy(userId, guildId, itemId) {
             flocos.add(userId, gain, { reason: 'caixa loja' });
             return { ok: true, item, consumed: true, gain };
         }
+        if (item.effect === 'box_cristais') {
+            const gain = 800 + Math.floor(Math.random() * 1701);
+            cristais.add(userId, gain);
+            return { ok: true, item, consumed: true, gainCristais: gain };
+        }
         if (item.effect === 'daily_boost_20') {
             inv.effects.dailyBoostUntil = Date.now() + 864e5;
             inv.effects.dailyBoostPct = 20;
@@ -255,7 +286,6 @@ function buy(userId, guildId, itemId) {
 
     if (!inv.owned.includes(itemId)) inv.owned.push(itemId);
 
-    // compra de decoração → equipa na hora (imagem no perfil)
     if (item.type === 'decoration') inv.equipped.decoration = itemId;
     if (item.title) inv.equipped.title = itemId;
 
@@ -317,12 +347,22 @@ function decorPanelUrl(guildId) {
     return guildId ? `${base}/decoracoes?guild=${guildId}` : `${base}/decoracoes`;
 }
 
+function itemsPanelUrl(guildId) {
+    const base = panelBase();
+    return guildId ? `${base}/itens?guild=${guildId}` : `${base}/itens`;
+}
+
+function shopPanelUrl(guildId) {
+    return itemsPanelUrl(guildId);
+}
+
 module.exports = {
     GLOBAL_ITEMS,
     DECORATIONS,
     ITEMS,
     catalog,
     decorations,
+    items,
     findItem,
     buy,
     equip,
@@ -334,5 +374,7 @@ module.exports = {
     guildVips,
     imageUrl,
     decorPanelUrl,
+    itemsPanelUrl,
+    shopPanelUrl,
     panelBase
 };
