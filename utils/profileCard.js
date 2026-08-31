@@ -85,6 +85,8 @@ function buildSvg(d, avatarData, bgData) {
         Math.min(100, Math.floor(((d.xpRemain || 0) / Math.max(1, d.xpNeed || 1)) * 100))
     );
 
+    // fundo mais brilhante: imagem com leve boost de luz no sharp depois;
+    // no SVG, véu bem mais transparente
     const bgLayer = bgData
         ? `<image href="${bgData}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
         : '';
@@ -94,7 +96,6 @@ function buildSvg(d, avatarData, bgData) {
         : `<circle cx="360" cy="132" r="84" fill="#4c1d95"/>
            <text x="360" y="150" text-anchor="middle" font-family="${FONT}" font-size="52" font-weight="700" fill="#ffffff">${esc((d.username || '?')[0]?.toUpperCase() || '?')}</text>`;
 
-    // texto branco sólido, maior — máximo contraste nos cards
     const aboutText = aboutLines
         .map(
             (line, i) =>
@@ -109,12 +110,14 @@ function buildSvg(d, avatarData, bgData) {
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#1e1b4b"/>
-      <stop offset="100%" stop-color="#0f172a"/>
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
     </linearGradient>
+    <!-- véu bem mais claro para a imagem de fundo brilhar -->
     <linearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#020617" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#020617" stop-opacity="0.9"/>
+      <stop offset="0%" stop-color="#0f172a" stop-opacity="0.12"/>
+      <stop offset="45%" stop-color="#0f172a" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#020617" stop-opacity="0.42"/>
     </linearGradient>
     <clipPath id="av"><circle cx="360" cy="132" r="84"/></clipPath>
     <linearGradient id="xp" x1="0" y1="0" x2="1" y2="0">
@@ -127,30 +130,26 @@ function buildSvg(d, avatarData, bgData) {
   ${bgLayer}
   <rect width="${W}" height="${H}" fill="url(#veil)"/>
 
-  <rect x="16" y="16" width="${W - 32}" height="${H - 32}" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="2"/>
+  <rect x="16" y="16" width="${W - 32}" height="${H - 32}" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="2"/>
 
   ${avatarLayer}
-  <circle cx="360" cy="132" r="88" fill="none" stroke="#ffffff" stroke-opacity="0.65" stroke-width="4"/>
+  <circle cx="360" cy="132" r="88" fill="none" stroke="#ffffff" stroke-opacity="0.75" stroke-width="4"/>
 
-  <!-- nome bem legível -->
   <text x="360" y="254" text-anchor="middle" font-family="${FONT}" font-size="34" font-weight="700" fill="#ffffff">${name}</text>
 
-  <!-- CARD: Raciocínio amoroso — fundo mais opaco -->
-  <rect x="40" y="280" width="${W - 80}" height="124" rx="20" fill="#020617" fill-opacity="0.92" stroke="#f9a8d4" stroke-width="2"/>
+  <rect x="40" y="280" width="${W - 80}" height="124" rx="20" fill="#020617" fill-opacity="0.88" stroke="#f9a8d4" stroke-width="2"/>
   <text x="58" y="316" font-family="${FONT}" font-size="15" font-weight="700" fill="#fce7f3" letter-spacing="1.5">RACIOCINIO AMOROSO</text>
   <text x="58" y="354" font-family="${FONT}" font-size="26" font-weight="700" fill="#ffffff">${esc(love.name)}</text>
   <text x="58" y="384" font-family="${FONT}" font-size="16" font-weight="600" fill="#f8fafc">${esc(love.desc)}</text>
 
-  <!-- CARD: XP -->
-  <rect x="40" y="422" width="${W - 80}" height="136" rx="20" fill="#020617" fill-opacity="0.92" stroke="#c4b5fd" stroke-width="2"/>
+  <rect x="40" y="422" width="${W - 80}" height="136" rx="20" fill="#020617" fill-opacity="0.88" stroke="#c4b5fd" stroke-width="2"/>
   <text x="58" y="458" font-family="${FONT}" font-size="15" font-weight="700" fill="#ede9fe" letter-spacing="1.5">EXPERIENCIA</text>
   <text x="58" y="498" font-family="${FONT}" font-size="30" font-weight="700" fill="#ffffff">Nivel ${level}</text>
   <text x="${W - 58}" y="498" text-anchor="end" font-family="${FONT}" font-size="17" font-weight="700" fill="#ffffff">${xpNow} / ${xpNeed} XP</text>
   <rect x="48" y="520" width="${barW}" height="18" rx="9" fill="#1e293b"/>
   <rect x="48" y="520" width="${Math.max(0, fillW)}" height="18" rx="9" fill="url(#xp)"/>
 
-  <!-- CARD: Sobre -->
-  <rect x="40" y="576" width="${W - 80}" height="${H - 576 - 36}" rx="20" fill="#020617" fill-opacity="0.92" stroke="#e2e8f0" stroke-width="2"/>
+  <rect x="40" y="576" width="${W - 80}" height="${H - 576 - 36}" rx="20" fill="#020617" fill-opacity="0.88" stroke="#e2e8f0" stroke-width="2"/>
   <text x="58" y="614" font-family="${FONT}" font-size="15" font-weight="700" fill="#f1f5f9" letter-spacing="1.5">SOBRE ELE(A)</text>
   ${aboutText}
 
@@ -169,7 +168,11 @@ async function render(d) {
 
     try {
         const sharp = require('sharp');
-        const png = await sharp(svgBuf, { density: 160 }).png({ quality: 92 }).toBuffer();
+        // modulate: mais brilho e saturação no PNG final
+        const png = await sharp(svgBuf, { density: 160 })
+            .modulate({ brightness: 1.18, saturation: 1.12 })
+            .png({ quality: 92 })
+            .toBuffer();
         return { buffer: png, name: 'perfil.png' };
     } catch (e) {
         console.error('[profileCard] sharp falhou, enviando SVG:', e.message);
