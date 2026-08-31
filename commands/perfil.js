@@ -21,7 +21,6 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-/** Banner padrão se não tiver decoração */
 function defaultBanner() {
     const q = encodeURIComponent(
         'cute doodle pattern blue gradient soft icons stars hearts kawaii aesthetic banner seamless, no text'
@@ -37,7 +36,6 @@ function buildEmbed(target, guild) {
     const p = profile.get(target.id);
     const invStats = guild ? invites.getStats(guild.id, target.id) : { total: 0 };
     const xpNeed = xp.xpForLevel(x.level);
-    // xp no nível atual (aproximado)
     let remain = x.xp;
     for (let lv = 0; lv < x.level; lv++) remain -= xp.xpForLevel(lv);
     if (remain < 0) remain = 0;
@@ -48,7 +46,7 @@ function buildEmbed(target, guild) {
 
     const banner = dec?.image || defaultBanner();
 
-    const embed = new EmbedBuilder()
+    return new EmbedBuilder()
         .setColor(0x3b82f6)
         .setAuthor({
             name: target.username,
@@ -57,7 +55,7 @@ function buildEmbed(target, guild) {
         .setDescription(
             [
                 title ? `👑 **${title}**` : null,
-                `⭐ **Nível ${x.level}** · \\`${Math.floor(remain)} / ${xpNeed} XP\\``,
+                `⭐ **Nível ${x.level}** · ${Math.floor(remain)} / ${xpNeed} XP`,
                 guild ? `🏆 **${guild.name}**` : null,
                 '',
                 `❄️ **${fmt(flocos.get(target.id))}**  ·  💠 **${fmt(cristais.get(target.id))}**  ·  🏦 **${fmt(bank.get(target.id))}**`,
@@ -78,32 +76,31 @@ function buildEmbed(target, guild) {
                 : 'Background padrão · compre em Decorações'
         })
         .setTimestamp();
-
-    return embed;
 }
 
 function buttons(guildId, isOwner) {
     const decorUrl = shop.decorPanelUrl(guildId);
-    const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('perfil:about')
-            .setLabel('Alterar Sobre Mim')
-            .setEmoji('📝')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(!isOwner),
-        new ButtonBuilder()
-            .setCustomId('perfil:bg')
-            .setLabel('Alterar Background')
-            .setEmoji('🖼️')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(!isOwner),
-        new ButtonBuilder()
-            .setLabel('Loja de Decorações')
-            .setEmoji('🛍️')
-            .setStyle(ButtonStyle.Link)
-            .setURL(decorUrl)
-    );
-    return [row1];
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('perfil:about')
+                .setLabel('Alterar Sobre Mim')
+                .setEmoji('📝')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(!isOwner),
+            new ButtonBuilder()
+                .setCustomId('perfil:bg')
+                .setLabel('Alterar Background')
+                .setEmoji('🖼️')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(!isOwner),
+            new ButtonBuilder()
+                .setLabel('Loja de Decorações')
+                .setEmoji('🛍️')
+                .setStyle(ButtonStyle.Link)
+                .setURL(decorUrl)
+        )
+    ];
 }
 
 async function showProfile(ctx, target) {
@@ -150,10 +147,6 @@ module.exports = {
         const id = interaction.customId;
 
         if (id === 'perfil:about') {
-            if (interaction.message?.interaction?.user?.id &&
-                interaction.message.interaction.user.id !== interaction.user.id) {
-                // mensagem de outro — ainda permite se for o dono do perfil no embed author
-            }
             const modal = new ModalBuilder()
                 .setCustomId('perfil:aboutmodal')
                 .setTitle('Alterar Sobre Mim');
@@ -199,27 +192,11 @@ module.exports = {
             if (!result.ok) {
                 return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
             }
-            // atualiza a mensagem original do perfil se possível
-            try {
-                const embed = buildEmbed(interaction.user, interaction.guild);
-                if (interaction.message && interaction.message.editable) {
-                    await interaction.update({
-                        content: `✅ Background **${result.item.name}** equipado!`,
-                        components: [],
-                        embeds: []
-                    });
-                } else {
-                    await interaction.reply({
-                        content: `✅ Background **${result.item.name}** equipado! Use \`O.perfil\` de novo.`,
-                        ephemeral: true
-                    });
-                }
-            } catch {
-                await interaction.reply({
-                    content: `✅ Background **${result.item.name}** equipado! Use \`O.perfil\`.`,
-                    ephemeral: true
-                }).catch(() => {});
-            }
+            return interaction.update({
+                content: `✅ Background **${result.item.name}** equipado! Use \`O.perfil\` para ver.`,
+                components: [],
+                embeds: []
+            });
         }
     },
 
@@ -228,10 +205,9 @@ module.exports = {
         const text = interaction.fields.getTextInputValue('about');
         profile.setAboutMe(interaction.user.id, text);
 
-        const embed = buildEmbed(interaction.user, interaction.guild);
         await interaction.reply({
             content: '✅ **Sobre Mim** atualizado!',
-            embeds: [embed],
+            embeds: [buildEmbed(interaction.user, interaction.guild)],
             components: buttons(interaction.guild?.id, true),
             ephemeral: true
         });
