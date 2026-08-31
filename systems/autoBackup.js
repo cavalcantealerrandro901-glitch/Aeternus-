@@ -1,6 +1,8 @@
 const backup = require('../utils/backup');
 
-module.exports = (client) => {
+function setup(client) {
     backup.startAutoBackup();
     client.backup = backup;
-};
+}
+
+module.exports = { setup };
