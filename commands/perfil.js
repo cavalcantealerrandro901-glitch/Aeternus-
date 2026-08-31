@@ -18,11 +18,12 @@ const snapshot = require('../utils/userSnapshot');
 function buttons(guildId, isOwner) {
     const decorUrl = shop.decorPanelUrl(guildId);
     const itensUrl = shop.itemsPanelUrl(guildId);
+    const fxUrl = shop.effectsPanelUrl(guildId);
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('perfil:about')
-                .setLabel('Alterar Sobre Mim')
+                .setLabel('Sobre Mim')
                 .setEmoji('📝')
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(!isOwner),
@@ -33,7 +34,20 @@ function buttons(guildId, isOwner) {
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(!isOwner),
             new ButtonBuilder()
-                .setLabel('Itens / Títulos')
+                .setCustomId('perfil:fx')
+                .setLabel('Efeito')
+                .setEmoji('✨')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(!isOwner)
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Efeitos')
+                .setEmoji('✨')
+                .setStyle(ButtonStyle.Link)
+                .setURL(fxUrl),
+            new ButtonBuilder()
+                .setLabel('Itens')
                 .setEmoji('👑')
                 .setStyle(ButtonStyle.Link)
                 .setURL(itensUrl),
@@ -50,6 +64,7 @@ async function buildAttachment(target) {
     const x = xp.get(target.id);
     const dec = shop.getEquippedDecoration(target.id);
     const title = shop.getEquippedTitle(target.id);
+    const fx = shop.getEquippedEffect(target.id);
     const p = profile.get(target.id);
 
     let remain = x.xp;
@@ -66,7 +81,9 @@ async function buildAttachment(target) {
         xpRemain: Math.floor(remain),
         xpNeed: xp.xpForLevel(x.level),
         bgImage: dec?.image || null,
-        love: profileCard.loveTypeFor(target.id)
+        love: profileCard.loveTypeFor(target.id),
+        effectStyle: fx?.style || null,
+        effectName: fx?.name || null
     });
 
     return new AttachmentBuilder(buffer, { name });
@@ -121,7 +138,7 @@ module.exports = {
             });
         } catch (e) {
             console.error('[perfil]', e);
-            await interaction.editReply('❌ Não consegui gerar o card. Rode `npm i sharp`.').catch(() => {});
+            await interaction.editReply('❌ Não consegui gerar o card.').catch(() => {});
         }
     },
 
@@ -168,7 +185,33 @@ module.exports = {
             });
         }
 
-        if (id === 'perfil:equipbg') {
+        if (id === 'perfil:fx') {
+            const owned = shop.ownedEffects(interaction.user.id);
+            if (!owned.length) {
+                return interaction.reply({
+                    content: `Sem efeitos. Compre: ${shop.effectsPanelUrl(interaction.guild?.id)}`,
+                    ephemeral: true
+                });
+            }
+            const menu = new StringSelectMenuBuilder()
+                .setCustomId('perfil:equipfx')
+                .setPlaceholder('Efeito especial…')
+                .addOptions(
+                    owned.slice(0, 25).map((d) => ({
+                        label: d.name.slice(0, 100),
+                        value: d.id,
+                        description: (d.desc || '').slice(0, 100),
+                        emoji: d.icon || '✨'
+                    }))
+                );
+            return interaction.reply({
+                content: '✨ Escolha o efeito do perfil:',
+                components: [new ActionRowBuilder().addComponents(menu)],
+                ephemeral: true
+            });
+        }
+
+        if (id === 'perfil:equipbg' || id === 'perfil:equipfx') {
             const result = shop.equip(interaction.user.id, interaction.values?.[0]);
             if (!result.ok) {
                 return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });

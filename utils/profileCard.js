@@ -1,5 +1,5 @@
 /**
- * Card de perfil → PNG (Discord só previewa PNG/JPG/WebP, não SVG).
+ * Card de perfil → PNG com efeitos especiais.
  */
 
 function esc(s) {
@@ -70,6 +70,76 @@ async function fetchDataUri(url) {
 
 const FONT = 'DejaVu Sans,Arial,Helvetica,sans-serif';
 
+function effectLayers(style) {
+    if (!style) return { frame: '', avatarRing: '', particles: '', badge: '' };
+
+    const particles = {
+        stars: `
+  <circle cx="80" cy="60" r="2.5" fill="#fff" opacity="0.9"/>
+  <circle cx="640" cy="90" r="2" fill="#fde68a" opacity="0.85"/>
+  <circle cx="120" cy="200" r="1.8" fill="#fff" opacity="0.7"/>
+  <circle cx="580" cy="180" r="2.2" fill="#c4b5fd" opacity="0.8"/>
+  <circle cx="200" cy="480" r="2" fill="#fff" opacity="0.75"/>
+  <circle cx="520" cy="520" r="1.6" fill="#f0abfc" opacity="0.8"/>
+  <circle cx="350" cy="40" r="1.5" fill="#fff" opacity="0.65"/>
+  <circle cx="450" cy="700" r="2" fill="#fde68a" opacity="0.7"/>`,
+        glow: '',
+        neon: '',
+        gold: '',
+        fire: '',
+        ice: '',
+        rainbow: '',
+        shadow: ''
+    };
+
+    const frames = {
+        glow: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#e9d5ff" stroke-width="3" opacity="0.55"/>
+  <rect x="16" y="16" width="688" height="868" rx="28" fill="none" stroke="#c4b5fd" stroke-width="1.5" opacity="0.4"/>`,
+        neon: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#f0abfc" stroke-width="4"/>
+  <rect x="18" y="18" width="684" height="864" rx="26" fill="none" stroke="#22d3ee" stroke-width="2" opacity="0.85"/>`,
+        gold: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#fbbf24" stroke-width="5"/>
+  <rect x="18" y="18" width="684" height="864" rx="26" fill="none" stroke="#fde68a" stroke-width="2"/>`,
+        fire: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#f97316" stroke-width="4"/>
+  <rect x="16" y="16" width="688" height="868" rx="28" fill="none" stroke="#ef4444" stroke-width="2" opacity="0.8"/>`,
+        ice: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#67e8f9" stroke-width="4"/>
+  <rect x="16" y="16" width="688" height="868" rx="28" fill="none" stroke="#a5f3fc" stroke-width="2"/>`,
+        rainbow: `<rect x="8" y="8" width="704" height="884" rx="32" fill="none" stroke="#f472b6" stroke-width="3"/>
+  <rect x="12" y="12" width="696" height="876" rx="30" fill="none" stroke="#a78bfa" stroke-width="3"/>
+  <rect x="16" y="16" width="688" height="868" rx="28" fill="none" stroke="#38bdf8" stroke-width="2"/>`,
+        stars: `<rect x="14" y="14" width="692" height="872" rx="28" fill="none" stroke="#e9d5ff" stroke-width="2" opacity="0.5"/>`,
+        shadow: `<rect x="20" y="24" width="690" height="870" rx="28" fill="#000" opacity="0.35"/>
+  <rect x="14" y="14" width="692" height="872" rx="28" fill="none" stroke="#64748b" stroke-width="2"/>`
+    };
+
+    const rings = {
+        glow: `<circle cx="360" cy="132" r="94" fill="none" stroke="#e9d5ff" stroke-width="6" opacity="0.55"/>
+  <circle cx="360" cy="132" r="102" fill="none" stroke="#c4b5fd" stroke-width="3" opacity="0.35"/>`,
+        neon: `<circle cx="360" cy="132" r="94" fill="none" stroke="#f0abfc" stroke-width="5"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#22d3ee" stroke-width="3"/>`,
+        gold: `<circle cx="360" cy="132" r="94" fill="none" stroke="#fbbf24" stroke-width="6"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#fde68a" stroke-width="3"/>`,
+        fire: `<circle cx="360" cy="132" r="94" fill="none" stroke="#f97316" stroke-width="5"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#ef4444" stroke-width="3"/>`,
+        ice: `<circle cx="360" cy="132" r="94" fill="none" stroke="#67e8f9" stroke-width="5"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#e0f2fe" stroke-width="2"/>`,
+        rainbow: `<circle cx="360" cy="132" r="94" fill="none" stroke="#f472b6" stroke-width="4"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#a78bfa" stroke-width="3"/>
+  <circle cx="360" cy="132" r="106" fill="none" stroke="#38bdf8" stroke-width="2"/>`,
+        stars: `<circle cx="360" cy="132" r="94" fill="none" stroke="#fde68a" stroke-width="4" opacity="0.8"/>`,
+        shadow: `<circle cx="364" cy="138" r="90" fill="#000" opacity="0.35"/>
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#94a3b8" stroke-width="3"/>`
+    };
+
+    return {
+        frame: frames[style] || '',
+        avatarRing: rings[style] || '',
+        particles: particles[style] || '',
+        badge: style
+            ? `<text x="360" y="${style === 'stars' ? 868 : 868}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="700" fill="#e2e8f0">efeito ativo</text>`
+            : ''
+    };
+}
+
 function buildSvg(d, avatarData, bgData) {
     const W = 720;
     const H = 900;
@@ -87,7 +157,8 @@ function buildSvg(d, avatarData, bgData) {
         Math.min(100, Math.floor(((d.xpRemain || 0) / Math.max(1, d.xpNeed || 1)) * 100))
     );
 
-    // desloca blocos se tiver título sob o nome
+    const fxStyle = d.effectStyle || null;
+    const fx = effectLayers(fxStyle);
     const shift = hasTitle ? 28 : 0;
 
     const bgLayer = bgData
@@ -109,13 +180,16 @@ function buildSvg(d, avatarData, bgData) {
 
     const barW = 624;
     const fillW = Math.round((barW * pct) / 100);
-
     const loveY = 280 + shift;
     const xpY = 422 + shift;
     const aboutBoxY = 576 + shift;
 
     const titleSvg = hasTitle
         ? `<text x="360" y="286" text-anchor="middle" font-family="${FONT}" font-size="18" font-weight="700" fill="#fde68a">${title}</text>`
+        : '';
+
+    const fxName = d.effectName
+        ? `<text x="60" y="${H - 48}" font-family="${FONT}" font-size="13" font-weight="700" fill="#c4b5fd">FX · ${esc(d.effectName)}</text>`
         : '';
 
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -141,8 +215,12 @@ function buildSvg(d, avatarData, bgData) {
   ${bgLayer}
   <rect width="${W}" height="${H}" fill="url(#veil)"/>
 
+  ${fx.frame}
+  ${fx.particles}
+
   <rect x="16" y="16" width="${W - 32}" height="${H - 32}" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="2"/>
 
+  ${fx.avatarRing}
   ${avatarLayer}
   <circle cx="360" cy="132" r="88" fill="none" stroke="#ffffff" stroke-opacity="0.75" stroke-width="4"/>
 
@@ -165,6 +243,7 @@ function buildSvg(d, avatarData, bgData) {
   <text x="58" y="${aboutBoxY + 38}" font-family="${FONT}" font-size="15" font-weight="700" fill="#f1f5f9" letter-spacing="1.5">SOBRE ELE(A)</text>
   ${aboutText}
 
+  ${fxName}
   <text x="${W / 2}" y="${H - 22}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600" fill="#e2e8f0">Aeternus</text>
 </svg>`;
 }
