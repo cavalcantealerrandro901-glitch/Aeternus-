@@ -7,76 +7,17 @@ const {
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
+    AttachmentBuilder,
     SlashCommandBuilder
 } = require('discord.js');
 const flocos = require('../utils/flocos');
 const cristais = require('../utils/cristais');
 const bank = require('../utils/bank');
 const xp = require('../utils/xp');
-const invites = require('../utils/invites');
 const shop = require('../utils/shop');
 const profile = require('../utils/profile');
-
-function fmt(n) {
-    return Number(n || 0).toLocaleString('pt-BR');
-}
-
-function defaultBanner() {
-    const q = encodeURIComponent(
-        'cute doodle pattern blue gradient soft icons stars hearts kawaii aesthetic banner seamless, no text'
-    );
-    return `https://image.pollinations.ai/prompt/${q}?width=960&height=360&nologo=true&seed=42&model=flux`;
-}
-
-function buildEmbed(target, guild) {
-    const x = xp.get(target.id);
-    const inv = shop.getInv(target.id);
-    const dec = shop.getEquippedDecoration(target.id);
-    const title = shop.getEquippedTitle(target.id);
-    const p = profile.get(target.id);
-    const invStats = guild ? invites.getStats(guild.id, target.id) : { total: 0 };
-    const xpNeed = xp.xpForLevel(x.level);
-    let remain = x.xp;
-    for (let lv = 0; lv < x.level; lv++) remain -= xp.xpForLevel(lv);
-    if (remain < 0) remain = 0;
-
-    const about =
-        p.aboutMe ||
-        'Ainda sem biografia… Use o botão **Alterar Sobre Mim** para escrever a sua!';
-
-    const banner = dec?.image || defaultBanner();
-
-    return new EmbedBuilder()
-        .setColor(0x3b82f6)
-        .setAuthor({
-            name: target.username,
-            iconURL: target.displayAvatarURL({ size: 128 })
-        })
-        .setDescription(
-            [
-                title ? `👑 **${title}**` : null,
-                `⭐ **Nível ${x.level}** · ${Math.floor(remain)} / ${xpNeed} XP`,
-                guild ? `🏆 **${guild.name}**` : null,
-                '',
-                `❄️ **${fmt(flocos.get(target.id))}**  ·  💠 **${fmt(cristais.get(target.id))}**  ·  🏦 **${fmt(bank.get(target.id))}**`,
-                `🎒 Coleção **${inv.owned.length}**` +
-                    (guild ? `  ·  📩 Convites **${invStats.total}**` : ''),
-                '',
-                '**Sobre Mim**',
-                about
-            ]
-                .filter((l) => l !== null)
-                .join('\n')
-        )
-        .setThumbnail(target.displayAvatarURL({ size: 256 }))
-        .setImage(banner)
-        .setFooter({
-            text: dec
-                ? `Background: ${dec.name} · Aeternus`
-                : 'Background padrão · compre em Decorações'
-        })
-        .setTimestamp();
-}
+const profileCard = require('../utils/profileCard');
+const snapshot = require('../utils/userSnapshot');
 
 function buttons(guildId, isOwner) {
     const decorUrl = shop.decorPanelUrl(guildId);
@@ -103,15 +44,57 @@ function buttons(guildId, isOwner) {
     ];
 }
 
+function buildCardData(target) {
+    const x = xp.get(target.id);
+    const dec = shop.getEquippedDecoration(target.id);
+    const p = profile.get(target.id);
+    let remain = x.xp;
+    for (let lv = 0; lv < x.level; lv++) remain -= xp.xpForLevel(lv);
+    if (remain < 0) remain = 0;
+
+    return {
+        username: target.username,
+        avatarURL: target.displayAvatarURL({ extension: 'png', size: 128 }),
+        title: shop.getEquippedTitle(target.id) || 'Membro',
+        aboutMe: p.aboutMe || 'Ainda sem biografia… Use Alterar Sobre Mim.',
+        level: x.level,
+        xpRemain: Math.floor(remain),
+        xpNeed: xp.xpForLevel(x.level),
+        flocos: flocos.get(target.id),
+        cristais: cristais.get(target.id),
+        bank: bank.get(target.id),
+        bgImage: dec?.image || null,
+        decorationName: dec?.name || 'Padrão'
+    };
+}
+
 async function showProfile(ctx, target) {
     const isSlash = Boolean(ctx.isChatInputCommand && ctx.isChatInputCommand());
     const viewer = ctx.user || ctx.author;
     const isOwner = viewer.id === target.id;
-    const guild = ctx.guild;
+
+    // snapshot 10 dias (Mongo/arquivo) — painel e pós-deploy
+    snapshot.captureFromLive(target.id, {
+        username: target.username,
+        avatarURL: target.displayAvatarURL({ extension: 'png', size: 128 })
+    });
+
+    const data = buildCardData(target);
+    const buf = profileCard.render(data);
+    const file = new AttachmentBuilder(buf, { name: 'perfil.png' });
+    // Discord aceita SVG como attachment; extensão .png às vezes ajuda no mobile
+    // preferir .svg para fidelidade
+    const fileSvg = new AttachmentBuilder(buf, { name: 'perfil.svg' });
+
+    const embed = new EmbedBuilder()
+        .setColor(0x6366f1)
+        .setImage('attachment://perfil.svg')
+        .setFooter({ text: 'Card com fundo + seções · dados salvos 10 dias' });
 
     const payload = {
-        embeds: [buildEmbed(target, guild)],
-        components: buttons(guild?.id, isOwner)
+        embeds: [embed],
+        files: [fileSvg],
+        components: buttons(ctx.guild?.id, isOwner)
     };
 
     if (isSlash) {
@@ -124,10 +107,10 @@ async function showProfile(ctx, target) {
 module.exports = {
     name: 'perfil',
     aliases: ['profile', 'eu'],
-    description: 'Perfil com banner, sobre mim e botões',
+    description: 'Perfil em card com fundo e seções',
     data: new SlashCommandBuilder()
         .setName('perfil')
-        .setDescription('Mostra o perfil estilo card')
+        .setDescription('Mostra o perfil em card')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Usuário').setRequired(false)
         ),
@@ -165,37 +148,39 @@ module.exports = {
             const owned = shop.ownedDecorations(interaction.user.id);
             if (!owned.length) {
                 return interaction.reply({
-                    content: `Você ainda não tem backgrounds.\nCompre aqui: ${shop.decorPanelUrl(interaction.guild?.id)}`,
+                    content: `Sem backgrounds. Compre: ${shop.decorPanelUrl(interaction.guild?.id)}`,
                     ephemeral: true
                 });
             }
             const menu = new StringSelectMenuBuilder()
                 .setCustomId('perfil:equipbg')
-                .setPlaceholder('Escolha um background da sua coleção…')
+                .setPlaceholder('Background da coleção…')
                 .addOptions(
                     owned.slice(0, 25).map((d) => ({
                         label: d.name.slice(0, 100),
                         value: d.id,
-                        description: (d.desc || 'Background').slice(0, 100)
+                        description: (d.desc || '').slice(0, 100)
                     }))
                 );
             return interaction.reply({
-                content: '🖼️ **Seus backgrounds** — selecione para aplicar no perfil:',
+                content: '🖼️ Escolha o background:',
                 components: [new ActionRowBuilder().addComponents(menu)],
                 ephemeral: true
             });
         }
 
         if (id === 'perfil:equipbg') {
-            const itemId = interaction.values?.[0];
-            const result = shop.equip(interaction.user.id, itemId);
+            const result = shop.equip(interaction.user.id, interaction.values?.[0]);
             if (!result.ok) {
                 return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
             }
+            snapshot.captureFromLive(interaction.user.id, {
+                username: interaction.user.username,
+                avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 })
+            });
             return interaction.update({
-                content: `✅ Background **${result.item.name}** equipado! Use \`O.perfil\` para ver.`,
-                components: [],
-                embeds: []
+                content: `✅ Background **${result.item.name}** equipado! Use \`O.perfil\`.`,
+                components: []
             });
         }
     },
@@ -204,11 +189,13 @@ module.exports = {
         if (interaction.customId !== 'perfil:aboutmodal') return false;
         const text = interaction.fields.getTextInputValue('about');
         profile.setAboutMe(interaction.user.id, text);
-
+        snapshot.captureFromLive(interaction.user.id, {
+            username: interaction.user.username,
+            avatarURL: interaction.user.displayAvatarURL({ extension: 'png', size: 128 }),
+            aboutMe: text
+        });
         await interaction.reply({
-            content: '✅ **Sobre Mim** atualizado!',
-            embeds: [buildEmbed(interaction.user, interaction.guild)],
-            components: buttons(interaction.guild?.id, true),
+            content: '✅ Sobre Mim salvo (10 dias no banco). Use `O.perfil` para ver o card.',
             ephemeral: true
         });
         return true;
