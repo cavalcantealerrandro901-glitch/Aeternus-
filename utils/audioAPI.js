@@ -4,64 +4,13 @@ const play = require('play-dl');
 const API_CACHE = new Map();
 const CACHE_TTL = 3600000; // 1 hora
 
-// Ken API configuração
-const KEN_API_CONFIG = {
-    baseUrl: 'https://api.ken.ai/v1',
-    timeout: 10000
-};
-
-// Spotify API configuração (backup)
-const SPOTIFY_CONFIG = {
-    baseUrl: 'https://api.spotify.com/v1',
-    clientId: process.env.SPOTIFY_ID || '',
-    clientSecret: process.env.SPOTIFY_SECRET || ''
-};
-
-let spotifyToken = null;
-let spotifyTokenExpire = 0;
-
 /**
- * Obter token do Spotify (backup)
+ * Buscar música via Jio Saavn API (Gratuita e sem limites)
  */
-async function getSpotifyToken() {
-    try {
-        if (spotifyToken && Date.now() < spotifyTokenExpire) {
-            return spotifyToken;
-        }
-
-        if (!SPOTIFY_CONFIG.clientId || !SPOTIFY_CONFIG.clientSecret) {
-            return null;
-        }
-
-        const response = await axios.post('https://accounts.spotify.com/api/token', 
-            'grant_type=client_credentials',
-            {
-                auth: {
-                    username: SPOTIFY_CONFIG.clientId,
-                    password: SPOTIFY_CONFIG.clientSecret
-                },
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            }
-        );
-
-        spotifyToken = response.data.access_token;
-        spotifyTokenExpire = Date.now() + (response.data.expires_in * 1000);
-        return spotifyToken;
-    } catch (error) {
-        console.error('[Music API] Erro ao obter token Spotify:', error.message);
-        return null;
-    }
-}
-
-/**
- * Buscar música via Ken API (Gratuita e sem limites)
- */
-async function searchKenAPI(query) {
+async function searchJioSaavnAPI(query) {
     try {
         // Verificar cache
-        const cacheKey = `ken_${query}`;
+        const cacheKey = `saavn_${query}`;
         if (API_CACHE.has(cacheKey)) {
             const cached = API_CACHE.get(cacheKey);
             if (Date.now() < cached.expireAt) {
@@ -70,83 +19,26 @@ async function searchKenAPI(query) {
             API_CACHE.delete(cacheKey);
         }
 
-        // Tentar usar Ken API
-        const response = await axios.get(`${KEN_API_CONFIG.baseUrl}/search`, {
+        // Jio Saavn API (Gratuita)
+        const response = await axios.get('https://www.jiosaavn.com/api.php', {
             params: {
-                q: query,
-                type: 'track',
-                limit: 1
-            },
-            timeout: KEN_API_CONFIG.timeout
-        });
-
-        if (response.data && response.data.tracks && response.data.tracks.length > 0) {
-            const track = response.data.tracks[0];
-            const result = {
-                source: 'ken',
-                title: track.name,
-                artist: track.artist,
-                url: track.url,
-                duration: track.duration,
-                audioUrl: track.audio_url,
-                thumbnail: track.thumbnail
-            };
-
-            // Cachear resultado
-            API_CACHE.set(cacheKey, {
-                data: result,
-                expireAt: Date.now() + CACHE_TTL
-            });
-
-            return result;
-        }
-
-        return null;
-    } catch (error) {
-        console.error('[Ken API] Erro:', error.message);
-        return null;
-    }
-}
-
-/**
- * Buscar música via Spotify API (Backup)
- */
-async function searchSpotifyAPI(query) {
-    try {
-        // Verificar cache
-        const cacheKey = `spotify_${query}`;
-        if (API_CACHE.has(cacheKey)) {
-            const cached = API_CACHE.get(cacheKey);
-            if (Date.now() < cached.expireAt) {
-                return cached.data;
-            }
-            API_CACHE.delete(cacheKey);
-        }
-
-        const token = await getSpotifyToken();
-        if (!token) return null;
-
-        const response = await axios.get(`${SPOTIFY_CONFIG.baseUrl}/search`, {
-            params: {
-                q: query,
-                type: 'track',
-                limit: 1
-            },
-            headers: {
-                'Authorization': `Bearer ${token}`
+                __call: 'autocomplete.get',
+                _format: 'json',
+                query: query
             },
             timeout: 10000
         });
 
-        if (response.data.tracks.items.length > 0) {
-            const track = response.data.tracks.items[0];
+        if (response.data && response.data.songs && response.data.songs.length > 0) {
+            const track = response.data.songs[0];
             const result = {
-                source: 'spotify',
-                title: track.name,
-                artist: track.artists[0].name,
-                url: track.external_urls.spotify,
-                duration: Math.floor(track.duration_ms / 1000),
-                thumbnail: track.album.images[0]?.url
+                source: 'jio_saavn',
+                title: track.title,
+                artist: track.more_info?.artists?.[0]?.name || 'Unknown',
+                url: track.permaUrl,
+                duration: parseInt(track.duration) || 180,
+                thumbnail: track.image,
+                downloadUrl: track.more_info?.song_peri_url || track.permaUrl
             };
 
             // Cachear resultado
@@ -160,7 +52,60 @@ async function searchSpotifyAPI(query) {
 
         return null;
     } catch (error) {
-        console.error('[Spotify API] Erro:', error.message);
+        console.error('[Jio Saavn API] Erro:', error.message);
+        return null;
+    }
+}
+
+/**
+ * Buscar música via SoundCloud API (Gratuita)
+ */
+async function searchSoundCloudAPI(query) {
+    try {
+        // Verificar cache
+        const cacheKey = `soundcloud_${query}`;
+        if (API_CACHE.has(cacheKey)) {
+            const cached = API_CACHE.get(cacheKey);
+            if (Date.now() < cached.expireAt) {
+                return cached.data;
+            }
+            API_CACHE.delete(cacheKey);
+        }
+
+        // SoundCloud API pública
+        const response = await axios.get('https://api-v2.soundcloud.com/search/tracks', {
+            params: {
+                q: query,
+                client_id: 'a3e059563d7fd3372b49b37f4ef3e9a9',
+                limit: 1
+            },
+            timeout: 10000
+        });
+
+        if (response.data && response.data.collection && response.data.collection.length > 0) {
+            const track = response.data.collection[0];
+            const result = {
+                source: 'soundcloud',
+                title: track.title,
+                artist: track.user?.username || 'Unknown',
+                url: track.permalink_url,
+                duration: Math.floor(track.duration / 1000),
+                thumbnail: track.artwork_url,
+                downloadUrl: track.download_url || track.permalink_url
+            };
+
+            // Cachear resultado
+            API_CACHE.set(cacheKey, {
+                data: result,
+                expireAt: Date.now() + CACHE_TTL
+            });
+
+            return result;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('[SoundCloud API] Erro:', error.message);
         return null;
     }
 }
@@ -210,27 +155,30 @@ async function searchYouTubeAPI(query) {
  */
 async function getAudioStream(musicData) {
     try {
-        // Se tiver audioUrl direto (Ken API), usar diretamente
-        if (musicData.audioUrl) {
-            const response = await axios.get(musicData.audioUrl, {
-                responseType: 'stream',
-                timeout: 30000
-            });
-            return {
-                stream: response.data,
-                type: 'unknown',
-                source: 'ken'
-            };
-        }
-
-        // Se for YouTube URL, usar play-dl
+        // Se for URL do YouTube, usar play-dl
         if (musicData.url.includes('youtube.com') || musicData.url.includes('youtu.be')) {
             const stream = await play.stream(musicData.url);
             return stream;
         }
 
-        // Se for Spotify, tentar converter para YouTube
-        if (musicData.source === 'spotify') {
+        // Se for SoundCloud, tentar usar play-dl também
+        if (musicData.source === 'soundcloud') {
+            try {
+                const stream = await play.stream(musicData.url);
+                return stream;
+            } catch (e) {
+                console.error('[Audio Stream] SoundCloud fallback para YouTube');
+                // Fallback para YouTube se SoundCloud falhar
+                const ytResult = await searchYouTubeAPI(`${musicData.title} ${musicData.artist}`);
+                if (ytResult) {
+                    const stream = await play.stream(ytResult.url);
+                    return stream;
+                }
+            }
+        }
+
+        // Se for Jio Saavn, tentar converter para YouTube
+        if (musicData.source === 'jio_saavn') {
             const ytResult = await searchYouTubeAPI(`${musicData.title} ${musicData.artist}`);
             if (ytResult) {
                 const stream = await play.stream(ytResult.url);
@@ -252,17 +200,17 @@ async function searchMusic(query) {
     try {
         console.log(`[Music Search] Buscando: ${query}`);
 
-        // 1. Tentar Ken API (Gratuita e sem limites)
-        let result = await searchKenAPI(query);
+        // 1. Tentar Jio Saavn API (Gratuita e sem limites)
+        let result = await searchJioSaavnAPI(query);
         if (result) {
-            console.log(`[Music Search] Encontrado via Ken API: ${result.title}`);
+            console.log(`[Music Search] Encontrado via Jio Saavn: ${result.title}`);
             return result;
         }
 
-        // 2. Fallback para Spotify
-        result = await searchSpotifyAPI(query);
+        // 2. Fallback para SoundCloud
+        result = await searchSoundCloudAPI(query);
         if (result) {
-            console.log(`[Music Search] Encontrado via Spotify: ${result.title}`);
+            console.log(`[Music Search] Encontrado via SoundCloud: ${result.title}`);
             return result;
         }
 
@@ -298,10 +246,9 @@ setInterval(cleanOldCache, 30 * 60 * 1000);
 
 module.exports = {
     searchMusic,
-    searchKenAPI,
-    searchSpotifyAPI,
+    searchJioSaavnAPI,
+    searchSoundCloudAPI,
     searchYouTubeAPI,
     getAudioStream,
-    getSpotifyToken,
     API_CACHE
 };
