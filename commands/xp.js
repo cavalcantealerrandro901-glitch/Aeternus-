@@ -32,31 +32,31 @@ function titleForLevel(level) {
 function profileEmbed(user, p, rankInfo) {
     const title = titleForLevel(p.level);
     const lines = [
-        `${title.emoji} **Título:** ${title.name}`,
+        title.emoji + ' **Título:** ' + title.name,
         '',
-        `🎚️ **Nível** \\\`${p.level}\\\``,
-        `✨ **XP total** · ${fmt(p.totalXp)}`,
+        '🎚️ **Nível** **' + p.level + '**',
+        '✨ **XP total** · ' + fmt(p.totalXp),
         '',
-        `**Progresso no nível**`,
-        `\`${bar(p.pct)}\` **${p.pct}%**`,
-        `🔹 ${fmt(p.current)} / ${fmt(p.need)} XP`,
-        `⏳ Faltam **${fmt(p.toNext)}** XP para o nível ${p.level + 1}`,
+        '**Progresso no nível**',
+        '`' + bar(p.pct) + '` **' + p.pct + '%**',
+        '🔹 ' + fmt(p.current) + ' / ' + fmt(p.need) + ' XP',
+        '⏳ Faltam **' + fmt(p.toNext) + '** XP para o nível ' + (p.level + 1),
         '',
-        `🎁 **Multiplicador do Daily:** ×**${p.mult.toFixed(2)}**`,
-        `_Cada nível aumenta o daily (máx. ×3.00)._`,
+        '🎁 **Multiplicador do Daily:** ×**' + p.mult.toFixed(2) + '**',
+        '_Cada nível aumenta o daily (máx. ×3.00)._',
         '',
         rankInfo
-            ? `🏅 **Ranking global:** #**${rankInfo.rank}** de ${rankInfo.total}`
+            ? '🏅 **Ranking global:** #**' + rankInfo.rank + '** de ' + rankInfo.total
             : ''
     ].filter(Boolean);
 
     return new EmbedBuilder()
         .setColor(0xa78bfa)
         .setAuthor({
-            name: `${user.username} · Experiência`,
+            name: user.username + ' · Experiência',
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle(`${title.emoji}  Nível ${p.level}`)
+        .setTitle(title.emoji + '  Nível ' + p.level)
         .setDescription(lines.join('\n'))
         .setThumbnail(user.displayAvatarURL({ size: 256 }))
         .setFooter({ text: 'O.xp · O.level · O.nivel · /xp  ·  converse no chat para ganhar XP' })
@@ -67,9 +67,20 @@ function leaderboardEmbed(client, list) {
     const medals = ['🥇', '🥈', '🥉'];
     const lines = list.length
         ? list.map((row, i) => {
-              const medal = medals[i] || `**${i + 1}.**`;
+              const medal = medals[i] || '**' + (i + 1) + '.**';
               const title = titleForLevel(row.level);
-              return `${medal} <@${row.userId}> — ${title.emoji} Nv. **${row.level}** · ${fmt(row.xp)} XP`;
+              return (
+                  medal +
+                  ' <@' +
+                  row.userId +
+                  '> — ' +
+                  title.emoji +
+                  ' Nv. **' +
+                  row.level +
+                  '** · ' +
+                  fmt(row.xp) +
+                  ' XP'
+              );
           })
         : ['_Ainda ninguém no ranking. Converse no chat!_'];
 
@@ -174,6 +185,7 @@ module.exports = {
         }
 
         const user = message.mentions.users.first() || message.author;
+        // se o 1º arg for menção, parseSub já trata como me
         const p = xp.progress(user.id);
         const rankInfo = xp.rankOf(user.id);
         return message.reply({
