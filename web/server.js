@@ -9,6 +9,7 @@ const flocos = require('../utils/flocos');
 const cristais = require('../utils/cristais');
 const xp = require('../utils/xp');
 const shop = require('../utils/shop');
+const snapshot = require('../utils/userSnapshot');
 
 const sessions = new Map();
 const SETTINGS_KEYS = [
@@ -79,10 +80,24 @@ function setup(client) {
                     headers: { Authorization: `Bearer ${token.access_token}` }
                 })
             ).json();
+
+            // snapshot automático no login (10 dias)
+            try {
+                const avatarURL = user.avatar
+                    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`
+                    : null;
+                snapshot.captureFromLive(user.id, {
+                    username: user.username,
+                    avatarURL,
+                    discriminator: user.discriminator
+                });
+            } catch (e) {
+                console.error('snapshot login:', e.message);
+            }
+
             const sid = crypto.randomBytes(16).toString('hex');
             sessions.set(sid, { user, guilds: Array.isArray(guilds) ? guilds : [] });
             res.cookie('sid', sid, { httpOnly: true, maxAge: 7 * 864e5, sameSite: 'lax' });
-            // se veio de decorações, volta pra lá
             const next = req.cookies?.afterLogin || '/dashboard';
             res.clearCookie('afterLogin');
             res.redirect(next);
@@ -102,6 +117,21 @@ function setup(client) {
         const s = sessionUser(req);
         if (!s) return res.status(401).json({ error: 'auth' });
         const uid = s.user.id;
+
+        // atualiza snapshot sempre que o painel pede /api/me
+        let snap;
+        try {
+            const avatarURL = s.user.avatar
+                ? `https://cdn.discordapp.com/avatars/${s.user.id}/${s.user.avatar}.png?size=128`
+                : null;
+            snap = snapshot.captureFromLive(uid, {
+                username: s.user.username,
+                avatarURL
+            });
+        } catch {
+            snap = snapshot.getSnapshot(uid);
+        }
+
         res.json({
             user: s.user,
             economy: {
@@ -111,6 +141,7 @@ function setup(client) {
             },
             inventory: shop.getInv(uid),
             equippedDecoration: shop.getEquippedDecoration(uid),
+            snapshot: snap,
             bot: client.user
                 ? {
                       tag: client.user.tag,
@@ -121,7 +152,13 @@ function setup(client) {
         });
     });
 
-    // ── Decorações (imagens) ───────────────────────────────────────
+    app.get('/api/user/:id/snapshot', (req, res) => {
+        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
+        const snap = snapshot.getSnapshot(req.params.id);
+        if (!snap) return res.status(404).json({ error: 'Sem snapshot (expirou ou nunca salvo).' });
+        res.json(snap);
+    });
+
     app.get('/api/shop/decorations', (req, res) => {
         const s = sessionUser(req);
         const items = shop.decorations();
@@ -139,6 +176,9 @@ function setup(client) {
         const guildId = req.body?.guildId || null;
         const result = shop.buy(s.user.id, guildId, itemId);
         if (!result.ok) return res.status(400).json(result);
+        snapshot.captureFromLive(s.user.id, {
+            username: s.user.username
+        });
         res.json({
             ok: true,
             item: result.item,
@@ -155,6 +195,7 @@ function setup(client) {
         if (!s) return res.status(401).json({ error: 'Faça login no Discord.' });
         const result = shop.equip(s.user.id, req.body?.itemId);
         if (!result.ok) return res.status(400).json(result);
+        snapshot.captureFromLive(s.user.id, { username: s.user.username });
         res.json({ ok: true, item: result.item });
     });
 
@@ -171,6 +212,7 @@ function setup(client) {
         const guildId = req.body?.guildId || null;
         const result = daily.claim(s.user.id, guildId);
         if (!result.ok) return res.status(400).json(result);
+        snapshot.captureFromLive(s.user.id, { username: s.user.username });
         res.json(result);
     });
 
