@@ -82,4 +82,53 @@ async function flush() {
     }
 }
 
-module.exports = { load, save, filePath, ensureDir, hydrate, flush };
+/** Snapshot de tudo que está em memória + arquivos data/ */
+function dumpAll() {
+    ensureDir();
+    const out = {};
+
+    for (const [k, v] of memory.entries()) {
+        out[k] = clone(v);
+    }
+
+    try {
+        const dir = path.join(__dirname, '..', 'data');
+        for (const file of fs.readdirSync(dir)) {
+            if (!file.endsWith('.json')) continue;
+            if (out[file] !== undefined) continue;
+            try {
+                out[file] = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+            } catch (_) {}
+        }
+    } catch (_) {}
+
+    return out;
+}
+
+function keys() {
+    return [...memory.keys()];
+}
+
+/** Restaura um dump completo no store */
+async function restoreAll(payload) {
+    if (!payload || typeof payload !== 'object') return 0;
+    let n = 0;
+    for (const [name, data] of Object.entries(payload)) {
+        save(name, data);
+        n++;
+    }
+    await flush();
+    return n;
+}
+
+module.exports = {
+    load,
+    save,
+    filePath,
+    ensureDir,
+    hydrate,
+    flush,
+    dumpAll,
+    keys,
+    restoreAll
+};

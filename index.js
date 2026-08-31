@@ -43,6 +43,19 @@ async function main() {
     loadSystems(client);
     startWeb(client);
 
+    // backup também no shutdown (best-effort)
+    const backup = require('./utils/backup');
+    const shutdown = async (sig) => {
+        console.log(`\n${sig} — salvando backup final…`);
+        try {
+            await store.flush();
+            await backup.createBackup('shutdown');
+        } catch (_) {}
+        process.exit(0);
+    };
+    process.once('SIGINT', () => shutdown('SIGINT'));
+    process.once('SIGTERM', () => shutdown('SIGTERM'));
+
     await client.login(token);
 }
 

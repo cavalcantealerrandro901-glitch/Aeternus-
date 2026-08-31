@@ -32,6 +32,19 @@ const KvSchema = new mongoose.Schema(
     { collection: 'aeternus_store' }
 );
 
-const Kv = mongoose.models.AeternusStore || mongoose.model('AeternusStore', KvSchema);
+const BackupSchema = new mongoose.Schema(
+    {
+        createdAt: { type: Date, default: Date.now, index: true },
+        reason: { type: String, default: 'auto' },
+        keys: { type: [String], default: [] },
+        sizeBytes: { type: Number, default: 0 },
+        payload: { type: mongoose.Schema.Types.Mixed, required: true }
+    },
+    { collection: 'aeternus_backups' }
+);
 
-module.exports = { connect, isConnected, Kv, mongoose };
+const Kv = mongoose.models.AeternusStore || mongoose.model('AeternusStore', KvSchema);
+const Backup =
+    mongoose.models.AeternusBackup || mongoose.model('AeternusBackup', BackupSchema);
+
+module.exports = { connect, isConnected, Kv, Backup, mongoose };
