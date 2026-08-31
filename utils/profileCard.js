@@ -1,5 +1,5 @@
 /**
- * Card de perfil → PNG com efeitos especiais.
+ * Card de perfil → PNG com efeitos visíveis no avatar e no rodapé.
  */
 
 function esc(s) {
@@ -70,73 +70,192 @@ async function fetchDataUri(url) {
 
 const FONT = 'DejaVu Sans,Arial,Helvetica,sans-serif';
 
+/**
+ * Efeitos bem visíveis: ao redor da foto + barra no final do card.
+ */
 function effectLayers(style) {
-    if (!style) return { frame: '', avatarRing: '', particles: '', badge: '' };
+    if (!style) return { defs: '', behindAvatar: '', aroundAvatar: '', footer: '' };
 
-    const particles = {
+    // defs extras por estilo
+    const defsMap = {
+        fire: `
+    <radialGradient id="fxFire" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#f97316" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#dc2626" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fxFireBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7f1d1d"/>
+      <stop offset="50%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#7f1d1d"/>
+    </linearGradient>`,
+        glow: `
+    <radialGradient id="fxGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f5f3ff" stop-opacity="0.9"/>
+      <stop offset="40%" stop-color="#c4b5fd" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fxGlowBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4c1d95"/>
+      <stop offset="50%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#4c1d95"/>
+    </linearGradient>`,
+        neon: `
+    <radialGradient id="fxNeon" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f0abfc" stop-opacity="0.85"/>
+      <stop offset="50%" stop-color="#22d3ee" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fxNeonBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#db2777"/>
+      <stop offset="50%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>`,
+        gold: `
+    <radialGradient id="fxGold" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fef9c3" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#fbbf24" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#b45309" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fxGoldBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#78350f"/>
+      <stop offset="50%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#78350f"/>
+    </linearGradient>`,
+        ice: `
+    <radialGradient id="fxIce" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e0f2fe" stop-opacity="0.95"/>
+      <stop offset="45%" stop-color="#22d3ee" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#0369a1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fxIceBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0c4a6e"/>
+      <stop offset="50%" stop-color="#67e8f9"/>
+      <stop offset="100%" stop-color="#0c4a6e"/>
+    </linearGradient>`,
         stars: `
-  <circle cx="80" cy="60" r="2.5" fill="#fff" opacity="0.9"/>
-  <circle cx="640" cy="90" r="2" fill="#fde68a" opacity="0.85"/>
-  <circle cx="120" cy="200" r="1.8" fill="#fff" opacity="0.7"/>
-  <circle cx="580" cy="180" r="2.2" fill="#c4b5fd" opacity="0.8"/>
-  <circle cx="200" cy="480" r="2" fill="#fff" opacity="0.75"/>
-  <circle cx="520" cy="520" r="1.6" fill="#f0abfc" opacity="0.8"/>
-  <circle cx="350" cy="40" r="1.5" fill="#fff" opacity="0.65"/>
-  <circle cx="450" cy="700" r="2" fill="#fde68a" opacity="0.7"/>`,
-        glow: '',
-        neon: '',
-        gold: '',
-        fire: '',
-        ice: '',
-        rainbow: '',
-        shadow: ''
+    <radialGradient id="fxStars" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fef9c3" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#c4b5fd" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#312e81" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fxStarsBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="50%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>`,
+        rainbow: `
+    <radialGradient id="fxRb" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f472b6" stop-opacity="0.7"/>
+      <stop offset="40%" stop-color="#a78bfa" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fxRbBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="25%" stop-color="#f59e0b"/>
+      <stop offset="50%" stop-color="#22c55e"/>
+      <stop offset="75%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>`,
+        shadow: `
+    <radialGradient id="fxSh" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fxShBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>`
     };
 
-    const frames = {
-        glow: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#e9d5ff" stroke-width="3" opacity="0.55"/>
-  <rect x="16" y="16" width="688" height="868" rx="28" fill="none" stroke="#c4b5fd" stroke-width="1.5" opacity="0.4"/>`,
-        neon: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#f0abfc" stroke-width="4"/>
-  <rect x="18" y="18" width="684" height="864" rx="26" fill="none" stroke="#22d3ee" stroke-width="2" opacity="0.85"/>`,
-        gold: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#fbbf24" stroke-width="5"/>
-  <rect x="18" y="18" width="684" height="864" rx="26" fill="none" stroke="#fde68a" stroke-width="2"/>`,
-        fire: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#f97316" stroke-width="4"/>
-  <rect x="16" y="16" width="688" height="868" rx="28" fill="none" stroke="#ef4444" stroke-width="2" opacity="0.8"/>`,
-        ice: `<rect x="10" y="10" width="700" height="880" rx="30" fill="none" stroke="#67e8f9" stroke-width="4"/>
-  <rect x="16" y="16" width="688" height="868" rx="28" fill="none" stroke="#a5f3fc" stroke-width="2"/>`,
-        rainbow: `<rect x="8" y="8" width="704" height="884" rx="32" fill="none" stroke="#f472b6" stroke-width="3"/>
-  <rect x="12" y="12" width="696" height="876" rx="30" fill="none" stroke="#a78bfa" stroke-width="3"/>
-  <rect x="16" y="16" width="688" height="868" rx="28" fill="none" stroke="#38bdf8" stroke-width="2"/>`,
-        stars: `<rect x="14" y="14" width="692" height="872" rx="28" fill="none" stroke="#e9d5ff" stroke-width="2" opacity="0.5"/>`,
-        shadow: `<rect x="20" y="24" width="690" height="870" rx="28" fill="#000" opacity="0.35"/>
-  <rect x="14" y="14" width="692" height="872" rx="28" fill="none" stroke="#64748b" stroke-width="2"/>`
+    // glow circular atrás do avatar (fogo / aura)
+    const behind = {
+        fire: `
+  <ellipse cx="360" cy="140" rx="130" ry="125" fill="url(#fxFire)"/>
+  <ellipse cx="300" cy="100" rx="28" ry="55" fill="#f97316" opacity="0.75" transform="rotate(-25 300 100)"/>
+  <ellipse cx="420" cy="95" rx="26" ry="50" fill="#ef4444" opacity="0.7" transform="rotate(20 420 95)"/>
+  <ellipse cx="340" cy="70" rx="22" ry="48" fill="#fbbf24" opacity="0.8" transform="rotate(-8 340 70)"/>
+  <ellipse cx="385" cy="75" rx="20" ry="45" fill="#fb923c" opacity="0.75" transform="rotate(12 385 75)"/>
+  <ellipse cx="360" cy="55" rx="18" ry="40" fill="#fde68a" opacity="0.85"/>`,
+        glow: `<circle cx="360" cy="132" r="120" fill="url(#fxGlow)"/>
+  <circle cx="360" cy="132" r="105" fill="url(#fxGlow)" opacity="0.6"/>`,
+        neon: `<circle cx="360" cy="132" r="118" fill="url(#fxNeon)"/>`,
+        gold: `<circle cx="360" cy="132" r="118" fill="url(#fxGold)"/>`,
+        ice: `<circle cx="360" cy="132" r="118" fill="url(#fxIce)"/>
+  <ellipse cx="300" cy="90" rx="12" ry="22" fill="#e0f2fe" opacity="0.7" transform="rotate(-30 300 90)"/>
+  <ellipse cx="430" cy="100" rx="10" ry="20" fill="#a5f3fc" opacity="0.65" transform="rotate(25 430 100)"/>`,
+        stars: `<circle cx="360" cy="132" r="115" fill="url(#fxStars)"/>`,
+        rainbow: `<circle cx="360" cy="132" r="118" fill="url(#fxRb)"/>`,
+        shadow: `<circle cx="368" cy="142" r="100" fill="url(#fxSh)"/>`
     };
 
-    const rings = {
-        glow: `<circle cx="360" cy="132" r="94" fill="none" stroke="#e9d5ff" stroke-width="6" opacity="0.55"/>
-  <circle cx="360" cy="132" r="102" fill="none" stroke="#c4b5fd" stroke-width="3" opacity="0.35"/>`,
-        neon: `<circle cx="360" cy="132" r="94" fill="none" stroke="#f0abfc" stroke-width="5"/>
-  <circle cx="360" cy="132" r="100" fill="none" stroke="#22d3ee" stroke-width="3"/>`,
-        gold: `<circle cx="360" cy="132" r="94" fill="none" stroke="#fbbf24" stroke-width="6"/>
-  <circle cx="360" cy="132" r="100" fill="none" stroke="#fde68a" stroke-width="3"/>`,
-        fire: `<circle cx="360" cy="132" r="94" fill="none" stroke="#f97316" stroke-width="5"/>
-  <circle cx="360" cy="132" r="100" fill="none" stroke="#ef4444" stroke-width="3"/>`,
-        ice: `<circle cx="360" cy="132" r="94" fill="none" stroke="#67e8f9" stroke-width="5"/>
-  <circle cx="360" cy="132" r="100" fill="none" stroke="#e0f2fe" stroke-width="2"/>`,
-        rainbow: `<circle cx="360" cy="132" r="94" fill="none" stroke="#f472b6" stroke-width="4"/>
-  <circle cx="360" cy="132" r="100" fill="none" stroke="#a78bfa" stroke-width="3"/>
-  <circle cx="360" cy="132" r="106" fill="none" stroke="#38bdf8" stroke-width="2"/>`,
-        stars: `<circle cx="360" cy="132" r="94" fill="none" stroke="#fde68a" stroke-width="4" opacity="0.8"/>`,
-        shadow: `<circle cx="364" cy="138" r="90" fill="#000" opacity="0.35"/>
-  <circle cx="360" cy="132" r="92" fill="none" stroke="#94a3b8" stroke-width="3"/>`
+    // anéis em volta da foto (depois do avatar)
+    const around = {
+        fire: `
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#fbbf24" stroke-width="5"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#f97316" stroke-width="4" opacity="0.9"/>
+  <circle cx="360" cy="132" r="108" fill="none" stroke="#dc2626" stroke-width="3" opacity="0.7"/>
+  <circle cx="360" cy="132" r="116" fill="none" stroke="#7f1d1d" stroke-width="2" opacity="0.5"/>`,
+        glow: `
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#f5f3ff" stroke-width="6" opacity="0.9"/>
+  <circle cx="360" cy="132" r="102" fill="none" stroke="#c4b5fd" stroke-width="4" opacity="0.75"/>
+  <circle cx="360" cy="132" r="112" fill="none" stroke="#a78bfa" stroke-width="2" opacity="0.5"/>`,
+        neon: `
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#f0abfc" stroke-width="5"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#22d3ee" stroke-width="4"/>
+  <circle cx="360" cy="132" r="108" fill="none" stroke="#e879f9" stroke-width="2" opacity="0.8"/>`,
+        gold: `
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#fef08a" stroke-width="6"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#fbbf24" stroke-width="4"/>
+  <circle cx="360" cy="132" r="108" fill="none" stroke="#d97706" stroke-width="3"/>`,
+        ice: `
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#ecfeff" stroke-width="5"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#67e8f9" stroke-width="4"/>
+  <circle cx="360" cy="132" r="108" fill="none" stroke="#22d3ee" stroke-width="2"/>`,
+        stars: `
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#fde68a" stroke-width="4"/>
+  <circle cx="360" cy="132" r="100" fill="none" stroke="#e9d5ff" stroke-width="3" opacity="0.8"/>
+  <circle cx="280" cy="80" r="3" fill="#fff"/>
+  <circle cx="440" cy="70" r="2.5" fill="#fde68a"/>
+  <circle cx="250" cy="150" r="2" fill="#c4b5fd"/>
+  <circle cx="470" cy="160" r="2.5" fill="#fff"/>
+  <circle cx="360" cy="40" r="2" fill="#fef9c3"/>
+  <circle cx="310" cy="200" r="1.8" fill="#fff"/>
+  <circle cx="410" cy="195" r="2" fill="#fde68a"/>`,
+        rainbow: `
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#f472b6" stroke-width="4"/>
+  <circle cx="360" cy="132" r="98" fill="none" stroke="#a78bfa" stroke-width="3"/>
+  <circle cx="360" cy="132" r="104" fill="none" stroke="#38bdf8" stroke-width="3"/>
+  <circle cx="360" cy="132" r="110" fill="none" stroke="#4ade80" stroke-width="2"/>`,
+        shadow: `
+  <circle cx="360" cy="132" r="92" fill="none" stroke="#94a3b8" stroke-width="4"/>
+  <circle cx="360" cy="132" r="98" fill="none" stroke="#475569" stroke-width="2"/>`
     };
+
+    const barId = {
+        fire: 'fxFireBar',
+        glow: 'fxGlowBar',
+        neon: 'fxNeonBar',
+        gold: 'fxGoldBar',
+        ice: 'fxIceBar',
+        stars: 'fxStarsBar',
+        rainbow: 'fxRbBar',
+        shadow: 'fxShBar'
+    }[style];
+
+    // rodapé do card com efeito
+    const footer = barId
+        ? `
+  <rect x="40" y="868" width="640" height="14" rx="7" fill="url(#${barId})"/>
+  <rect x="40" y="868" width="640" height="14" rx="7" fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="1"/>`
+        : '';
 
     return {
-        frame: frames[style] || '',
-        avatarRing: rings[style] || '',
-        particles: particles[style] || '',
-        badge: style
-            ? `<text x="360" y="${style === 'stars' ? 868 : 868}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="700" fill="#e2e8f0">efeito ativo</text>`
-            : ''
+        defs: defsMap[style] || '',
+        behindAvatar: behind[style] || '',
+        aroundAvatar: around[style] || '',
+        footer
     };
 }
 
@@ -189,7 +308,7 @@ function buildSvg(d, avatarData, bgData) {
         : '';
 
     const fxName = d.effectName
-        ? `<text x="60" y="${H - 48}" font-family="${FONT}" font-size="13" font-weight="700" fill="#c4b5fd">FX · ${esc(d.effectName)}</text>`
+        ? `<text x="60" y="860" font-family="${FONT}" font-size="13" font-weight="700" fill="#f8fafc">FX · ${esc(d.effectName)}</text>`
         : '';
 
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -209,20 +328,23 @@ function buildSvg(d, avatarData, bgData) {
       <stop offset="0%" stop-color="#c4b5fd"/>
       <stop offset="100%" stop-color="#f0abfc"/>
     </linearGradient>
+    ${fx.defs}
   </defs>
 
   <rect width="${W}" height="${H}" fill="url(#g)"/>
   ${bgLayer}
   <rect width="${W}" height="${H}" fill="url(#veil)"/>
 
-  ${fx.frame}
-  ${fx.particles}
-
   <rect x="16" y="16" width="${W - 32}" height="${H - 32}" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="2"/>
 
-  ${fx.avatarRing}
+  <!-- efeito ATRÁS da foto (fogo / aura) -->
+  ${fx.behindAvatar}
+
   ${avatarLayer}
-  <circle cx="360" cy="132" r="88" fill="none" stroke="#ffffff" stroke-opacity="0.75" stroke-width="4"/>
+  <circle cx="360" cy="132" r="86" fill="none" stroke="#ffffff" stroke-opacity="0.9" stroke-width="3"/>
+
+  <!-- anéis / fogo em volta da foto -->
+  ${fx.aroundAvatar}
 
   <text x="360" y="254" text-anchor="middle" font-family="${FONT}" font-size="34" font-weight="700" fill="#ffffff">${name}</text>
   ${titleSvg}
@@ -239,12 +361,14 @@ function buildSvg(d, avatarData, bgData) {
   <rect x="48" y="${xpY + 98}" width="${barW}" height="18" rx="9" fill="#1e293b"/>
   <rect x="48" y="${xpY + 98}" width="${Math.max(0, fillW)}" height="18" rx="9" fill="url(#xp)"/>
 
-  <rect x="40" y="${aboutBoxY}" width="${W - 80}" height="${H - aboutBoxY - 36}" rx="20" fill="#020617" fill-opacity="0.88" stroke="#e2e8f0" stroke-width="2"/>
+  <rect x="40" y="${aboutBoxY}" width="${W - 80}" height="${H - aboutBoxY - 48}" rx="20" fill="#020617" fill-opacity="0.88" stroke="#e2e8f0" stroke-width="2"/>
   <text x="58" y="${aboutBoxY + 38}" font-family="${FONT}" font-size="15" font-weight="700" fill="#f1f5f9" letter-spacing="1.5">SOBRE ELE(A)</text>
   ${aboutText}
 
   ${fxName}
-  <text x="${W / 2}" y="${H - 22}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600" fill="#e2e8f0">Aeternus</text>
+  <!-- barra de efeito no final do card -->
+  ${fx.footer}
+  <text x="${W / 2}" y="${H - 8}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="600" fill="#e2e8f0">Aeternus</text>
 </svg>`;
 }
 
@@ -260,7 +384,7 @@ async function render(d) {
     try {
         const sharp = require('sharp');
         const png = await sharp(svgBuf, { density: 160 })
-            .modulate({ brightness: 1.18, saturation: 1.12 })
+            .modulate({ brightness: 1.15, saturation: 1.15 })
             .png({ quality: 92 })
             .toBuffer();
         return { buffer: png, name: 'perfil.png' };
