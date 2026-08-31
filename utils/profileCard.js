@@ -1,6 +1,6 @@
 /**
- * Gera SVG do perfil: imagem de fundo + cards separados para cada info.
- * Discord renderiza o SVG anexado como imagem única.
+ * Card de perfil em SVG auto-contido (imagens em base64).
+ * Sem embed — só o arquivo na mensagem.
  */
 
 function esc(s) {
@@ -8,16 +8,18 @@ function esc(s) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .slice(0, 80);
+        .replace(/"/g, '&quot;');
 }
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-function wrapText(text, maxLen = 42, maxLines = 3) {
-    const words = String(text || '').split(/\s+/);
+function wrapText(text, maxLen = 36, maxLines = 4) {
+    const words = String(text || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(' ');
     const lines = [];
     let cur = '';
     for (const w of words) {
@@ -32,101 +34,136 @@ function wrapText(text, maxLen = 42, maxLines = 3) {
     return lines.length ? lines : ['—'];
 }
 
+const LOVE_TYPES = [
+    { name: 'Palavras de Afirmação', emoji: '💬', desc: 'Valoriza elogios e mensagens carinhosas.' },
+    { name: 'Tempo de Qualidade', emoji: '⏳', desc: 'Prefere presença e atenção verdadeira.' },
+    { name: 'Presentes', emoji: '🎁', desc: 'Se sente amado(a) com gestos e surpresas.' },
+    { name: 'Atos de Serviço', emoji: '🛠️', desc: 'Amor se mostra ajudando no dia a dia.' },
+    { name: 'Toque Físico', emoji: '🤍', desc: 'Carinho e proximidade falam mais alto.' },
+    { name: 'Escuta Profunda', emoji: '🎧', desc: 'Quer ser ouvido(a) de verdade.' },
+    { name: 'Aventura a Dois', emoji: '🌙', desc: 'Conexão nasce em experiências novas.' },
+    { name: 'Cuidado Silencioso', emoji: '🌿', desc: 'Demonstra amor nos detalhes quietos.' }
+];
+
+function loveTypeFor(userId) {
+    const s = String(userId || '0');
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return LOVE_TYPES[h % LOVE_TYPES.length];
+}
+
+async function fetchDataUri(url) {
+    if (!url) return null;
+    try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) return null;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > 2_500_000) return null; // evita SVG gigante
+        let mime = res.headers.get('content-type') || 'image/png';
+        if (mime.includes(';')) mime = mime.split(';')[0].trim();
+        if (!mime.startsWith('image/')) mime = 'image/png';
+        return `data:${mime};base64,${buf.toString('base64')}`;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * @param {object} d
- * @returns {Buffer}
+ * @returns {Promise<Buffer>}
  */
-function render(d) {
-    const W = 900;
-    const H = 520;
-    const bg = d.bgImage || '';
-    const name = esc(d.username || 'Usuário');
-    const title = esc(d.title || 'Membro');
-    const aboutLines = wrapText(d.aboutMe || 'Sem biografia ainda.', 48, 3).map(esc);
-    const decName = esc(d.decorationName || 'Padrão');
+async function render(d) {
+    const W = 720;
+    const H = 900;
 
-    const cards = [
-        { x: 40, y: 210, w: 200, h: 88, label: 'NÍVEL', value: String(d.level ?? 0), sub: `${fmt(d.xpRemain || 0)} / ${fmt(d.xpNeed || 0)} XP` },
-        { x: 256, y: 210, w: 200, h: 88, label: 'FLOCOS', value: fmt(d.flocos), sub: 'carteira' },
-        { x: 472, y: 210, w: 200, h: 88, label: 'CRISTAIS', value: fmt(d.cristais), sub: 'premium' },
-        { x: 688, y: 210, w: 172, h: 88, label: 'BANCO', value: fmt(d.bank), sub: 'guardado' }
-    ];
+    const name = esc((d.username || 'Usuário').slice(0, 24));
+    const aboutLines = wrapText(d.aboutMe || 'Sem biografia ainda.', 40, 4).map(esc);
+    const love = d.love || loveTypeFor(d.userId);
+    const level = d.level ?? 0;
+    const xpNow = fmt(d.xpRemain || 0);
+    const xpNeed = fmt(d.xpNeed || 0);
+    const pct = Math.max(0, Math.min(100, Math.floor(((d.xpRemain || 0) / Math.max(1, d.xpNeed || 1)) * 100)));
 
-    const cardSvg = cards
-        .map(
-            (c) => `
-  <g>
-    <rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="16"
-      fill="rgba(15,23,42,0.72)" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
-    <text x="${c.x + 16}" y="${c.y + 28}" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="rgba(226,232,240,0.7)" letter-spacing="1.5">${c.label}</text>
-    <text x="${c.x + 16}" y="${c.y + 56}" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" fill="#f8fafc">${esc(c.value)}</text>
-    <text x="${c.x + 16}" y="${c.y + 74}" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="rgba(148,163,184,0.95)">${esc(c.sub)}</text>
-  </g>`
-        )
-        .join('');
+    const [avatarData, bgData] = await Promise.all([
+        fetchDataUri(d.avatarURL),
+        fetchDataUri(d.bgImage)
+    ]);
 
-    const aboutY = 318;
-    const aboutH = 150;
+    const bgLayer = bgData
+        ? `<image href="${bgData}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
+        : '';
+
+    const avatarLayer = avatarData
+        ? `<image href="${avatarData}" x="276" y="48" width="168" height="168" clip-path="url(#av)" preserveAspectRatio="xMidYMid slice"/>`
+        : `<circle cx="360" cy="132" r="84" fill="#4c1d95"/>
+           <text x="360" y="148" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="48" font-weight="700" fill="#e9d5ff">${esc((d.username || '?')[0]?.toUpperCase() || '?')}</text>`;
+
     const aboutText = aboutLines
         .map(
             (line, i) =>
-                `<text x="56" y="${aboutY + 52 + i * 22}" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#e2e8f0">${line}</text>`
+                `<text x="48" y="${620 + i * 26}" font-family="Segoe UI,Arial,sans-serif" font-size="16" fill="#e2e8f0">${line}</text>`
         )
-        .join('');
+        .join('\n');
 
-    // fundo: tenta imagem; sempre tem gradiente por baixo
-    const bgLayer = bg
-        ? `<image href="${esc(bg)}" xlink:href="${esc(bg)}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
-        : '';
-
-    const avatar = d.avatarURL
-        ? `<image href="${esc(d.avatarURL)}" xlink:href="${esc(d.avatarURL)}" x="48" y="48" width="96" height="96" clip-path="url(#av)" preserveAspectRatio="xMidYMid slice"/>`
-        : `<circle cx="96" cy="96" r="48" fill="#312e81"/>`;
+    const barW = 624;
+    const fillW = Math.round((barW * pct) / 100);
 
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
-    <linearGradient id="fallback" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#1e1b4b"/>
-      <stop offset="50%" stop-color="#312e81"/>
       <stop offset="100%" stop-color="#0f172a"/>
     </linearGradient>
     <linearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(2,6,23,0.35)"/>
-      <stop offset="100%" stop-color="rgba(2,6,23,0.75)"/>
+      <stop offset="0%" stop-color="rgba(15,23,42,0.45)"/>
+      <stop offset="100%" stop-color="rgba(15,23,42,0.82)"/>
     </linearGradient>
-    <clipPath id="av"><circle cx="96" cy="96" r="48"/></clipPath>
-    <filter id="soft"><feGaussianBlur stdDeviation="0.5"/></filter>
+    <clipPath id="av"><circle cx="360" cy="132" r="84"/></clipPath>
+    <linearGradient id="xp" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#f0abfc"/>
+    </linearGradient>
   </defs>
 
-  <!-- FUNDO (imagem de decoração cobre o card inteiro) -->
-  <rect width="${W}" height="${H}" fill="url(#fallback)"/>
+  <!-- fundo -->
+  <rect width="${W}" height="${H}" fill="url(#g)"/>
   ${bgLayer}
   <rect width="${W}" height="${H}" fill="url(#veil)"/>
 
   <!-- moldura -->
-  <rect x="12" y="12" width="${W - 24}" height="${H - 24}" rx="22" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="2"/>
+  <rect x="16" y="16" width="${W - 32}" height="${H - 32}" rx="28" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="2"/>
 
-  <!-- avatar + nome -->
-  ${avatar}
-  <circle cx="96" cy="96" r="50" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="3"/>
-  <text x="168" y="82" font-family="Segoe UI,Arial,sans-serif" font-size="28" font-weight="700" fill="#f8fafc">${name}</text>
-  <text x="168" y="112" font-family="Segoe UI,Arial,sans-serif" font-size="15" fill="#c4b5fd">${title}</text>
-  <text x="168" y="136" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="rgba(226,232,240,0.75)">Background · ${decName}</text>
+  <!-- FOTO no meio/topo -->
+  ${avatarLayer}
+  <circle cx="360" cy="132" r="88" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="4"/>
 
-  <!-- cards de stats -->
-  ${cardSvg}
+  <!-- nome -->
+  <text x="360" y="252" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="30" font-weight="700" fill="#f8fafc">${name}</text>
 
-  <!-- card Sobre Mim -->
-  <rect x="40" y="${aboutY}" width="${W - 80}" height="${aboutH}" rx="18"
-    fill="rgba(15,23,42,0.78)" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
-  <text x="56" y="${aboutY + 28}" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="rgba(226,232,240,0.7)" letter-spacing="1.5">SOBRE MIM</text>
+  <!-- DIVISÃO: Raciocínio amoroso -->
+  <rect x="40" y="280" width="${W - 80}" height="120" rx="20" fill="rgba(15,23,42,0.78)" stroke="rgba(244,114,182,0.35)" stroke-width="1.5"/>
+  <text x="60" y="312" font-family="Segoe UI,Arial,sans-serif" font-size="13" letter-spacing="2" fill="rgba(251,207,232,0.85)">RACIOCÍNIO AMOROSO</text>
+  <text x="60" y="348" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" fill="#fbcfe8">${esc(love.emoji)}  ${esc(love.name)}</text>
+  <text x="60" y="378" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#cbd5e1">${esc(love.desc)}</text>
+
+  <!-- DIVISÃO: XP -->
+  <rect x="40" y="420" width="${W - 80}" height="130" rx="20" fill="rgba(15,23,42,0.78)" stroke="rgba(167,139,250,0.35)" stroke-width="1.5"/>
+  <text x="60" y="452" font-family="Segoe UI,Arial,sans-serif" font-size="13" letter-spacing="2" fill="rgba(196,181,253,0.85)">EXPERIÊNCIA</text>
+  <text x="60" y="488" font-family="Segoe UI,Arial,sans-serif" font-size="26" font-weight="700" fill="#f8fafc">Nível ${level}</text>
+  <text x="${W - 60}" y="488" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="14" fill="#cbd5e1">${xpNow} / ${xpNeed} XP</text>
+  <rect x="48" y="510" width="${barW}" height="16" rx="8" fill="rgba(30,41,59,0.9)"/>
+  <rect x="48" y="510" width="${fillW}" height="16" rx="8" fill="url(#xp)"/>
+
+  <!-- DIVISÃO: Sobre ele -->
+  <rect x="40" y="570" width="${W - 80}" height="${H - 570 - 40}" rx="20" fill="rgba(15,23,42,0.78)" stroke="rgba(148,163,184,0.3)" stroke-width="1.5"/>
+  <text x="60" y="602" font-family="Segoe UI,Arial,sans-serif" font-size="13" letter-spacing="2" fill="rgba(226,232,240,0.75)">SOBRE ELE(A)</text>
   ${aboutText}
 
-  <text x="${W - 28}" y="${H - 22}" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="rgba(148,163,184,0.8)">Aeternus Profile</text>
+  <text x="${W / 2}" y="${H - 28}" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="rgba(148,163,184,0.7)">Aeternus</text>
 </svg>`;
 
     return Buffer.from(svg, 'utf8');
 }
 
-module.exports = { render };
+module.exports = { render, loveTypeFor, LOVE_TYPES };
