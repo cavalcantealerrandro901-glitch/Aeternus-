@@ -26,6 +26,18 @@ const LOSE_LINES = [
     'Giro cruel. Prejuízo na mesa.'
 ];
 
+const FUN_WIN = [
+    'Só de zoeira — e você acertou.',
+    'Modo diversão, mas a vitória foi real.',
+    'Sem flocos em jogo… só o ego.'
+];
+
+const FUN_LOSE = [
+    'Diversão pura. Sem prejuízo no bolso.',
+    'Errou a face, mas não perdeu nada.',
+    'A moeda riu de você — de graça.'
+];
+
 function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
 }
@@ -38,12 +50,12 @@ function sideLabel(side) {
     return side === 'cara' ? 'CARA' : 'COROA';
 }
 
-function spinningEmbed({ user, amount, choice, frame, step, total }) {
+function spinningEmbed({ user, amount, choice, frame, step, total, fun }) {
     const dots = '•'.repeat(step + 1) + '·'.repeat(Math.max(0, total - step - 1));
     return new EmbedBuilder()
-        .setColor(0xfbbf24)
+        .setColor(fun ? 0x38bdf8 : 0xfbbf24)
         .setAuthor({
-            name: 'Aeternus Casino · Cara ou Coroa',
+            name: fun ? 'Aeternus · Cara ou Coroa · Diversão' : 'Aeternus Casino · Cara ou Coroa',
             iconURL: user.displayAvatarURL({ size: 64 })
         })
         .setTitle('🪙  A moeda está no ar…')
@@ -54,42 +66,57 @@ function spinningEmbed({ user, amount, choice, frame, step, total }) {
                 `        ║      ${frame}  GIRO      ║`,
                 '        ╚══════════════════╝',
                 '```',
-                `${user} apostou ❄️ **${fmt(amount)}** em **${sideLabel(choice)}** ${sideEmoji(choice)}`,
+                fun
+                    ? `${user} escolheu **${sideLabel(choice)}** ${sideEmoji(choice)} · 🎮 **modo diversão**`
+                    : `${user} apostou ❄️ **${fmt(amount)}** em **${sideLabel(choice)}** ${sideEmoji(choice)}`,
                 '',
                 `🌀 Girando ${dots}`,
                 '',
-                '_Ninguém respira. A face ainda não decidiu._'
+                fun
+                    ? '_Sem aposta. Só a emoção do giro._'
+                    : '_Ninguém respira. A face ainda não decidiu._'
             ].join('\n')
         )
-        .setFooter({ text: '50/50 real · ' + betFooter() })
+        .setFooter({
+            text: fun ? 'Modo diversão · sem flocos' : '50/50 real · ' + betFooter()
+        })
         .setTimestamp();
 }
 
-function resultEmbed({ user, amount, choice, result, win, balance }) {
+function resultEmbed({ user, amount, choice, result, win, balance, fun }) {
     const payout = amount * 2;
-    const line = win
-        ? WIN_LINES[Math.floor(Math.random() * WIN_LINES.length)]
-        : LOSE_LINES[Math.floor(Math.random() * LOSE_LINES.length)];
+    const line = fun
+        ? (win ? FUN_WIN : FUN_LOSE)[Math.floor(Math.random() * 3)]
+        : (win ? WIN_LINES : LOSE_LINES)[Math.floor(Math.random() * 5)];
 
     const face = result === 'cara' ? '🟡 CARA' : '⚪ COROA';
+
+    const moneyBlock = fun
+        ? win
+            ? '🎉 **Acertou!**\n🎮 Diversão — nenhum floco movimentado.'
+            : '💨 **Errou!**\n🎮 Diversão — seu saldo continua igual.'
+        : win
+          ? `🎉 **VITÓRIA**\n✨ +❄️ **${fmt(payout)}** (2×)`
+          : `💥 **DERROTA**\n💫 −❄️ **${fmt(amount)}**`;
 
     const lines = [
         '```',
         '   ╔════════════════════════════╗',
-        '   ║   AETERNUS  ·  COIN FLIP   ║',
+        fun
+            ? '   ║  COIN FLIP  ·  DIVERSÃO    ║'
+            : '   ║   AETERNUS  ·  COIN FLIP   ║',
         '   ╚════════════════════════════╝',
         '```',
+        fun ? '🎮 **Modo diversão**' : null,
         `🎯 Escolha: **${sideLabel(choice)}** ${sideEmoji(choice)}`,
         `🪙 Resultado: **${face}**`,
         '',
-        win
-            ? `🎉 **VITÓRIA**\n✨ +❄️ **${fmt(payout)}** (2×)`
-            : `💥 **DERROTA**\n💫 −❄️ **${fmt(amount)}**`,
+        moneyBlock,
         '',
         `_${line}_`,
-        '',
-        `💼 Saldo: ❄️ **${fmt(balance)}**`
-    ];
+        fun ? null : '',
+        fun ? null : `💼 Saldo: ❄️ **${fmt(balance)}**`
+    ].filter((x) => x != null);
 
     return new EmbedBuilder()
         .setColor(win ? C.win : C.lose)
@@ -97,37 +124,45 @@ function resultEmbed({ user, amount, choice, result, win, balance }) {
             name: user.username,
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle(win ? '🪙  Cara ou Coroa · Você levou' : '🪙  Cara ou Coroa · A casa levou')
+        .setTitle(
+            fun
+                ? win
+                    ? '🪙  Diversão · Acertou'
+                    : '🪙  Diversão · Errou'
+                : win
+                  ? '🪙  Cara ou Coroa · Você levou'
+                  : '🪙  Cara ou Coroa · A casa levou'
+        )
         .setDescription(lines.join('\n'))
         .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'Cara 🟡 · Coroa ⚪ · ' + betFooter() })
+        .setFooter({
+            text: fun
+                ? 'O.cara <cara|coroa> · diversão · com valor = aposta'
+                : 'Cara 🟡 · Coroa ⚪ · ' + betFooter()
+        })
         .setTimestamp();
 }
 
-function againRow(side, amount, userId) {
+function againRow(side, amount, userId, fun) {
+    const amt = fun ? 'fun' : String(amount);
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`cara:again:${side}:${amount}:${userId}`)
+            .setCustomId(`cara:again:${side}:${amt}:${userId}`)
             .setLabel('Tentar novamente')
             .setEmoji('🔁')
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
-            .setCustomId(`cara:switch:${side === 'cara' ? 'coroa' : 'cara'}:${amount}:${userId}`)
+            .setCustomId(`cara:switch:${side === 'cara' ? 'coroa' : 'cara'}:${amt}:${userId}`)
             .setLabel(side === 'cara' ? 'Jogar COROA' : 'Jogar CARA')
             .setEmoji(side === 'cara' ? '⚪' : '🟡')
             .setStyle(ButtonStyle.Secondary)
     );
 }
 
-function flipOnce(userId, amount) {
-    // 50/50 realista
-    const result = Math.random() < 0.5 ? 'cara' : 'coroa';
-    return result;
-}
-
-async function runFlip({ replyFn, updateFn, user, userId, side, amount, isUpdate }) {
-    // debita antes do giro
-    flocos.remove(userId, amount, { reason: 'cara bet' });
+async function runFlip({ updateFn, replyFn, user, userId, side, amount, fun, isUpdate }) {
+    if (!fun) {
+        flocos.remove(userId, amount, { reason: 'cara bet' });
+    }
 
     const total = SPIN_FRAMES.length;
     let msg = null;
@@ -139,7 +174,8 @@ async function runFlip({ replyFn, updateFn, user, userId, side, amount, isUpdate
             choice: side,
             frame: SPIN_FRAMES[i],
             step: i,
-            total
+            total,
+            fun
         });
         if (i === 0) {
             if (isUpdate && updateFn) {
@@ -155,9 +191,11 @@ async function runFlip({ replyFn, updateFn, user, userId, side, amount, isUpdate
         await sleep(i < total - 1 ? 380 : 520);
     }
 
-    const result = flipOnce(userId, amount);
+    const result = Math.random() < 0.5 ? 'cara' : 'coroa';
     const win = result === side;
-    if (win) flocos.add(userId, amount * 2, { reason: 'cara win' });
+    if (!fun && win) {
+        flocos.add(userId, amount * 2, { reason: 'cara win' });
+    }
 
     const payload = {
         embeds: [
@@ -167,27 +205,28 @@ async function runFlip({ replyFn, updateFn, user, userId, side, amount, isUpdate
                 choice: side,
                 result,
                 win,
-                balance: flocos.get(userId)
+                balance: flocos.get(userId),
+                fun
             })
         ],
-        components: [againRow(side, amount, userId)]
+        components: [againRow(side, amount, userId, fun)]
     };
 
     if (isUpdate && updateFn) {
         await updateFn(payload);
-        return null;
+        return;
     }
     if (msg) {
         await msg.edit(payload).catch(() => {});
-        return msg;
+        return;
     }
-    return replyFn(payload);
+    await replyFn(payload);
 }
 
 module.exports = {
     name: 'cara',
     aliases: ['coroa', 'coinflip', 'cf', 'caracoroa'],
-    description: 'Cara ou coroa realista · nível max',
+    description: 'Cara ou coroa · aposta ou diversão',
 
     async execute(message, args) {
         const side = (args[0] || '').toLowerCase();
@@ -195,31 +234,43 @@ module.exports = {
             return message.reply(
                 [
                     '🪙 **Cara ou Coroa**',
-                    'Uso: `O.cara <cara|coroa> <valor|all|half|k|m>`',
+                    '🎮 Diversão: `O.cara <cara|coroa>`',
+                    '❄️ Aposta: `O.cara <cara|coroa> <valor|all|half>`',
                     '',
-                    '🟡 **cara** · ⚪ **coroa**',
-                    'Vitória paga **2×** · chance real **50/50**'
+                    '🟡 **cara** · ⚪ **coroa** · vitória **2×**'
                 ].join('\n')
             );
+        }
+
+        // sem valor → diversão
+        if (args[1] == null || args[1] === '') {
+            return runFlip({
+                replyFn: (p) => message.reply(p),
+                user: message.author,
+                userId: message.author.id,
+                side,
+                amount: 0,
+                fun: true,
+                isUpdate: false
+            });
         }
 
         const bet = resolveBet(args[1], flocos.get(message.author.id), { label: '❄️' });
         if (!bet.ok) return message.reply(`❌ ${bet.error}`);
 
-        await runFlip({
+        return runFlip({
             replyFn: (p) => message.reply(p),
             user: message.author,
             userId: message.author.id,
             side,
             amount: bet.amount,
+            fun: false,
             isUpdate: false
         });
     },
 
     async handleComponent(interaction) {
         const parts = interaction.customId.split(':');
-        // cara:again:side:amount:userId  |  cara:switch:side:amount:userId
-        const action = parts[1];
         const side = parts[2];
         const amountStr = parts[3];
         const owner = parts[4];
@@ -231,55 +282,27 @@ module.exports = {
             return interaction.reply({ content: 'Dados inválidos.', ephemeral: true });
         }
 
-        const bet = resolveBet(amountStr, flocos.get(owner), { label: '❄️' });
-        if (!bet.ok) {
-            return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
+        const fun = amountStr === 'fun';
+        let amount = 0;
+
+        if (!fun) {
+            const bet = resolveBet(amountStr, flocos.get(owner), { label: '❄️' });
+            if (!bet.ok) {
+                return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
+            }
+            amount = bet.amount;
         }
 
-        // acknowledge + animar via update
+        await interaction.deferUpdate();
+
         await runFlip({
             updateFn: (p) => interaction.editReply(p),
-            replyFn: (p) => interaction.editReply(p),
             user: interaction.user,
             userId: owner,
             side,
-            amount: bet.amount,
+            amount,
+            fun,
             isUpdate: true
         });
-
-        // primeira update precisa de defer se ainda não respondeu
-        // runFlip chama updateFn — garantir defer antes
     }
-};
-
-// Wrapper: defer na interaction antes do giro (discord exige resposta em 3s)
-const _handle = module.exports.handleComponent;
-module.exports.handleComponent = async function handleComponent(interaction) {
-    const parts = interaction.customId.split(':');
-    const side = parts[2];
-    const amountStr = parts[3];
-    const owner = parts[4];
-
-    if (interaction.user.id !== owner) {
-        return interaction.reply({ content: 'Não é a sua moeda.', ephemeral: true });
-    }
-    if (!['cara', 'coroa'].includes(side)) {
-        return interaction.reply({ content: 'Dados inválidos.', ephemeral: true });
-    }
-
-    const bet = resolveBet(amountStr, flocos.get(owner), { label: '❄️' });
-    if (!bet.ok) {
-        return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
-    }
-
-    await interaction.deferUpdate();
-
-    await runFlip({
-        updateFn: (p) => interaction.editReply(p),
-        user: interaction.user,
-        userId: owner,
-        side,
-        amount: bet.amount,
-        isUpdate: true
-    });
 };
