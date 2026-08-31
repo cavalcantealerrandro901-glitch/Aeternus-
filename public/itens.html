@@ -31,136 +31,75 @@
         #070a12;
     }
     .wrap { position: relative; z-index: 1; }
-
-    /* menu canto superior direito */
-    .nav-menu {
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      z-index: 40;
-    }
+    .nav-menu { position: fixed; top: 16px; right: 16px; z-index: 40; }
     .nav-toggle {
-      width: 46px; height: 46px;
-      border-radius: 14px;
+      width: 46px; height: 46px; border-radius: 14px;
       border: 1px solid rgba(165, 180, 252, 0.45);
-      background: rgba(15, 23, 42, 0.9);
-      color: #fff;
-      font-size: 1.25rem;
-      cursor: pointer;
-      box-shadow: var(--glow);
-      backdrop-filter: blur(10px);
+      background: rgba(15, 23, 42, 0.9); color: #fff; font-size: 1.25rem;
+      cursor: pointer; box-shadow: var(--glow); backdrop-filter: blur(10px);
     }
     .nav-panel {
-      display: none;
-      position: absolute;
-      top: 54px;
-      right: 0;
-      min-width: 210px;
-      background: rgba(15, 23, 42, 0.96);
-      border: 1px solid rgba(165, 180, 252, 0.35);
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+      display: none; position: absolute; top: 54px; right: 0; min-width: 210px;
+      background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(165, 180, 252, 0.35);
+      border-radius: 14px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.45);
     }
     .nav-panel.open { display: block; }
     .nav-panel a {
-      display: block;
-      padding: 12px 16px;
-      color: var(--text);
-      text-decoration: none;
-      font-weight: 600;
-      border-bottom: 1px solid rgba(51, 65, 85, 0.6);
-      transition: background .15s;
+      display: block; padding: 12px 16px; color: var(--text); text-decoration: none;
+      font-weight: 600; border-bottom: 1px solid rgba(51, 65, 85, 0.6);
     }
     .nav-panel a:last-child { border-bottom: none; }
     .nav-panel a:hover { background: rgba(99, 102, 241, 0.25); }
     .nav-panel a.active { color: #c4b5fd; }
-
-    header {
-      padding: 56px 20px 10px;
-      text-align: center;
-    }
+    header { padding: 56px 20px 10px; text-align: center; }
     header h1 {
-      margin: 0;
-      font-size: clamp(1.5rem, 4vw, 2.2rem);
-      letter-spacing: 0.1em;
+      margin: 0; font-size: clamp(1.5rem, 4vw, 2.2rem); letter-spacing: 0.1em;
       text-transform: uppercase;
       background: linear-gradient(90deg, #a5b4fc, #c4b5fd, #f0abfc);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      -webkit-background-clip: text; background-clip: text; color: transparent;
     }
     header p { color: var(--muted); margin: 10px auto 0; max-width: 520px; }
     .bal {
-      display: inline-flex; gap: 18px; margin-top: 16px;
-      padding: 12px 22px;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.75);
-      border: 1px solid rgba(165, 180, 252, 0.35);
-      box-shadow: var(--glow);
+      display: inline-flex; gap: 18px; margin-top: 16px; padding: 12px 22px;
+      border-radius: 999px; background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(165, 180, 252, 0.35); box-shadow: var(--glow);
     }
     .msg { text-align: center; padding: 14px; color: var(--muted); }
     .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 20px;
-      padding: 12px 20px 48px;
-      max-width: 1100px;
-      margin: 0 auto;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px; padding: 12px 20px 48px; max-width: 1100px; margin: 0 auto;
     }
     .card {
-      background: var(--card);
-      border: 1px solid rgba(51, 65, 85, 0.85);
-      border-radius: 18px;
-      padding: 18px 16px 16px;
-      cursor: pointer;
+      background: var(--card); border: 1px solid rgba(51, 65, 85, 0.85);
+      border-radius: 18px; padding: 18px 16px 16px; cursor: pointer;
       transition: transform .2s, border-color .2s, box-shadow .2s;
     }
     .card:hover {
-      transform: translateY(-6px);
-      border-color: rgba(165, 180, 252, 0.7);
+      transform: translateY(-6px); border-color: rgba(165, 180, 252, 0.7);
       box-shadow: 0 12px 32px rgba(99, 102, 241, 0.3);
     }
-    .card .icon {
-      font-size: 2rem;
-      margin-bottom: 8px;
-    }
+    .card .icon { font-size: 2rem; margin-bottom: 8px; }
     .card h3 { margin: 0 0 6px; font-size: 1.1rem; }
     .card .desc { color: var(--muted); font-size: 0.88rem; margin: 0 0 12px; min-height: 2.4em; }
     .price { font-weight: 800; color: var(--accent); font-size: 1.05rem; }
     .badge {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      background: rgba(16, 185, 129, 0.2);
-      color: #6ee7b7;
-      border: 1px solid rgba(52, 211, 153, 0.4);
+      display: inline-block; margin-top: 10px; padding: 3px 10px; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 700; background: rgba(16, 185, 129, 0.2);
+      color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.4);
     }
     .badge.vip {
-      background: rgba(251, 191, 36, 0.2);
-      color: #fcd34d;
+      background: rgba(251, 191, 36, 0.2); color: #fcd34d;
       border-color: rgba(251, 191, 36, 0.45);
     }
-
     .modal-bg {
-      position: fixed; inset: 0; z-index: 50;
-      background: rgba(2, 6, 23, 0.72);
-      backdrop-filter: blur(8px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
+      position: fixed; inset: 0; z-index: 50; background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; padding: 16px;
     }
     .modal-bg.open { display: flex; }
     .modal {
       width: min(400px, 100%);
       background: linear-gradient(160deg, rgba(30, 27, 75, 0.96), rgba(15, 23, 42, 0.98));
-      border: 1px solid rgba(165, 180, 252, 0.45);
-      border-radius: 20px;
-      padding: 22px 20px;
+      border: 1px solid rgba(165, 180, 252, 0.45); border-radius: 20px; padding: 22px 20px;
       box-shadow: var(--glow);
     }
     .modal h2 { margin: 0 0 8px; }
@@ -168,29 +107,21 @@
     .modal .mprice { font-size: 1.35rem; font-weight: 800; color: #c4b5fd; margin-bottom: 16px; }
     .modal-actions { display: flex; gap: 10px; }
     .modal-actions button {
-      flex: 1;
-      padding: 12px;
-      border-radius: 12px;
-      border: none;
-      font-weight: 700;
-      cursor: pointer;
+      flex: 1; padding: 12px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer;
     }
     .btn-buy { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; }
     .btn-cancel { background: rgba(51, 65, 85, 0.8); color: #fff; }
     #toast {
-      position: fixed; bottom: 24px; left: 50%;
-      transform: translateX(-50%) translateY(16px);
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px);
       background: #1e1b4b; border: 1px solid rgba(196,181,253,0.5);
       color: #fff; padding: 14px 22px; border-radius: 14px;
-      opacity: 0; transition: .25s; z-index: 60; font-weight: 600;
-      pointer-events: none;
+      opacity: 0; transition: .25s; z-index: 60; font-weight: 600; pointer-events: none;
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
   <div class="bg-layer"></div>
-
   <div class="nav-menu">
     <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu">☰</button>
     <div class="nav-panel" id="navPanel">
@@ -200,17 +131,15 @@
       <a href="/login">🔐 Login</a>
     </div>
   </div>
-
   <div class="wrap">
     <header>
       <h1>✦ Loja de Itens ✦</h1>
-      <p>Títulos, boosts, caixas e VIP. Clique para ver o preço e comprar.</p>
+      <p>Títulos, boosts, caixas e VIP. Títulos vão direto para o perfil.</p>
       <div class="bal" id="bal">Carregando saldo…</div>
     </header>
     <div class="msg" id="status">Carregando…</div>
     <div class="grid" id="grid"></div>
   </div>
-
   <div class="modal-bg" id="modalBg">
     <div class="modal">
       <h2 id="mName"></h2>
@@ -223,48 +152,38 @@
     </div>
   </div>
   <div id="toast"></div>
-
   <script>
     const params = new URLSearchParams(location.search);
     const guildId = params.get('guild') || '';
     let current = null;
     let currentOwned = false;
-
     if (guildId) {
       document.getElementById('linkDecor').href = '/decoracoes?guild=' + guildId;
       document.getElementById('linkItens').href = '/itens?guild=' + guildId;
     }
-
     document.getElementById('navToggle').onclick = () => {
       document.getElementById('navPanel').classList.toggle('open');
     };
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.nav-menu')) {
-        document.getElementById('navPanel').classList.remove('open');
-      }
+      if (!e.target.closest('.nav-menu')) document.getElementById('navPanel').classList.remove('open');
     });
-
     function toast(t) {
       const el = document.getElementById('toast');
       el.textContent = t;
       el.classList.add('show');
-      setTimeout(() => el.classList.remove('show'), 2800);
+      setTimeout(() => el.classList.remove('show'), 3000);
     }
     function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
     function coin(c) { return c === 'flocos' ? '❄️' : '💠'; }
-
     function openModal(item, owned) {
-      current = item;
-      currentOwned = owned;
+      current = item; currentOwned = owned;
       document.getElementById('mName').textContent = (item.icon || '🎁') + ' ' + item.name;
       document.getElementById('mDesc').textContent = item.desc || '';
       document.getElementById('mPrice').textContent = owned && !item.consumable
         ? 'Já na sua coleção'
         : coin(item.currency) + ' ' + fmt(item.price);
       document.getElementById('mBuy').textContent =
-        owned && !item.consumable
-          ? (item.title ? 'Equipar título' : 'Já possui')
-          : 'Comprar agora';
+        owned && !item.consumable ? (item.title ? 'Equipar título' : 'Já possui') : 'Comprar agora';
       document.getElementById('mBuy').disabled = owned && !item.consumable && !item.title;
       document.getElementById('modalBg').classList.add('open');
     }
@@ -273,45 +192,33 @@
       current = null;
     }
     document.getElementById('mCancel').onclick = closeModal;
-    document.getElementById('modalBg').onclick = (e) => {
-      if (e.target.id === 'modalBg') closeModal();
-    };
-
+    document.getElementById('modalBg').onclick = (e) => { if (e.target.id === 'modalBg') closeModal(); };
     document.getElementById('mBuy').onclick = async () => {
       if (!current) return;
-      const item = current;
-      const owned = currentOwned;
+      const item = current, owned = currentOwned;
       closeModal();
-
       if (owned && !item.consumable && item.title) {
         const res = await fetch('/api/shop/equip', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId: item.id })
         }).then((r) => r.json());
-        toast(res.ok ? '✨ Título equipado!' : (res.error || 'Erro'));
+        toast(res.ok ? `✨ Título «${item.title}» no perfil! Use O.perfil` : (res.error || 'Erro'));
         if (res.ok) load();
         return;
       }
-
       const res = await fetch('/api/shop/buy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId: item.id, guildId })
       }).then((r) => r.json());
-
-      if (!res.ok) {
-        toast(res.error || 'Falha na compra');
-        return;
-      }
+      if (!res.ok) { toast(res.error || 'Falha na compra'); return; }
       let msg = '✅ Comprado!';
+      if (item.title) msg = `✅ Título «${item.title}» aplicado no perfil! Use O.perfil`;
       if (res.gain) msg = `✅ +${fmt(res.gain)} flocos`;
       if (res.gainCristais) msg = `✅ +${fmt(res.gainCristais)} cristais`;
       if (res.boost) msg = `✅ Boost daily +${res.boost}% por 24h`;
       toast(msg);
       load();
     };
-
     async function load() {
       const me = await fetch('/api/me').then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (!me) {
@@ -321,23 +228,17 @@
         document.getElementById('bal').innerHTML =
           `❄️ ${fmt(me.economy?.flocos)} · 💠 ${fmt(me.economy?.cristais)}`;
       }
-
       const url = guildId ? `/api/shop/items?guild=${guildId}` : '/api/shop/items';
       const data = await fetch(url).then((r) => r.json()).catch(() => null);
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
-
       if (!data?.items?.length) {
         document.getElementById('status').textContent = 'Nenhum item disponível.';
         return;
       }
-
-      document.getElementById('status').textContent =
-        `${data.items.length} itens · títulos, boosts e VIP`;
-
+      document.getElementById('status').textContent = `${data.items.length} itens · títulos, boosts e VIP`;
       const owned = new Set(data.owned || []);
       const eqTitle = data.equipped?.title || null;
-
       data.items.forEach((item) => {
         const isOwned = owned.has(item.id);
         const card = document.createElement('div');
@@ -347,7 +248,6 @@
         else if (isOwned && !item.consumable) badge = '<span class="badge">NA COLEÇÃO</span>';
         else if (item.consumable) badge = '<span class="badge">CONSUMÍVEL</span>';
         if (eqTitle === item.id) badge = '<span class="badge">EQUIPADO</span>';
-
         card.innerHTML = `
           <div class="icon">${item.icon || '🎁'}</div>
           <h3>${item.name}</h3>
@@ -358,7 +258,6 @@
         grid.appendChild(card);
       });
     }
-
     load();
   </script>
 </body>
