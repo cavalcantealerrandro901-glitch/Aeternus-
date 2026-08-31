@@ -9,17 +9,18 @@ const { resolveBet } = require('../utils/parseAmount');
 const { fmt, betFooter, C } = require('../utils/gameStyle');
 
 /**
- * 4 colunas × 3 linhas = 12 casas
+ * 4 colunas × 4 linhas = 16 casas
  * row4: Aleatório | Atualizar
  * row5: Sacar / Encerrar
  * (Discord max 5 ActionRows; texto entre botões só no embed)
  */
 const COLS = 4;
-const ROWS = 3;
+const ROWS = 4;
 const TOTAL = COLS * ROWS;
 const MAX_BOMBS = 11;
 const HOUSE = 0.96;
 const IDLE_MS = 7 * 60 * 1000;
+const BOMB_CHANCE = 0.26; // 26% de chance de bomba no botão aleatório
 
 const games = new Map();
 
@@ -132,7 +133,7 @@ function panelEmbed(game, extra) {
         color = C.win;
     }
 
-    // frase “meia apagada” (depois dos botões aleatório/atualizar, no embed)
+    // frase "meia apagada" (depois dos botões aleatório/atualizar, no embed)
     const softPhrase =
         game.dead || game.cashed
             ? null
@@ -163,7 +164,7 @@ function panelEmbed(game, extra) {
 
     return new EmbedBuilder()
         .setColor(color)
-        .setTitle('💎  Mines · 4×3')
+        .setTitle('💎  Mines · 4×4')
         .setDescription(lines.filter((x) => x != null).join('\n'))
         .setFooter({
             text: game.fun
@@ -289,11 +290,44 @@ function makeGame(userId, amount, bombCount, fun, meta = {}) {
     return g;
 }
 
+// Função para obter vizinhos de uma célula
+function getNeighbors(idx) {
+    const neighbors = [];
+    const row = Math.floor(idx / COLS);
+    const col = idx % COLS;
+
+    for (let r = Math.max(0, row - 1); r <= Math.min(ROWS - 1, row + 1); r++) {
+        for (let c = Math.max(0, col - 1); c <= Math.min(COLS - 1, col + 1); c++) {
+            const nIdx = r * COLS + c;
+            if (nIdx !== idx) neighbors.push(nIdx);
+        }
+    }
+    return neighbors;
+}
+
+// Função para abrir casas ao redor de uma bomba
+function openAdjacentCells(game, bombIdx) {
+    const neighbors = getNeighbors(bombIdx);
+    const toOpen = [];
+    
+    for (const nIdx of neighbors) {
+        if (!game.opened.has(nIdx) && !game.bombs.has(nIdx)) {
+            toOpen.push(nIdx);
+        }
+    }
+    
+    // Abrir as casas adjacentes
+    toOpen.forEach(idx => game.opened.add(idx));
+    return toOpen;
+}
+
 function openCell(game, idx) {
     if (game.dead || game.cashed || game.opened.has(idx)) return { ok: false };
     if (game.bombs.has(idx)) {
         game.dead = true;
         clearTimer(game);
+        // Abrir casas adjacentes à bomba
+        openAdjacentCells(game, idx);
         return { ok: true, bomb: true };
     }
     game.opened.add(idx);
@@ -319,6 +353,16 @@ function pickRandom(game) {
         any.push(i);
         if (!game.bombs.has(i)) safe.push(i);
     }
+    
+    // 26% de chance de escolher uma bomba se houver disponível
+    if (any.length > 0 && game.bombs.size > 0 && Math.random() < BOMB_CHANCE) {
+        const bombPool = any.filter(i => game.bombs.has(i));
+        if (bombPool.length > 0) {
+            return bombPool[Math.floor(Math.random() * bombPool.length)];
+        }
+    }
+    
+    // Caso contrário, escolher uma casa segura ou qualquer uma
     const pool = safe.length ? safe : any;
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
 }
@@ -335,14 +379,14 @@ function endPayload(game, note) {
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'mine', 'campo'],
-    description: 'Mines 4×3 em flocos',
+    description: 'Mines 4×4 em flocos',
 
     async execute(message, args, client) {
         const bombsRaw = parseInt(args[0], 10);
         if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
             return message.reply(
                 [
-                    '💎 **Mines 4×3** · moeda ❄️ flocos',
+                    '💎 **Mines 4×4** · moeda ❄️ flocos',
                     '🎮 `O.mines <1-11>` — diversão',
                     '❄️ `O.mines <bombas> <valor|all|half>` — aposta',
                     '⏱️ AFK 7 min → saque automático se houver gemas.'
