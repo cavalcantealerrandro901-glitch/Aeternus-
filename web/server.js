@@ -37,6 +37,10 @@ function setup(client) {
         res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
     });
 
+    app.get('/decoracoes', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'decoracoes.html'));
+    });
+
     app.get('/login', (req, res) => {
         if (!CLIENT_ID) return res.status(500).send('CLIENT_ID missing');
         const url = new URL('https://discord.com/api/oauth2/authorize');
@@ -78,7 +82,10 @@ function setup(client) {
             const sid = crypto.randomBytes(16).toString('hex');
             sessions.set(sid, { user, guilds: Array.isArray(guilds) ? guilds : [] });
             res.cookie('sid', sid, { httpOnly: true, maxAge: 7 * 864e5, sameSite: 'lax' });
-            res.redirect('/dashboard');
+            // se veio de decorações, volta pra lá
+            const next = req.cookies?.afterLogin || '/dashboard';
+            res.clearCookie('afterLogin');
+            res.redirect(next);
         } catch (e) {
             console.error(e);
             res.redirect('/?err=auth');
@@ -103,6 +110,7 @@ function setup(client) {
                 xp: xp.get(uid)
             },
             inventory: shop.getInv(uid),
+            equippedDecoration: shop.getEquippedDecoration(uid),
             bot: client.user
                 ? {
                       tag: client.user.tag,
@@ -111,6 +119,43 @@ function setup(client) {
                   }
                 : null
         });
+    });
+
+    // ── Decorações (imagens) ───────────────────────────────────────
+    app.get('/api/shop/decorations', (req, res) => {
+        const s = sessionUser(req);
+        const items = shop.decorations();
+        res.json({
+            items,
+            owned: s ? shop.getInv(s.user.id).owned : [],
+            equipped: s ? shop.getInv(s.user.id).equipped : null
+        });
+    });
+
+    app.post('/api/shop/buy', (req, res) => {
+        const s = sessionUser(req);
+        if (!s) return res.status(401).json({ error: 'Faça login no Discord.' });
+        const itemId = req.body?.itemId;
+        const guildId = req.body?.guildId || null;
+        const result = shop.buy(s.user.id, guildId, itemId);
+        if (!result.ok) return res.status(400).json(result);
+        res.json({
+            ok: true,
+            item: result.item,
+            balance: {
+                flocos: flocos.get(s.user.id),
+                cristais: cristais.get(s.user.id)
+            },
+            equipped: shop.getEquippedDecoration(s.user.id)
+        });
+    });
+
+    app.post('/api/shop/equip', (req, res) => {
+        const s = sessionUser(req);
+        if (!s) return res.status(401).json({ error: 'Faça login no Discord.' });
+        const result = shop.equip(s.user.id, req.body?.itemId);
+        if (!result.ok) return res.status(400).json(result);
+        res.json({ ok: true, item: result.item });
     });
 
     app.get('/api/daily', (req, res) => {
@@ -185,7 +230,6 @@ function setup(client) {
         });
     });
 
-    /** Loja do servidor — catálogo + VIPs do painel */
     app.get('/api/guild/:id/shop', (req, res) => {
         if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
         const guild = client.guilds.cache.get(req.params.id);
@@ -199,7 +243,6 @@ function setup(client) {
         });
     });
 
-    /** Salvar lista de VIPs do servidor */
     app.post('/api/guild/:id/shop/vips', (req, res) => {
         if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
         const guild = client.guilds.cache.get(req.params.id);
