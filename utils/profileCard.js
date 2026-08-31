@@ -75,6 +75,8 @@ function buildSvg(d, avatarData, bgData) {
     const H = 900;
 
     const name = esc((d.username || 'Usuário').slice(0, 24));
+    const title = esc((d.title || '').slice(0, 28));
+    const hasTitle = Boolean(title);
     const aboutLines = wrapText(d.aboutMe || 'Sem biografia ainda.', 34, 4).map(esc);
     const love = d.love || loveTypeFor(d.userId);
     const level = d.level ?? 0;
@@ -85,8 +87,9 @@ function buildSvg(d, avatarData, bgData) {
         Math.min(100, Math.floor(((d.xpRemain || 0) / Math.max(1, d.xpNeed || 1)) * 100))
     );
 
-    // fundo mais brilhante: imagem com leve boost de luz no sharp depois;
-    // no SVG, véu bem mais transparente
+    // desloca blocos se tiver título sob o nome
+    const shift = hasTitle ? 28 : 0;
+
     const bgLayer = bgData
         ? `<image href="${bgData}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
         : '';
@@ -96,15 +99,24 @@ function buildSvg(d, avatarData, bgData) {
         : `<circle cx="360" cy="132" r="84" fill="#4c1d95"/>
            <text x="360" y="150" text-anchor="middle" font-family="${FONT}" font-size="52" font-weight="700" fill="#ffffff">${esc((d.username || '?')[0]?.toUpperCase() || '?')}</text>`;
 
+    const aboutY0 = 628 + shift;
     const aboutText = aboutLines
         .map(
             (line, i) =>
-                `<text x="58" y="${628 + i * 30}" font-family="${FONT}" font-size="18" font-weight="600" fill="#ffffff">${line}</text>`
+                `<text x="58" y="${aboutY0 + i * 30}" font-family="${FONT}" font-size="18" font-weight="600" fill="#ffffff">${line}</text>`
         )
         .join('\n');
 
     const barW = 624;
     const fillW = Math.round((barW * pct) / 100);
+
+    const loveY = 280 + shift;
+    const xpY = 422 + shift;
+    const aboutBoxY = 576 + shift;
+
+    const titleSvg = hasTitle
+        ? `<text x="360" y="286" text-anchor="middle" font-family="${FONT}" font-size="18" font-weight="700" fill="#fde68a">${title}</text>`
+        : '';
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -113,7 +125,6 @@ function buildSvg(d, avatarData, bgData) {
       <stop offset="0%" stop-color="#312e81"/>
       <stop offset="100%" stop-color="#1e1b4b"/>
     </linearGradient>
-    <!-- véu bem mais claro para a imagem de fundo brilhar -->
     <linearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#0f172a" stop-opacity="0.12"/>
       <stop offset="45%" stop-color="#0f172a" stop-opacity="0.18"/>
@@ -136,21 +147,22 @@ function buildSvg(d, avatarData, bgData) {
   <circle cx="360" cy="132" r="88" fill="none" stroke="#ffffff" stroke-opacity="0.75" stroke-width="4"/>
 
   <text x="360" y="254" text-anchor="middle" font-family="${FONT}" font-size="34" font-weight="700" fill="#ffffff">${name}</text>
+  ${titleSvg}
 
-  <rect x="40" y="280" width="${W - 80}" height="124" rx="20" fill="#020617" fill-opacity="0.88" stroke="#f9a8d4" stroke-width="2"/>
-  <text x="58" y="316" font-family="${FONT}" font-size="15" font-weight="700" fill="#fce7f3" letter-spacing="1.5">RACIOCINIO AMOROSO</text>
-  <text x="58" y="354" font-family="${FONT}" font-size="26" font-weight="700" fill="#ffffff">${esc(love.name)}</text>
-  <text x="58" y="384" font-family="${FONT}" font-size="16" font-weight="600" fill="#f8fafc">${esc(love.desc)}</text>
+  <rect x="40" y="${loveY}" width="${W - 80}" height="124" rx="20" fill="#020617" fill-opacity="0.88" stroke="#f9a8d4" stroke-width="2"/>
+  <text x="58" y="${loveY + 36}" font-family="${FONT}" font-size="15" font-weight="700" fill="#fce7f3" letter-spacing="1.5">RACIOCINIO AMOROSO</text>
+  <text x="58" y="${loveY + 74}" font-family="${FONT}" font-size="26" font-weight="700" fill="#ffffff">${esc(love.name)}</text>
+  <text x="58" y="${loveY + 104}" font-family="${FONT}" font-size="16" font-weight="600" fill="#f8fafc">${esc(love.desc)}</text>
 
-  <rect x="40" y="422" width="${W - 80}" height="136" rx="20" fill="#020617" fill-opacity="0.88" stroke="#c4b5fd" stroke-width="2"/>
-  <text x="58" y="458" font-family="${FONT}" font-size="15" font-weight="700" fill="#ede9fe" letter-spacing="1.5">EXPERIENCIA</text>
-  <text x="58" y="498" font-family="${FONT}" font-size="30" font-weight="700" fill="#ffffff">Nivel ${level}</text>
-  <text x="${W - 58}" y="498" text-anchor="end" font-family="${FONT}" font-size="17" font-weight="700" fill="#ffffff">${xpNow} / ${xpNeed} XP</text>
-  <rect x="48" y="520" width="${barW}" height="18" rx="9" fill="#1e293b"/>
-  <rect x="48" y="520" width="${Math.max(0, fillW)}" height="18" rx="9" fill="url(#xp)"/>
+  <rect x="40" y="${xpY}" width="${W - 80}" height="136" rx="20" fill="#020617" fill-opacity="0.88" stroke="#c4b5fd" stroke-width="2"/>
+  <text x="58" y="${xpY + 36}" font-family="${FONT}" font-size="15" font-weight="700" fill="#ede9fe" letter-spacing="1.5">EXPERIENCIA</text>
+  <text x="58" y="${xpY + 76}" font-family="${FONT}" font-size="30" font-weight="700" fill="#ffffff">Nivel ${level}</text>
+  <text x="${W - 58}" y="${xpY + 76}" text-anchor="end" font-family="${FONT}" font-size="17" font-weight="700" fill="#ffffff">${xpNow} / ${xpNeed} XP</text>
+  <rect x="48" y="${xpY + 98}" width="${barW}" height="18" rx="9" fill="#1e293b"/>
+  <rect x="48" y="${xpY + 98}" width="${Math.max(0, fillW)}" height="18" rx="9" fill="url(#xp)"/>
 
-  <rect x="40" y="576" width="${W - 80}" height="${H - 576 - 36}" rx="20" fill="#020617" fill-opacity="0.88" stroke="#e2e8f0" stroke-width="2"/>
-  <text x="58" y="614" font-family="${FONT}" font-size="15" font-weight="700" fill="#f1f5f9" letter-spacing="1.5">SOBRE ELE(A)</text>
+  <rect x="40" y="${aboutBoxY}" width="${W - 80}" height="${H - aboutBoxY - 36}" rx="20" fill="#020617" fill-opacity="0.88" stroke="#e2e8f0" stroke-width="2"/>
+  <text x="58" y="${aboutBoxY + 38}" font-family="${FONT}" font-size="15" font-weight="700" fill="#f1f5f9" letter-spacing="1.5">SOBRE ELE(A)</text>
   ${aboutText}
 
   <text x="${W / 2}" y="${H - 22}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600" fill="#e2e8f0">Aeternus</text>
@@ -168,7 +180,6 @@ async function render(d) {
 
     try {
         const sharp = require('sharp');
-        // modulate: mais brilho e saturação no PNG final
         const png = await sharp(svgBuf, { density: 160 })
             .modulate({ brightness: 1.18, saturation: 1.12 })
             .png({ quality: 92 })

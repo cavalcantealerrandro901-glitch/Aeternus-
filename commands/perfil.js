@@ -17,6 +17,7 @@ const snapshot = require('../utils/userSnapshot');
 
 function buttons(guildId, isOwner) {
     const decorUrl = shop.decorPanelUrl(guildId);
+    const itensUrl = shop.itemsPanelUrl(guildId);
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -32,6 +33,11 @@ function buttons(guildId, isOwner) {
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(!isOwner),
             new ButtonBuilder()
+                .setLabel('Itens / Títulos')
+                .setEmoji('👑')
+                .setStyle(ButtonStyle.Link)
+                .setURL(itensUrl),
+            new ButtonBuilder()
                 .setLabel('Decorações')
                 .setEmoji('🛍️')
                 .setStyle(ButtonStyle.Link)
@@ -43,6 +49,7 @@ function buttons(guildId, isOwner) {
 async function buildAttachment(target) {
     const x = xp.get(target.id);
     const dec = shop.getEquippedDecoration(target.id);
+    const title = shop.getEquippedTitle(target.id);
     const p = profile.get(target.id);
 
     let remain = x.xp;
@@ -52,6 +59,7 @@ async function buildAttachment(target) {
     const { buffer, name } = await profileCard.render({
         userId: target.id,
         username: target.username,
+        title: title || '',
         avatarURL: target.displayAvatarURL({ extension: 'png', size: 256 }),
         aboutMe: p.aboutMe || 'Ainda sem biografia…',
         level: x.level,
