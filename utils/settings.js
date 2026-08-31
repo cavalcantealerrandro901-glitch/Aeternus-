@@ -41,6 +41,14 @@ const DEFAULT = {
             minCristais: 0
         },
         extraEntries: []
+    },
+    /** Loja — VIPs configuráveis no painel */
+    shop: {
+        enabled: true,
+        vips: [
+            // exemplo:
+            // { id: 'vip1', name: 'VIP Prata', desc: 'Cargo VIP', price: 5000, currency: 'cristais', roleId: '123', durationDays: 0 }
+        ]
     }
 };
 
@@ -84,6 +92,11 @@ function getSettings(guildId) {
             extraEntries: Array.isArray(g.drops?.extraEntries)
                 ? g.drops.extraEntries
                 : DEFAULT.drops.extraEntries
+        },
+        shop: {
+            ...DEFAULT.shop,
+            ...(g.shop || {}),
+            vips: Array.isArray(g.shop?.vips) ? g.shop.vips : DEFAULT.shop.vips
         }
     };
 }
@@ -91,7 +104,6 @@ function getSettings(guildId) {
 function setSettings(guildId, patch) {
     const all = store.load('guilds.json', {});
     all[guildId] = deepMerge(all[guildId] || {}, patch);
-    // arrays de extraEntries / requiredRoleIds substituem por completo se enviados
     if (patch.drops?.extraEntries) {
         all[guildId].drops = all[guildId].drops || {};
         all[guildId].drops.extraEntries = patch.drops.extraEntries;
@@ -100,6 +112,11 @@ function setSettings(guildId, patch) {
         all[guildId].drops = all[guildId].drops || {};
         all[guildId].drops.requirements = all[guildId].drops.requirements || {};
         all[guildId].drops.requirements.requiredRoleIds = patch.drops.requirements.requiredRoleIds;
+    }
+    // VIPs: substitui lista inteira quando enviada
+    if (patch.shop?.vips) {
+        all[guildId].shop = all[guildId].shop || {};
+        all[guildId].shop.vips = patch.shop.vips;
     }
     store.save('guilds.json', all);
     return getSettings(guildId);

@@ -8,12 +8,13 @@ const daily = require('../utils/daily');
 const flocos = require('../utils/flocos');
 const cristais = require('../utils/cristais');
 const xp = require('../utils/xp');
+const shop = require('../utils/shop');
 
 const sessions = new Map();
 const SETTINGS_KEYS = [
     'prefix', 'logs', 'welcome', 'leave', 'automod', 'tickets', 'music',
     'economy', 'xp', 'suggestions', 'reports', 'levels', 'starboard',
-    'autorole', 'verification', 'antinuke', 'drops'
+    'autorole', 'verification', 'antinuke', 'drops', 'shop'
 ];
 
 function setup(client) {
@@ -101,6 +102,7 @@ function setup(client) {
                 cristais: cristais.get(uid),
                 xp: xp.get(uid)
             },
+            inventory: shop.getInv(uid),
             bot: client.user
                 ? {
                       tag: client.user.tag,
@@ -181,6 +183,43 @@ function setup(client) {
                 .sort((a, b) => b.position - a.position)
                 .map((r) => ({ id: r.id, name: r.name, color: r.hexColor }))
         });
+    });
+
+    /** Loja do servidor — catálogo + VIPs do painel */
+    app.get('/api/guild/:id/shop', (req, res) => {
+        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
+        const guild = client.guilds.cache.get(req.params.id);
+        if (!guild) return res.status(404).json({ error: 'not found' });
+        const settings = getSettings(guild.id);
+        res.json({
+            enabled: settings.shop?.enabled !== false,
+            vips: settings.shop?.vips || [],
+            catalog: shop.catalog(guild.id),
+            globalItems: shop.GLOBAL_ITEMS
+        });
+    });
+
+    /** Salvar lista de VIPs do servidor */
+    app.post('/api/guild/:id/shop/vips', (req, res) => {
+        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
+        const guild = client.guilds.cache.get(req.params.id);
+        if (!guild) return res.status(404).json({ error: 'not found' });
+
+        const raw = Array.isArray(req.body?.vips) ? req.body.vips : [];
+        const vips = raw
+            .filter((v) => v && v.name && v.roleId)
+            .map((v, i) => ({
+                id: String(v.id || `vip_${Date.now()}_${i}`),
+                name: String(v.name).slice(0, 64),
+                desc: String(v.desc || 'Cargo VIP').slice(0, 120),
+                price: Math.max(0, Math.floor(Number(v.price) || 0)),
+                currency: v.currency === 'flocos' ? 'flocos' : 'cristais',
+                roleId: String(v.roleId),
+                durationDays: Math.max(0, Math.floor(Number(v.durationDays) || 0))
+            }));
+
+        const settings = setSettings(guild.id, { shop: { enabled: true, vips } });
+        res.json({ ok: true, vips: settings.shop.vips });
     });
 
     app.post('/api/guild/:id/settings', (req, res) => {
