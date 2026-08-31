@@ -3,69 +3,109 @@ const flocos = require('./flocos');
 const cristais = require('./cristais');
 const { getSettings } = require('./settings');
 
-/** Catálogo global (decorações + itens). VIP vem do painel por servidor. */
-const GLOBAL_ITEMS = [
-    // ── Decorações (fundo do perfil gerado pelo bot) ───────────────
+/**
+ * Decorações = imagens geradas (Pollinations) com preços variados.
+ * Não altera cor do embed — só a imagem do perfil.
+ */
+const DECORATIONS = [
     {
         id: 'dec_aurora',
         type: 'decoration',
         name: 'Aurora Violeta',
-        desc: 'Fundo aurora no card de perfil',
-        price: 2500,
+        desc: 'Céu aurora violeta cinematográfico',
+        price: 2200,
         currency: 'cristais',
-        theme: { bg1: '#1a0b2e', bg2: '#2d1b69', accent: '#c084fc', name: 'AURORA' }
+        prompt: 'cinematic purple aurora borealis night sky, stars, soft glow, profile banner art, no text, high quality'
     },
     {
         id: 'dec_gelo',
         type: 'decoration',
         name: 'Campo de Gelo',
-        desc: 'Fundo glacial no perfil',
-        price: 2500,
+        desc: 'Paisagem glacial azul',
+        price: 2400,
         currency: 'cristais',
-        theme: { bg1: '#0c1929', bg2: '#0e7490', accent: '#67e8f9', name: 'GELO' }
+        prompt: 'frozen ice landscape, blue crystal mountains, soft light, aesthetic banner, no text'
     },
     {
         id: 'dec_ouro',
         type: 'decoration',
-        name: 'Ouro Real',
-        desc: 'Fundo dourado premium',
-        price: 5000,
+        name: 'Palácio de Ouro',
+        desc: 'Luxo dourado premium',
+        price: 5200,
         currency: 'cristais',
-        theme: { bg1: '#1c1408', bg2: '#854d0e', accent: '#fbbf24', name: 'OURO' }
+        prompt: 'luxury golden palace interior, warm light, elegant marble, premium aesthetic, no text'
     },
     {
         id: 'dec_neon',
         type: 'decoration',
-        name: 'Neon Cyber',
-        desc: 'Fundo neon futurista',
-        price: 3500,
+        name: 'Cidade Neon',
+        desc: 'Cyberpunk noturno',
+        price: 3800,
         currency: 'cristais',
-        theme: { bg1: '#0a0a12', bg2: '#3b0764', accent: '#f0abfc', name: 'NEON' }
+        prompt: 'cyberpunk neon city night rain, pink purple lights, cinematic banner, no text'
     },
     {
         id: 'dec_rosa',
         type: 'decoration',
-        name: 'Rosa Mística',
-        desc: 'Fundo rosa elegante',
+        name: 'Jardim Rosa',
+        desc: 'Flores e névoa rosa',
         price: 3000,
         currency: 'cristais',
-        theme: { bg1: '#1a0a12', bg2: '#9d174d', accent: '#fb7185', name: 'ROSA' }
+        prompt: 'mystical rose garden fog soft pink light aesthetic banner, no text'
     },
     {
         id: 'dec_floresta',
         type: 'decoration',
         name: 'Floresta Arcana',
-        desc: 'Fundo verde místico',
+        desc: 'Bosque mágico verde',
         price: 2800,
         currency: 'cristais',
-        theme: { bg1: '#052e16', bg2: '#14532d', accent: '#4ade80', name: 'FLORESTA' }
+        prompt: 'enchanted green forest glowing particles magical atmosphere banner, no text'
     },
-    // ── Itens ───────────────────────────────────────────────────────
+    {
+        id: 'dec_oceano',
+        type: 'decoration',
+        name: 'Oceano Profundo',
+        desc: 'Abismo azul com luz',
+        price: 3100,
+        currency: 'cristais',
+        prompt: 'deep ocean underwater light rays blue aesthetic cinematic banner, no text'
+    },
+    {
+        id: 'dec_espaco',
+        type: 'decoration',
+        name: 'Nebulosa',
+        desc: 'Espaço sideral colorido',
+        price: 4500,
+        currency: 'cristais',
+        prompt: 'colorful space nebula stars cosmic dust epic banner art, no text'
+    },
+    {
+        id: 'dec_sakura',
+        type: 'decoration',
+        name: 'Sakura',
+        desc: 'Cerejeiras ao entardecer',
+        price: 3300,
+        currency: 'cristais',
+        prompt: 'cherry blossom sakura sunset japanese aesthetic soft banner, no text'
+    },
+    {
+        id: 'dec_vulcao',
+        type: 'decoration',
+        name: 'Vulcão',
+        desc: 'Lava e fumaça dramática',
+        price: 4100,
+        currency: 'cristais',
+        prompt: 'volcano lava dramatic sky dark cinematic banner, no text'
+    }
+];
+
+const ITEMS = [
     {
         id: 'item_titulo_lenda',
         type: 'item',
         name: 'Título: Lenda',
-        desc: 'Exibe o título «Lenda» no perfil',
+        desc: 'Título «Lenda» no perfil',
         price: 15000,
         currency: 'flocos',
         title: 'Lenda'
@@ -74,7 +114,7 @@ const GLOBAL_ITEMS = [
         id: 'item_titulo_astro',
         type: 'item',
         name: 'Título: Astro',
-        desc: 'Exibe o título «Astro» no perfil',
+        desc: 'Título «Astro» no perfil',
         price: 25000,
         currency: 'flocos',
         title: 'Astro'
@@ -83,7 +123,7 @@ const GLOBAL_ITEMS = [
         id: 'item_titulo_soberano',
         type: 'item',
         name: 'Título: Soberano',
-        desc: 'Exibe o título «Soberano» no perfil',
+        desc: 'Título «Soberano» no perfil',
         price: 8000,
         currency: 'cristais',
         title: 'Soberano'
@@ -92,7 +132,7 @@ const GLOBAL_ITEMS = [
         id: 'item_boost_daily',
         type: 'item',
         name: 'Boost Daily +20%',
-        desc: 'Multiplicador +20% no próximo daily (1 uso)',
+        desc: 'Boost no daily por 24h',
         price: 4000,
         currency: 'cristais',
         consumable: true,
@@ -102,13 +142,30 @@ const GLOBAL_ITEMS = [
         id: 'item_caixa_flocos',
         type: 'item',
         name: 'Caixa de Flocos',
-        desc: 'Recebe 10k–40k flocos na hora',
+        desc: '10k–40k flocos na hora',
         price: 3000,
         currency: 'cristais',
         consumable: true,
         effect: 'box_flocos'
     }
 ];
+
+const GLOBAL_ITEMS = [...DECORATIONS, ...ITEMS];
+
+function imageUrl(item) {
+    if (!item?.prompt) return null;
+    const q = encodeURIComponent(item.prompt);
+    // seed fixo por id → mesma imagem sempre
+    const seed = [...String(item.id)].reduce((a, c) => a + c.charCodeAt(0), 0);
+    return `https://image.pollinations.ai/prompt/${q}?width=960&height=540&nologo=true&seed=${seed}&model=flux`;
+}
+
+function withImages(list) {
+    return list.map((i) => ({
+        ...i,
+        image: i.type === 'decoration' ? imageUrl(i) : i.image || null
+    }));
+}
 
 function invAll() {
     return store.load('inventory.json', {});
@@ -142,20 +199,20 @@ function guildVips(guildId) {
             price: Math.max(0, Math.floor(Number(v.price) || 0)),
             currency: v.currency === 'flocos' ? 'flocos' : 'cristais',
             roleId: String(v.roleId),
-            durationDays: Math.max(0, Math.floor(Number(v.durationDays) || 0)) // 0 = permanente
+            durationDays: Math.max(0, Math.floor(Number(v.durationDays) || 0))
         }));
 }
 
+function decorations() {
+    return withImages(DECORATIONS);
+}
+
 function catalog(guildId) {
-    return [...GLOBAL_ITEMS, ...guildVips(guildId)];
+    return [...withImages(GLOBAL_ITEMS), ...guildVips(guildId)];
 }
 
 function findItem(guildId, itemId) {
     return catalog(guildId).find((i) => i.id === itemId) || null;
-}
-
-function owns(userId, itemId) {
-    return getInv(userId).owned.includes(itemId);
 }
 
 function buy(userId, guildId, itemId) {
@@ -182,7 +239,6 @@ function buy(userId, guildId, itemId) {
     }
 
     if (item.consumable) {
-        // aplica efeito imediato
         if (item.effect === 'box_flocos') {
             const gain = 10000 + Math.floor(Math.random() * 30001);
             flocos.add(userId, gain, { reason: 'caixa loja' });
@@ -199,7 +255,7 @@ function buy(userId, guildId, itemId) {
 
     if (!inv.owned.includes(itemId)) inv.owned.push(itemId);
 
-    // auto-equip decoração / título
+    // compra de decoração → equipa na hora (imagem no perfil)
     if (item.type === 'decoration') inv.equipped.decoration = itemId;
     if (item.title) inv.equipped.title = itemId;
 
@@ -211,25 +267,32 @@ function equip(userId, itemId) {
     const inv = getInv(userId);
     if (!inv.owned.includes(itemId)) return { ok: false, error: 'Você não possui este item.' };
     const item = GLOBAL_ITEMS.find((i) => i.id === itemId);
-    if (!item) return { ok: false, error: 'Só decorações/itens globais podem ser equipados assim.' };
+    if (!item) return { ok: false, error: 'Item inválido.' };
     if (item.type === 'decoration') inv.equipped.decoration = itemId;
     if (item.title) inv.equipped.title = itemId;
     saveInv(userId, inv);
-    return { ok: true, inv, item };
+    return { ok: true, inv, item: { ...item, image: imageUrl(item) } };
 }
 
-function getEquippedTheme(userId) {
+function getEquippedDecoration(userId) {
     const inv = getInv(userId);
-    const decId = inv.equipped?.decoration;
-    const item = GLOBAL_ITEMS.find((i) => i.id === decId);
-    return item?.theme || { bg1: '#0f172a', bg2: '#1e1b4b', accent: '#a78bfa', name: 'PADRÃO' };
+    const id = inv.equipped?.decoration;
+    if (!id) return null;
+    const item = DECORATIONS.find((i) => i.id === id);
+    if (!item) return null;
+    return { ...item, image: imageUrl(item) };
 }
 
 function getEquippedTitle(userId) {
     const inv = getInv(userId);
     const tId = inv.equipped?.title;
-    const item = GLOBAL_ITEMS.find((i) => i.id === tId);
+    const item = ITEMS.find((i) => i.id === tId);
     return item?.title || null;
+}
+
+function ownedDecorations(userId) {
+    const inv = getInv(userId);
+    return decorations().filter((d) => inv.owned.includes(d.id));
 }
 
 function getDailyBoost(userId) {
@@ -240,16 +303,36 @@ function getDailyBoost(userId) {
     return 0;
 }
 
+function panelBase() {
+    return (
+        process.env.PANEL_URL ||
+        process.env.RENDER_EXTERNAL_URL ||
+        process.env.REDIRECT_URI?.replace(/\/auth\/discord\/callback.?$/, '') ||
+        'https://aeternus-q7gt.onrender.com'
+    ).replace(/\/$/, '');
+}
+
+function decorPanelUrl(guildId) {
+    const base = panelBase();
+    return guildId ? `${base}/decoracoes?guild=${guildId}` : `${base}/decoracoes`;
+}
+
 module.exports = {
     GLOBAL_ITEMS,
+    DECORATIONS,
+    ITEMS,
     catalog,
+    decorations,
     findItem,
     buy,
     equip,
-    owns,
     getInv,
-    getEquippedTheme,
+    getEquippedDecoration,
     getEquippedTitle,
+    ownedDecorations,
     getDailyBoost,
-    guildVips
+    guildVips,
+    imageUrl,
+    decorPanelUrl,
+    panelBase
 };

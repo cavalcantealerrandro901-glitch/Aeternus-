@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aeternus · Decorações</title>
+  <style>
+    :root {
+      --bg: #0b0f1a;
+      --card: #121826;
+      --accent: #a78bfa;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #2e1065 0%, transparent 50%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 28px 20px 12px;
+      text-align: center;
+    }
+    header h1 { margin: 0; font-size: 1.6rem; letter-spacing: 0.04em; }
+    header p { color: var(--muted); margin: 8px 0 0; }
+    .bal {
+      display: inline-flex; gap: 16px; margin-top: 12px;
+      background: var(--card); padding: 10px 18px; border-radius: 999px;
+      border: 1px solid #1e293b;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 18px;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto 40px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      overflow: hidden;
+      transition: transform .15s, border-color .15s;
+      cursor: pointer;
+    }
+    .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+    .card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      display: block;
+      background: #0f172a;
+    }
+    .card .body { padding: 14px 16px 16px; }
+    .card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+    .card .desc { color: var(--muted); font-size: 0.88rem; margin: 0 0 10px; }
+    .price { color: var(--accent); font-weight: 700; }
+    .owned { color: #34d399; font-size: 0.85rem; }
+    .msg {
+      text-align: center; padding: 12px; color: var(--muted);
+    }
+    .top {
+      display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
+      padding: 0 16px 8px;
+    }
+    a.btn, button.btn {
+      background: #1e1b4b; color: var(--text); border: 1px solid #312e81;
+      padding: 8px 14px; border-radius: 10px; text-decoration: none; cursor: pointer;
+    }
+    a.btn:hover, button.btn:hover { border-color: var(--accent); }
+    #toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: #fff; padding: 12px 18px; border-radius: 12px;
+      opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎨 Decorações</h1>
+    <p>Clique em uma imagem para ver o preço e comprar. Ela vai direto no seu perfil.</p>
+    <div class="bal" id="bal">Carregando saldo…</div>
+  </header>
+  <div class="top">
+    <a class="btn" href="/dashboard">Painel</a>
+    <a class="btn" href="/login">Login Discord</a>
+  </div>
+  <div class="msg" id="status">Carregando catálogo…</div>
+  <div class="grid" id="grid"></div>
+  <div id="toast"></div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const guildId = params.get('guild') || '';
+
+    function toast(t) {
+      const el = document.getElementById('toast');
+      el.textContent = t;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2800);
+    }
+
+    function fmt(n) {
+      return Number(n || 0).toLocaleString('pt-BR');
+    }
+
+    async function load() {
+      const me = await fetch('/api/me').then(r => r.ok ? r.json() : null).catch(() => null);
+      if (!me) {
+        document.getElementById('status').textContent = 'Faça login no Discord para comprar.';
+        document.getElementById('bal').textContent = 'Não autenticado';
+      } else {
+        document.getElementById('bal').innerHTML =
+          `❄️ ${fmt(me.economy?.flocos)} · 💠 ${fmt(me.economy?.cristais)}`;
+      }
+
+      const url = guildId ? `/api/shop/decorations?guild=${guildId}` : '/api/shop/decorations';
+      const data = await fetch(url).then(r => r.json()).catch(() => null);
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+
+      if (!data?.items?.length) {
+        document.getElementById('status').textContent = 'Nenhuma decoração disponível.';
+        return;
+      }
+
+      document.getElementById('status').textContent =
+        `${data.items.length} imagens · preços variam por arte`;
+
+      const owned = new Set(data.owned || []);
+
+      for (const item of data.items) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <img src="${item.image}" alt="${item.name}" loading="lazy" />
+          <div class="body">
+            <h3>${item.name}</h3>
+            <p class="desc">${item.desc || ''}</p>
+            <div class="price">💠 ${fmt(item.price)}</div>
+            ${owned.has(item.id) ? '<div class="owned">✓ Já possui</div>' : ''}
+          </div>`;
+        card.onclick = () => buy(item, owned.has(item.id));
+        grid.appendChild(card);
+      }
+    }
+
+    async function buy(item, already) {
+      if (already) {
+        const ok = confirm(`Você já tem "${item.name}". Equipar no perfil?`);
+        if (!ok) return;
+        const res = await fetch('/api/shop/equip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: item.id })
+        }).then(r => r.json());
+        toast(res.ok ? 'Equipado no perfil!' : (res.error || 'Erro'));
+        return;
+      }
+
+      const ok = confirm(`Comprar "${item.name}" por 💠 ${fmt(item.price)}?\nA imagem vai para o perfil na hora.`);
+      if (!ok) return;
+
+      const res = await fetch('/api/shop/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: item.id, guildId })
+      }).then(r => r.json());
+
+      if (!res.ok) {
+        toast(res.error || 'Falha na compra');
+        return;
+      }
+      toast('Comprado e equipado no perfil!');
+      load();
+    }
+
+    load();
+  </script>
+</body>
+</html>
