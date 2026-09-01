@@ -9,7 +9,7 @@ const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const { againRow, fmt, C } = require('../utils/gameStyle');
 
-const REELS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎', '7️⃣'];
+const REELS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎', '㟾️'];
 const WEIGHTS = [28, 24, 18, 14, 10, 5, 1];
 
 function pick() {
@@ -24,7 +24,7 @@ function pick() {
 
 function multiplier(a, b, c) {
     if (a === b && b === c) {
-        if (a === '7️⃣') return 25;
+        if (a === '㟾️') return 25;
         if (a === '💎') return 18;
         if (a === '⭐') return 12;
         if (a === '🍉') return 8;
@@ -34,7 +34,7 @@ function multiplier(a, b, c) {
     }
     if (a === b || b === c || a === c) {
         const pair = a === b ? a : b === c ? b : a;
-        if (pair === '7️⃣' || pair === '💎') return 2.5;
+        if (pair === '㟾️' || pair === '💎') return 2.5;
         if (pair === '⭐') return 2;
         return 1.5;
     }
@@ -44,9 +44,9 @@ function multiplier(a, b, c) {
 function frame(a, b, c) {
     return [
         '```',
-        '  ╔══════════════════╗',
+        '  ╔════════════════════╗',
         `  ║   ${a}  │  ${b}  │  ${c}   ║`,
-        '  ╚══════════════════╝',
+        '  ╚════════════════════╝',
         '```'
     ].join('\n');
 }
@@ -82,11 +82,11 @@ function payload(r, amount, user, userId) {
     let money;
     if (r.win) {
         money = [
-            `✨ **Ganhou** +✨ **${fmt(r.payout)}** (×${r.mult})`,
+            `✨ **Ganhou** + **${fmt(r.payout)}** (×${r.mult})`,
             `📈 Lucro: ✨ **${fmt(r.profit)}**`
         ].join('\n');
     } else {
-        money = `💫 **Perdeu** −✨ **${fmt(amount)}**`;
+        money = `💫 **Perdeu** − **${fmt(amount)}**`;
     }
 
     const emb = new EmbedBuilder()
@@ -108,7 +108,7 @@ function payload(r, amount, user, userId) {
                 `💼 Saldo: ✨ **${fmt(bal)}**`
             ].join('\n')
         )
-        .setFooter({ text: 'O.slots 1k · all · half  ·  7️⃣7️⃣7️⃣ ×25 · Aeternus' })
+        .setFooter({ text: 'O.slots 1k · all · half  ·  㟾️㟾️㟾️ ×25 · Aeternus' })
         .setTimestamp();
 
     return {
@@ -133,7 +133,7 @@ function tableEmbed() {
         .setDescription(
             [
                 '**Três iguais**',
-                '7️⃣7️⃣7️⃣ → ×**25**',
+                '㟾️㟾️㟾️ → ×**25**',
                 '💎💎💎 → ×**18**',
                 '⭐⭐⭐ → ×**12**',
                 '🍉🍉🍉 → ×**8**',
@@ -174,7 +174,7 @@ module.exports = {
                                 '`O.slots half`',
                                 '`O.slots all`',
                                 '',
-                                '7️⃣7️⃣7️⃣ paga **×25** — o jackpot dos deuses.'
+                                '㟾️㟾️㟾️ paga **×25** — o jackpot dos deuses.'
                             ].join('\n')
                         )
                         .setFooter({ text: 'Apostas em Éter ✨' })
