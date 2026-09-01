@@ -1,12 +1,12 @@
-const flocos = require('../utils/flocos');
+const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const { crystalResult, againRow } = require('../utils/gameStyle');
 
 function play(guess, amount, userId) {
-    flocos.remove(userId, amount, { reason: 'dado' });
+    eter.remove(userId, amount, { reason: 'dado' });
     const roll = 1 + Math.floor(Math.random() * 6);
     const win = roll === guess;
-    if (win) flocos.add(userId, amount * 6, { reason: 'dado win' });
+    if (win) eter.add(userId, amount * 6, { reason: 'dado win' });
     return { roll, win, payout: amount * 6 };
 }
 
@@ -18,7 +18,7 @@ function payload(r, guess, amount, user, userId) {
                 win: r.win,
                 amount,
                 payout: r.payout,
-                balance: flocos.get(userId),
+                balance: eter.get(userId),
                 user,
                 extra: `Você apostou no **${guess}** · Saiu **${r.roll}**`
             })
@@ -30,12 +30,12 @@ function payload(r, guess, amount, user, userId) {
 module.exports = {
     name: 'dado',
     aliases: ['dice', 'roll'],
-    description: 'Aposta no dado 1-6 (flocos)',
+    description: 'Aposta no dado 1-6 (éter)',
     async execute(message, args) {
         const guess = parseInt(args[0], 10);
         if (!guess || guess < 1 || guess > 6)
             return message.reply('Uso: `O.dado <1-6> <valor|all|half>`');
-        const bet = resolveBet(args[1], flocos.get(message.author.id), { label: '❄️' });
+        const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
         if (!bet.ok) return message.reply(`❌ ${bet.error}`);
         const r = play(guess, bet.amount, message.author.id);
         await message.reply(payload(r, guess, bet.amount, message.author, message.author.id));
@@ -45,7 +45,7 @@ module.exports = {
         if (interaction.user.id !== owner)
             return interaction.reply({ content: 'Não é sua partida.', ephemeral: true });
         const guess = parseInt(guessStr, 10);
-        const bet = resolveBet(amountStr, flocos.get(owner), { label: '❄️' });
+        const bet = resolveBet(amountStr, eter.get(owner), { label: '✨' });
         if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
         const r = play(guess, bet.amount, owner);
         await interaction.update(payload(r, guess, bet.amount, interaction.user, owner));
