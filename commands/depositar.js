@@ -14,7 +14,7 @@ module.exports = {
     async execute(message, args) {
         const bet = resolveBet(args[0], eter.get(message.author.id), { label: '✨' });
         if (!bet.ok)
-            return message.reply(`❌ ${bet.error}\nUso: \`O.depositar <valor|all|half>\``);
+            return message.reply(`❌ ${bet.error}\nUso: \`O.depositar <valor|all|half>\`);
 
         eter.remove(message.author.id, bet.amount);
         bank.add(message.author.id, bet.amount);
