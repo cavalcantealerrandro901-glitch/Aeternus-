@@ -1,5 +1,5 @@
 const store = require('./store');
-const flocos = require('./flocos');
+const eter = require('./eter');
 const xp = require('./xp');
 const { getSettings } = require('./settings');
 
@@ -8,8 +8,6 @@ function todayKey() {
 }
 
 function yesterdayKey() {
-    const y = new Date();
-    // BRT approx via toLocale
     const today = todayKey();
     const d = new Date(today + 'T12:00:00');
     d.setDate(d.getDate() - 1);
@@ -29,19 +27,27 @@ function status(userId, guildId) {
     const level = xp.get(userId).level || 0;
     const mult = xp.dailyMultiplier(level);
     return {
+        ok: true,
         claimed,
+        available: !claimed,
         last: info.last,
         streak: info.streak || 0,
-        nextStreak: claimed ? info.streak || 0 : info.last === yesterdayKey() ? (info.streak || 0) + 1 : 1,
+        nextStreak: claimed
+            ? info.streak || 0
+            : info.last === yesterdayKey()
+              ? (info.streak || 0) + 1
+              : 1,
         dailyMin: eco.dailyMin ?? 5000,
         dailyMax: eco.dailyMax ?? 50000,
         multiplier: mult,
         level,
-        balance: flocos.get(userId),
-        timezone: 'America/Sao_Paulo'
+        balance: eter.get(userId),
+        timezone: 'America/Sao_Paulo',
+        leftText: claimed ? 'Volte após meia-noite BRT.' : null
     };
 }
 
+/** Coleta — usada apenas pelo painel (/api/daily/claim) */
 function claim(userId, guildId) {
     const all = store.load('daily.json', {});
     const today = todayKey();
@@ -58,7 +64,7 @@ function claim(userId, guildId) {
     const mult = xp.dailyMultiplier(xp.get(userId).level);
     const total = Math.floor(base * mult);
 
-    flocos.add(userId, total);
+    eter.add(userId, total, { reason: 'daily' });
     all[userId] = { last: today, streak };
     store.save('daily.json', all);
 
@@ -68,7 +74,7 @@ function claim(userId, guildId) {
         base,
         multiplier: mult,
         streak,
-        balance: flocos.get(userId)
+        balance: eter.get(userId)
     };
 }
 

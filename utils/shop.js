@@ -1,6 +1,5 @@
 const store = require('./store');
-const flocos = require('./flocos');
-const cristais = require('./cristais');
+const eter = require('./eter');
 const { getSettings } = require('./settings');
 
 const DECORATIONS = [
@@ -10,7 +9,7 @@ const DECORATIONS = [
         name: 'Aurora Violeta',
         desc: 'Céu aurora violeta cinematográfico',
         price: 2200,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'cinematic purple aurora borealis night sky, stars, soft glow, profile banner art, no text, high quality'
     },
     {
@@ -19,7 +18,7 @@ const DECORATIONS = [
         name: 'Campo de Gelo',
         desc: 'Paisagem glacial azul',
         price: 2400,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'frozen ice landscape, blue crystal mountains, soft light, aesthetic banner, no text'
     },
     {
@@ -28,7 +27,7 @@ const DECORATIONS = [
         name: 'Palácio de Ouro',
         desc: 'Luxo dourado premium',
         price: 5200,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'luxury golden palace interior, warm light, elegant marble, premium aesthetic, no text'
     },
     {
@@ -37,7 +36,7 @@ const DECORATIONS = [
         name: 'Cidade Neon',
         desc: 'Cyberpunk noturno',
         price: 3800,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'cyberpunk neon city night rain, pink purple lights, cinematic banner, no text'
     },
     {
@@ -46,7 +45,7 @@ const DECORATIONS = [
         name: 'Jardim Rosa',
         desc: 'Flores e névoa rosa',
         price: 3000,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'mystical rose garden fog soft pink light aesthetic banner, no text'
     },
     {
@@ -55,7 +54,7 @@ const DECORATIONS = [
         name: 'Floresta Arcana',
         desc: 'Bosque mágico verde',
         price: 2800,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'enchanted green forest glowing particles magical atmosphere banner, no text'
     },
     {
@@ -64,7 +63,7 @@ const DECORATIONS = [
         name: 'Oceano Profundo',
         desc: 'Abismo azul com luz',
         price: 3100,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'deep ocean underwater light rays blue aesthetic cinematic banner, no text'
     },
     {
@@ -73,7 +72,7 @@ const DECORATIONS = [
         name: 'Nebulosa',
         desc: 'Espaço sideral colorido',
         price: 4500,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'colorful space nebula stars cosmic dust epic banner art, no text'
     },
     {
@@ -82,7 +81,7 @@ const DECORATIONS = [
         name: 'Sakura',
         desc: 'Cerejeiras ao entardecer',
         price: 3300,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'cherry blossom sakura sunset japanese aesthetic soft banner, no text'
     },
     {
@@ -91,12 +90,11 @@ const DECORATIONS = [
         name: 'Vulcão',
         desc: 'Lava e fumaça dramática',
         price: 4100,
-        currency: 'cristais',
+        currency: 'eter',
         prompt: 'volcano lava dramatic sky dark cinematic banner, no text'
     }
 ];
 
-/** Efeitos visuais do card de perfil */
 const EFFECTS = [
     {
         id: 'fx_brilho',
@@ -104,7 +102,7 @@ const EFFECTS = [
         name: 'Brilho Suave',
         desc: 'Halo luminoso ao redor do avatar',
         price: 2500,
-        currency: 'cristais',
+        currency: 'eter',
         style: 'glow',
         icon: '✨'
     },
@@ -114,7 +112,7 @@ const EFFECTS = [
         name: 'Aura Neon',
         desc: 'Moldura neon rosa/azul',
         price: 4200,
-        currency: 'cristais',
+        currency: 'eter',
         style: 'neon',
         icon: '💜'
     },
@@ -124,7 +122,7 @@ const EFFECTS = [
         name: 'Moldura de Ouro',
         desc: 'Borda dourada premium',
         price: 5500,
-        currency: 'cristais',
+        currency: 'eter',
         style: 'gold',
         icon: '🥇'
     },
@@ -134,7 +132,7 @@ const EFFECTS = [
         name: 'Chuva de Estrelas',
         desc: 'Partículas brilhantes no card',
         price: 3800,
-        currency: 'cristais',
+        currency: 'eter',
         style: 'stars',
         icon: '🌟'
     },
@@ -144,7 +142,7 @@ const EFFECTS = [
         name: 'Chamas',
         desc: 'Bordas em tom de fogo',
         price: 4800,
-        currency: 'cristais',
+        currency: 'eter',
         style: 'fire',
         icon: '🔥'
     },
@@ -154,7 +152,7 @@ const EFFECTS = [
         name: 'Cristal de Gelo',
         desc: 'Aura gelada azul-ciano',
         price: 3600,
-        currency: 'cristais',
+        currency: 'eter',
         style: 'ice',
         icon: '❄️'
     },
@@ -164,7 +162,7 @@ const EFFECTS = [
         name: 'Arco-íris',
         desc: 'Moldura multicolor',
         price: 6000,
-        currency: 'cristais',
+        currency: 'eter',
         style: 'rainbow',
         icon: '🌈'
     },
@@ -174,7 +172,7 @@ const EFFECTS = [
         name: 'Sombra Real',
         desc: 'Sombra dramática no avatar',
         price: 2000,
-        currency: 'cristais',
+        currency: 'eter',
         style: 'shadow',
         icon: '🌑'
     }
@@ -187,7 +185,7 @@ const ITEMS = [
         name: 'Título: Lenda',
         desc: 'Título «Lenda» no perfil',
         price: 15000,
-        currency: 'flocos',
+        currency: 'eter',
         title: 'Lenda',
         icon: '👑'
     },
@@ -197,7 +195,7 @@ const ITEMS = [
         name: 'Título: Astro',
         desc: 'Título «Astro» no perfil',
         price: 25000,
-        currency: 'flocos',
+        currency: 'eter',
         title: 'Astro',
         icon: '⭐'
     },
@@ -207,7 +205,7 @@ const ITEMS = [
         name: 'Título: Soberano',
         desc: 'Título «Soberano» no perfil',
         price: 8000,
-        currency: 'cristais',
+        currency: 'eter',
         title: 'Soberano',
         icon: '🏰'
     },
@@ -217,20 +215,20 @@ const ITEMS = [
         name: 'Boost Daily +20%',
         desc: 'Boost no daily por 24h',
         price: 4000,
-        currency: 'cristais',
+        currency: 'eter',
         consumable: true,
         effect: 'daily_boost_20',
         icon: '⚡'
     },
     {
-        id: 'item_caixa_flocos',
+        id: 'item_caixa_eter',
         type: 'item',
-        name: 'Caixa de Flocos',
-        desc: '10k–40k flocos na hora',
+        name: 'Caixa de Éter',
+        desc: '10k–40k éter na hora',
         price: 3000,
-        currency: 'cristais',
+        currency: 'eter',
         consumable: true,
-        effect: 'box_flocos',
+        effect: 'box_eter',
         icon: '📦'
     },
     {
@@ -239,20 +237,9 @@ const ITEMS = [
         name: 'Título: Eterno',
         desc: 'Título «Eterno» no perfil',
         price: 12000,
-        currency: 'cristais',
+        currency: 'eter',
         title: 'Eterno',
         icon: '♾️'
-    },
-    {
-        id: 'item_caixa_cristal',
-        type: 'item',
-        name: 'Caixa de Cristais',
-        desc: '800–2500 cristais na hora',
-        price: 18000,
-        currency: 'flocos',
-        consumable: true,
-        effect: 'box_cristais',
-        icon: '💎'
     }
 ];
 
@@ -302,7 +289,7 @@ function guildVips(guildId) {
             name: String(v.name),
             desc: String(v.desc || 'Cargo VIP do servidor'),
             price: Math.max(0, Math.floor(Number(v.price) || 0)),
-            currency: v.currency === 'flocos' ? 'flocos' : 'cristais',
+            currency: 'eter',
             roleId: String(v.roleId),
             durationDays: Math.max(0, Math.floor(Number(v.durationDays) || 0)),
             icon: '👑'
@@ -338,30 +325,21 @@ function buy(userId, guildId, itemId) {
         return { ok: false, error: 'Você já possui este item.' };
     }
 
-    const bal = item.currency === 'flocos' ? flocos.get(userId) : cristais.get(userId);
+    const bal = eter.get(userId);
     if (bal < item.price) {
         return {
             ok: false,
-            error: `Saldo insuficiente. Precisa de ${item.price.toLocaleString('pt-BR')} ${item.currency === 'flocos' ? '❄️' : '💠'}.`
+            error: `Saldo insuficiente. Precisa de ${item.price.toLocaleString('pt-BR')} ✨ éter.`
         };
     }
 
-    if (item.currency === 'flocos') {
-        flocos.remove(userId, item.price, { reason: `loja:${item.id}` });
-    } else {
-        cristais.remove(userId, item.price);
-    }
+    eter.remove(userId, item.price, { reason: `loja:${item.id}` });
 
     if (item.consumable) {
-        if (item.effect === 'box_flocos') {
+        if (item.effect === 'box_eter' || item.effect === 'box_flocos') {
             const gain = 10000 + Math.floor(Math.random() * 30001);
-            flocos.add(userId, gain, { reason: 'caixa loja' });
+            eter.add(userId, gain, { reason: 'caixa loja' });
             return { ok: true, item, consumed: true, gain };
-        }
-        if (item.effect === 'box_cristais') {
-            const gain = 800 + Math.floor(Math.random() * 1701);
-            cristais.add(userId, gain);
-            return { ok: true, item, consumed: true, gainCristais: gain };
         }
         if (item.effect === 'daily_boost_20') {
             inv.effects.dailyBoostUntil = Date.now() + 864e5;
@@ -446,6 +424,10 @@ function panelBase() {
     ).replace(/\/$/, '');
 }
 
+function dashboardPanelUrl() {
+    return `${panelBase()}/dashboard`;
+}
+
 function decorPanelUrl(guildId) {
     const base = panelBase();
     return guildId ? `${base}/decoracoes?guild=${guildId}` : `${base}/decoracoes`;
@@ -490,5 +472,6 @@ module.exports = {
     itemsPanelUrl,
     effectsPanelUrl,
     shopPanelUrl,
+    dashboardPanelUrl,
     panelBase
 };
