@@ -5,7 +5,7 @@ const {
     ButtonStyle,
     SlashCommandBuilder
 } = require('discord.js');
-const flocos = require('../utils/flocos');
+const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const { againRow, fmt, C } = require('../utils/gameStyle');
 
@@ -41,7 +41,7 @@ function normalizeChoice(raw) {
 }
 
 function play(choice, amount, userId) {
-    flocos.remove(userId, amount, { reason: 'roleta' });
+    eter.remove(userId, amount, { reason: 'roleta' });
     const n = Math.floor(Math.random() * 37);
     const color = colorOf(n);
     let mult = 0;
@@ -67,7 +67,7 @@ function play(choice, amount, userId) {
     }
 
     const payout = Math.floor(amount * mult);
-    if (payout > 0) flocos.add(userId, payout, { reason: 'roleta win' });
+    if (payout > 0) eter.add(userId, payout, { reason: 'roleta win' });
     return { n, color, win, mult, payout, kind, profit: payout - amount };
 }
 
@@ -90,7 +90,7 @@ function vibe(r) {
 }
 
 function payload(r, choice, amount, user, userId) {
-    const bal = flocos.get(userId);
+    const bal = eter.get(userId);
     const emb = new EmbedBuilder()
         .setColor(r.mult >= 14 ? C.gold : r.win ? C.win : C.lose)
         .setAuthor({
@@ -108,10 +108,10 @@ function payload(r, choice, amount, user, userId) {
                 vibe(r),
                 '',
                 r.win
-                    ? `✨ **Ganhou** +❄️ **${fmt(r.payout)}**\n📈 Lucro: ❄️ **${fmt(r.profit)}**`
-                    : `💫 **Perdeu** −❄️ **${fmt(amount)}**`,
+                    ? `✨ **Ganhou** +**${fmt(r.payout)}**\n📈 Lucro: ✨ **${fmt(r.profit)}**`
+                    : `💫 **Perdeu** − **${fmt(amount)}**`,
                 '',
-                `💼 Saldo: ❄️ **${fmt(bal)}**`
+                `💼 Saldo: ✨ **${fmt(bal)}**`
             ]
                 .filter(Boolean)
                 .join('\n')
@@ -149,10 +149,10 @@ function payload(r, choice, amount, user, userId) {
 module.exports = {
     name: 'roleta',
     aliases: ['roulette', 'rl'],
-    description: 'Roleta europeia (flocos)',
+    description: 'Roleta europeia (éter)',
     data: new SlashCommandBuilder()
         .setName('roleta')
-        .setDescription('Gira a roleta (flocos)')
+        .setDescription('Gira a roleta (éter)')
         .addStringOption((o) =>
             o
                 .setName('aposta')
@@ -187,7 +187,7 @@ module.exports = {
                 ]
             });
         }
-        const bet = resolveBet(args[1], flocos.get(message.author.id), { label: '❄️' });
+        const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
         if (!bet.ok) return message.reply(`❌ ${bet.error}`);
         const r = play(choice, bet.amount, message.author.id);
         return message.reply(
@@ -205,8 +205,8 @@ module.exports = {
         }
         const bet = resolveBet(
             interaction.options.getString('valor'),
-            flocos.get(interaction.user.id),
-            { label: '❄️' }
+            eter.get(interaction.user.id),
+            { label: '✨' }
         );
         if (!bet.ok) {
             return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
@@ -229,7 +229,7 @@ module.exports = {
             return interaction.reply({ content: 'Não é a sua partida.', ephemeral: true });
         }
 
-        const bet = resolveBet(amountStr, flocos.get(owner), { label: '❄️' });
+        const bet = resolveBet(amountStr, eter.get(owner), { label: '✨' });
         if (!bet.ok) {
             return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
         }
