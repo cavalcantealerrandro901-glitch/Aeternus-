@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const flocos = require('../utils/flocos');
+const eter = require('../utils/eter');
 const bank = require('../utils/bank');
 const { resolveBet } = require('../utils/parseAmount');
 
@@ -10,13 +10,13 @@ function fmt(n) {
 module.exports = {
     name: 'depositar',
     aliases: ['dep', 'deposit'],
-    description: 'Deposita flocos no banco',
+    description: 'Deposita éter no banco',
     async execute(message, args) {
-        const bet = resolveBet(args[0], flocos.get(message.author.id), { label: '❄️' });
+        const bet = resolveBet(args[0], eter.get(message.author.id), { label: '✨' });
         if (!bet.ok)
-            return message.reply(`❌ ${bet.error}\nUso: \`O.depositar <valor|all|half>\``);
+            return message.reply(`❌ ${bet.error}\nUso: \`O.depositar <valor|all|half>\`);
 
-        flocos.remove(message.author.id, bet.amount);
+        eter.remove(message.author.id, bet.amount);
         bank.add(message.author.id, bet.amount);
 
         await message.reply({
@@ -33,18 +33,18 @@ module.exports = {
                             '```',
                             '  CARTEIRA  ──►  COFRE',
                             '```',
-                            `Valor creditado: ❄️ **${fmt(bet.amount)}**`
+                            `Valor creditado: ✨ **${fmt(bet.amount)}**`
                         ].join('\n')
                     )
                     .addFields(
                         {
                             name: '💵 Carteira',
-                            value: `❄️ **${fmt(flocos.get(message.author.id))}**`,
+                            value: `✨ **${fmt(eter.get(message.author.id))}**`,
                             inline: true
                         },
                         {
                             name: '🔒 Cofre',
-                            value: `❄️ **${fmt(bank.get(message.author.id))}**`,
+                            value: `✨ **${fmt(bank.get(message.author.id))}**`,
                             inline: true
                         }
                     )

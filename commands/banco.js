@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const flocos = require('../utils/flocos');
+const eter = require('../utils/eter');
 const bank = require('../utils/bank');
 const { getPrefix } = require('../utils/settings');
 
@@ -18,7 +18,7 @@ module.exports = {
     description: 'Extrato bancário Aeternus',
     async execute(message) {
         const u = message.mentions.users.first() || message.author;
-        const wallet = flocos.get(u.id);
+        const wallet = eter.get(u.id);
         const saved = bank.get(u.id);
         const total = wallet + saved;
         const pctBank = total > 0 ? saved / total : 0;
@@ -55,17 +55,17 @@ module.exports = {
             .addFields(
                 {
                     name: '💵  Disponível (carteira)',
-                    value: `❄️ **${fmt(wallet)}** flocos`,
+                    value: `✨ **${fmt(wallet)}** éter`,
                     inline: true
                 },
                 {
                     name: '🔒  Aplicado (cofre)',
-                    value: `❄️ **${fmt(saved)}** flocos`,
+                    value: `✨ **${fmt(saved)}** éter`,
                     inline: true
                 },
                 {
                     name: '📊  Patrimônio total',
-                    value: `❄️ **${fmt(total)}** flocos`,
+                    value: `✨ **${fmt(total)}** éter`,
                     inline: false
                 },
                 {
