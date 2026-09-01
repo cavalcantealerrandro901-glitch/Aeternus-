@@ -7,11 +7,9 @@ const {
 } = require('discord.js');
 const flocos = require('../utils/flocos');
 const { resolveBet } = require('../utils/parseAmount');
-const { againRow, fmt } = require('../utils/gameStyle');
+const { againRow, fmt, C } = require('../utils/gameStyle');
 
 const REELS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎', '7️⃣'];
-
-/** pesos: índice 0..6 — 7️⃣ e 💎 mais raros */
 const WEIGHTS = [28, 24, 18, 14, 10, 5, 1];
 
 function pick() {
@@ -32,9 +30,8 @@ function multiplier(a, b, c) {
         if (a === '🍉') return 8;
         if (a === '🍇') return 6;
         if (a === '🍋') return 5;
-        return 4; // cereja
+        return 4;
     }
-    // dois iguais
     if (a === b || b === c || a === c) {
         const pair = a === b ? a : b === c ? b : a;
         if (pair === '7️⃣' || pair === '💎') return 2.5;
@@ -47,9 +44,9 @@ function multiplier(a, b, c) {
 function frame(a, b, c) {
     return [
         '```',
-        '  ╔═══════════════╗',
-        `  ║  ${a} │ ${b} │ ${c}  ║`,
-        '  ╚═══════════════╝',
+        '  ╔═════════════════╗',
+        `  ║   ${a}  │  ${b}  │  ${c}   ║`,
+        '  ╚═════════════════╝',
         '```'
     ].join('\n');
 }
@@ -62,21 +59,25 @@ function spin(amount, userId) {
     const mult = multiplier(a, b, c);
     const payout = Math.floor(amount * mult);
     if (payout > 0) flocos.add(userId, payout, { reason: 'slots win' });
-    return {
-        a,
-        b,
-        c,
-        mult,
-        payout,
-        win: payout > 0,
-        profit: payout - amount
-    };
+    return { a, b, c, mult, payout, win: payout > 0, profit: payout - amount };
+}
+
+function vibe(r) {
+    if (r.mult >= 18) return '🌟 **MEGA JACKPOT!** As estrelas se alinharam.';
+    if (r.mult >= 8) return '🎉 **Grande vitória!** Os rolos te abençoaram.';
+    if (r.win) return '✨ **Vitória!** Mais uma rodada vencedora.';
+    return '💨 Os rolos giraram… a sorte volta na próxima.';
 }
 
 function payload(r, amount, user, userId) {
     const bal = flocos.get(userId);
-    const color = r.win ? 0x34d399 : 0xf43f5e;
-    const title = r.win ? '🎰  JACKPOT · Vitória' : '🎰  Slots · Derrota';
+    const color = r.mult >= 12 ? C.gold : r.win ? C.win : C.lose;
+    const title =
+        r.mult >= 18
+            ? '🎰  MEGA JACKPOT'
+            : r.win
+              ? '🎰  Slots · Vitória'
+              : '🎰  Slots · Derrota';
 
     let money;
     if (r.win) {
@@ -85,16 +86,13 @@ function payload(r, amount, user, userId) {
             `📈 Lucro: ❄️ **${fmt(r.profit)}**`
         ].join('\n');
     } else {
-        money = [
-            `💫 **Perdeu** −❄️ **${fmt(amount)}**`,
-            `_Tente de novo — a sorte muda._`
-        ].join('\n');
+        money = `💫 **Perdeu** −❄️ **${fmt(amount)}**`;
     }
 
     const emb = new EmbedBuilder()
         .setColor(color)
         .setAuthor({
-            name: `${user.username} · Cassino`,
+            name: `${user.username} · Cassino Aeternus`,
             iconURL: user.displayAvatarURL({ size: 64 })
         })
         .setTitle(title)
@@ -103,12 +101,14 @@ function payload(r, amount, user, userId) {
                 frame(r.a, r.b, r.c),
                 `Aposta: ❄️ **${fmt(amount)}**`,
                 '',
+                vibe(r),
+                '',
                 money,
                 '',
                 `💼 Saldo: ❄️ **${fmt(bal)}**`
             ].join('\n')
         )
-        .setFooter({ text: 'O.slots 1k · all · half  ·  7️⃣7️⃣7️⃣ ×25' })
+        .setFooter({ text: 'O.slots 1k · all · half  ·  7️⃣7️⃣7️⃣ ×25 · Aeternus' })
         .setTimestamp();
 
     return {
@@ -129,7 +129,7 @@ function payload(r, amount, user, userId) {
 function tableEmbed() {
     return new EmbedBuilder()
         .setColor(0xa78bfa)
-        .setTitle('📜  Tabela · Slots')
+        .setTitle('📜  Tabela · Slots Aeternus')
         .setDescription(
             [
                 '**Três iguais**',
@@ -143,7 +143,7 @@ function tableEmbed() {
                 '',
                 '**Dois iguais** → ×**1.5** a ×**2.5**',
                 '',
-                '_Moeda: flocos ❄️_'
+                '_Moeda: flocos ❄️ · Boa sorte._'
             ].join('\n')
         );
 }
@@ -165,14 +165,16 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xa78bfa)
-                        .setTitle('🎰  Slots')
+                        .setTitle('🎰  Slots Aeternus')
                         .setDescription(
                             [
                                 'Uso: `O.slots <valor|all|half>`',
                                 '',
                                 '`O.slots 1k`',
                                 '`O.slots half`',
-                                '`O.slots all`'
+                                '`O.slots all`',
+                                '',
+                                '7️⃣7️⃣7️⃣ paga **×25** — o jackpot dos deuses.'
                             ].join('\n')
                         )
                         .setFooter({ text: 'Apostas em flocos ❄️' })
@@ -202,7 +204,6 @@ module.exports = {
         const parts = interaction.customId.split(':');
         if (parts[0] !== 'slots') return;
 
-        // tabela
         if (parts[4] === 'x' || interaction.customId.includes(':x')) {
             return interaction.reply({ embeds: [tableEmbed()], ephemeral: true });
         }

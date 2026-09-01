@@ -7,7 +7,7 @@ const {
 } = require('discord.js');
 const flocos = require('../utils/flocos');
 const { resolveBet } = require('../utils/parseAmount');
-const { againRow, fmt } = require('../utils/gameStyle');
+const { againRow, fmt, C } = require('../utils/gameStyle');
 
 const RED = new Set([
     1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36
@@ -75,28 +75,37 @@ function wheelArt(n, color) {
     const e = colorEmoji(color);
     return [
         '```',
-        '    ╭─────────╮',
-        `    │   ${e} ${String(n).padStart(2, ' ')}   │`,
-        '    ╰─────────╯',
+        '     ╭───────────╮',
+        `     │   ${e}  ${String(n).padStart(2, ' ')}   │`,
+        '     ╰───────────╯',
         '```'
     ].join('\n');
+}
+
+function vibe(r) {
+    if (r.mult >= 36) return '🌟 **Número certeiro!** A roda te escolheu.';
+    if (r.mult >= 14) return '🟢 **Verde lendário!** Quase impossível.';
+    if (r.win) return '🎉 **Cor certa!** A mesa pagou.';
+    return '🌀 A bola parou… não era a sua vez.';
 }
 
 function payload(r, choice, amount, user, userId) {
     const bal = flocos.get(userId);
     const emb = new EmbedBuilder()
-        .setColor(r.win ? 0x34d399 : 0xf43f5e)
+        .setColor(r.mult >= 14 ? C.gold : r.win ? C.win : C.lose)
         .setAuthor({
             name: `${user.username} · Roleta`,
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle(r.win ? '🎡  Roleta · Vitória' : '🎡  Roleta · Derrota')
+        .setTitle(r.win ? (r.mult >= 14 ? '🎡  Roleta · Jackpot' : '🎡  Roleta · Vitória') : '🎡  Roleta · Derrota')
         .setDescription(
             [
                 wheelArt(r.n, r.color),
                 `Apostou em **${choice}**`,
                 `Saiu **${r.n}** ${colorEmoji(r.color)} (**${r.color}**)`,
                 r.win && r.kind ? `Acerto: **${r.kind}** · ×**${r.mult}**` : '',
+                '',
+                vibe(r),
                 '',
                 r.win
                     ? `✨ **Ganhou** +❄️ **${fmt(r.payout)}**\n📈 Lucro: ❄️ **${fmt(r.profit)}**`
@@ -108,7 +117,7 @@ function payload(r, choice, amount, user, userId) {
                 .join('\n')
         )
         .setFooter({
-            text: 'vermelho/preto ×2 · verde ×14 · número ×36 · O.roleta'
+            text: 'vermelho/preto ×2 · verde ×14 · número ×36 · Aeternus'
         })
         .setTimestamp();
 
@@ -139,7 +148,7 @@ function payload(r, choice, amount, user, userId) {
 
 module.exports = {
     name: 'roleta',
-    aliases: ['roulette', 'roleta', 'rl'],
+    aliases: ['roulette', 'rl'],
     description: 'Roleta europeia (flocos)',
     data: new SlashCommandBuilder()
         .setName('roleta')
@@ -161,7 +170,7 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xa78bfa)
-                        .setTitle('🎡  Roleta')
+                        .setTitle('🎡  Roleta Aeternus')
                         .setDescription(
                             [
                                 '**Uso**',
@@ -212,7 +221,6 @@ module.exports = {
         const parts = interaction.customId.split(':');
         if (parts[0] !== 'roleta') return;
 
-        const mode = parts[1]; // again | quick
         const choice = normalizeChoice(parts[2]) || parts[2];
         const amountStr = parts[3];
         const owner = parts[4];
