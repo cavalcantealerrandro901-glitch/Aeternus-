@@ -5,8 +5,7 @@ const crypto = require('crypto');
 const { getSettings, setSettings } = require('../utils/settings');
 const dropsUtil = require('../utils/drops');
 const daily = require('../utils/daily');
-const flocos = require('../utils/flocos');
-const cristais = require('../utils/cristais');
+const eter = require('../utils/eter');
 const xp = require('../utils/xp');
 const shop = require('../utils/shop');
 const snapshot = require('../utils/userSnapshot');
@@ -138,12 +137,15 @@ function setup(client) {
             snap = snapshot.getSnapshot(uid);
         }
 
+        const prog = xp.progress(uid);
         res.json({
             user: s.user,
             economy: {
-                flocos: flocos.get(uid),
-                cristais: cristais.get(uid),
-                xp: xp.get(uid)
+                eter: eter.get(uid),
+                flocos: eter.get(uid),
+                cristais: 0,
+                xp: xp.get(uid),
+                progress: prog
             },
             inventory: shop.getInv(uid),
             equippedDecoration: shop.getEquippedDecoration(uid),
@@ -210,11 +212,11 @@ function setup(client) {
             ok: true,
             item: result.item,
             gain: result.gain,
-            gainCristais: result.gainCristais,
             boost: result.boost,
             balance: {
-                flocos: flocos.get(s.user.id),
-                cristais: cristais.get(s.user.id)
+                eter: eter.get(s.user.id),
+                flocos: eter.get(s.user.id),
+                cristais: 0
             },
             equipped: shop.getEquippedDecoration(s.user.id),
             equippedEffect: shop.getEquippedEffect(s.user.id)
@@ -244,7 +246,10 @@ function setup(client) {
         const result = daily.claim(s.user.id, guildId);
         if (!result.ok) return res.status(400).json(result);
         snapshot.captureFromLive(s.user.id, { username: s.user.username });
-        res.json(result);
+        res.json({
+            ...result,
+            balance: eter.get(s.user.id)
+        });
     });
 
     app.get('/api/guilds', (req, res) => {
@@ -329,7 +334,7 @@ function setup(client) {
                 name: String(v.name).slice(0, 64),
                 desc: String(v.desc || 'Cargo VIP').slice(0, 120),
                 price: Math.max(0, Math.floor(Number(v.price) || 0)),
-                currency: v.currency === 'flocos' ? 'flocos' : 'cristais',
+                currency: 'eter',
                 roleId: String(v.roleId),
                 durationDays: Math.max(0, Math.floor(Number(v.durationDays) || 0))
             }));
