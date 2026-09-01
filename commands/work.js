@@ -6,7 +6,7 @@ const {
     SlashCommandBuilder
 } = require('discord.js');
 const workUtil = require('../utils/work');
-const flocos = require('../utils/flocos');
+const eter = require('../utils/eter');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -26,12 +26,12 @@ function resultEmbed(user, r) {
     const lines = [
         `> ${r.phrase}`,
         '',
-        `💰 **+❄️ ${fmt(r.pay)}** flocos`,
-        `🏦 Saldo: ❄️ **${fmt(r.balance)}**`,
+        `💰 **+✨ ${fmt(r.pay)}** éter`,
+        `🏦 Saldo: ✨ **${fmt(r.balance)}**`,
         '',
         `${r.rank.emoji} **Cargo:** ${r.rank.name}`,
         `📦 Turnos feitos: **${fmt(r.jobs)}**`,
-        `📈 Total ganho no trabalho: ❄️ **${fmt(r.totalEarned)}**`
+        `📈 Total ganho no trabalho: ✨ **${fmt(r.totalEarned)}**`
     ];
 
     if (r.promoted) {
@@ -82,7 +82,7 @@ function cooldownEmbed(user, leftText, st) {
                 '',
                 `${st.rank.emoji} Cargo atual: **${st.rank.name}**`,
                 `📦 Turnos: **${fmt(st.jobs)}**`,
-                `❄️ Saldo: **${fmt(st.balance)}**`,
+                `✨ Saldo: **${fmt(st.balance)}**`,
                 st.next
                     ? `⏳ Próximo cargo: **${st.next.name}** (${st.jobsToNext} turnos)`
                     : '🌌 Cargo máximo alcançado.'
@@ -95,7 +95,7 @@ function cooldownEmbed(user, leftText, st) {
 function statusEmbed(user, st) {
     const ranksList = workUtil.RANKS.map((rk) => {
         const mark = rk.id === st.rank.id ? '▸' : '·';
-        const range = `❄️ ${fmt(rk.min)}–${fmt(rk.max)}`;
+        const range = `✨ ${fmt(rk.min)}–${fmt(rk.max)}`;
         return `${mark} ${rk.emoji} **${rk.name}** — ${range} · ${rk.minJobs}+ turnos`;
     }).join('\n');
 
@@ -110,8 +110,8 @@ function statusEmbed(user, st) {
             [
                 `${st.rank.emoji} **Cargo:** ${st.rank.name}`,
                 `📦 Turnos: **${fmt(st.jobs)}**`,
-                `📈 Total ganho: ❄️ **${fmt(st.totalEarned)}**`,
-                `❄️ Saldo: **${fmt(st.balance)}**`,
+                `📈 Total ganho: ✨ **${fmt(st.totalEarned)}**`,
+                `✨ Saldo: **${fmt(st.balance)}**`,
                 `⏰ Cooldown: **${st.cooldownText}**`,
                 '',
                 st.next
@@ -168,10 +168,10 @@ async function doWork(user) {
 module.exports = {
     name: 'work',
     aliases: ['trabalhar', 'job', 'emprego', 'trabalho', 'wrk'],
-    description: 'Trabalha e ganha flocos conforme o cargo',
+    description: 'Trabalha e ganha éter conforme o cargo',
     data: new SlashCommandBuilder()
         .setName('work')
-        .setDescription('Trabalha e ganha flocos')
+        .setDescription('Trabalha e ganha éter')
         .addStringOption((o) =>
             o
                 .setName('acao')
@@ -236,11 +236,6 @@ module.exports = {
         }
 
         if (id === 'work:go') {
-            if (interaction.message?.interaction?.user?.id &&
-                interaction.message.interaction.user.id !== interaction.user.id) {
-                // permite qualquer um com o botão na própria mensagem se for o autor do comando original
-            }
-            // só o autor da mensagem original (ou quem clicou se for ephemeral-less)
             const payload = await doWork(interaction.user);
             return interaction.update(payload);
         }
