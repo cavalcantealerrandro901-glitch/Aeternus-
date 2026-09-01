@@ -1,6 +1,5 @@
 /**
- * Sistema de música Aeternus — @discordjs/voice + play-dl
- * Fila por servidor, stream sob demanda, auto-next, limpeza de conexão.
+ * Música Aeternus — multi-fonte (youtube-sr + ytdl + play-dl fallback)
  */
 const {
     createAudioPlayer,
@@ -10,11 +9,36 @@ const {
     entersState,
     joinVoiceChannel,
     getVoiceConnection,
-    NoSubscriberBehavior
+    NoSubscriberBehavior,
+    StreamType
 } = require('@discordjs/voice');
-const play = require('play-dl');
+const { PermissionsBitField } = require('discord.js');
 
-/** @type {Map<string, GuildMusic>} */
+// ffmpeg path for prism / discord voice pipelines
+try {
+    process.env.FFMPEG_PATH = require('ffmpeg-static');
+} catch (_) {}
+
+let playDl = null;
+try {
+    playDl = require('play-dl');
+    if (process.env.YT_COOKIE) {
+        playDl
+            .setToken({ youtube: { cookie: process.env.YT_COOKIE } })
+            .catch(() => {});
+    }
+} catch (_) {}
+
+let ytdl = null;
+try {
+    ytdl = require('@distube/ytdl-core');
+} catch (_) {}
+
+let YouTube = null;
+try {
+    YouTube = require('youtube-sr').default;
+} catch (_) {}
+
 const guilds = new Map();
 
 function fmtDuration(sec) {
@@ -26,6 +50,10 @@ function fmtDuration(sec) {
     return `${m}:${String(r).padStart(2, '0')}`;
 }
 
+function isYtUrl(q) {
+    return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(String(q || ''));
+}
+
 function getState(guildId) {
     if (!guilds.has(guildId)) {
         guilds.set(guildId, {
@@ -35,7 +63,7 @@ function getState(guildId) {
             player: null,
             textChannelId: null,
             voiceChannelId: null,
-            loop: false, // false | 'track' | 'queue'
+            loop: false,
             volume: 100,
             paused: false
         });
@@ -44,76 +72,200 @@ function getState(guildId) {
 }
 
 async function resolveTrack(query, requestedBy) {
-    let url = query;
-    let info = null;
+    const q = String(query || '').trim();
+    if (!q) return null;
 
-    try {
-        if (play.yt_validate(query) === 'video') {
-            const vi = await play.video_info(query);
-            info = vi.video_details;
-            url = info.url;
-        } else if (play.yt_validate(query) === 'playlist') {
-            // primeira faixa da playlist
-            const pl = await play.playlist_info(query, { incomplete: true });
-            const videos = await pl.all_videos();
-            if (!videos?.length) return null;
-            info = videos[0];
-            url = info.url;
-        } else {
-            const results = await play.search(query, { limit: 1, source: { type: 'video' } });
-            if (!results?.length) return null;
-            info = results[0];
-            url = info.url;
+    // 1) youtube-sr
+    if (YouTube) {
+        try {
+            if (isYtUrl(q)) {
+                const v = await YouTube.getVideo(q);
+                if (v?.id) {
+                    return {
+                        title: v.title || q,
+                        url: v.url || `https://www.youtube.com/watch?v=${v.id}`,
+                        duration: Number(v.duration) || 0,
+                        thumbnail: v.thumbnail?.displayThumbnailURL?.('maxresdefault') || v.thumbnail?.url || null,
+                        channel: v.channel?.name || 'YouTube',
+                        requestedBy: requestedBy || null
+                    };
+                }
+            } else {
+                const v = await YouTube.searchOne(q, 'video');
+                if (v?.id) {
+                    return {
+                        title: v.title || q,
+                        url: v.url || `https://www.youtube.com/watch?v=${v.id}`,
+                        duration: Number(v.duration) || 0,
+                        thumbnail: v.thumbnail?.displayThumbnailURL?.('maxresdefault') || v.thumbnail?.url || null,
+                        channel: v.channel?.name || 'YouTube',
+                        requestedBy: requestedBy || null
+                    };
+                }
+            }
+        } catch (e) {
+            console.error('[music] youtube-sr:', e.message);
         }
-    } catch (e) {
-        console.error('[music] resolve:', e.message);
-        return null;
     }
 
-    const duration =
-        Number(info.durationInSec) ||
-        Number(info.durationInSec === 0 ? 0 : info.duration) ||
-        0;
+    // 2) play-dl
+    if (playDl) {
+        try {
+            const kind = playDl.yt_validate(q);
+            if (kind === 'video') {
+                const vi = await playDl.video_info(q);
+                const d = vi.video_details;
+                return {
+                    title: d.title || q,
+                    url: d.url || q,
+                    duration: Number(d.durationInSec) || 0,
+                    thumbnail: d.thumbnails?.[0]?.url || null,
+                    channel: d.channel?.name || 'YouTube',
+                    requestedBy: requestedBy || null
+                };
+            }
+            if (kind !== 'playlist') {
+                const results = await playDl.search(q, { limit: 1 });
+                if (results?.[0]) {
+                    const d = results[0];
+                    return {
+                        title: d.title || q,
+                        url: d.url,
+                        duration: Number(d.durationInSec) || Number(d.duration) || 0,
+                        thumbnail: d.thumbnails?.[0]?.url || null,
+                        channel: d.channel?.name || d.channel || 'YouTube',
+                        requestedBy: requestedBy || null
+                    };
+                }
+            }
+        } catch (e) {
+            console.error('[music] play-dl resolve:', e.message);
+        }
+    }
 
-    return {
-        title: info.title || query,
-        url,
-        duration,
-        thumbnail: info.thumbnails?.[0]?.url || info.thumbnail?.url || null,
-        channel: info.channel?.name || info.channel || 'YouTube',
-        requestedBy: requestedBy || null
-    };
+    // 3) ytdl getInfo se for URL
+    if (ytdl && isYtUrl(q) && ytdl.validateURL(q)) {
+        try {
+            const info = await ytdl.getBasicInfo(q);
+            const d = info.videoDetails;
+            return {
+                title: d.title || q,
+                url: d.video_url || q,
+                duration: Number(d.lengthSeconds) || 0,
+                thumbnail: d.thumbnails?.[d.thumbnails.length - 1]?.url || null,
+                channel: d.author?.name || 'YouTube',
+                requestedBy: requestedBy || null
+            };
+        } catch (e) {
+            console.error('[music] ytdl info:', e.message);
+        }
+    }
+
+    return null;
+}
+
+async function openStream(url) {
+    // play-dl stream
+    if (playDl) {
+        try {
+            const s = await playDl.stream(url, { quality: 2 });
+            if (s?.stream) {
+                return { stream: s.stream, type: s.type || StreamType.Arbitrary };
+            }
+        } catch (e) {
+            console.error('[music] play-dl stream:', e.message);
+        }
+    }
+
+    // ytdl-core
+    if (ytdl && ytdl.validateURL(url)) {
+        try {
+            const stream = ytdl(url, {
+                filter: 'audioonly',
+                quality: 'highestaudio',
+                highWaterMark: 1 << 25,
+                dlChunkSize: 0
+            });
+            return { stream, type: StreamType.Arbitrary };
+        } catch (e) {
+            console.error('[music] ytdl stream:', e.message);
+        }
+    }
+
+    return null;
+}
+
+function canJoin(guild, voiceChannel) {
+    const me = guild.members.me;
+    if (!me) return 'Bot não está no servidor.';
+    const perms = voiceChannel.permissionsFor(me);
+    if (!perms) return 'Sem permissões no canal de voz.';
+    if (!perms.has(PermissionsBitField.Flags.Connect))
+        return 'Preciso da permissão **Conectar** no canal de voz.';
+    if (!perms.has(PermissionsBitField.Flags.Speak))
+        return 'Preciso da permissão **Falar** no canal de voz.';
+    if (voiceChannel.full) return 'Canal de voz cheio.';
+    return null;
 }
 
 async function ensureConnection(guild, voiceChannel) {
+    const permErr = canJoin(guild, voiceChannel);
+    if (permErr) throw new Error(permErr);
+
     let connection = getVoiceConnection(guild.id);
-    if (connection) return connection;
+
+    // já conectado no canal certo
+    if (connection && connection.joinConfig.channelId === voiceChannel.id) {
+        if (connection.state.status === VoiceConnectionStatus.Ready) return connection;
+        try {
+            await entersState(connection, VoiceConnectionStatus.Ready, 15_000);
+            return connection;
+        } catch {\n            try {
+                connection.destroy();
+            } catch (_) {}
+            connection = null;
+        }
+    }
+
+    // canal diferente ou morto — recria
+    if (connection) {
+        try {
+            connection.destroy();
+        } catch (_) {}
+    }
 
     connection = joinVoiceChannel({
         channelId: voiceChannel.id,
         guildId: guild.id,
         adapterCreator: guild.voiceAdapterCreator,
-        selfDeaf: true
+        selfDeaf: true,
+        selfMute: false
     });
 
     try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+        await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
     } catch (e) {
-        connection.destroy();
-        throw new Error('Não consegui conectar no canal de voz.');
+        try {
+            connection.destroy();
+        } catch (_) {}
+        throw new Error(
+            'Não consegui entrar no canal de voz a tempo. Verifique permissões (Conectar/Falar) e tente de novo.'
+        );
     }
 
-    connection.on(VoiceConnectionStatus.Disconnected, async () => {
-        try {
-            await Promise.race([
-                entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
-                entersState(connection, VoiceConnectionStatus.Connecting, 5_000)
-            ]);
-        } catch {
-            try {
-                connection.destroy();
-            } catch (_) {}
-            destroyGuild(guild.id);
+    connection.on('stateChange', (oldS, newS) => {
+        if (newS.status === VoiceConnectionStatus.Disconnected) {
+            const st = guilds.get(guild.id);
+            if (!st) return;
+            setTimeout(() => {
+                const c = getVoiceConnection(guild.id);
+                if (c && c.state.status === VoiceConnectionStatus.Disconnected) {
+                    try {
+                        c.destroy();
+                    } catch (_) {}
+                    destroyGuild(guild.id);
+                }
+            }, 5000);
         }
     });
 
@@ -156,19 +308,21 @@ async function playCurrent(guildId) {
     connection.subscribe(player);
 
     try {
-        const stream = await play.stream(track.url, { quality: 2 });
-        const resource = createAudioResource(stream.stream, {
-            inputType: stream.type,
+        const opened = await openStream(track.url);
+        if (!opened) return false;
+
+        const resource = createAudioResource(opened.stream, {
+            inputType: opened.type || StreamType.Arbitrary,
             inlineVolume: true
         });
         if (resource.volume) {
-            resource.volume.setVolume(Math.max(0, Math.min(1, state.volume / 100)));
+            resource.volume.setVolume(Math.max(0, Math.min(1, (state.volume || 100) / 100)));
         }
         state.paused = false;
         player.play(resource);
         return true;
     } catch (e) {
-        console.error('[music] stream', e.message);
+        console.error('[music] playCurrent:', e.message);
         return false;
     }
 }
@@ -189,25 +343,33 @@ async function onTrackEnd(guildId) {
         const ok = await playCurrent(guildId);
         if (!ok) await onTrackEnd(guildId);
     } else {
-        // nada na fila — desconecta após 60s
         setTimeout(() => {
             const s = guilds.get(guildId);
-            if (s && !s.current && !s.queue.length) {
-                leave(guildId);
-            }
+            if (s && !s.current && !s.queue.length) leave(guildId);
         }, 60_000);
     }
 }
 
 async function enqueue(guild, voiceChannel, textChannel, query, user) {
-    const track = await resolveTrack(query, user);
-    if (!track) return { ok: false, error: 'Nenhuma música encontrada.' };
+    if (!voiceChannel) return { ok: false, error: 'Entre em um canal de voz.' };
 
-    await ensureConnection(guild, voiceChannel);
+    const track = await resolveTrack(query, user);
+    if (!track) {
+        return {
+            ok: false,
+            error: 'Nenhuma música encontrada (YouTube pode estar bloqueando o servidor). Tente um link direto ou depois.'
+        };
+    }
+
+    try {
+        await ensureConnection(guild, voiceChannel);
+    } catch (e) {
+        return { ok: false, error: e.message || 'Falha ao conectar no canal de voz.' };
+    }
+
     const state = getState(guild.id);
     state.textChannelId = textChannel?.id || state.textChannelId;
     state.voiceChannelId = voiceChannel.id;
-
     ensurePlayer(guild.id);
 
     if (!state.current) {
@@ -215,7 +377,10 @@ async function enqueue(guild, voiceChannel, textChannel, query, user) {
         const ok = await playCurrent(guild.id);
         if (!ok) {
             state.current = null;
-            return { ok: false, error: 'Não consegui reproduzir esta faixa.' };
+            return {
+                ok: false,
+                error: 'Achei a música, mas não consegui abrir o áudio. Tente outro link.'
+            };
         }
         return { ok: true, track, position: 0, playing: true };
     }
@@ -255,9 +420,8 @@ function setVolume(guildId, vol) {
 
 function setLoop(guildId, mode) {
     const state = getState(guildId);
-    if (mode === 'track' || mode === 'queue' || mode === false) {
-        state.loop = mode;
-    } else if (mode === 'cycle') {
+    if (mode === 'track' || mode === 'queue' || mode === false) state.loop = mode;
+    else if (mode === 'cycle') {
         state.loop = state.loop === false ? 'track' : state.loop === 'track' ? 'queue' : false;
     }
     return state.loop;
