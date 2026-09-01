@@ -1,6 +1,6 @@
 /**
  * Música Aeternus — multi-fonte gratuita
- * Ordem: SoundCloud → Spotify/Deezer (via busca) → YouTube → links diretos
+ * Ordem: Link direto → SoundCloud → JioSaavn → Spotify/Deezer → YouTube → Bandcamp/Rádio
  */
 const {
     createAudioPlayer,
@@ -37,6 +37,12 @@ try {
     YouTube = require('youtube-sr').default;
 } catch (_) {}
 
+// API gratuita (JioSaavn etc)
+let audioAPI = null;
+try {
+    audioAPI = require('./audioAPI');
+} catch (_) {}
+
 const guilds = new Map();
 
 function fmtDuration(sec) {
@@ -68,8 +74,18 @@ function isBandcampUrl(q) {
     return /bandcamp\.com\//i.test(String(q || ''));
 }
 
+function isVimeoUrl(q) {
+    return /vimeo\.com\//i.test(String(q || ''));
+}
+
 function isDirectAudioUrl(q) {
-    return /^https?:\/\/.+\.(mp3|ogg|wav|flac|m4a|aac|opus)(\?.*)?$/i.test(String(q || ''));
+    return /^https?:\/\/.+\.(mp3|ogg|wav|flac|m4a|aac|opus|webm)(\?.*)?$/i.test(String(q || ''));
+}
+
+function isRadioOrStreamUrl(q) {
+    // URLs de rádio / Icecast / Shoutcast comuns
+    return /^https?:\/\/.+(\/stream|\/live|\/radio|icecast|shoutcast|\.m3u8?|\.pls)(\?.*)?$/i.test(String(q || ''))
+        || /\.(m3u8?|pls)(\?.*)?$/i.test(String(q || ''));
 }
 
 function getState(guildId) {
@@ -90,12 +106,11 @@ function getState(guildId) {
 }
 
 /**
- * Tenta resolver via SoundCloud
+ * SoundCloud
  */
 async function resolveSoundCloud(q, requestedBy) {
     if (!playDl) return null;
 
-    // Link direto
     if (isSoundCloudUrl(q)) {
         try {
             const info = await playDl.soundcloud(q);
@@ -115,7 +130,6 @@ async function resolveSoundCloud(q, requestedBy) {
         }
     }
 
-    // Busca
     try {
         const results = await playDl.search(q, {
             limit: 1,
@@ -141,7 +155,46 @@ async function resolveSoundCloud(q, requestedBy) {
 }
 
 /**
- * Spotify / Deezer → pega metadados e busca stream em SoundCloud ou YouTube
+ * JioSaavn (API gratuita via audioAPI)
+ */
+async function resolveJioSaavn(q, requestedBy) {
+    if (!audioAPI?.searchJioSaavnAPI) return null;
+
+    try {
+        const result = await audioAPI.searchJioSaavnAPI(q);
+        if (result) {
+            // Converte para stream via YouTube/SoundCloud usando o título
+            const searchQ = `${result.title} ${result.artist || ''}`.trim();
+
+            // Tenta SoundCloud primeiro
+            const sc = await resolveSoundCloud(searchQ, requestedBy);
+            if (sc) {
+                sc.title = result.title || sc.title;
+                sc.channel = result.artist || sc.channel;
+                sc.thumbnail = result.thumbnail || sc.thumbnail;
+                sc.source = 'jiosaavn';
+                return sc;
+            }
+
+            // Fallback YouTube
+            const yt = await resolveYouTube(searchQ, requestedBy);
+            if (yt) {
+                yt.title = result.title || yt.title;
+                yt.channel = result.artist || yt.channel;
+                yt.thumbnail = result.thumbnail || yt.thumbnail;
+                yt.source = 'jiosaavn';
+                return yt;
+            }
+        }
+    } catch (e) {
+        console.error('[music] jiosaavn:', e.message);
+    }
+
+    return null;
+}
+
+/**
+ * Spotify / Deezer → metadados + stream via SC/YT
  */
 async function resolveSpotifyOrDeezer(q, requestedBy) {
     if (!playDl) return null;
@@ -151,42 +204,42 @@ async function resolveSpotifyOrDeezer(q, requestedBy) {
         let metaTitle = null;
         let metaArtist = null;
         let metaThumb = null;
-        let sourceLabel = 'Spotify';
+        let sourceLabel = 'spotify';
 
         if (isSpotifyUrl(q)) {
-            const sp = await playDl.spotify(q);
-            if (sp) {
-                // Track único
-                if (sp.type === 'track' || sp.name) {
-                    metaTitle = sp.name || sp.title;
-                    metaArtist = sp.artists?.map?.(a => a.name).join(', ') || sp.artist || '';
-                    metaThumb = sp.thumbnail || sp.thumbnails?.[0]?.url || null;
-                    searchQuery = `${metaTitle} ${metaArtist}`.trim();
-                    sourceLabel = 'Spotify';
+            try {
+                const sp = await playDl.spotify(q);
+                if (sp) {
+                    if (sp.type === 'track' || sp.name) {
+                        metaTitle = sp.name || sp.title;
+                        metaArtist = sp.artists?.map?.(a => a.name).join(', ') || sp.artist || '';
+                        metaThumb = sp.thumbnail || sp.thumbnails?.[0]?.url || null;
+                        searchQuery = `${metaTitle} ${metaArtist}`.trim();
+                        sourceLabel = 'spotify';
+                    }
                 }
+            } catch (e) {
+                console.error('[music] spotify parse:', e.message);
             }
         } else if (isDeezerUrl(q)) {
-            // play-dl não tem deezer nativo forte, usa busca genérica
-            sourceLabel = 'Deezer';
+            sourceLabel = 'deezer';
             searchQuery = q;
         }
 
-        // 1º tenta SoundCloud com o nome da música
         if (searchQuery && searchQuery !== q) {
             const sc = await resolveSoundCloud(searchQuery, requestedBy);
             if (sc) {
                 sc.channel = metaArtist || sc.channel;
-                sc.source = sourceLabel.toLowerCase();
+                sc.source = sourceLabel;
                 if (metaThumb) sc.thumbnail = metaThumb;
                 if (metaTitle) sc.title = metaTitle;
                 return sc;
             }
         }
 
-        // 2º tenta YouTube
         const yt = await resolveYouTube(searchQuery || q, requestedBy);
         if (yt) {
-            yt.source = sourceLabel.toLowerCase();
+            yt.source = sourceLabel;
             if (metaThumb) yt.thumbnail = metaThumb;
             if (metaTitle) yt.title = metaTitle;
             if (metaArtist) yt.channel = metaArtist;
@@ -203,7 +256,6 @@ async function resolveSpotifyOrDeezer(q, requestedBy) {
  * YouTube
  */
 async function resolveYouTube(q, requestedBy) {
-    // youtube-sr
     if (YouTube) {
         try {
             if (isYtUrl(q)) {
@@ -238,7 +290,6 @@ async function resolveYouTube(q, requestedBy) {
         }
     }
 
-    // play-dl YouTube
     if (playDl) {
         try {
             const kind = playDl.yt_validate(q);
@@ -275,7 +326,6 @@ async function resolveYouTube(q, requestedBy) {
         }
     }
 
-    // ytdl fallback
     if (ytdl && isYtUrl(q) && ytdl.validateURL(q)) {
         try {
             const info = await ytdl.getBasicInfo(q);
@@ -298,12 +348,12 @@ async function resolveYouTube(q, requestedBy) {
 }
 
 /**
- * Bandcamp / links diretos de áudio
+ * Links diretos, Bandcamp, Vimeo, rádio
  */
-async function resolveDirectOrBandcamp(q, requestedBy) {
+async function resolveDirectOrOther(q, requestedBy) {
     if (isDirectAudioUrl(q)) {
         return {
-            title: q.split('/').pop().split('?')[0] || 'Áudio',
+            title: decodeURIComponent(q.split('/').pop().split('?')[0]) || 'Áudio',
             url: q,
             duration: 0,
             thumbnail: null,
@@ -313,16 +363,40 @@ async function resolveDirectOrBandcamp(q, requestedBy) {
         };
     }
 
-    if (isBandcampUrl(q) && playDl) {
+    if (isRadioOrStreamUrl(q)) {
+        return {
+            title: 'Rádio / Stream',
+            url: q,
+            duration: 0,
+            thumbnail: null,
+            channel: 'Live Stream',
+            source: 'radio',
+            requestedBy: requestedBy || null
+        };
+    }
+
+    if (isBandcampUrl(q)) {
+        return {
+            title: 'Bandcamp',
+            url: q,
+            duration: 0,
+            thumbnail: null,
+            channel: 'Bandcamp',
+            source: 'bandcamp',
+            requestedBy: requestedBy || null
+        };
+    }
+
+    if (isVimeoUrl(q) && playDl) {
         try {
-            // play-dl pode não ter bandcamp nativo; tenta stream direto
+            // play-dl pode streamar alguns vimeo
             return {
-                title: 'Bandcamp Track',
+                title: 'Vimeo',
                 url: q,
                 duration: 0,
                 thumbnail: null,
-                channel: 'Bandcamp',
-                source: 'bandcamp',
+                channel: 'Vimeo',
+                source: 'vimeo',
                 requestedBy: requestedBy || null
             };
         } catch (_) {}
@@ -338,25 +412,29 @@ async function resolveTrack(query, requestedBy) {
     const q = String(query || '').trim();
     if (!q) return null;
 
-    // 1. Links diretos de áudio
-    let track = await resolveDirectOrBandcamp(q, requestedBy);
+    // 1. Links diretos / rádio / bandcamp / vimeo
+    let track = await resolveDirectOrOther(q, requestedBy);
     if (track) return track;
 
     // 2. SoundCloud (melhor fonte gratuita estável)
     track = await resolveSoundCloud(q, requestedBy);
     if (track) return track;
 
-    // 3. Spotify / Deezer (metadados + stream via SC/YT)
+    // 3. JioSaavn (API gratuita)
+    track = await resolveJioSaavn(q, requestedBy);
+    if (track) return track;
+
+    // 4. Spotify / Deezer
     if (isSpotifyUrl(q) || isDeezerUrl(q) || /spotify|deezer/i.test(q)) {
         track = await resolveSpotifyOrDeezer(q, requestedBy);
         if (track) return track;
     }
 
-    // 4. YouTube
+    // 5. YouTube
     track = await resolveYouTube(q, requestedBy);
     if (track) return track;
 
-    // 5. Última tentativa: busca genérica no play-dl (pode pegar SC/YT)
+    // 6. Busca genérica play-dl (pega o que conseguir)
     if (playDl) {
         try {
             const results = await playDl.search(q, { limit: 1 });
@@ -377,12 +455,17 @@ async function resolveTrack(query, requestedBy) {
         }
     }
 
+    // 7. Última tentativa: Spotify/Deezer genérico mesmo sem link
+    track = await resolveSpotifyOrDeezer(q, requestedBy);
+    if (track) return track;
+
     return null;
 }
 
 async function openStream(url) {
-    // Links diretos de áudio
-    if (isDirectAudioUrl(url)) {
+    // Links diretos e rádio
+    if (isDirectAudioUrl(url) || isRadioOrStreamUrl(url) || isBandcampUrl(url) || isVimeoUrl(url)) {
+        // createAudioResource aceita URL string diretamente em muitos casos
         return { stream: url, type: StreamType.Arbitrary };
     }
 
@@ -573,7 +656,7 @@ async function enqueue(guild, voiceChannel, textChannel, query, user) {
     if (!track) {
         return {
             ok: false,
-            error: 'Nenhuma música encontrada. Tente SoundCloud, Spotify, YouTube ou link direto.'
+            error: 'Nenhuma música encontrada. Tente SoundCloud, Spotify, YouTube, JioSaavn, Bandcamp ou link direto.'
         };
     }
 
