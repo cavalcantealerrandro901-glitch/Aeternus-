@@ -4,38 +4,38 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Aeternus — Control Center</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',system-ui,sans-serif;background:#03030a;color:#f8fafc;min-height:100vh;overflow-x:hidden}
 .mesh{position:fixed;inset:0;z-index:0;background:
-  radial-gradient(at 20% 20%,rgba(124,58,237,.4) 0,transparent 40%),
-  radial-gradient(at 80% 10%,rgba(6,182,212,.25) 0,transparent 35%),
-  radial-gradient(at 50% 80%,rgba(236,72,153,.15) 0,transparent 40%),
+  radial-gradient(at 20% 20%,rgba(124,58,237,.45) 0,transparent 42%),
+  radial-gradient(at 80% 10%,rgba(6,182,212,.28) 0,transparent 38%),
+  radial-gradient(at 50% 80%,rgba(236,72,153,.18) 0,transparent 42%),
   #03030a}
-.noise{position:fixed;inset:0;z-index:1;opacity:.04;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.noise{position:fixed;inset:0;z-index:1;opacity:.045;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 nav{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:1.4rem 7vw;max-width:1100px;margin:0 auto}
-.logo{font-family:Syne,sans-serif;font-weight:800;font-size:1.4rem;letter-spacing:-.03em}
+.logo{font-family:Syne,sans-serif;font-weight:800;font-size:1.45rem;letter-spacing:-.03em}
 .logo b{background:linear-gradient(135deg,#a78bfa,#22d3ee,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-a.lk{color:#94a3b8;text-decoration:none;margin-left:1.4rem;font-weight:500;font-size:.92rem}
+a.lk{color:#94a3b8;text-decoration:none;margin-left:1.4rem;font-weight:600;font-size:.92rem;transition:.2s}
 a.lk:hover{color:#fff}
-.hero{position:relative;z-index:2;text-align:center;padding:8vh 6vw 3rem;max-width:860px;margin:0 auto}
-.pill{display:inline-block;padding:.4rem 1rem;border-radius:999px;border:1px solid rgba(167,139,250,.4);background:rgba(124,58,237,.15);color:#c4b5fd;font-size:.78rem;font-weight:600;letter-spacing:.04em;margin-bottom:1.4rem}
-h1{font-family:Syne,sans-serif;font-size:clamp(2.6rem,7vw,4.5rem);font-weight:800;line-height:1.05;letter-spacing:-.04em}
+.hero{position:relative;z-index:2;text-align:center;padding:9vh 6vw 2.5rem;max-width:900px;margin:0 auto}
+.pill{display:inline-block;padding:.42rem 1.05rem;border-radius:999px;border:1px solid rgba(167,139,250,.45);background:rgba(124,58,237,.18);color:#c4b5fd;font-size:.78rem;font-weight:700;letter-spacing:.05em;margin-bottom:1.5rem}
+h1{font-family:Syne,sans-serif;font-size:clamp(2.7rem,7.2vw,4.6rem);font-weight:800;line-height:1.05;letter-spacing:-.04em}
 h1 span{background:linear-gradient(100deg,#e9d5ff,#67e8f9,#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.lead{color:#94a3b8;font-size:1.12rem;margin:1.2rem auto 2rem;max-width:520px;line-height:1.65}
-.cta{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
-.b{padding:.9rem 1.7rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:.95rem;transition:.25s}
-.bp{background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;box-shadow:0 0 40px rgba(124,58,237,.45)}
-.bp:hover{transform:translateY(-3px);box-shadow:0 0 60px rgba(124,58,237,.6)}
-.bg{border:1px solid rgba(255,255,255,.12);color:#e2e8f0;background:rgba(255,255,255,.03)}
-.bg:hover{background:rgba(255,255,255,.08)}
-.feat{position:relative;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;max-width:1000px;margin:0 auto;padding:2rem 6vw 5rem}
-.fc{padding:1.5rem;border-radius:1.25rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);backdrop-filter:blur(16px);transition:.3s}
-.fc:hover{border-color:rgba(167,139,250,.4);transform:translateY(-4px)}
-.fc i{font-style:normal;font-size:1.5rem;display:block;margin-bottom:.6rem}
-.fc h3{font-family:Syne,sans-serif;font-size:1rem;margin-bottom:.35rem}
-.fc p{color:#94a3b8;font-size:.88rem;line-height:1.5}
+.lead{color:#94a3b8;font-size:1.14rem;margin:1.25rem auto 2.1rem;max-width:540px;line-height:1.7}
+.cta{display:flex;gap:.85rem;justify-content:center;flex-wrap:wrap}
+.b{padding:.95rem 1.8rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:.95rem;transition:.25s}
+.bp{background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;box-shadow:0 0 44px rgba(124,58,237,.5)}
+.bp:hover{transform:translateY(-3px);box-shadow:0 0 70px rgba(124,58,237,.65)}
+.bg{border:1px solid rgba(255,255,255,.14);color:#e2e8f0;background:rgba(255,255,255,.04)}
+.bg:hover{background:rgba(255,255,255,.09)}
+.feat{position:relative;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.05rem;max-width:1040px;margin:0 auto;padding:2.2rem 6vw 5rem}
+.fc{padding:1.55rem;border-radius:1.3rem;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(18px);transition:.3s}
+.fc:hover{border-color:rgba(167,139,250,.45);transform:translateY(-5px);box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.fc i{font-style:normal;font-size:1.55rem;display:block;margin-bottom:.65rem}
+.fc h3{font-family:Syne,sans-serif;font-size:1.02rem;margin-bottom:.4rem}
+.fc p{color:#94a3b8;font-size:.88rem;line-height:1.55}
 footer{position:relative;z-index:2;text-align:center;padding:2rem;color:#475569;font-size:.8rem}
 </style>
 </head>
@@ -46,20 +46,20 @@ footer{position:relative;z-index:2;text-align:center;padding:2rem;color:#475569;
   <div><a class="lk" href="/dashboard">Painel</a><a class="lk" href="/login">Entrar</a></div>
 </nav>
 <section class="hero">
-  <div class="pill">CONTROL CENTER · v4</div>
+  <div class="pill">CONTROL CENTER · MAX</div>
   <h1>Poder total.<br/><span>Uma interface.</span></h1>
-  <p class="lead">Daily, drops, economia, anti-spam e XP — tudo configurável em um painel pensado para dominar servidores.</p>
+  <p class="lead">Cassino, economia, drops, anti-spam e XP — tudo configurável em um painel pensado para dominar servidores e viciar membros.</p>
   <div class="cta">
     <a class="b bp" href="/login">Entrar com Discord</a>
     <a class="b bg" href="/dashboard">Abrir painel</a>
   </div>
 </section>
 <section class="feat">
-  <div class="fc"><i>❄️</i><h3>Daily no painel</h3><p>Colete sua recompensa diária direto na web, com sequência e multiplicador de nível.</p></div>
-  <div class="fc"><i>🎁</i><h3>Drops pro</h3><p>Botões, requisitos, entradas extras, autopix e reroll por ID.</p></div>
-  <div class="fc"><i>🛡️</i><h3>Automod</h3><p>Anti-flood, anti-link e anti-convite em tempo real.</p></div>
-  <div class="fc"><i>⭐</i><h3>XP & flocos</h3><p>Progressão por chat, level-up e dual currency.</p></div>
+  <div class="fc"><i>🎰</i><h3>Cassino realista</h3><p>Blackjack, slots, roleta e mines com botões, feedbacks e apostas em flocos.</p></div>
+  <div class="fc"><i>❄️</i><h3>Daily & economia</h3><p>Recompensa diária, sequência, dual currency e loja de decorações.</p></div>
+  <div class="fc"><i>🎁</i><h3>Drops pro</h3><p>Botões, requisitos, entradas extras, autopix e controle total no painel.</p></div>
+  <div class="fc"><i>🛡️</i><h3>Automod + XP</h3><p>Anti-flood, anti-link e progressão por chat com level-up.</p></div>
 </section>
-<footer>Aeternus · overpowered by design</footer>
+<footer>Aeternus · nível imortalidade</footer>
 </body>
 </html>

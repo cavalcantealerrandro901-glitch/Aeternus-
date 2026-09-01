@@ -17,22 +17,34 @@ module.exports = {
         if (!result.ok) return message.reply(`❄️ ${result.error}`);
 
         const decorUrl = shop.decorPanelUrl(message.guild.id);
+        const streakFire = result.streak >= 7 ? '🔥🔥🔥' : result.streak >= 3 ? '🔥🔥' : '🔥';
 
         await message.reply({
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xfbbf24)
-                    .setTitle('❄️ Daily coletado')
+                    .setAuthor({
+                        name: `${message.author.username} · Daily`,
+                        iconURL: message.author.displayAvatarURL({ size: 64 })
+                    })
+                    .setTitle('❄️  Daily coletado!')
                     .setDescription(
                         [
+                            '```',
+                            '  ╔══════════════════════════╗',
+                            '  ║   RECOMPENSA DO DIA      ║',
+                            '  ╚══════════════════════════╝',
+                            '```',
                             `Você recebeu **${flocos.format(result.amount)}**`,
-                            `🔥 Sequência **${result.streak}** · ×**${result.multiplier.toFixed(2)}**`,
-                            `💼 Saldo: ${flocos.format(result.balance)}`,
+                            `${streakFire} Sequência **${result.streak}** dia(s) · multiplicador **×${result.multiplier.toFixed(2)}**`,
                             '',
-                            '🎨 Quer uma **imagem de fundo** no perfil? Abra as decorações.'
+                            `💼 Saldo atual: **${flocos.format(result.balance)}**`,
+                            '',
+                            '🎨 Personalize seu perfil com decorações exclusivas no painel.'
                         ].join('\n')
                     )
-                    .setFooter({ text: 'Decorações · imagens reais no painel' })
+                    .setFooter({ text: 'Volte amanhã · sequência aumenta a recompensa' })
+                    .setTimestamp()
             ],
             components: [
                 new ActionRowBuilder().addComponents(
@@ -45,9 +57,33 @@ module.exports = {
                         .setCustomId('loja:perfil')
                         .setLabel('Meu perfil')
                         .setEmoji('🖼️')
-                        .setStyle(ButtonStyle.Secondary)
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId('daily:saldo')
+                        .setLabel('Ver saldo')
+                        .setEmoji('💎')
+                        .setStyle(ButtonStyle.Primary)
                 )
             ]
+        });
+    },
+
+    async handleComponent(interaction) {
+        if (interaction.customId !== 'daily:saldo') return;
+        const flocos = require('../utils/flocos');
+        const cristais = require('../utils/cristais');
+        const f = flocos.get(interaction.user.id);
+        const c = cristais.get(interaction.user.id);
+        return interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0x8b5cf6)
+                    .setTitle('💎 Sua carteira')
+                    .setDescription(
+                        `❄️ **${flocos.formatPlain(f)}** flocos\n💠 **${cristais.formatPlain(c)}** cristais`
+                    )
+            ],
+            ephemeral: true
         });
     }
 };
