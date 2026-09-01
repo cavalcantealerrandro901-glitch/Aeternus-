@@ -14,7 +14,6 @@ const {
 } = require('@discordjs/voice');
 const { PermissionsBitField } = require('discord.js');
 
-// ffmpeg path for prism / discord voice pipelines
 try {
     process.env.FFMPEG_PATH = require('ffmpeg-static');
 } catch (_) {}
@@ -23,9 +22,7 @@ let playDl = null;
 try {
     playDl = require('play-dl');
     if (process.env.YT_COOKIE) {
-        playDl
-            .setToken({ youtube: { cookie: process.env.YT_COOKIE } })
-            .catch(() => {});
+        playDl.setToken({ youtube: { cookie: process.env.YT_COOKIE } }).catch(() => {});
     }
 } catch (_) {}
 
@@ -75,7 +72,6 @@ async function resolveTrack(query, requestedBy) {
     const q = String(query || '').trim();
     if (!q) return null;
 
-    // 1) youtube-sr
     if (YouTube) {
         try {
             if (isYtUrl(q)) {
@@ -108,7 +104,6 @@ async function resolveTrack(query, requestedBy) {
         }
     }
 
-    // 2) play-dl
     if (playDl) {
         try {
             const kind = playDl.yt_validate(q);
@@ -143,7 +138,6 @@ async function resolveTrack(query, requestedBy) {
         }
     }
 
-    // 3) ytdl getInfo se for URL
     if (ytdl && isYtUrl(q) && ytdl.validateURL(q)) {
         try {
             const info = await ytdl.getBasicInfo(q);
@@ -165,19 +159,15 @@ async function resolveTrack(query, requestedBy) {
 }
 
 async function openStream(url) {
-    // play-dl stream
     if (playDl) {
         try {
             const s = await playDl.stream(url, { quality: 2 });
-            if (s?.stream) {
-                return { stream: s.stream, type: s.type || StreamType.Arbitrary };
-            }
+            if (s?.stream) return { stream: s.stream, type: s.type || StreamType.Arbitrary };
         } catch (e) {
             console.error('[music] play-dl stream:', e.message);
         }
     }
 
-    // ytdl-core
     if (ytdl && ytdl.validateURL(url)) {
         try {
             const stream = ytdl(url, {
@@ -214,20 +204,19 @@ async function ensureConnection(guild, voiceChannel) {
 
     let connection = getVoiceConnection(guild.id);
 
-    // já conectado no canal certo
     if (connection && connection.joinConfig.channelId === voiceChannel.id) {
         if (connection.state.status === VoiceConnectionStatus.Ready) return connection;
         try {
             await entersState(connection, VoiceConnectionStatus.Ready, 15_000);
             return connection;
-        } catch {\n            try {
+        } catch {
+            try {
                 connection.destroy();
             } catch (_) {}
             connection = null;
         }
     }
 
-    // canal diferente ou morto — recria
     if (connection) {
         try {
             connection.destroy();
@@ -244,7 +233,7 @@ async function ensureConnection(guild, voiceChannel) {
 
     try {
         await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
-    } catch (e) {
+    } catch {
         try {
             connection.destroy();
         } catch (_) {}
@@ -253,10 +242,8 @@ async function ensureConnection(guild, voiceChannel) {
         );
     }
 
-    connection.on('stateChange', (oldS, newS) => {
+    connection.on('stateChange', (_oldS, newS) => {
         if (newS.status === VoiceConnectionStatus.Disconnected) {
-            const st = guilds.get(guild.id);
-            if (!st) return;
             setTimeout(() => {
                 const c = getVoiceConnection(guild.id);
                 if (c && c.state.status === VoiceConnectionStatus.Disconnected) {
