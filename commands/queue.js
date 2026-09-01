@@ -4,32 +4,44 @@ const music = require('../utils/music');
 module.exports = {
     name: 'queue',
     aliases: ['fila', 'q'],
-    description: 'Mostra a fila de música',
+    description: 'Mostra a fila de músicas',
 
-    async execute(message, args, client) {
-        const queue = music.getQueue(message.guild.id);
-
-        if (queue.length === 0) {
+    async execute(message) {
+        const view = music.getQueueView(message.guild.id);
+        if (!view.current && !view.queue.length) {
             return message.reply('❌ A fila está vazia.');
         }
 
-        const queueList = queue
-            .slice(0, 10)
-            .map((song, index) => {
-                const duration = `${Math.floor(song.duration / 60)}:${(song.duration % 60).toString().padStart(2, '0')}`;
-                return `**${index + 1}.** [${song.title}](${song.url}) \`${duration}\``;
-            })
-            .join('\n');
+        const lines = [];
+        if (view.current) {
+            lines.push(
+                `**▶ Agora:** [${view.current.title}](${view.current.url}) \`${music.fmtDuration(view.current.duration)}\``
+            );
+            lines.push('');
+        }
+        view.queue.slice(0, 12).forEach((song, i) => {
+            lines.push(
+                `**${i + 1}.** [${song.title}](${song.url}) \`${music.fmtDuration(song.duration)}\``
+            );
+        });
+        if (view.queue.length > 12) {
+            lines.push(`_…e mais ${view.queue.length - 12}_`);
+        }
 
-        const embed = new EmbedBuilder()
-            .setColor(0x1db954)
-            .setTitle('🎵 Fila de Música')
-            .setDescription(queueList)
-            .setFooter({
-                text: `Total: ${queue.length} música${queue.length !== 1 ? 's' : ''}`
-            })
-            .setTimestamp();
+        const loopLabel =
+            view.loop === 'track' ? 'faixa' : view.loop === 'queue' ? 'fila' : 'off';
 
-        return message.reply({ embeds: [embed] });
+        return message.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0xa78bfa)
+                    .setTitle('🎵  Fila de músicas')
+                    .setDescription(lines.join('\n'))
+                    .setFooter({
+                        text: `${view.queue.length} na fila · loop ${loopLabel} · vol ${view.volume}%`
+                    })
+                    .setTimestamp()
+            ]
+        });
     }
 };

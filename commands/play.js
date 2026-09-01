@@ -1,69 +1,161 @@
-const { EmbedBuilder } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice');
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    SlashCommandBuilder
+} = require('discord.js');
 const music = require('../utils/music');
+
+function controls() {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('music:pause').setLabel('Pausar').setEmoji('⏸️').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('music:resume').setLabel('Retomar').setEmoji('▶️').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('music:skip').setLabel('Pular').setEmoji('⏭️').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('music:stop').setLabel('Parar').setEmoji('⏹️').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('music:loop').setLabel('Loop').setEmoji('🔁').setStyle(ButtonStyle.Secondary)
+    );
+}
+
+function trackEmbed(track, { position, playing, user }) {
+    const emb = new EmbedBuilder()
+        .setColor(0xa78bfa)
+        .setAuthor({
+            name: playing ? 'Tocando agora' : 'Adicionado à fila',
+            iconURL: user?.displayAvatarURL?.({ size: 64 })
+        })
+        .setTitle(track.title.slice(0, 200))
+        .setURL(track.url)
+        .addFields(
+            { name: 'Duração', value: music.fmtDuration(track.duration), inline: true },
+            { name: 'Canal', value: String(track.channel || 'YouTube').slice(0, 40), inline: true },
+            {
+                name: playing ? 'Status' : 'Posição',
+                value: playing ? '▶️ Reproduzindo' : `#${position}`,
+                inline: true
+            }
+        )
+        .setFooter({ text: 'O.play · O.queue · O.np · O.skip · O.stop' })
+        .setTimestamp();
+    if (track.thumbnail) emb.setThumbnail(track.thumbnail);
+    return emb;
+}
+
+async function runPlay(ctx, query, member, channel) {
+    if (!member?.voice?.channel) {
+        return { content: '❌ Entre em um canal de voz primeiro.' };
+    }
+    if (!query?.trim()) {
+        return {
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0xa78bfa)
+                    .setTitle('🎵  Play')
+                    .setDescription(
+                        [
+                            'Uso: `O.play <nome ou link>`',
+                            '',
+                            '`O.play never gonna give you up`',
+                            '`O.play https://youtu.be/...`',
+                            '',
+                            'Controles: pausar · retomar · pular · parar · loop'
+                        ].join('\n')
+                    )
+            ]
+        };
+    }
+
+    const result = await music.enqueue(
+        ctx.guild,
+        member.voice.channel,
+        channel,
+        query.trim(),
+        ctx.user || ctx.author
+    );
+
+    if (!result.ok) return { content: `❌ ${result.error}` };
+
+    return {
+        embeds: [
+            trackEmbed(result.track, {
+                position: result.position,
+                playing: result.playing,
+                user: ctx.user || ctx.author
+            })
+        ],
+        components: [controls()]
+    };
+}
 
 module.exports = {
     name: 'play',
     aliases: ['p', 'tocar'],
-    description: 'Toca uma música do YouTube',
+    description: 'Toca música do YouTube',
+    data: new SlashCommandBuilder()
+        .setName('play')
+        .setDescription('Toca uma música do YouTube')
+        .addStringOption((o) =>
+            o.setName('busca').setDescription('Nome ou link do YouTube').setRequired(true)
+        ),
 
-    async execute(message, args, client) {
-        // Verificar se o usuário está em um canal de voz
-        if (!message.member.voice.channel) {
-            return message.reply('❌ Você precisa estar em um canal de voz para tocar música!');
-        }
-
-        if (!args[0]) {
-            return message.reply('❌ Use: `O.play <nome da música>` ou `O.play <link do YouTube>`');
-        }
-
+    async execute(message, args) {
         const query = args.join(' ');
-        const voiceChannel = message.member.voice.channel;
-
+        const wait = await message.reply('🔍 Buscando…');
         try {
-            // Mostrar mensagem de busca
-            const searching = await message.reply('🔍 Buscando música...');
+            const payload = await runPlay(message, query, message.member, message.channel);
+            await wait.edit(payload);
+        } catch (e) {
+            console.error('[play]', e);
+            await wait.edit(`❌ ${e.message || 'Erro ao tocar.'}`);
+        }
+    },
 
-            // Buscar a música
-            const songData = await music.getYouTubeStream(query);
-            if (!songData) {
-                return searching.edit('❌ Nenhuma música encontrada. Tente novamente!');
-            }
+    async executeSlash(interaction) {
+        await interaction.deferReply();
+        const query = interaction.options.getString('busca');
+        try {
+            const payload = await runPlay(
+                interaction,
+                query,
+                interaction.member,
+                interaction.channel
+            );
+            await interaction.editReply(payload);
+        } catch (e) {
+            console.error('[play]', e);
+            await interaction.editReply(`❌ ${e.message || 'Erro ao tocar.'}`);
+        }
+    },
 
-            // Conectar ao canal de voz
-            let connection = client.voice.connections.get(message.guild.id);
-            if (!connection) {
-                connection = joinVoiceChannel({
-                    channelId: voiceChannel.id,
-                    guildId: message.guild.id,
-                    adapterCreator: message.guild.voiceAdapterCreator
-                });
-            }
+    async handleComponent(interaction) {
+        if (!interaction.customId.startsWith('music:')) return;
+        if (!interaction.member?.voice?.channel) {
+            return interaction.reply({ content: 'Entre no canal de voz.', ephemeral: true });
+        }
 
-            // Adicionar à fila
-            const position = music.addToQueue(message.guild.id, songData);
+        const action = interaction.customId.split(':')[1];
+        const gid = interaction.guildId;
 
-            // Se é a primeira música, tocar imediatamente
-            if (position === 1) {
-                await music.playNext(connection, message.guild.id);
-            }
-
-            // Embed de confirmação
-            const embed = new EmbedBuilder()
-                .setColor(0x1db954) // Cor do Spotify
-                .setTitle('🎵 Adicionado à fila')
-                .setDescription(`[${songData.title}](${songData.url})`)
-                .addFields(
-                    { name: 'Duração', value: `${Math.floor(songData.duration / 60)}:${(songData.duration % 60).toString().padStart(2, '0')}`, inline: true },
-                    { name: 'Posição na fila', value: `#${position}`, inline: true }
-                )
-                .setFooter({ text: 'Use O.queue para ver a fila' })
-                .setTimestamp();
-
-            return searching.edit({ embeds: [embed] });
-        } catch (error) {
-            console.error('[Play Command]', error);
-            return message.reply('❌ Erro ao tocar a música. Tente novamente!');
+        if (action === 'pause') {
+            const ok = music.pause(gid);
+            return interaction.reply({ content: ok ? '⏸️ Pausado.' : '❌ Nada tocando.', ephemeral: true });
+        }
+        if (action === 'resume') {
+            const ok = music.resume(gid);
+            return interaction.reply({ content: ok ? '▶️ Retomado.' : '❌ Nada pausado.', ephemeral: true });
+        }
+        if (action === 'skip') {
+            const ok = music.skip(gid);
+            return interaction.reply({ content: ok ? '⏭️ Pulado.' : '❌ Nada na fila.', ephemeral: true });
+        }
+        if (action === 'stop') {
+            music.stop(gid);
+            return interaction.reply({ content: '⏹️ Parado e desconectado.', ephemeral: true });
+        }
+        if (action === 'loop') {
+            const mode = music.setLoop(gid, 'cycle');
+            const label = mode === 'track' ? 'faixa' : mode === 'queue' ? 'fila' : 'desligado';
+            return interaction.reply({ content: `🔁 Loop: **${label}**`, ephemeral: true });
         }
     }
 };

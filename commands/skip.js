@@ -3,28 +3,26 @@ const music = require('../utils/music');
 
 module.exports = {
     name: 'skip',
-    aliases: ['próximo', 'pular'],
+    aliases: ['próximo', 'proximo', 'pular', 's'],
     description: 'Pula a música atual',
 
-    async execute(message, args, client) {
-        const connection = client.voice.connections.get(message.guild.id);
-        if (!connection) {
-            return message.reply('❌ Não há nada tocando no momento.');
+    async execute(message) {
+        if (!message.member?.voice?.channel) {
+            return message.reply('❌ Entre em um canal de voz.');
         }
-
-        const result = music.skipSong(connection, message.guild.id);
-        if (result) {
-            const queue = music.getQueue(message.guild.id);
-            let nextSong = queue[0];
-
-            const embed = new EmbedBuilder()
-                .setColor(0x1db954)
-                .setTitle('⏭️ Música pulada')
-                .setDescription(nextSong ? `Tocando: [${nextSong.title}](${nextSong.url})` : 'Fila vazia');
-
-            return message.reply({ embeds: [embed] });
+        const view = music.getQueueView(message.guild.id);
+        if (!view.current && !view.queue.length) {
+            return message.reply('❌ Nada tocando.');
         }
-
-        return message.reply('❌ Erro ao pular a música.');
+        const prev = view.current?.title;
+        music.skip(message.guild.id);
+        return message.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0xa78bfa)
+                    .setTitle('⏭️  Pulado')
+                    .setDescription(prev ? `**${prev}**` : 'Próxima faixa…')
+            ]
+        });
     }
 };
