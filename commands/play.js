@@ -18,6 +18,18 @@ function controls() {
 }
 
 function trackEmbed(track, { position, playing, user }) {
+    const sourceLabel = {
+        soundcloud: 'SoundCloud',
+        youtube: 'YouTube',
+        spotify: 'Spotify',
+        deezer: 'Deezer',
+        jiosaavn: 'JioSaavn',
+        bandcamp: 'Bandcamp',
+        radio: 'Rádio',
+        direct: 'Link direto',
+        vimeo: 'Vimeo'
+    }[track.source] || track.channel || track.source || 'Desconhecido';
+
     const emb = new EmbedBuilder()
         .setColor(0xa78bfa)
         .setAuthor({
@@ -28,7 +40,7 @@ function trackEmbed(track, { position, playing, user }) {
         .setURL(track.url)
         .addFields(
             { name: 'Duração', value: music.fmtDuration(track.duration), inline: true },
-            { name: 'Fonte', value: String(track.channel || track.source || 'SoundCloud').slice(0, 40), inline: true },
+            { name: 'Fonte', value: String(sourceLabel).slice(0, 40), inline: true },
             {
                 name: playing ? 'Status' : 'Posição',
                 value: playing ? '▶️ Reproduzindo' : `#${position}`,
@@ -55,11 +67,22 @@ async function runPlay(ctx, query, member, channel) {
                         [
                             'Uso: `O.play <nome ou link>`',
                             '',
+                            '**Fontes suportadas (todas gratuitas):**',
+                            '• SoundCloud',
+                            '• YouTube',
+                            '• Spotify (busca)',
+                            '• Deezer',
+                            '• JioSaavn',
+                            '• Bandcamp',
+                            '• Links diretos (.mp3, .ogg, etc)',
+                            '• Rádios / streams',
+                            '',
+                            'Exemplos:',
                             '`O.play never gonna give you up`',
                             '`O.play https://soundcloud.com/...`',
+                            '`O.play https://open.spotify.com/track/...`',
                             '`O.play https://youtu.be/...`',
                             '',
-                            'Fonte principal: **SoundCloud** (gratuita)',
                             'Controles: pausar · retomar · pular · parar · loop'
                         ].join('\n')
                     )
@@ -92,12 +115,12 @@ async function runPlay(ctx, query, member, channel) {
 module.exports = {
     name: 'play',
     aliases: ['p', 'tocar'],
-    description: 'Toca música (SoundCloud prioritário + YouTube fallback)',
+    description: 'Toca música de várias fontes gratuitas',
     data: new SlashCommandBuilder()
         .setName('play')
-        .setDescription('Toca uma música (SoundCloud / YouTube)')
+        .setDescription('Toca música (SoundCloud, YouTube, Spotify, etc)')
         .addStringOption((o) =>
-            o.setName('busca').setDescription('Nome ou link (SoundCloud ou YouTube)').setRequired(true)
+            o.setName('busca').setDescription('Nome ou link de qualquer fonte suportada').setRequired(true)
         ),
 
     async execute(message, args) {
