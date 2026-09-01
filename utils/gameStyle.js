@@ -5,28 +5,30 @@ const C = {
     lose: 0xf43f5e,
     draw: 0xfbbf24,
     info: 0xa78bfa,
-    dark: 0x0f172a
+    dark: 0x0f172a,
+    gold: 0xf59e0b,
+    neon: 0x22d3ee
 };
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-function resultEmbed({ title, win, lines = [], footer, user }) {
-    let color = C.info;
-    if (win === true) color = C.win;
-    else if (win === false) color = C.lose;
-    else if (win === 'draw') color = C.draw;
+function resultEmbed({ title, win, lines = [], footer, user, color }) {
+    let col = color || C.info;
+    if (win === true) col = C.win;
+    else if (win === false) col = C.lose;
+    else if (win === 'draw') col = C.draw;
 
     const emb = new EmbedBuilder()
-        .setColor(color)
+        .setColor(col)
         .setTitle(title)
-        .setDescription(lines.filter((l) => l !== undefined && l !== null).join('\n'))
+        .setDescription(lines.filter((l) => l !== undefined && l !== null && l !== '').join('\n'))
         .setTimestamp();
     if (footer) emb.setFooter({ text: footer });
     if (user) {
         emb.setAuthor({
-            name: user.username || user.globalName || 'Jogador',
+            name: user.username || user.globalName || user.tag || 'Jogador',
             iconURL:
                 typeof user.displayAvatarURL === 'function'
                     ? user.displayAvatarURL({ size: 64 })
@@ -51,23 +53,49 @@ function againRow(customId, label = 'Jogar de novo') {
 }
 
 /** Resultado padrão dos jogos (flocos) */
-function crystalResult({ title, win, amount, payout, balance, extra, user }) {
+function crystalResult({ title, win, amount, payout, balance, extra, user, mult }) {
     let moneyLine;
     if (win === true) {
-        moneyLine = `✨ **Ganhou** +❄️ **${fmt(payout)}**`;
+        const multTxt = mult ? ` (×${mult})` : '';
+        moneyLine = `✨ **Ganhou** +❄️ **${fmt(payout)}**${multTxt}`;
     } else if (win === 'draw') {
         moneyLine = `🤝 **Empate** · aposta devolvida ❄️ **${fmt(amount)}**`;
     } else {
         moneyLine = `💫 **Perdeu** −❄️ **${fmt(amount)}**`;
     }
 
+    const profit =
+        win === true && payout != null && amount != null
+            ? `📈 Lucro: ❄️ **${fmt(payout - amount)}**`
+            : null;
+
     return resultEmbed({
         title,
         win,
         user,
-        lines: [extra || '', '', moneyLine, `💼 Saldo: ❄️ **${fmt(balance)}**`],
+        lines: [extra || '', '', moneyLine, profit, '', `💼 Saldo: ❄️ **${fmt(balance)}**`].filter(Boolean),
         footer: betFooter()
     });
 }
 
-module.exports = { C, fmt, resultEmbed, betFooter, againRow, crystalResult };
+/** Frame visual padrão para cassino */
+function casinoFrame(title, bodyLines = []) {
+    return [
+        '```',
+        `  ╔════════════════════════════╗`,
+        `  ║  ${String(title).padEnd(26).slice(0, 26)}║`,
+        `  ╚════════════════════════════╝`,
+        '```',
+        ...bodyLines
+    ].join('\n');
+}
+
+module.exports = {
+    C,
+    fmt,
+    resultEmbed,
+    betFooter,
+    againRow,
+    crystalResult,
+    casinoFrame
+};
