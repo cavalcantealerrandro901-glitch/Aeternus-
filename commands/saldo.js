@@ -1,50 +1,42 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const flocos = require('../utils/flocos');
-const cristais = require('../utils/cristais');
+const eter = require('../utils/eter');
 const xp = require('../utils/xp');
 
 module.exports = {
     name: 'saldo',
-    aliases: ['bal', 'atm', 'balance', 'carteira'],
-    description: 'Mostra flocos e cristais',
+    aliases: ['bal', 'atm', 'balance', 'carteira', 'eter'],
+    description: 'Mostra Éter e XP',
     async execute(message, args) {
-        const sub = (args[0] || '').toLowerCase();
-        if (['bloqueado', 'locked', 'liquidacao', 'liquidação', 'vault', 'pending'].includes(sub)) {
-            const cmd = message.client.commands.get('saldo-bloqueado');
-            if (cmd?.execute) return cmd.execute(message, args.slice(1));
-        }
-
         const user = message.mentions.users.first() || message.author;
-        const f = flocos.get(user.id);
-        const c = cristais.get(user.id);
+        const e = eter.get(user.id);
         const x = xp.get(user.id);
+        const prog = xp.progress(user.id);
 
         await message.reply({
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0x8b5cf6)
+                    .setColor(0xa78bfa)
                     .setAuthor({
                         name: user.username,
                         iconURL: user.displayAvatarURL({ size: 64 })
                     })
-                    .setTitle('💎  Carteira Aeternus')
+                    .setTitle('✨  Carteira Aeternus')
                     .setDescription(
                         [
                             '```',
                             '  ╔══════════════════════════╗',
-                            '  ║      SEU PATRIMÔNIO      ║',
+                            '  ║     XP  ·  ÉTER          ║',
                             '  ╚══════════════════════════╝',
                             '```',
-                            `❄️ **${flocos.formatPlain(f)}** flocos`,
-                            `💠 **${cristais.formatPlain(c)}** cristais`,
-                            `⭐ Nível **${x.level || 0}** · XP **${flocos.formatPlain(x.xp || 0)}**`,
+                            `✨ **${eter.formatPlain(e)}** éter`,
+                            `⭐ Nível **${x.level || 0}** · XP **${eter.formatPlain(x.xp || 0)}**`,
+                            `📊 Progresso: **${prog.current}/${prog.need}** (${prog.pct}%)`,
                             '',
-                            '🔒 Saldo bloqueado → `O.saldo bloqueado`',
-                            '🛒 Loja de cristais → `/loja` ou painel web'
+                            '_Única moeda: Éter · Progressão: XP_'
                         ].join('\n')
                     )
                     .setThumbnail(user.displayAvatarURL({ size: 128 }))
-                    .setFooter({ text: 'Aeternus · economia dual currency' })
+                    .setFooter({ text: 'Aeternus · XP + Éter' })
                     .setTimestamp()
             ],
             components: [
@@ -63,36 +55,31 @@ module.exports = {
         const parts = interaction.customId.split(':');
         if (parts[0] !== 'saldo' || parts[1] !== 'refresh') return;
         const userId = parts[2];
-        const f = flocos.get(userId);
-        const c = cristais.get(userId);
+        const e = eter.get(userId);
         const x = xp.get(userId);
+        const prog = xp.progress(userId);
         const user = await interaction.client.users.fetch(userId).catch(() => interaction.user);
 
         return interaction.update({
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0x8b5cf6)
+                    .setColor(0xa78bfa)
                     .setAuthor({
                         name: user.username,
                         iconURL: user.displayAvatarURL({ size: 64 })
                     })
-                    .setTitle('💎  Carteira Aeternus')
+                    .setTitle('✨  Carteira Aeternus')
                     .setDescription(
                         [
-                            '```',
-                            '  ╔══════════════════════════╗',
-                            '  ║      SEU PATRIMÔNIO      ║',
-                            '  ╚══════════════════════════╝',
-                            '```',
-                            `❄️ **${flocos.formatPlain(f)}** flocos`,
-                            `💠 **${cristais.formatPlain(c)}** cristais`,
-                            `⭐ Nível **${x.level || 0}** · XP **${flocos.formatPlain(x.xp || 0)}**`,
+                            `✨ **${eter.formatPlain(e)}** éter`,
+                            `⭐ Nível **${x.level || 0}** · XP **${eter.formatPlain(x.xp || 0)}**`,
+                            `📊 Progresso: **${prog.current}/${prog.need}** (${prog.pct}%)`,
                             '',
                             '_Atualizado agora_'
                         ].join('\n')
                     )
                     .setThumbnail(user.displayAvatarURL({ size: 128 }))
-                    .setFooter({ text: 'Aeternus · economia dual currency' })
+                    .setFooter({ text: 'Aeternus · XP + Éter' })
                     .setTimestamp()
             ]
         });

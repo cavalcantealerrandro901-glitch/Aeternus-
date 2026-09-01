@@ -4,29 +4,28 @@ const CATEGORIES = {
     economia: {
         id: 'economia',
         label: 'Economia',
-        emoji: '💰',
-        description: 'Flocos, cristais, banco e progresso',
+        emoji: '✨',
+        description: 'Éter e XP — progresso e carteira',
         commands: [
-            { name: 'saldo', desc: 'Ver flocos e cristais', slash: true },
-            { name: 'saldo-bloqueado', desc: 'Valores em liquidação', slash: true },
-            { name: 'daily', desc: 'Recompensa diária', slash: true },
+            { name: 'saldo', desc: 'Ver éter e XP', slash: true },
+            { name: 'daily', desc: 'Recompensa diária em éter', slash: true },
             { name: 'banco', desc: 'Conta bancária', slash: true },
-            { name: 'depositar', desc: 'Depositar no banco', slash: true },
-            { name: 'sacar', desc: 'Sacar do banco', slash: true },
-            { name: 'pay', desc: 'Transferir flocos', slash: true },
-            { name: 'converter', desc: 'Câmbio flocos ↔ cristais', slash: true },
-            { name: 'transacoes', desc: 'Extrato da carteira', slash: true },
+            { name: 'depositar', desc: 'Depositar éter', slash: true },
+            { name: 'sacar', desc: 'Sacar éter', slash: true },
+            { name: 'pay', desc: 'Transferir éter', slash: true },
+            { name: 'transacoes', desc: 'Extrato', slash: true },
             { name: 'xp', desc: 'Nível e experiência', slash: true },
-            { name: 'perfil', desc: 'Perfil econômico', slash: true },
-            { name: 'addmoney', desc: 'Adicionar moeda (admin)', slash: true },
-            { name: 'removemoney', desc: 'Remover moeda (admin)', slash: true }
+            { name: 'perfil', desc: 'Card de perfil', slash: true },
+            { name: 'work', desc: 'Trabalhar por éter', slash: true },
+            { name: 'addmoney', desc: 'Adicionar éter (admin)', slash: true },
+            { name: 'removemoney', desc: 'Remover éter (admin)', slash: true }
         ]
     },
     jogos: {
         id: 'jogos',
         label: 'Jogos',
         emoji: '🎮',
-        description: 'Apostas e diversão em flocos',
+        description: 'Apostas em éter',
         commands: [
             { name: 'cara', desc: 'Cara ou coroa', slash: true },
             { name: 'dado', desc: 'Aposta no dado', slash: true },
@@ -35,10 +34,7 @@ const CATEGORIES = {
             { name: 'ppt', desc: 'Pedra papel tesoura', slash: true },
             { name: 'minas', desc: 'Mines', slash: true },
             { name: 'blackjack', desc: 'Blackjack 21', slash: true },
-            { name: 'duplicar', desc: 'Dobrar ou perder', slash: true },
-            { name: 'quiz', desc: 'Quiz em grupo', slash: true },
-            { name: 'conta', desc: 'Contas matemáticas', slash: true },
-            { name: 'aura', desc: 'Scanner de aura', slash: true }
+            { name: 'quiz', desc: 'Quiz', slash: true }
         ]
     },
     moderacao: {
@@ -85,8 +81,6 @@ const CATEGORIES = {
             { name: 'ping', desc: 'Latência do bot', slash: true },
             { name: 'afk', desc: 'Modo AFK', slash: true },
             { name: 'painel', desc: 'Link do painel web', slash: true },
-            { name: 'invites', desc: 'Convites do membro', slash: true },
-            { name: 'noticias', desc: 'Notícias por tema', slash: true },
             { name: 'play', desc: 'Tocar música', slash: true }
         ]
     }

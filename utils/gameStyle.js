@@ -39,7 +39,7 @@ function resultEmbed({ title, win, lines = [], footer, user, color }) {
 }
 
 function betFooter() {
-    return '❄️ Apostas: 1k · 2.5m · all · half · Aeternus Casino';
+    return '✨ Apostas: 1k · 2.5m · all · half · Éter';
 }
 
 function againRow(customId, label = 'Jogar de novo') {
@@ -56,23 +56,23 @@ function crystalResult({ title, win, amount, payout, balance, extra, user, mult 
     let moneyLine;
     if (win === true) {
         const multTxt = mult ? ` (×${mult})` : '';
-        moneyLine = `✨ **Ganhou** +❄️ **${fmt(payout)}**${multTxt}`;
+        moneyLine = `✨ **Ganhou** +✨ **${fmt(payout)}** éter${multTxt}`;
     } else if (win === 'draw') {
-        moneyLine = `🤝 **Empate** · aposta devolvida ❄️ **${fmt(amount)}**`;
+        moneyLine = `🤝 **Empate** · aposta devolvida ✨ **${fmt(amount)}**`;
     } else {
-        moneyLine = `💫 **Perdeu** −❄️ **${fmt(amount)}**`;
+        moneyLine = `💫 **Perdeu** −✨ **${fmt(amount)}** éter`;
     }
 
     const profit =
         win === true && payout != null && amount != null
-            ? `📈 Lucro: ❄️ **${fmt(payout - amount)}**`
+            ? `📈 Lucro: ✨ **${fmt(payout - amount)}**`
             : null;
 
     return resultEmbed({
         title,
         win,
         user,
-        lines: [extra || '', '', moneyLine, profit, '', `💼 Saldo: ❄️ **${fmt(balance)}**`].filter(Boolean),
+        lines: [extra || '', '', moneyLine, profit, '', `💼 Saldo: ✨ **${fmt(balance)}** éter`].filter(Boolean),
         footer: betFooter()
     });
 }

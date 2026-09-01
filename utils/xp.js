@@ -1,5 +1,5 @@
 const store = require('./store');
-const flocos = require('./flocos');
+const eter = require('./eter');
 
 function all() {
     return store.load('xp.json', {});
@@ -25,7 +25,6 @@ function levelFromXp(totalXp) {
     return level;
 }
 
-/** XP dentro do nível atual e quanto falta pro próximo */
 function progress(userId) {
     const { xp, level } = get(userId);
     let remain = Number(xp || 0);
@@ -46,7 +45,6 @@ function progress(userId) {
     };
 }
 
-/** Multiplicador do daily: +4% por nível, máximo ×3.00 */
 function dailyMultiplier(level) {
     return 1 + Math.min(2, Number(level || 0) * 0.04);
 }
@@ -63,12 +61,11 @@ function addXp(userId, amount) {
 
     let reward = 0;
     if (after > before) {
-        // 300–5000 flocos por nível (pode subir vários de uma vez)
         const levelsGained = after - before;
         for (let i = 0; i < levelsGained; i++) {
             reward += 300 + Math.floor(Math.random() * 4701);
         }
-        flocos.add(userId, reward, { reason: `levelup:${before}->${after}` });
+        eter.add(userId, reward, { reason: `levelup:${before}->${after}` });
     }
 
     return {
