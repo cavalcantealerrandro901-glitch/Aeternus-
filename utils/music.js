@@ -1,5 +1,6 @@
 /**
- * Música Aeternus — multi-fonte (youtube-sr + ytdl + play-dl fallback)
+ * Música Aeternus — prioriza SoundCloud (gratuito/estável) + YouTube como fallback
+ * Fonte principal: SoundCloud (sem bloqueios pesados de YouTube)
  */
 const {
     createAudioPlayer,
@@ -51,6 +52,10 @@ function isYtUrl(q) {
     return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(String(q || ''));
 }
 
+function isSoundCloudUrl(q) {
+    return /^(https?:\/\/)?(www\.|m\.)?soundcloud\.com\//i.test(String(q || ''));
+}
+
 function getState(guildId) {
     if (!guilds.has(guildId)) {
         guilds.set(guildId, {
@@ -68,10 +73,58 @@ function getState(guildId) {
     return guilds.get(guildId);
 }
 
+/**
+ * Resolve track priorizando SoundCloud (gratuito e estável para bots)
+ */
 async function resolveTrack(query, requestedBy) {
     const q = String(query || '').trim();
     if (!q) return null;
 
+    // 1. Se for link direto do SoundCloud
+    if (playDl && isSoundCloudUrl(q)) {
+        try {
+            const info = await playDl.soundcloud(q);
+            if (info) {
+                return {
+                    title: info.name || info.title || q,
+                    url: info.url || q,
+                    duration: Number(info.durationInSec) || Number(info.duration) || 0,
+                    thumbnail: info.thumbnail || null,
+                    channel: info.user?.name || info.publisher?.name || 'SoundCloud',
+                    source: 'soundcloud',
+                    requestedBy: requestedBy || null
+                };
+            }
+        } catch (e) {
+            console.error('[music] soundcloud link:', e.message);
+        }
+    }
+
+    // 2. Busca no SoundCloud (fonte principal gratuita)
+    if (playDl) {
+        try {
+            const results = await playDl.search(q, {
+                limit: 1,
+                source: { soundcloud: 'tracks' }
+            });
+            if (results?.[0]) {
+                const d = results[0];
+                return {
+                    title: d.name || d.title || q,
+                    url: d.url,
+                    duration: Number(d.durationInSec) || Number(d.duration) || 0,
+                    thumbnail: d.thumbnail || null,
+                    channel: d.user?.name || d.publisher?.name || 'SoundCloud',
+                    source: 'soundcloud',
+                    requestedBy: requestedBy || null
+                };
+            }
+        } catch (e) {
+            console.error('[music] soundcloud search:', e.message);
+        }
+    }
+
+    // 3. Fallback: YouTube (caso SoundCloud não encontre)
     if (YouTube) {
         try {
             if (isYtUrl(q)) {
@@ -83,6 +136,7 @@ async function resolveTrack(query, requestedBy) {
                         duration: Number(v.duration) || 0,
                         thumbnail: v.thumbnail?.displayThumbnailURL?.('maxresdefault') || v.thumbnail?.url || null,
                         channel: v.channel?.name || 'YouTube',
+                        source: 'youtube',
                         requestedBy: requestedBy || null
                     };
                 }
@@ -95,6 +149,7 @@ async function resolveTrack(query, requestedBy) {
                         duration: Number(v.duration) || 0,
                         thumbnail: v.thumbnail?.displayThumbnailURL?.('maxresdefault') || v.thumbnail?.url || null,
                         channel: v.channel?.name || 'YouTube',
+                        source: 'youtube',
                         requestedBy: requestedBy || null
                     };
                 }
@@ -116,6 +171,7 @@ async function resolveTrack(query, requestedBy) {
                     duration: Number(d.durationInSec) || 0,
                     thumbnail: d.thumbnails?.[0]?.url || null,
                     channel: d.channel?.name || 'YouTube',
+                    source: 'youtube',
                     requestedBy: requestedBy || null
                 };
             }
@@ -129,6 +185,7 @@ async function resolveTrack(query, requestedBy) {
                         duration: Number(d.durationInSec) || Number(d.duration) || 0,
                         thumbnail: d.thumbnails?.[0]?.url || null,
                         channel: d.channel?.name || d.channel || 'YouTube',
+                        source: 'youtube',
                         requestedBy: requestedBy || null
                     };
                 }
@@ -148,6 +205,7 @@ async function resolveTrack(query, requestedBy) {
                 duration: Number(d.lengthSeconds) || 0,
                 thumbnail: d.thumbnails?.[d.thumbnails.length - 1]?.url || null,
                 channel: d.author?.name || 'YouTube',
+                source: 'youtube',
                 requestedBy: requestedBy || null
             };
         } catch (e) {
@@ -159,6 +217,7 @@ async function resolveTrack(query, requestedBy) {
 }
 
 async function openStream(url) {
+    // SoundCloud e YouTube via play-dl (melhor suporte atual)
     if (playDl) {
         try {
             const s = await playDl.stream(url, { quality: 2 });
@@ -168,6 +227,7 @@ async function openStream(url) {
         }
     }
 
+    // Fallback ytdl só para YouTube
     if (ytdl && ytdl.validateURL(url)) {
         try {
             const stream = ytdl(url, {
@@ -344,7 +404,7 @@ async function enqueue(guild, voiceChannel, textChannel, query, user) {
     if (!track) {
         return {
             ok: false,
-            error: 'Nenhuma música encontrada (YouTube pode estar bloqueando o servidor). Tente um link direto ou depois.'
+            error: 'Nenhuma música encontrada. Tente outro nome ou um link do SoundCloud.'
         };
     }
 
@@ -366,7 +426,7 @@ async function enqueue(guild, voiceChannel, textChannel, query, user) {
             state.current = null;
             return {
                 ok: false,
-                error: 'Achei a música, mas não consegui abrir o áudio. Tente outro link.'
+                error: 'Achei a música, mas não consegui abrir o áudio. Tente outro link ou nome.'
             };
         }
         return { ok: true, track, position: 0, playing: true };
