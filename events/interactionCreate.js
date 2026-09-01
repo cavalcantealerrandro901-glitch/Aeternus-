@@ -95,10 +95,10 @@ module.exports = {
                 let cmd = client.commands.get(parts[0]);
 
                 if (!cmd && parts[0] === 'bj') cmd = client.commands.get('blackjack');
+                if (!cmd && parts[0] === 'music') cmd = client.commands.get('play');
                 if (parts[0] === 'act' && parts[1] === 'devolver' && parts[2]) {
                     cmd = client.commands.get(parts[2]);
                 }
-                // botão perfil no daily/loja também
                 if (!cmd && id.startsWith('loja:')) cmd = client.commands.get('loja');
 
                 if (cmd?.handleComponent) {
