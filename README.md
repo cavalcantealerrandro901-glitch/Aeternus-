@@ -1,19 +1,17 @@
 # Aeternus
 
-Bot Discord completo com economia, jogos de cassino, música e painel web.
+Bot Discord com economia simples, jogos, música e painel web.
 
-## Upgrade MAX (main)
+## Economia (simplificada)
 
-- Jogos e embeds mais imersivos
-- Economia (daily / saldo) com feedback premium
-- Landing e painel com visual reforçado
-- Base visual unificada (`gameStyle`)
+- **XP** — progresso e níveis
+- **Éter ✨** — única moeda (apostas, daily, trabalho, loja)
+
+Flocos e cristais foram removidos. Saldos antigos de flocos migram automaticamente para Éter.
 
 ## Render
 
-- **Root Directory:** deixe **vazio** (raiz do repo)
+- **Root Directory:** vazio
 - **Build:** `npm install`
 - **Start:** `npm start` ou `node index.js`
 - **Env:** `TOKEN`, `CLIENT_ID`, `CLIENT_SECRET`, `REDIRECT_URI`, `MONGO_URI`, `PORT`
-
-Não use Root Directory `src` — o `package.json` fica na raiz.
