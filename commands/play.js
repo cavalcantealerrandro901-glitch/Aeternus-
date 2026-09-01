@@ -28,7 +28,7 @@ function trackEmbed(track, { position, playing, user }) {
         .setURL(track.url)
         .addFields(
             { name: 'Duração', value: music.fmtDuration(track.duration), inline: true },
-            { name: 'Canal', value: String(track.channel || 'YouTube').slice(0, 40), inline: true },
+            { name: 'Fonte', value: String(track.channel || track.source || 'SoundCloud').slice(0, 40), inline: true },
             {
                 name: playing ? 'Status' : 'Posição',
                 value: playing ? '▶️ Reproduzindo' : `#${position}`,
@@ -56,8 +56,10 @@ async function runPlay(ctx, query, member, channel) {
                             'Uso: `O.play <nome ou link>`',
                             '',
                             '`O.play never gonna give you up`',
+                            '`O.play https://soundcloud.com/...`',
                             '`O.play https://youtu.be/...`',
                             '',
+                            'Fonte principal: **SoundCloud** (gratuita)',
                             'Controles: pausar · retomar · pular · parar · loop'
                         ].join('\n')
                     )
@@ -90,12 +92,12 @@ async function runPlay(ctx, query, member, channel) {
 module.exports = {
     name: 'play',
     aliases: ['p', 'tocar'],
-    description: 'Toca música do YouTube',
+    description: 'Toca música (SoundCloud prioritário + YouTube fallback)',
     data: new SlashCommandBuilder()
         .setName('play')
-        .setDescription('Toca uma música do YouTube')
+        .setDescription('Toca uma música (SoundCloud / YouTube)')
         .addStringOption((o) =>
-            o.setName('busca').setDescription('Nome ou link do YouTube').setRequired(true)
+            o.setName('busca').setDescription('Nome ou link (SoundCloud ou YouTube)').setRequired(true)
         ),
 
     async execute(message, args) {
