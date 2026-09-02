@@ -61,21 +61,31 @@ module.exports = {
             }
         } catch (_) {}
 
+        // Resposta a @bot: só menção direta, NUNCA na "linha de resposta" (reply)
         try {
-            if (message.mentions.has(client.user) && !message.mentions.everyone) {
-                const onlyMention =
-                    message.content.replace(/<@!?\d+>/g, '').trim().length === 0 ||
-                    /^(ol[aá]|oi|hey|help|ajuda)\s*$/i.test(
-                        message.content.replace(/<@!?\d+>/g, '').trim()
-                    );
+            const botMentioned =
+                message.mentions.users.has(client.user.id) && !message.mentions.everyone;
 
-                if (onlyMention || message.mentions.users.has(client.user.id)) {
-                    const prefix = getPrefix(message.guild.id);
-                    const startsWithPrefix = message.content
-                        .toLowerCase()
-                        .startsWith(prefix.toLowerCase());
+            if (botMentioned) {
+                // Discord coloca menção automática ao responder uma msg do bot
+                const isReply = Boolean(message.reference?.messageId);
+                const prefix = getPrefix(message.guild.id);
+                const startsWithPrefix = message.content
+                    .toLowerCase()
+                    .startsWith(prefix.toLowerCase());
 
-                    if (!startsWithPrefix) {
+                // se é reply OU já é comando com prefixo → não manda o embed de "Olá"
+                if (!isReply && !startsWithPrefix) {
+                    const stripped = message.content
+                        .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
+                        .trim();
+
+                    // só se a mensagem for só a menção (ou oi/ola/help)
+                    const onlyMention =
+                        stripped.length === 0 ||
+                        /^(ol[aá]|oi|hey|help|ajuda|bot)\s*$/i.test(stripped);
+
+                    if (onlyMention) {
                         const embed = new EmbedBuilder()
                             .setColor(0xa78bfa)
                             .setAuthor({
@@ -85,12 +95,11 @@ module.exports = {
                             .setTitle(`Olá, ${message.author.username}`)
                             .setDescription(
                                 [
-                                    `Eu sou o **${client.user.username}** — economia, jogos e utilidades para o seu servidor.`,
+                                    `Eu sou o **${client.user.username}** — economia, jogos e utilidades.`,
                                     '',
-                                    `**Prefixo neste servidor:** \`${prefix}\``,
-                                    `**Exemplos:** \`${prefix}ajuda\` · \`${prefix}saldo\` · \`${prefix}daily\``,
+                                    `**Prefixo:** \`${prefix}\``,
+                                    `**Exemplos:** \`${prefix}ajuda\` · \`${prefix}saldo\` · \`${prefix}daily\` · \`${prefix}bj\``,
                                     '',
-                                    'Também respondo a comandos **/** (slash).',
                                     `Digite \`${prefix}ajuda\` para a central completa.`
                                 ].join('\n')
                             )
