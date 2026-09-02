@@ -2,13 +2,13 @@
  * Sistemas configuráveis pelo painel (não-economia).
  * Lê getSettings(guildId) e reage a eventos.
  */
-const { EmbedBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, ChannelType } = require('discord.js');
 const { getSettings, setSettings } = require('../utils/settings');
 
-const stickyCount = new Map(); // channelId -> msgs since last sticky
+const stickyCount = new Map();
 const stickyMsgId = new Map();
-const lastCounter = new Map(); // channelId -> last userId (counting)
-const antinukeHits = new Map(); // guildId:action -> { n, at }
+const lastCounter = new Map();
+const antinukeHits = new Map();
 
 function fmt(tpl, map) {
     let s = String(tpl || '');
@@ -43,13 +43,20 @@ function antinukeCheck(guildId, action, max, windowSec) {
     return st.n > (max || 3);
 }
 
+/** Só número inteiro puro (ex: "42"). Texto normal não conta. */
+function parseCountMessage(content) {
+    const t = String(content || '').trim();
+    if (!/^\d+$/.test(t)) return null;
+    const n = Number(t);
+    if (!Number.isSafeInteger(n)) return null;
+    return n;
+}
+
 function setup(client) {
-    // ── Entrada / saída ─────────────────────────────────
     client.on('guildMemberAdd', async (member) => {
         if (member.user.bot) return;
         const s = getSettings(member.guild.id);
 
-        // autorole
         try {
             if (s.autorole?.enabled && s.autorole.roleId) {
                 const delay = Math.max(0, Number(s.autorole.delaySec) || 0) * 1000;
@@ -61,7 +68,6 @@ function setup(client) {
             }
         } catch (_) {}
 
-        // welcome canal
         try {
             if (s.welcome?.enabled && s.welcome.channelId) {
                 const ch = await member.guild.channels.fetch(s.welcome.channelId).catch(() => null);
@@ -90,7 +96,6 @@ function setup(client) {
             }
         } catch (_) {}
 
-        // DM welcome
         try {
             if (s.dmWelcome?.enabled && s.dmWelcome.message) {
                 const text = fmt(s.dmWelcome.message, {
@@ -123,12 +128,10 @@ function setup(client) {
         await updateMemberCounter(member.guild);
     });
 
-    // ── Mensagens: contagem, sticky, auto-react, auto-thread, menções ──
     client.on('messageCreate', async (message) => {
         if (!message.guild || message.author.bot) return;
         const s = getSettings(message.guild.id);
 
-        // mention guard
         try {
             if (s.mentionGuard?.enabled) {
                 const max = s.mentionGuard.maxMentions ?? 5;
@@ -148,30 +151,35 @@ function setup(client) {
             }
         } catch (_) {}
 
-        // counting
+        // counting — só age em mensagens que são números puros
         try {
             const ct = s.counting;
             if (ct?.enabled && ct.channelId === message.channel.id) {
-                const expected = (Number(ct.current) || 0) + 1;
-                const num = Number(message.content.trim());
-                const sameUser = lastCounter.get(message.channel.id) === message.author.id;
-                if (
-                    !Number.isInteger(num) ||
-                    num !== expected ||
-                    (!ct.allowSameUser && sameUser)
-                ) {
-                    await message.delete().catch(() => {});
-                    return;
+                const num = parseCountMessage(message.content);
+
+                // texto, emoji, comando, etc. → não apaga, não interfere
+                if (num === null) {
+                    // segue para sticky / auto-react etc.
+                } else {
+                    const expected = (Number(ct.current) || 0) + 1;
+                    const sameUser =
+                        lastCounter.get(message.channel.id) === message.author.id;
+
+                    if (num !== expected || (!ct.allowSameUser && sameUser)) {
+                        // número errado ou mesmo user seguido → só apaga a tentativa
+                        await message.delete().catch(() => {});
+                        return;
+                    }
+
+                    lastCounter.set(message.channel.id, message.author.id);
+                    setSettings(message.guild.id, {
+                        counting: { ...ct, current: expected }
+                    });
+                    await message.react('✅').catch(() => {});
                 }
-                lastCounter.set(message.channel.id, message.author.id);
-                setSettings(message.guild.id, {
-                    counting: { ...ct, current: expected }
-                });
-                await message.react('✅').catch(() => {});
             }
         } catch (_) {}
 
-        // sticky
         try {
             const st = s.sticky;
             if (st?.enabled && st.channelId === message.channel.id && st.content) {
@@ -192,7 +200,6 @@ function setup(client) {
             }
         } catch (_) {}
 
-        // auto-react
         try {
             const rx = s.autoReact;
             if (rx?.enabled && rx.channelId === message.channel.id) {
@@ -203,7 +210,6 @@ function setup(client) {
             }
         } catch (_) {}
 
-        // auto-thread
         try {
             const at = s.autoThread;
             if (at?.enabled && at.channelId === message.channel.id && message.channel.isTextBased()) {
@@ -215,7 +221,6 @@ function setup(client) {
             }
         } catch (_) {}
 
-        // auto-publish (canais de anúncio)
         try {
             const ap = s.autoPublish;
             if (
@@ -229,7 +234,6 @@ function setup(client) {
         } catch (_) {}
     });
 
-    // ── Starboard ───────────────────────────────────────
     client.on('messageReactionAdd', async (reaction, user) => {
         try {
             if (user.bot) return;
@@ -261,7 +265,6 @@ function setup(client) {
             const board = await message.guild.channels.fetch(s.channelId).catch(() => null);
             if (!board?.isTextBased()) return;
 
-            // evita duplicar: procura embed com footer msg id
             const recent = await board.messages.fetch({ limit: 30 }).catch(() => null);
             const already = recent?.find(
                 (m) =>
@@ -269,9 +272,7 @@ function setup(client) {
                     m.embeds?.[0]?.footer?.text?.includes(message.id)
             );
             if (already) {
-                const emb = EmbedBuilder.from(already.embeds[0]).setTitle(
-                    `${emoji} ${count}`
-                );
+                const emb = EmbedBuilder.from(already.embeds[0]).setTitle(`${emoji} ${count}`);
                 await already.edit({ embeds: [emb] }).catch(() => {});
                 return;
             }
@@ -300,7 +301,6 @@ function setup(client) {
         } catch (_) {}
     });
 
-    // ── Verificação (botão) ───────────────────────────────
     client.on('interactionCreate', async (interaction) => {
         try {
             if (!interaction.isButton()) return;
@@ -318,7 +318,6 @@ function setup(client) {
         } catch (_) {}
     });
 
-    // ── Voice hub (canal temporário) ─────────────────────────
     client.on('voiceStateUpdate', async (oldS, newS) => {
         try {
             const guild = newS.guild || oldS.guild;
@@ -354,7 +353,6 @@ function setup(client) {
         } catch (_) {}
     });
 
-    // ── Anti-nuke leve ────────────────────────────────────
     client.on('guildBanAdd', async (ban) => {
         try {
             const s = getSettings(ban.guild.id).antinuke;
@@ -364,9 +362,7 @@ function setup(client) {
                 if (log?.enabled && log.channelId) {
                     const ch = await ban.guild.channels.fetch(log.channelId).catch(() => null);
                     await ch
-                        ?.send(
-                            `🚨 **Anti-nuke:** muitos bans em pouco tempo neste servidor.`
-                        )
+                        ?.send(`🚨 **Anti-nuke:** muitos bans em pouco tempo neste servidor.`)
                         .catch(() => {});
                 }
             }
@@ -395,7 +391,6 @@ function setup(client) {
     console.log('🧩 [guildModules] sistemas do painel ativos');
 }
 
-/** Anúncio de level-up (usado pelo messageCreate) */
 async function announceLevel(message, res) {
     try {
         const s = getSettings(message.guild.id).levels;
