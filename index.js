@@ -69,5 +69,29 @@ main().catch((e) => {
     process.exit(1);
 });
 
-process.on('unhandledRejection', (err) => console.error('[unhandledRejection]', err));
-process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
+// unhandledRejection / uncaughtException são capturados pelo systems/autoRepair
+// (reportError → DM do OWNER_ID). Mantém log de fallback se o sistema ainda não carregou.
+process.on('unhandledRejection', (err) => {
+    try {
+        const ar = require('./utils/autoRepair');
+        ar.reportError({
+            source: 'unhandledRejection',
+            error: err,
+            context: 'index fallback'
+        }).catch(() => {});
+    } catch (_) {
+        console.error('[unhandledRejection]', err);
+    }
+});
+process.on('uncaughtException', (err) => {
+    try {
+        const ar = require('./utils/autoRepair');
+        ar.reportError({
+            source: 'uncaughtException',
+            error: err,
+            context: 'index fallback'
+        }).catch(() => {});
+    } catch (_) {
+        console.error('[uncaughtException]', err);
+    }
+});
