@@ -33,10 +33,14 @@ function loadFighter(userId, isBot) {
         const attrs = { forca: 8, defesa: 8, agilidade: 8, vida: 12 };
         const maxHp = 50 + attrs.vida * 8;
         const maxMana = 40;
+        const cls = player.getClass('guerreiro');
         return {
             id: userId,
             isBot: true,
             name: 'Bot',
+            classId: 'guerreiro',
+            cls,
+            photo: null,
             attrs,
             hp: maxHp,
             maxHp,
@@ -49,10 +53,14 @@ function loadFighter(userId, isBot) {
     const maxHp = xp.maxHp(userId);
     const maxMana = xp.maxMana(userId);
     const prof = player.get(userId);
+    const cls = player.getClass(prof?.classId || 'guerreiro');
     return {
         id: userId,
         isBot: false,
         name: prof?.name || 'Jogador',
+        classId: prof?.classId || 'guerreiro',
+        cls,
+        photo: prof?.photoUrl || null,
         attrs,
         hp: maxHp,
         maxHp,
@@ -81,22 +89,28 @@ function calcDamage(attacker, defender, kind) {
 function fightEmbed(fight) {
     const a = fight.a;
     const b = fight.b;
-    const turnName = fight.turn === a.id ? a.name : b.name;
+    const turnF = fight.turn === a.id ? a : b;
+    const color = fight.over
+        ? 0xfbbf24
+        : turnF.cls?.color || a.cls?.color || 0xa78bfa;
 
     const block = (f) =>
         [
-            `**${f.name}** <@${f.id}>`,
+            `**${f.cls?.emoji || '⚔️'} ${f.name}** · ${f.cls?.name || '?'}`,
+            `<@${f.id}>`,
             `❤️ HP  ┌${bar(f.hp, f.maxHp)}┐ **${f.hp}/${f.maxHp}**`,
             `🔵 Mana ┌${bar(f.mana, f.maxMana)}┐ **${f.mana}/${f.maxMana}**`,
             `FOR ${f.attrs.forca} · DEF ${f.attrs.defesa} · AGI ${f.attrs.agilidade}`
         ].join('\n');
 
-    return new EmbedBuilder()
-        .setColor(fight.over ? 0xfbbf24 : 0xa78bfa)
-        .setTitle(`⚔️ PVP · Rodada ${fight.round}`)
+    const emb = new EmbedBuilder()
+        .setColor(color)
+        .setTitle(`⚔️ ${a.name} vs ${b.name} · R${fight.round}`)
         .setDescription(
             [
                 block(a),
+                '',
+                '━'.repeat(18),
                 '',
                 block(b),
                 '',
@@ -104,16 +118,27 @@ function fightEmbed(fight) {
                 '',
                 fight.over
                     ? `🏆 **Vencedor:** <@${fight.winnerId}>`
-                    : `⏱️ **Vez de <@${fight.turn}>** (${turnName}) — só essa pessoa usa os botões.`
+                    : `⏱️ **Vez de ${turnF.name}** (<@${fight.turn}>) — só essa pessoa usa os botões.`
             ].join('\n')
         )
         .setFooter({
             text:
                 fight.bet > 0
-                    ? `Aposta ${eter.formatPlain(fight.bet)} éter · Ataque 0 · Pesado ${MANA_COST.heavy} · Def ${MANA_COST.defend} · Esp ${MANA_COST.special} mana`
+                    ? `Aposta ${eter.formatPlain(fight.bet)} · Mana: 0 / ${MANA_COST.heavy} / ${MANA_COST.defend} / ${MANA_COST.special}`
                     : `Mana: Ataque 0 · Pesado ${MANA_COST.heavy} · Def ${MANA_COST.defend} · Esp ${MANA_COST.special}`
         })
         .setTimestamp();
+
+    // imagem da classe de quem está na vez (ou vencedor)
+    const theme = fight.over
+        ? (fight.winnerId === a.id ? a : b).cls
+        : turnF.cls;
+    if (theme?.banner) emb.setImage(theme.banner);
+
+    if (a.photo) emb.setThumbnail(a.photo);
+    else if (b.photo) emb.setThumbnail(b.photo);
+
+    return emb;
 }
 
 function attackRow(fightId, enabled) {
@@ -165,9 +190,8 @@ function scheduleTurnTimeout(fight, channel) {
         if (fight.over || !fights.has(fight.id)) return;
         const actor = fight.turn === fight.a.id ? fight.a : fight.b;
         const other = actor === fight.a ? fight.b : fight.a;
-        fight.lastLog = `⏰ <@${actor.id}> perdeu o turno por tempo.`;
+        fight.lastLog = `⏰ **${actor.name}** perdeu o turno por tempo.`;
         actor.defending = false;
-        // regen leve de mana no fim do turno
         actor.mana = Math.min(actor.maxMana, actor.mana + 2);
         fight.turn = other.id;
         fight.round += 1;
@@ -182,6 +206,7 @@ async function pushState(fight, channel, buttonsOn) {
         const msg = await channel.messages.fetch(fight.messageId).catch(() => null);
         if (!msg) return;
         await msg.edit({
+            content: null,
             embeds: [fightEmbed(fight)],
             components: [attackRow(fight.id, !!buttonsOn && !fight.over)]
         });
@@ -200,7 +225,7 @@ async function endFight(fight, channel) {
             eter.add(fight.winnerId, fight.bet * 2, { reason: 'pvp_win' });
         }
     }
-    if (fight.winnerId && !String(fight.winnerId).includes('botfake')) {
+    if (fight.winnerId) {
         try {
             const w = fight.a.id === fight.winnerId ? fight.a : fight.b;
             if (!w.isBot) xp.addXp(fight.winnerId, 40 + Math.floor(Math.random() * 40));
@@ -213,7 +238,7 @@ async function endFight(fight, channel) {
 function applyAction(fight, actor, target, kind) {
     const cost = MANA_COST[kind] || 0;
     if (actor.mana < cost) {
-        fight.lastLog = `❌ <@${actor.id}> sem mana para isso (precisa **${cost}**).`;
+        fight.lastLog = `❌ **${actor.name}** sem mana (precisa **${cost}**).`;
         return false;
     }
     actor.mana -= cost;
@@ -230,14 +255,15 @@ function applyAction(fight, actor, target, kind) {
     target.defending = false;
     const kindName =
         kind === 'heavy' ? 'ataque pesado' : kind === 'special' ? 'golpe especial' : 'ataque';
-    fight.lastLog = `${crit ? '⚡ **CRÍTICO!** ' : ''}**${actor.name}** usou **${kindName}** em **${target.name}** → **-${dmg}** HP${cost ? ` (-${cost} mana)` : ''}`;
+    fight.lastLog = `${crit ? '⚡ **CRÍTICO!** ' : ''}**${actor.name}** → **${kindName}** em **${target.name}** (**-${dmg}** HP)${cost ? ` · -${cost} mana` : ''}`;
     return true;
 }
 
 async function afterAction(fight, channel) {
     if (fight.a.hp <= 0 || fight.b.hp <= 0) {
         fight.winnerId = fight.a.hp <= 0 ? fight.b.id : fight.a.id;
-        fight.lastLog += `\n🏆 <@${fight.winnerId}> venceu!`;
+        const wname = fight.winnerId === fight.a.id ? fight.a.name : fight.b.name;
+        fight.lastLog += `\n🏆 **${wname}** venceu o duelo!`;
         await endFight(fight, channel);
         return;
     }
@@ -263,9 +289,7 @@ async function botPlay(fight, channel) {
         kind = 'defend';
     else if (actor.mana >= MANA_COST.special && roll < 0.22) kind = 'special';
     else if (actor.mana >= MANA_COST.heavy && roll < 0.5) kind = 'heavy';
-    if (!applyAction(fight, actor, target, kind)) {
-        applyAction(fight, actor, target, 'attack');
-    }
+    if (!applyAction(fight, actor, target, kind)) applyAction(fight, actor, target, 'attack');
     await afterAction(fight, channel);
 }
 
@@ -306,7 +330,7 @@ async function startFight(channel, challengerId, targetId, bet, vsBot) {
         humanId: challengerId,
         over: false,
         winnerId: null,
-        lastLog: `_Maior Agilidade começa · <@${first}>_`,
+        lastLog: `_Maior Agilidade começa · **${first === a.id ? a.name : b.name}**_`,
         messageId: null,
         timer: null
     };
@@ -326,24 +350,19 @@ async function startFight(channel, challengerId, targetId, bet, vsBot) {
 module.exports = {
     name: 'pvp',
     aliases: ['duelo', 'desafiar', 'luta'],
-    description: 'PVP por turnos com embed, mana e botões',
+    description: 'PVP por turnos — desafio em texto, combate em embed',
 
     async execute(message, args) {
         const target =
             message.mentions.users.first() ||
             (args[0] && (await message.client.users.fetch(args[0]).catch(() => null)));
 
-        if (!target) {
-            return message.reply('Uso: `O.pvp @usuário|@bot [aposta]`');
-        }
-        if (target.id === message.author.id) {
+        if (!target) return message.reply('Uso: `O.pvp @usuário|@bot [aposta]`');
+        if (target.id === message.author.id)
             return message.reply('Não pode duelar consigo mesmo.');
-        }
 
         if (!player.has(message.author.id)) {
-            return message.reply(
-                'Crie seu perfil antes: `O.j criar` (recebe o PV de criação).'
-            );
+            return message.reply('Crie seu perfil antes: `O.j criar`.');
         }
 
         const vsBot = !!target.bot;
@@ -382,17 +401,14 @@ module.exports = {
             return message.reply('Aguarde um pouco.');
         }
 
+        const me = player.get(message.author.id);
+        const myName = me?.name || message.author.username;
+
         if (vsBot) {
             lastFight.set(key, now);
-            const intro = await message.channel.send({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0x22d3ee)
-                        .setDescription(
-                            `${message.author} vs ${target} _(bot)_\nAceitação automática…`
-                        )
-                ]
-            });
+            const intro = await message.channel.send(
+                `⚔️ **${myName}** desafiou ${target} _(bot)_ — aceitação automática…`
+            );
             await new Promise((r) => setTimeout(r, BOT_ACCEPT_MS));
             await intro.delete().catch(() => {});
             const started = await startFight(
@@ -406,20 +422,32 @@ module.exports = {
             return;
         }
 
-        pending.set(key, { challengerId: message.author.id, targetId: target.id, bet, at: now });
+        const their = player.get(target.id);
+        const theirName = their?.name || target.username;
+
+        pending.set(key, {
+            challengerId: message.author.id,
+            targetId: target.id,
+            bet,
+            at: now
+        });
         setTimeout(() => {
             if (pending.get(key)?.at === now) pending.delete(key);
         }, 60_000);
 
+        // SEM embed — só texto + botão Aceitar
+        const betLine =
+            bet > 0
+                ? `Aposta: **${eter.formatPlain(bet)}** éter cada.`
+                : 'Duelo sem aposta.';
+
         await message.channel.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0xa78bfa)
-                    .setTitle('⚔️ Desafio PVP')
-                    .setDescription(
-                        `${message.author} desafiou ${target}!\n${bet > 0 ? `Aposta: **${eter.formatPlain(bet)}** cada` : 'Sem aposta.'}\n\n${target}, **Aceitar** para entrar.`
-                    )
-            ],
+            content: [
+                `⚔️ **${myName}** desafiou **${theirName}** (${target}) para um PVP!`,
+                betLine,
+                '',
+                `${target}, clique em **Aceitar** se quiser lutar (60s).`
+            ].join('\n'),
             components: [challengeRow(message.author.id, target.id, bet)]
         });
     },
@@ -475,11 +503,8 @@ module.exports = {
             }
             pending.delete(key);
             return interaction.update({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0x94a3b8)
-                        .setDescription(`❌ Cancelado por ${interaction.user}.`)
-                ],
+                content: `❌ Desafio cancelado por ${interaction.user}.`,
+                embeds: [],
                 components: []
             });
         }
@@ -489,30 +514,32 @@ module.exports = {
             const targetId = parts[3];
             const bet = Math.max(0, Math.floor(Number(parts[4]) || 0));
             const key = fightKey(challengerId, targetId);
+
             if (interaction.user.id !== targetId) {
                 return interaction.reply({
-                    content: 'Só o desafiado aceita.',
+                    content: 'Só o desafiado pode aceitar.',
                     ephemeral: true
                 });
             }
             if (!pending.has(key)) {
                 return interaction.update({
-                    embeds: [
-                        new EmbedBuilder().setDescription('⏰ Expirou.').setColor(0x94a3b8)
-                    ],
+                    content: '⏰ Este desafio expirou.',
+                    embeds: [],
                     components: []
                 });
             }
+
             pending.delete(key);
             lastFight.set(key, Date.now());
+
+            // ainda sem embed de combate — só confirmação em texto
             await interaction.update({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0x34d399)
-                        .setDescription(`⚔️ ${interaction.user} aceitou!`)
-                ],
+                content: `⚔️ ${interaction.user} **aceitou** o duelo! Abrindo o combate…`,
+                embeds: [],
                 components: []
             });
+
+            // agora sim o embed do PVP
             const started = await startFight(
                 interaction.channel,
                 challengerId,
@@ -520,7 +547,9 @@ module.exports = {
                 bet,
                 false
             );
-            if (started.error) await interaction.channel.send(started.error).catch(() => {});
+            if (started.error) {
+                await interaction.channel.send(started.error).catch(() => {});
+            }
         }
     }
 };
