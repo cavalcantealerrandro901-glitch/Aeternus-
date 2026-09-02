@@ -1,7 +1,6 @@
 const autoRepair = require('../utils/autoRepair');
 const { Collection } = require('discord.js');
 
-/** Ponte slash → execute de prefixo (args em opção string) */
 async function bridgeSlashToPrefix(interaction, cmd, client) {
     const raw = interaction.options?.getString?.('args') || '';
     const args = raw.trim() ? raw.trim().split(/\s+/) : [];
@@ -26,7 +25,8 @@ async function bridgeSlashToPrefix(interaction, cmd, client) {
         mentions: {
             users: mentionUsers,
             members: interaction.guild?.members?.cache || new Collection(),
-            has: () => false
+            has: () => false,
+            first: () => mentionUsers.first() || null
         },
         async reply(payload) {
             if (!replied && !interaction.replied && !interaction.deferred) {
@@ -95,12 +95,19 @@ module.exports = {
                 const parts = id.split(':');
                 let cmd = client.commands.get(parts[0]);
 
-                if (!cmd && parts[0] === 'bj') cmd = client.commands.get('blackjack');
+                // aliases de customId → comando
+                if (!cmd && (parts[0] === 'bj' || parts[0] === 'blackjack')) {
+                    cmd = client.commands.get('blackjack') || client.commands.get('bj');
+                }
                 if (!cmd && parts[0] === 'music') cmd = client.commands.get('play');
+                if (!cmd && parts[0] === 'pvp') cmd = client.commands.get('pvp');
+                if (!cmd && parts[0] === 'j') cmd = client.commands.get('j');
+                if (!cmd && parts[0] === 'rank') cmd = client.commands.get('rank');
+                if (!cmd && parts[0] === 'quiz') cmd = client.commands.get('quiz');
+                if (!cmd && id.startsWith('loja:')) cmd = client.commands.get('loja');
                 if (parts[0] === 'act' && parts[1] === 'devolver' && parts[2]) {
                     cmd = client.commands.get(parts[2]);
                 }
-                if (!cmd && id.startsWith('loja:')) cmd = client.commands.get('loja');
 
                 if (cmd?.handleComponent) {
                     await cmd.handleComponent(interaction, client);
