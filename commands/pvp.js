@@ -6,7 +6,6 @@ const {
 const eter = require('../utils/eter');
 const { parseAmount } = require('../utils/parseAmount');
 
-/** desafios pendentes: key = `${challenger}:${target}` */
 const pending = new Map();
 const COOLDOWN_MS = 15_000;
 const lastFight = new Map();
@@ -26,7 +25,6 @@ function fightKey(a, b) {
 }
 
 function rollFight(aId, bId) {
-    // melhor de 3 rounds simples
     let scoreA = 0;
     let scoreB = 0;
     const log = [];
@@ -93,19 +91,15 @@ module.exports = {
             return message.reply('Você não pode duelar consigo mesmo.');
         }
 
-        const betRaw = args.find((a) => !a.startsWith('<@') && /\d/.test(a));
+        const betRaw = args.find((a) => !/^<@!?\d+>$/.test(a) && a.toLowerCase() !== target.id);
         let bet = 0;
         if (betRaw) {
-            const parsed = parseAmount
-                ? parseAmount(betRaw, eter.get(message.author.id))
-                : { ok: true, amount: Math.floor(Number(String(betRaw).replace(/\D/g, '')) || 0) };
-            if (parsed && parsed.ok === false) {
-                return message.reply(parsed.error || 'Aposta inválida.');
+            const amount = parseAmount(betRaw, eter.get(message.author.id));
+            if (!Number.isFinite(amount) || amount < 0) {
+                return message.reply('Aposta inválida. Use número, `1k`, `all`, etc.');
             }
-            bet = Math.floor(Number(parsed?.amount ?? parsed) || 0);
+            bet = Math.floor(amount);
         }
-
-        if (bet < 0) bet = 0;
 
         if (bet > 0) {
             if (eter.get(message.author.id) < bet) {
@@ -140,10 +134,9 @@ module.exports = {
 
         const betLine =
             bet > 0
-                ? `Aposta: **${eter.formatPlain(bet)}** éter cada (total pot **${eter.formatPlain(bet * 2)}**)`
+                ? `Aposta: **${eter.formatPlain(bet)}** éter cada (pot **${eter.formatPlain(bet * 2)}**)`
                 : 'Duelo amistoso (sem aposta).';
 
-        // sem embed — só texto + botões
         await message.channel.send({
             content: [
                 `⚔️ **Desafio PVP**`,
@@ -161,7 +154,6 @@ module.exports = {
         if (!id.startsWith('pvp:')) return;
 
         const parts = id.split(':');
-        // pvp:accept|decline:challenger:target:bet
         const action = parts[1];
         const challengerId = parts[2];
         const targetId = parts[3];
