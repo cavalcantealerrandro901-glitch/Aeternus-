@@ -30,24 +30,21 @@ function ensureAttrs(d) {
 
 function get(userId) {
     const raw = all()[userId] || { xp: 0, level: 0 };
-    const d = {
+    return {
         xp: Number(raw.xp || 0),
         level: Number(raw.level || 0),
         attrs: ensureAttrs({ attrs: raw.attrs })
     };
-    return d;
 }
 
 function xpForLevel(level) {
     const lv = Math.max(0, Number(level) || 0);
-    // escala suave para níveis altos (999+)
     return Math.floor(100 + lv * 85 + Math.pow(lv, 1.15) * 2);
 }
 
 function levelFromXp(totalXp) {
     let level = 0;
     let remain = Number(totalXp || 0);
-    // sem teto prático — 999+
     while (remain >= xpForLevel(level)) {
         remain -= xpForLevel(level);
         level++;
@@ -59,9 +56,7 @@ function levelFromXp(totalXp) {
 function progress(userId) {
     const { xp, level, attrs } = get(userId);
     let remain = Number(xp || 0);
-    for (let lv = 0; lv < level; lv++) {
-        remain -= xpForLevel(lv);
-    }
+    for (let lv = 0; lv < level; lv++) remain -= xpForLevel(lv);
     if (remain < 0) remain = 0;
     const need = xpForLevel(level);
     const pct = Math.min(100, Math.floor((remain / Math.max(1, need)) * 100));
@@ -81,10 +76,10 @@ function dailyMultiplier(level) {
     return 1 + Math.min(2, Number(level || 0) * 0.04);
 }
 
-/** +1 a +3 em um atributo aleatório por nível ganho */
-function rollAttrGain() {
+function rollAttrGain(double = false) {
     const key = ATTR_KEYS[Math.floor(Math.random() * ATTR_KEYS.length)];
-    const amount = 1 + Math.floor(Math.random() * 3);
+    let amount = 1 + Math.floor(Math.random() * 3);
+    if (double) amount *= 2;
     return { key, amount, label: ATTR_LABEL[key] };
 }
 
@@ -99,12 +94,31 @@ function addXp(userId, amount) {
     cur.level = after;
 
     const gains = [];
+    const items = [];
+
     if (after > before) {
+        let playerUtil = null;
+        try {
+            playerUtil = require('./player');
+        } catch (_) {}
+
         const levelsGained = after - before;
         for (let i = 0; i < levelsGained; i++) {
-            const g = rollAttrGain();
-            cur.attrs[g.key] = (cur.attrs[g.key] || 0) + g.amount;
-            gains.push(g);
+            // dobro de atributos por nível (2 rolls)
+            for (let r = 0; r < 2; r++) {
+                const g = rollAttrGain(false);
+                cur.attrs[g.key] = (cur.attrs[g.key] || 0) + g.amount;
+                gains.push(g);
+            }
+
+            // 5% item de classe
+            if (playerUtil && Math.random() < 0.05) {
+                const profile = playerUtil.get(userId);
+                const classId = profile?.classId || 'guerreiro';
+                const item = playerUtil.rollClassItem(classId);
+                playerUtil.addItem(userId, item);
+                items.push(item);
+            }
         }
     }
 
@@ -116,8 +130,9 @@ function addXp(userId, amount) {
         level: cur.level,
         attrs: { ...cur.attrs },
         leveled: after > before,
-        reward: 0, // não dá mais éter
+        reward: 0,
         attrGains: gains,
+        items,
         oldLevel: before,
         progress: progress(userId)
     };
@@ -127,10 +142,21 @@ function getAttrs(userId) {
     return get(userId).attrs;
 }
 
-/** HP máximo derivado de Vida */
 function maxHp(userId) {
     const a = getAttrs(userId);
     return 50 + a.vida * 8;
+}
+
+function maxMana(userId) {
+    try {
+        const player = require('./player');
+        const profile = player.get(userId);
+        const level = get(userId).level;
+        return player.maxManaFromLevel(level, profile?.classId || 'guerreiro');
+    } catch {
+        const level = get(userId).level;
+        return 20 + level * 4;
+    }
 }
 
 function leaderboard(limit = 10) {
@@ -167,6 +193,7 @@ module.exports = {
     all,
     getAttrs,
     maxHp,
+    maxMana,
     ATTR_KEYS,
     ATTR_LABEL,
     BASE_ATTR
