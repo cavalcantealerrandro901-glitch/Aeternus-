@@ -25,13 +25,19 @@ async function main() {
             GatewayIntentBits.Guilds,
             GatewayIntentBits.GuildMembers,
             GatewayIntentBits.GuildMessages,
+            GatewayIntentBits.GuildMessageReactions,
             GatewayIntentBits.GuildModeration,
             GatewayIntentBits.GuildVoiceStates,
             GatewayIntentBits.GuildInvites,
             GatewayIntentBits.MessageContent,
             GatewayIntentBits.DirectMessages
         ],
-        partials: [Partials.Channel, Partials.Message, Partials.GuildMember]
+        partials: [
+            Partials.Channel,
+            Partials.Message,
+            Partials.GuildMember,
+            Partials.Reaction
+        ]
     });
 
     client.commands = new Collection();
@@ -43,7 +49,6 @@ async function main() {
     loadSystems(client);
     startWeb(client);
 
-    // backup também no shutdown (best-effort)
     const backup = require('./utils/backup');
     const shutdown = async (sig) => {
         console.log(`\n${sig} — salvando backup final…`);
