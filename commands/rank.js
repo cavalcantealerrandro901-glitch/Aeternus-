@@ -7,19 +7,24 @@ const {
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 6;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
 function medal(i) {
-    return ['🥇', '🥈', '🥉'][i] || `**${i + 1}.**`;
+    return ['🥇', '🥈', '🥉'][i] || `**#${i + 1}**`;
 }
 
-/**
- * mode: 'global' | 'local' | 'xp'
- */
+/** Nome visual @user sem ping real */
+function displayTag(user, fallbackId) {
+    if (!user) return `@usuário-${String(fallbackId).slice(-4)}`;
+    const name = user.globalName || user.username || `id-${fallbackId}`;
+    // texto plano — Discord não notifica
+    return `@${name}`;
+}
+
 function parseMode(args) {
     const a = String(args?.[0] || '')
         .toLowerCase()
@@ -32,26 +37,19 @@ function parseMode(args) {
         .replace(/[\u0300-\u036f]/g, '')
         .trim();
 
-    // O.rank xp
     if (a === 'xp' || a === 'nivel' || a === 'level' || a === 'exp') return 'xp';
 
-    // O.rank eter local | O.rank local | O.rank eter
     if (
         a === 'local' ||
         a === 'servidor' ||
         a === 'server' ||
-        (a === 'eter' && (b === 'local' || b === 'servidor' || b === 'server' || !b)) ||
-        a === 'eterlocal'
+        a === 'eterlocal' ||
+        (a === 'eter' && (b === 'local' || b === 'servidor' || b === 'server' || !b))
     ) {
-        // "eter" sozinho = local do servidor; global é o padrão sem args ou "global"
-        if (a === 'eter' && !b) return 'local';
-        if (a === 'local' || a === 'servidor' || a === 'server' || a === 'eterlocal') return 'local';
-        if (a === 'eter' && (b === 'local' || b === 'servidor' || b === 'server')) return 'local';
+        return 'local';
     }
 
     if (a === 'global' || a === 'mundo' || a === 'all') return 'global';
-
-    // padrão: ranking global de éter
     return 'global';
 }
 
@@ -83,9 +81,6 @@ function modeMeta(mode) {
     };
 }
 
-/**
- * Lista ordenada: [{ id, value, level? }]
- */
 async function buildList(mode, guild) {
     if (mode === 'xp') {
         const data = xp.all() || {};
@@ -96,15 +91,12 @@ async function buildList(mode, guild) {
         }));
 
         if (guild) {
-            // só membros deste servidor
             const memberIds = new Set();
             try {
                 const members = await guild.members.fetch().catch(() => null);
                 if (members) members.forEach((m) => memberIds.add(m.id));
             } catch (_) {}
-            if (memberIds.size) {
-                entries = entries.filter((e) => memberIds.has(e.id));
-            }
+            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
         }
 
         return entries
@@ -112,7 +104,6 @@ async function buildList(mode, guild) {
             .sort((a, b) => b.value - a.value || b.level - a.level);
     }
 
-    // éter global ou local
     const data = eter.all() || {};
     let entries = Object.entries(data).map(([id, v]) => ({
         id,
@@ -125,9 +116,7 @@ async function buildList(mode, guild) {
             const members = await guild.members.fetch().catch(() => null);
             if (members) members.forEach((m) => memberIds.add(m.id));
         } catch (_) {}
-        if (memberIds.size) {
-            entries = entries.filter((e) => memberIds.has(e.id));
-        }
+        if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
     }
 
     return entries.filter((e) => e.value > 0).sort((a, b) => b.value - a.value);
@@ -150,22 +139,26 @@ async function pageEmbed(client, list, mode, page, guildName) {
     const start = p * PAGE_SIZE;
     const slice = list.slice(start, start + PAGE_SIZE);
 
-    const lines = [];
+    const blocks = [];
     for (let i = 0; i < slice.length; i++) {
         const e = slice[i];
         const pos = start + i;
         const u = await client.users.fetch(e.id).catch(() => null);
-        const name = u ? u.username : `ID ${e.id}`;
+        const tag = displayTag(u, e.id);
         const extra =
-            mode === 'xp' && e.level != null ? ` · Nv. **${e.level}**` : '';
-        lines.push(
-            `${medal(pos)} ${name} — ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+            mode === 'xp' && e.level != null ? `\n   Nv. **${e.level}**` : '';
+
+        blocks.push(
+            [
+                `${medal(pos)}  **${tag}**`,
+                `   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+            ].join('\n')
         );
     }
 
-    if (!lines.length) {
-        lines.push('_Ninguém no ranking ainda._');
-    }
+    const body = blocks.length
+        ? blocks.join('\n\n──────────────────\n\n')
+        : '_Ninguém no ranking ainda._';
 
     const scopeLine =
         meta.scope === 'local'
@@ -177,19 +170,14 @@ async function pageEmbed(client, list, mode, page, guildName) {
         .setTitle(meta.title)
         .setDescription(
             [
-                '```',
-                '  ╔═══════════════════════════╗',
-                '  ║     AETERNUS  ·  RANKING     ║',
-                '  ╚═══════════════════════════╝',
-                '```',
                 scopeLine,
-                `Total no ranking: **${fmt(list.length)}**`,
+                `Total no ranking: **${fmt(list.length)}** · **${PAGE_SIZE}** por página`,
                 '',
-                lines.join('\n')
+                body
             ].join('\n')
         )
         .setFooter({
-            text: `Página ${p + 1}/${totalPages} · 10 por página · O.rank · O.rank eter · O.rank xp`
+            text: `Página ${p + 1}/${totalPages} · O.rank · O.rank local · O.rank xp`
         })
         .setTimestamp();
 }
@@ -231,7 +219,7 @@ function helpEmbed() {
                 '**Navegação**',
                 '⬅️ Voltar · 👤 Ver meu rank · ➡️ Próximo',
                 '',
-                '10 membros por página.'
+                `${PAGE_SIZE} membros por página.`
             ].join('\n')
         )
         .setFooter({ text: 'Aeternus · Rank' });
@@ -249,13 +237,7 @@ async function sendRank(ctx, mode, page = 0) {
     const list = await buildList(mode, guild);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     const p = Math.min(Math.max(0, page), totalPages - 1);
-    const emb = await pageEmbed(
-        ctx.client,
-        list,
-        mode,
-        p,
-        guild?.name
-    );
+    const emb = await pageEmbed(ctx.client, list, mode, p, guild?.name);
 
     return {
         embeds: [emb],
@@ -283,7 +265,6 @@ module.exports = {
         if (!interaction.customId.startsWith('rank:')) return;
 
         const parts = interaction.customId.split(':');
-        // rank:prev|next|me:mode:page
         const action = parts[1];
         const mode = parts[2] || 'global';
         let page = parseInt(parts[3], 10) || 0;
@@ -292,7 +273,6 @@ module.exports = {
             return interaction.reply({ content: 'Modo inválido.', ephemeral: true });
         }
 
-        // Ver meu rank — resposta efêmera
         if (action === 'me') {
             const guild = interaction.guild;
             if ((mode === 'local' || mode === 'xp') && !guild) {
@@ -321,8 +301,7 @@ module.exports = {
             }
 
             const pageOfMe = Math.floor((mine.rank - 1) / PAGE_SIZE);
-            const extra =
-                mode === 'xp' ? ` · Nível **${mine.level}**` : '';
+            const extra = mode === 'xp' ? ` · Nível **${mine.level}**` : '';
 
             return interaction.reply({
                 embeds: [
