@@ -3,6 +3,7 @@
  */
 const { EmbedBuilder, ChannelType } = require('discord.js');
 const { getSettings, setSettings } = require('../utils/settings');
+const { ATTR_LABEL } = require('../utils/xp');
 
 const stickyCount = new Map();
 const stickyMsgId = new Map();
@@ -246,7 +247,6 @@ function setup(client) {
             }
         } catch (_) {}
 
-        // counting
         try {
             const ct = s.counting;
             if (ct?.enabled && String(ct.channelId) === String(message.channel.id)) {
@@ -503,9 +503,16 @@ async function announceLevel(message, res) {
     try {
         const s = getSettings(message.guild.id).levels;
         if (s?.enabled === false) return null;
-        const text = `✨ ${message.author} nível **${res.level}** · +✨ ${Number(
-            res.reward || 0
-        ).toLocaleString('pt-BR')} éter`;
+
+        const gains = Array.isArray(res.attrGains) ? res.attrGains : [];
+        const gainText = gains.length
+            ? gains
+                  .map((g) => `+${g.amount} ${g.label || ATTR_LABEL[g.key] || g.key}`)
+                  .join(' · ')
+            : 'atributos reforçados';
+
+        const text = `⭐ ${message.author} subiu para o nível **${res.level}**!\n💪 ${gainText}`;
+
         if (s?.announceChannelId) {
             const ch = await message.guild.channels.fetch(s.announceChannelId).catch(() => null);
             if (ch?.isTextBased()) return ch.send(text).catch(() => null);
