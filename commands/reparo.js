@@ -3,9 +3,9 @@ const autoRepair = require('../utils/autoRepair');
 
 module.exports = {
     name: 'reparo',
-    aliases: ['autorepair', 'repair', 'reparos'],
-    description: 'Status do sistema de auto-reparo (dono)',
-    async execute(message) {
+    aliases: ['autorepair', 'repair', 'reparos', 'scan'],
+    description: 'Status do auto-reparo e busca em arquivos (dono)',
+    async execute(message, args) {
         const owners = autoRepair.ownerIds();
         const isOwner =
             owners.includes(message.author.id) ||
@@ -15,13 +15,26 @@ module.exports = {
             return message.reply('❌ Só o dono do bot pode usar este comando.');
         }
 
+        const query = (args[0] || '').toLowerCase();
         const list = autoRepair.getStatus();
         const lines = list.length
-            ? list.slice(0, 15).map((s) => {
+            ? list.slice(0, 12).map((s) => {
                   const when = new Date(s.lastAt).toLocaleString('pt-BR');
                   return `• **${s.name}** — tentativas: ${s.attempts} · ${when}\n  \`${String(s.lastError).slice(0, 80)}\``;
               })
             : ['_Nenhum erro registrado desde o boot._'];
+
+        let scanBlock = '';
+        if (query) {
+            const hits = autoRepair.scanAll(query);
+            scanBlock =
+                hits.length > 0
+                    ? hits
+                          .slice(0, 8)
+                          .map((h, i) => `${i + 1}. \`${h.rel}\` (${h.score}) — ${h.reason}`)
+                          .join('\n')
+                    : '_Nada encontrado._';
+        }
 
         await message.reply({
             embeds: [
@@ -30,14 +43,21 @@ module.exports = {
                     .setTitle('🔧 Auto-reparo')
                     .setDescription(
                         [
-                            `**Donos notificados:** ${owners.length ? owners.map((id) => `<@${id}>`).join(', ') : '_não configurado (OWNER_ID)_'}`,
-                            `**Máx. tentativas:** ${autoRepair.MAX_ATTEMPTS}`,
+                            `**Donos:** ${owners.length ? owners.map((id) => `<@${id}>`).join(', ') : '_OWNER_ID não definido_'}`,
+                            `**Máx. reload:** ${autoRepair.MAX_ATTEMPTS}`,
+                            '**Modo:** avisa no DM + busca em `commands/`, `utils/`, `systems/`, `events/`',
                             '',
                             '**Últimos erros**',
-                            ...lines
-                        ].join('\n')
+                            ...lines,
+                            query ? '' : null,
+                            query ? `**Scan \`${query}\`**` : null,
+                            query ? scanBlock : null,
+                            '',
+                            '_Uso:_ `O.reparo [nome]` para varrer arquivos._'
+                        ]
+                            .filter((x) => x != null)
+                            .join('\n')
                     )
-                    .setFooter({ text: 'Defina OWNER_ID no .env / Render' })
                     .setTimestamp()
             ]
         });
