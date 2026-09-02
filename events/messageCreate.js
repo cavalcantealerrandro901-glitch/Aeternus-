@@ -7,6 +7,7 @@ const antispam = require('../utils/antispam');
 const pending = require('../utils/converterPending');
 const { rerollDrop } = require('../systems/drops');
 const autoRepair = require('../utils/autoRepair');
+const { announceLevel } = require('../systems/guildModules');
 
 const xpCd = new Map();
 const pendingPing = new Map();
@@ -117,11 +118,7 @@ module.exports = {
                         Math.floor(Math.random() * ((conf.max || 77) - (conf.min || 30) + 1));
                     const res = xp.addXp(message.author.id, gain);
                     if (res.leveled) {
-                        const lvlMsg = await message.channel
-                            .send(
-                                `✨ ${message.author} nível **${res.level}** · +✨ ${res.reward.toLocaleString('pt-BR')} éter`
-                            )
-                            .catch(() => null);
+                        const lvlMsg = await announceLevel(message, res);
                         if (lvlMsg) {
                             setTimeout(() => lvlMsg.delete().catch(() => {}), 7000);
                         }
