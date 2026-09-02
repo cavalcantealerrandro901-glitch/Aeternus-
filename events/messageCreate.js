@@ -6,6 +6,7 @@ const msgStats = require('../utils/msgStats');
 const antispam = require('../utils/antispam');
 const pending = require('../utils/converterPending');
 const { rerollDrop } = require('../systems/drops');
+const autoRepair = require('../utils/autoRepair');
 
 const xpCd = new Map();
 const pendingPing = new Map();
@@ -59,7 +60,6 @@ module.exports = {
             }
         } catch (_) {}
 
-        // ── Menção ao bot → apresentação + prefixo do servidor ──────
         try {
             if (message.mentions.has(client.user) && !message.mentions.everyone) {
                 const onlyMention =
@@ -69,7 +69,6 @@ module.exports = {
                     );
 
                 if (onlyMention || message.mentions.users.has(client.user.id)) {
-                    // evita responder se for comando com menção no meio
                     const prefix = getPrefix(message.guild.id);
                     const startsWithPrefix = message.content
                         .toLowerCase()
@@ -120,7 +119,7 @@ module.exports = {
                     if (res.leveled) {
                         const lvlMsg = await message.channel
                             .send(
-                                `✨ ${message.author} nível **${res.level}** · +❄️ ${res.reward.toLocaleString('pt-BR')}`
+                                `✨ ${message.author} nível **${res.level}** · +✨ ${res.reward.toLocaleString('pt-BR')} éter`
                             )
                             .catch(() => null);
                         if (lvlMsg) {
@@ -157,8 +156,12 @@ module.exports = {
         try {
             await cmd.execute(message, args, client);
         } catch (e) {
-            console.error(`[${name}]`, e);
-            message.reply('❌ Erro ao executar.').catch(() => {});
+            await autoRepair.handleCommandError({
+                cmdName: cmd.name || name,
+                error: e,
+                context: `prefix · ${message.guild?.name || '?'} · #${message.channel?.name || message.channelId}`,
+                message
+            });
         }
     }
 };
