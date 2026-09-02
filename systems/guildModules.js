@@ -7,7 +7,6 @@ const { ATTR_LABEL } = require('../utils/xp');
 
 const stickyCount = new Map();
 const stickyMsgId = new Map();
-/** channelId -> { current: number, lastUser: string|null } */
 const countRuntime = new Map();
 const antinukeHits = new Map();
 
@@ -84,15 +83,9 @@ function digitsToInt(str) {
 function parseCountMessage(content) {
     const raw = String(content || '').trim();
     if (!raw) return null;
-
     const asDigits = digitsToInt(raw);
     if (asDigits !== null) return asDigits;
-
-    const key = raw
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{M}/gu, '')
-        .replace(/[^\p{L}\p{N}]/gu, '');
+    const key = raw.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}]/gu, '');
     if (WORD_NUMBERS[raw] !== undefined) return WORD_NUMBERS[raw];
     if (WORD_NUMBERS[key] !== undefined) return WORD_NUMBERS[key];
     return null;
@@ -126,44 +119,33 @@ async function failCounting(message, ct, state, expected, reason) {
     state.current = 0;
     state.lastUser = null;
     persistCount(message.guild.id, ct, state);
-
     await message.react('❌').catch(() => {});
-
-    const emb = new EmbedBuilder()
-        .setColor(0xf87171)
-        .setTitle('🔢 Contagem errada')
-        .setDescription(
-            [
-                `${message.author} errou a contagem.`,
-                '',
-                reason || 'Número incorreto.',
-                `O número certo era **${expected}**.`,
-                '',
-                'A contagem **reiniciou**. O próximo número é **1**.'
-            ].join('\n')
-        )
-        .setFooter({ text: message.guild.name })
-        .setTimestamp();
-
-    await message.channel.send({ embeds: [emb] }).catch(() => {});
+    await message.channel
+        .send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0xf87171)
+                    .setTitle('🔢 Contagem errada')
+                    .setDescription(
+                        `${message.author} errou.\n${reason || ''}\nCerto: **${expected}**. Reiniciou em **1**.`
+                    )
+            ]
+        })
+        .catch(() => {});
 }
 
 function setup(client) {
     client.on('guildMemberAdd', async (member) => {
         if (member.user.bot) return;
         const s = getSettings(member.guild.id);
-
         try {
             if (s.autorole?.enabled && s.autorole.roleId) {
                 const delay = Math.max(0, Number(s.autorole.delaySec) || 0) * 1000;
-                const run = async () => {
-                    await member.roles.add(s.autorole.roleId).catch(() => {});
-                };
+                const run = async () => member.roles.add(s.autorole.roleId).catch(() => {});
                 if (delay) setTimeout(run, delay);
                 else await run();
             }
         } catch (_) {}
-
         try {
             if (s.welcome?.enabled && s.welcome.channelId) {
                 const ch = await member.guild.channels.fetch(s.welcome.channelId).catch(() => null);
@@ -181,28 +163,26 @@ function setup(client) {
                                         .setColor(0xa78bfa)
                                         .setDescription(text)
                                         .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
-                                        .setTimestamp()
                                 ]
                             })
                             .catch(() => {});
-                    } else {
-                        await ch.send(text).catch(() => {});
-                    }
+                    } else await ch.send(text).catch(() => {});
                 }
             }
         } catch (_) {}
-
         try {
             if (s.dmWelcome?.enabled && s.dmWelcome.message) {
-                const text = fmt(s.dmWelcome.message, {
-                    user: member.user.username,
-                    server: member.guild.name,
-                    memberCount: member.guild.memberCount
-                });
-                await member.send(text).catch(() => {});
+                await member
+                    .send(
+                        fmt(s.dmWelcome.message, {
+                            user: member.user.username,
+                            server: member.guild.name,
+                            memberCount: member.guild.memberCount
+                        })
+                    )
+                    .catch(() => {});
             }
         } catch (_) {}
-
         await updateMemberCounter(member.guild);
     });
 
@@ -212,12 +192,15 @@ function setup(client) {
             if (s.leave?.enabled && s.leave.channelId) {
                 const ch = await member.guild.channels.fetch(s.leave.channelId).catch(() => null);
                 if (ch?.isTextBased()) {
-                    const text = fmt(s.leave.message || '{user} saiu.', {
-                        user: member.user?.tag || member.id,
-                        server: member.guild.name,
-                        memberCount: member.guild.memberCount
-                    });
-                    await ch.send(text).catch(() => {});
+                    await ch
+                        .send(
+                            fmt(s.leave.message || '{user} saiu.', {
+                                user: member.user?.tag || member.id,
+                                server: member.guild.name,
+                                memberCount: member.guild.memberCount
+                            })
+                        )
+                        .catch(() => {});
                 }
             }
         } catch (_) {}
@@ -227,7 +210,6 @@ function setup(client) {
     client.on('messageCreate', async (message) => {
         if (!message.guild || message.author.bot) return;
         const s = getSettings(message.guild.id);
-
         try {
             if (s.mentionGuard?.enabled) {
                 const max = s.mentionGuard.maxMentions ?? 5;
@@ -237,9 +219,7 @@ function setup(client) {
                     (message.mentions.everyone ? 5 : 0);
                 if (count > max) {
                     if (s.mentionGuard.punish === 'timeout') {
-                        await message.member
-                            ?.timeout?.(60_000, 'Menções em excesso')
-                            .catch(() => {});
+                        await message.member?.timeout?.(60_000, 'Menções').catch(() => {});
                     }
                     await message.delete().catch(() => {});
                     return;
@@ -251,33 +231,29 @@ function setup(client) {
             const ct = s.counting;
             if (ct?.enabled && String(ct.channelId) === String(message.channel.id)) {
                 const num = parseCountMessage(message.content);
-
                 if (num !== null) {
                     const state = getCountState(message.channel.id, ct.current);
                     const expected = state.current + 1;
-
                     if (!ct.allowSameUser && state.lastUser === message.author.id) {
                         await failCounting(
                             message,
                             ct,
                             state,
                             expected,
-                            'A mesma pessoa não pode contar duas vezes seguidas.'
+                            'Mesma pessoa não conta duas vezes.'
                         );
                         return;
                     }
-
                     if (num !== expected) {
                         await failCounting(
                             message,
                             ct,
                             state,
                             expected,
-                            `Você enviou **${num}**, mas o certo era **${expected}**.`
+                            `Você enviou **${num}**.`
                         );
                         return;
                     }
-
                     state.current = expected;
                     state.lastUser = message.author.id;
                     persistCount(message.guild.id, ct, state);
@@ -297,9 +273,7 @@ function setup(client) {
                 if (n >= every) {
                     stickyCount.set(message.channel.id, 0);
                     const oldId = stickyMsgId.get(message.channel.id);
-                    if (oldId) {
-                        await message.channel.messages.delete(oldId).catch(() => {});
-                    }
+                    if (oldId) await message.channel.messages.delete(oldId).catch(() => {});
                     const sent = await message.channel
                         .send({ content: st.content.slice(0, 2000) })
                         .catch(() => null);
@@ -311,8 +285,7 @@ function setup(client) {
         try {
             const rx = s.autoReact;
             if (rx?.enabled && rx.channelId === message.channel.id) {
-                const emojis = Array.isArray(rx.emojis) ? rx.emojis : ['👍'];
-                for (const e of emojis.slice(0, 5)) {
+                for (const e of (Array.isArray(rx.emojis) ? rx.emojis : ['👍']).slice(0, 5)) {
                     await message.react(e).catch(() => {});
                 }
             }
@@ -321,11 +294,15 @@ function setup(client) {
         try {
             const at = s.autoThread;
             if (at?.enabled && at.channelId === message.channel.id && message.channel.isTextBased()) {
-                const name = fmt(at.nameFormat || 'Discussão · {user}', {
-                    user: message.author.username,
-                    server: message.guild.name
-                }).slice(0, 100);
-                await message.startThread({ name, autoArchiveDuration: 1440 }).catch(() => {});
+                await message
+                    .startThread({
+                        name: fmt(at.nameFormat || 'Discussão · {user}', {
+                            user: message.author.username,
+                            server: message.guild.name
+                        }).slice(0, 100),
+                        autoArchiveDuration: 1440
+                    })
+                    .catch(() => {});
             }
         } catch (_) {}
 
@@ -347,32 +324,22 @@ function setup(client) {
             if (user.bot) return;
             if (reaction.partial) await reaction.fetch().catch(() => null);
             const message = reaction.message;
-            if (!message?.guild || message.partial) {
-                await message?.fetch?.().catch(() => null);
-            }
+            if (!message?.guild || message.partial) await message?.fetch?.().catch(() => null);
             if (!message?.guild) return;
-
             const s = getSettings(message.guild.id).starboard;
             if (!s?.enabled || !s.channelId) return;
-
             const emoji = s.emoji || '⭐';
             const name = reaction.emoji?.name || '';
-            const id = reaction.emoji?.id;
             const match =
                 name === emoji ||
                 reaction.emoji?.toString?.() === emoji ||
-                (id && emoji.includes(id));
+                (reaction.emoji?.id && emoji.includes(reaction.emoji.id));
             if (!match && emoji === '⭐' && name !== '⭐' && name !== 'star') return;
             if (!match && emoji !== '⭐') return;
-
-            const min = s.minStars ?? 3;
-            const count = reaction.count || 0;
-            if (count < min) return;
+            if ((reaction.count || 0) < (s.minStars ?? 3)) return;
             if (message.channel.id === s.channelId) return;
-
             const board = await message.guild.channels.fetch(s.channelId).catch(() => null);
             if (!board?.isTextBased()) return;
-
             const recent = await board.messages.fetch({ limit: 30 }).catch(() => null);
             const already = recent?.find(
                 (m) =>
@@ -380,11 +347,13 @@ function setup(client) {
                     m.embeds?.[0]?.footer?.text?.includes(message.id)
             );
             if (already) {
-                const emb = EmbedBuilder.from(already.embeds[0]).setTitle(`${emoji} ${count}`);
-                await already.edit({ embeds: [emb] }).catch(() => {});
+                await already
+                    .edit({
+                        embeds: [EmbedBuilder.from(already.embeds[0]).setTitle(`${emoji} ${reaction.count}`)]
+                    })
+                    .catch(() => {});
                 return;
             }
-
             const emb = new EmbedBuilder()
                 .setColor(0xfbbf24)
                 .setAuthor({
@@ -392,37 +361,30 @@ function setup(client) {
                     iconURL: message.author?.displayAvatarURL?.({ size: 64 })
                 })
                 .setDescription(message.content?.slice(0, 1500) || '_sem texto_')
-                .setTitle(`${emoji} ${count}`)
+                .setTitle(`${emoji} ${reaction.count}`)
                 .addFields({
                     name: 'Origem',
-                    value: `[Ir à mensagem](${message.url}) · <#${message.channel.id}>`
+                    value: `[Ir](${message.url}) · <#${message.channel.id}>`
                 })
                 .setFooter({ text: `ID ${message.id}` })
                 .setTimestamp(message.createdAt);
-
             const img = message.attachments?.find((a) =>
                 /\.(png|jpe?g|gif|webp)$/i.test(a.name || a.url)
             );
             if (img) emb.setImage(img.url);
-
             await board.send({ embeds: [emb] }).catch(() => {});
         } catch (_) {}
     });
 
     client.on('interactionCreate', async (interaction) => {
         try {
-            if (!interaction.isButton()) return;
-            if (interaction.customId !== 'verify:btn') return;
+            if (!interaction.isButton() || interaction.customId !== 'verify:btn') return;
             const s = getSettings(interaction.guildId).verification;
             if (!s?.enabled || !s.roleId) {
-                return interaction
-                    .reply({ content: 'Verificação desativada.', ephemeral: true })
-                    .catch(() => {});
+                return interaction.reply({ content: 'Verificação desativada.', ephemeral: true });
             }
             await interaction.member.roles.add(s.roleId).catch(() => null);
-            await interaction
-                .reply({ content: '✅ Verificado!', ephemeral: true })
-                .catch(() => {});
+            await interaction.reply({ content: '✅ Verificado!', ephemeral: true });
         } catch (_) {}
     });
 
@@ -432,7 +394,6 @@ function setup(client) {
             if (!guild) return;
             const s = getSettings(guild.id).voiceHub;
             if (!s?.enabled || !s.channelId || !s.createTemp) return;
-
             if (newS.channelId === s.channelId) {
                 const ch = await guild.channels
                     .create({
@@ -447,7 +408,6 @@ function setup(client) {
                     ch.tempHub = true;
                 }
             }
-
             if (oldS.channel && oldS.channelId !== s.channelId) {
                 const ch = oldS.channel;
                 if (
@@ -469,9 +429,7 @@ function setup(client) {
                 const log = getSettings(ban.guild.id).logs;
                 if (log?.enabled && log.channelId) {
                     const ch = await ban.guild.channels.fetch(log.channelId).catch(() => null);
-                    await ch
-                        ?.send(`🚨 **Anti-nuke:** muitos bans em pouco tempo neste servidor.`)
-                        .catch(() => {});
+                    await ch?.send('🚨 **Anti-nuke:** muitos bans.').catch(() => {});
                 }
             }
         } catch (_) {}
@@ -485,12 +443,8 @@ function setup(client) {
             if (antinukeCheck(channel.guild.id, 'channel', s.maxChannels, s.windowSec)) {
                 const log = getSettings(channel.guild.id).logs;
                 if (log?.enabled && log.channelId) {
-                    const ch = await channel.guild.channels
-                        .fetch(log.channelId)
-                        .catch(() => null);
-                    await ch
-                        ?.send(`🚨 **Anti-nuke:** exclusão rápida de canais detectada.`)
-                        .catch(() => {});
+                    const ch = await channel.guild.channels.fetch(log.channelId).catch(() => null);
+                    await ch?.send('🚨 **Anti-nuke:** exclusão rápida de canais.').catch(() => {});
                 }
             }
         } catch (_) {}
@@ -511,7 +465,12 @@ async function announceLevel(message, res) {
                   .join(' · ')
             : 'atributos reforçados';
 
-        const text = `⭐ ${message.author} subiu para o nível **${res.level}**!\n💪 ${gainText}`;
+        const items = Array.isArray(res.items) ? res.items : [];
+        const itemText = items.length
+            ? '\n🎁 Item: ' + items.map((i) => `${i.emoji || ''} **${i.name}**`).join(', ')
+            : '';
+
+        const text = `⭐ ${message.author} nível **${res.level}**!\n💪 ${gainText}${itemText}`;
 
         if (s?.announceChannelId) {
             const ch = await message.guild.channels.fetch(s.announceChannelId).catch(() => null);
