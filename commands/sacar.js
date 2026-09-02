@@ -9,15 +9,25 @@ function fmt(n) {
 
 module.exports = {
     name: 'sacar',
-    aliases: ['with', 'withdraw', 'saque'],
+    aliases: ['saque', 'with'],
     description: 'Saca éter do banco',
     async execute(message, args) {
-        const bet = resolveBet(args[0], bank.get(message.author.id), { label: '🏦' });
-        if (!bet.ok)
+        if (!args[0]) {
+            return message.reply('❌ Uso: `O.sacar <valor|all|half>`\nEx.: `O.sacar 500` · `O.sacar all`');
+        }
+
+        const saved = bank.get(message.author.id);
+        if (saved <= 0) {
+            return message.reply('❌ Seu cofre está vazio. Nada para sacar.');
+        }
+
+        const bet = resolveBet(args[0], saved, { label: '🏦' });
+        if (!bet.ok) {
             return message.reply(`❌ ${bet.error}\nUso: \`O.sacar <valor|all|half>\`);
+        }
 
         bank.remove(message.author.id, bet.amount);
-        eter.add(message.author.id, bet.amount);
+        eter.add(message.author.id, bet.amount, { reason: 'withdraw' });
 
         await message.reply({
             embeds: [

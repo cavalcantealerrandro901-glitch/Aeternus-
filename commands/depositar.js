@@ -9,14 +9,24 @@ function fmt(n) {
 
 module.exports = {
     name: 'depositar',
-    aliases: ['dep', 'deposit'],
+    aliases: ['dep'],
     description: 'Deposita éter no banco',
     async execute(message, args) {
-        const bet = resolveBet(args[0], eter.get(message.author.id), { label: '✨' });
-        if (!bet.ok)
-            return message.reply(`❌ ${bet.error}\nUso: \`O.depositar <valor|all|half>\`);
+        if (!args[0]) {
+            return message.reply('❌ Uso: `O.dep <valor|all|half>`\nEx.: `O.dep 1k` · `O.dep all`');
+        }
 
-        eter.remove(message.author.id, bet.amount);
+        const wallet = eter.get(message.author.id);
+        if (wallet <= 0) {
+            return message.reply('❌ Sua carteira está vazia. Nada para depositar.');
+        }
+
+        const bet = resolveBet(args[0], wallet, { label: '✨' });
+        if (!bet.ok) {
+            return message.reply(`❌ ${bet.error}\nUso: \`O.dep <valor|all|half>\`);
+        }
+
+        eter.remove(message.author.id, bet.amount, { reason: 'deposit' });
         bank.add(message.author.id, bet.amount);
 
         await message.reply({
@@ -27,13 +37,13 @@ module.exports = {
                         name: 'Aeternus Bank · Depósito',
                         iconURL: message.client.user.displayAvatarURL({ size: 64 })
                     })
-                    .setTitle('✅  Transferência concluída')
+                    .setTitle('✅  Depósito concluído')
                     .setDescription(
                         [
                             '```',
                             '  CARTEIRA  ──►  COFRE',
                             '```',
-                            `Valor creditado: ✨ **${fmt(bet.amount)}**`
+                            `Valor guardado: ✨ **${fmt(bet.amount)}**`
                         ].join('\n')
                     )
                     .addFields(
@@ -48,7 +58,7 @@ module.exports = {
                             inline: true
                         }
                     )
-                    .setFooter({ text: 'Comprovante · Aeternus Bank' })
+                    .setFooter({ text: 'Valores no cofre ficam protegidos de roubos' })
                     .setTimestamp()
             ]
         });
