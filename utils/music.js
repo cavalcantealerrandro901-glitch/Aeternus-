@@ -1,6 +1,6 @@
 /**
- * Música Aeternus — multi-fonte gratuita
- * Ordem: Link direto → SoundCloud → JioSaavn → Spotify/Deezer → YouTube → Bandcamp/Rádio
+ * Música Aeternus — multi-fonte
+ * SoundCloud via API pública (client_id) — não depende do play-dl.search SC
  */
 const {
     createAudioPlayer,
@@ -14,6 +14,7 @@ const {
     StreamType
 } = require('@discordjs/voice');
 const { PermissionsBitField } = require('discord.js');
+const axios = require('axios');
 
 try {
     process.env.FFMPEG_PATH = require('ffmpeg-static');
@@ -37,13 +38,98 @@ try {
     YouTube = require('youtube-sr').default;
 } catch (_) {}
 
-// API gratuita (JioSaavn etc)
 let audioAPI = null;
 try {
     audioAPI = require('./audioAPI');
 } catch (_) {}
 
 const guilds = new Map();
+
+/** client_id SoundCloud (cache) */
+let scClientId = process.env.SOUNDCLOUD_CLIENT_ID || 'a3e059563d7fd3372b49b37f4ef3e9a9';
+let scClientFetchedAt = 0;
+
+async function refreshSoundCloudClientId() {
+    // só tenta a cada 6h
+    if (Date.now() - scClientFetchedAt < 6 * 60 * 60 * 1000 && scClientId) {
+        return scClientId;
+    }
+    try {
+        const { data: html } = await axios.get('https://soundcloud.com', {
+            timeout: 8000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const scriptUrls = [...String(html).matchAll(/src="(https:\/\/[^"]+sndcdn\.com\/assets\/[^"]+\.js)"/g)].map(
+            (m) => m[1]
+        );
+        for (const url of scriptUrls.slice(0, 8)) {
+            try {
+                const { data: js } = await axios.get(url, { timeout: 8000 });
+                const m = String(js).match(/client_id\s*[:=]\s*["']([a-zA-Z0-9]{32})["']/);
+                if (m?.[1]) {
+                    scClientId = m[1];
+                    scClientFetchedAt = Date.now();
+                    console.log('[music] SoundCloud client_id atualizado');
+                    return scClientId;
+                }
+            } catch (_) {}
+        }
+    } catch (e) {
+        console.error('[music] refresh SC client_id:', e.message);
+    }
+    scClientFetchedAt = Date.now();
+    return scClientId;
+}
+
+async function searchSoundCloudPublic(query) {
+    const client_id = await refreshSoundCloudClientId();
+    if (!client_id) return null;
+
+    try {
+        const { data } = await axios.get('https://api-v2.soundcloud.com/search/tracks', {
+            params: { q: query, client_id, limit: 5, app_locale: 'pt' },
+            timeout: 10000,
+            headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
+        });
+        const track = data?.collection?.find((t) => t?.permalink_url) || data?.collection?.[0];
+        if (!track) return null;
+        return {
+            title: track.title || query,
+            url: track.permalink_url,
+            duration: Math.floor((track.duration || 0) / 1000),
+            thumbnail: (track.artwork_url || '').replace('-large', '-t500x500') || null,
+            channel: track.user?.username || 'SoundCloud',
+            source: 'soundcloud'
+        };
+    } catch (e) {
+        // client_id pode ter expirado — força refresh uma vez
+        if (e.response?.status === 401 || e.response?.status === 403) {
+            scClientFetchedAt = 0;
+            try {
+                const client_id2 = await refreshSoundCloudClientId();
+                const { data } = await axios.get('https://api-v2.soundcloud.com/search/tracks', {
+                    params: { q: query, client_id: client_id2, limit: 5 },
+                    timeout: 10000
+                });
+                const track = data?.collection?.[0];
+                if (!track) return null;
+                return {
+                    title: track.title || query,
+                    url: track.permalink_url,
+                    duration: Math.floor((track.duration || 0) / 1000),
+                    thumbnail: (track.artwork_url || '').replace('-large', '-t500x500') || null,
+                    channel: track.user?.username || 'SoundCloud',
+                    source: 'soundcloud'
+                };
+            } catch (e2) {
+                console.error('[music] SC API retry:', e2.message);
+            }
+        } else {
+            console.error('[music] SC API:', e.message);
+        }
+        return null;
+    }
+}
 
 function fmtDuration(sec) {
     const s = Math.max(0, Math.floor(Number(sec) || 0));
@@ -59,11 +145,13 @@ function isYtUrl(q) {
 }
 
 function isSoundCloudUrl(q) {
-    return /^(https?:\/\/)?(www\.|m\.)?soundcloud\.com\//i.test(String(q || ''));
+    return /^(https?:\/\/)?(www\.|m\.|on\.)?soundcloud\.com\//i.test(String(q || ''));
 }
 
 function isSpotifyUrl(q) {
-    return /^(https?:\/\/)?(open\.)?spotify\.com\/(track|album|playlist|artist)\//i.test(String(q || ''));
+    return /^(https?:\/\/)?(open\.)?spotify\.com\/(track|album|playlist|artist)\//i.test(
+        String(q || '')
+    );
 }
 
 function isDeezerUrl(q) {
@@ -83,9 +171,11 @@ function isDirectAudioUrl(q) {
 }
 
 function isRadioOrStreamUrl(q) {
-    // URLs de rádio / Icecast / Shoutcast comuns
-    return /^https?:\/\/.+(\/stream|\/live|\/radio|icecast|shoutcast|\.m3u8?|\.pls)(\?.*)?$/i.test(String(q || ''))
-        || /\.(m3u8?|pls)(\?.*)?$/i.test(String(q || ''));
+    return (
+        /^https?:\/\/.+(\/stream|\/live|\/radio|icecast|shoutcast|\.m3u8?|\.pls)(\?.*)?$/i.test(
+            String(q || '')
+        ) || /\.(m3u8?|pls)(\?.*)?$/i.test(String(q || ''))
+    );
 }
 
 function getState(guildId) {
@@ -106,67 +196,82 @@ function getState(guildId) {
 }
 
 /**
- * SoundCloud
+ * SoundCloud — SEM playDl.search (quebra com client_id undefined)
  */
 async function resolveSoundCloud(q, requestedBy) {
-    if (!playDl) return null;
-
+    // Link direto
     if (isSoundCloudUrl(q)) {
-        try {
-            const info = await playDl.soundcloud(q);
-            if (info) {
+        // tenta play-dl só no link (pode funcionar mesmo sem search)
+        if (playDl) {
+            try {
+                const info = await playDl.soundcloud(q);
+                if (info) {
+                    return {
+                        title: info.name || info.title || q,
+                        url: info.url || q,
+                        duration: Number(info.durationInSec) || Number(info.duration) || 0,
+                        thumbnail: info.thumbnail || null,
+                        channel: info.user?.name || info.publisher?.name || 'SoundCloud',
+                        source: 'soundcloud',
+                        requestedBy: requestedBy || null
+                    };
+                }
+            } catch (e) {
+                console.error('[music] soundcloud link play-dl:', e.message);
+            }
+        }
+        return {
+            title: 'SoundCloud',
+            url: q,
+            duration: 0,
+            thumbnail: null,
+            channel: 'SoundCloud',
+            source: 'soundcloud',
+            requestedBy: requestedBy || null
+        };
+    }
+
+    // Busca por texto → API pública
+    try {
+        if (audioAPI?.searchSoundCloudAPI) {
+            const api = await audioAPI.searchSoundCloudAPI(q);
+            if (api?.url) {
                 return {
-                    title: info.name || info.title || q,
-                    url: info.url || q,
-                    duration: Number(info.durationInSec) || Number(info.duration) || 0,
-                    thumbnail: info.thumbnail || null,
-                    channel: info.user?.name || info.publisher?.name || 'SoundCloud',
+                    title: api.title || q,
+                    url: api.url,
+                    duration: Number(api.duration) || 0,
+                    thumbnail: api.thumbnail || null,
+                    channel: api.artist || 'SoundCloud',
                     source: 'soundcloud',
                     requestedBy: requestedBy || null
                 };
             }
-        } catch (e) {
-            console.error('[music] soundcloud link:', e.message);
         }
+    } catch (e) {
+        console.error('[music] audioAPI SC:', e.message);
     }
 
     try {
-        const results = await playDl.search(q, {
-            limit: 1,
-            source: { soundcloud: 'tracks' }
-        });
-        if (results?.[0]) {
-            const d = results[0];
-            return {
-                title: d.name || d.title || q,
-                url: d.url,
-                duration: Number(d.durationInSec) || Number(d.duration) || 0,
-                thumbnail: d.thumbnail || null,
-                channel: d.user?.name || d.publisher?.name || 'SoundCloud',
-                source: 'soundcloud',
-                requestedBy: requestedBy || null
-            };
+        const pub = await searchSoundCloudPublic(q);
+        if (pub) {
+            return { ...pub, requestedBy: requestedBy || null };
         }
     } catch (e) {
-        console.error('[music] soundcloud search:', e.message);
+        console.error('[music] soundcloud public:', e.message);
     }
 
+    // NÃO usa playDl.search com source soundcloud — causa client_id undefined
     return null;
 }
 
-/**
- * JioSaavn (API gratuita via audioAPI)
- */
 async function resolveJioSaavn(q, requestedBy) {
     if (!audioAPI?.searchJioSaavnAPI) return null;
 
     try {
         const result = await audioAPI.searchJioSaavnAPI(q);
         if (result) {
-            // Converte para stream via YouTube/SoundCloud usando o título
             const searchQ = `${result.title} ${result.artist || ''}`.trim();
 
-            // Tenta SoundCloud primeiro
             const sc = await resolveSoundCloud(searchQ, requestedBy);
             if (sc) {
                 sc.title = result.title || sc.title;
@@ -176,7 +281,6 @@ async function resolveJioSaavn(q, requestedBy) {
                 return sc;
             }
 
-            // Fallback YouTube
             const yt = await resolveYouTube(searchQ, requestedBy);
             if (yt) {
                 yt.title = result.title || yt.title;
@@ -193,9 +297,6 @@ async function resolveJioSaavn(q, requestedBy) {
     return null;
 }
 
-/**
- * Spotify / Deezer → metadados + stream via SC/YT
- */
 async function resolveSpotifyOrDeezer(q, requestedBy) {
     if (!playDl) return null;
 
@@ -212,7 +313,8 @@ async function resolveSpotifyOrDeezer(q, requestedBy) {
                 if (sp) {
                     if (sp.type === 'track' || sp.name) {
                         metaTitle = sp.name || sp.title;
-                        metaArtist = sp.artists?.map?.(a => a.name).join(', ') || sp.artist || '';
+                        metaArtist =
+                            sp.artists?.map?.((a) => a.name).join(', ') || sp.artist || '';
                         metaThumb = sp.thumbnail || sp.thumbnails?.[0]?.url || null;
                         searchQuery = `${metaTitle} ${metaArtist}`.trim();
                         sourceLabel = 'spotify';
@@ -252,9 +354,6 @@ async function resolveSpotifyOrDeezer(q, requestedBy) {
     return null;
 }
 
-/**
- * YouTube
- */
 async function resolveYouTube(q, requestedBy) {
     if (YouTube) {
         try {
@@ -265,7 +364,10 @@ async function resolveYouTube(q, requestedBy) {
                         title: v.title || q,
                         url: v.url || `https://www.youtube.com/watch?v=${v.id}`,
                         duration: Number(v.duration) || 0,
-                        thumbnail: v.thumbnail?.displayThumbnailURL?.('maxresdefault') || v.thumbnail?.url || null,
+                        thumbnail:
+                            v.thumbnail?.displayThumbnailURL?.('maxresdefault') ||
+                            v.thumbnail?.url ||
+                            null,
                         channel: v.channel?.name || 'YouTube',
                         source: 'youtube',
                         requestedBy: requestedBy || null
@@ -278,7 +380,10 @@ async function resolveYouTube(q, requestedBy) {
                         title: v.title || q,
                         url: v.url || `https://www.youtube.com/watch?v=${v.id}`,
                         duration: Number(v.duration) || 0,
-                        thumbnail: v.thumbnail?.displayThumbnailURL?.('maxresdefault') || v.thumbnail?.url || null,
+                        thumbnail:
+                            v.thumbnail?.displayThumbnailURL?.('maxresdefault') ||
+                            v.thumbnail?.url ||
+                            null,
                         channel: v.channel?.name || 'YouTube',
                         source: 'youtube',
                         requestedBy: requestedBy || null
@@ -307,6 +412,7 @@ async function resolveYouTube(q, requestedBy) {
                 };
             }
             if (kind !== 'playlist') {
+                // busca YT padrão (sem source soundcloud)
                 const results = await playDl.search(q, { limit: 1 });
                 if (results?.[0]) {
                     const d = results[0];
@@ -347,9 +453,6 @@ async function resolveYouTube(q, requestedBy) {
     return null;
 }
 
-/**
- * Links diretos, Bandcamp, Vimeo, rádio
- */
 async function resolveDirectOrOther(q, requestedBy) {
     if (isDirectAudioUrl(q)) {
         return {
@@ -387,54 +490,44 @@ async function resolveDirectOrOther(q, requestedBy) {
         };
     }
 
-    if (isVimeoUrl(q) && playDl) {
-        try {
-            // play-dl pode streamar alguns vimeo
-            return {
-                title: 'Vimeo',
-                url: q,
-                duration: 0,
-                thumbnail: null,
-                channel: 'Vimeo',
-                source: 'vimeo',
-                requestedBy: requestedBy || null
-            };
-        } catch (_) {}
+    if (isVimeoUrl(q)) {
+        return {
+            title: 'Vimeo',
+            url: q,
+            duration: 0,
+            thumbnail: null,
+            channel: 'Vimeo',
+            source: 'vimeo',
+            requestedBy: requestedBy || null
+        };
     }
 
     return null;
 }
 
-/**
- * Resolve track com múltiplas fontes gratuitas
- */
 async function resolveTrack(query, requestedBy) {
     const q = String(query || '').trim();
     if (!q) return null;
 
-    // 1. Links diretos / rádio / bandcamp / vimeo
     let track = await resolveDirectOrOther(q, requestedBy);
     if (track) return track;
 
-    // 2. SoundCloud (melhor fonte gratuita estável)
+    // SoundCloud (API pública — não quebra)
     track = await resolveSoundCloud(q, requestedBy);
     if (track) return track;
 
-    // 3. JioSaavn (API gratuita)
     track = await resolveJioSaavn(q, requestedBy);
     if (track) return track;
 
-    // 4. Spotify / Deezer
-    if (isSpotifyUrl(q) || isDeezerUrl(q) || /spotify|deezer/i.test(q)) {
+    if (isSpotifyUrl(q) || isDeezerUrl(q)) {
         track = await resolveSpotifyOrDeezer(q, requestedBy);
         if (track) return track;
     }
 
-    // 5. YouTube
     track = await resolveYouTube(q, requestedBy);
     if (track) return track;
 
-    // 6. Busca genérica play-dl (pega o que conseguir)
+    // busca genérica YT via play-dl (sem soundcloud source)
     if (playDl) {
         try {
             const results = await playDl.search(q, { limit: 1 });
@@ -455,21 +548,14 @@ async function resolveTrack(query, requestedBy) {
         }
     }
 
-    // 7. Última tentativa: Spotify/Deezer genérico mesmo sem link
-    track = await resolveSpotifyOrDeezer(q, requestedBy);
-    if (track) return track;
-
     return null;
 }
 
 async function openStream(url) {
-    // Links diretos e rádio
     if (isDirectAudioUrl(url) || isRadioOrStreamUrl(url) || isBandcampUrl(url) || isVimeoUrl(url)) {
-        // createAudioResource aceita URL string diretamente em muitos casos
         return { stream: url, type: StreamType.Arbitrary };
     }
 
-    // play-dl (SoundCloud, YouTube, etc.)
     if (playDl) {
         try {
             const s = await playDl.stream(url, { quality: 2 });
@@ -479,7 +565,6 @@ async function openStream(url) {
         }
     }
 
-    // ytdl só YouTube
     if (ytdl && ytdl.validateURL(url)) {
         try {
             const stream = ytdl(url, {
@@ -656,7 +741,7 @@ async function enqueue(guild, voiceChannel, textChannel, query, user) {
     if (!track) {
         return {
             ok: false,
-            error: 'Nenhuma música encontrada. Tente SoundCloud, Spotify, YouTube, JioSaavn, Bandcamp ou link direto.'
+            error: 'Nenhuma música encontrada. Tente outro nome, link do YouTube ou SoundCloud.'
         };
     }
 
