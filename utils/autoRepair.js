@@ -1,15 +1,14 @@
 /**
- * Auto-reparo
- * - Avisa o dono no DM (1x por erro, com cooldown)
- * - Faz busca automática em pastas/arquivos do projeto
- * - Tenta recarregar o módulo encontrado (até 3x) e reporta o resultado
+ * Auto-reparo + aviso de erros no DM do dono
+ * - Qualquer erro de comando, sistema, unhandledRejection, uncaughtException
+ * - Busca arquivos relacionados e tenta reload de comandos
  */
 const fs = require('fs');
 const path = require('path');
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 
 const MAX_ATTEMPTS = 3;
-const DM_COOLDOWN_MS = 60_000;
+const DM_COOLDOWN_MS = 45_000;
 const ROOT = path.join(__dirname, '..');
 const SCAN_DIRS = ['commands', 'utils', 'systems', 'events', 'bot', 'web'];
 
@@ -19,9 +18,11 @@ const state = new Map();
 const dmCooldown = new Map();
 
 let clientRef = null;
+let hooksInstalled = false;
 
 function setClient(client) {
     clientRef = client;
+    installGlobalHooks();
 }
 
 function ownerIds() {
@@ -61,6 +62,10 @@ async function dmOwners(embed) {
         console.warn('[autoRepair] OWNER_ID não configurado — só log no console.');
         return false;
     }
+    // client precisa estar pronto
+    if (!clientRef.isReady?.() && clientRef.ws?.status !== 0) {
+        // ainda tenta
+    }
     let sent = false;
     for (const id of ids) {
         try {
@@ -75,7 +80,6 @@ async function dmOwners(embed) {
     return sent;
 }
 
-/** Lista recursiva de .js sob pastas conhecidas */
 function walkJsFiles(dir, acc = [], depth = 0) {
     if (depth > 6) return acc;
     if (!fs.existsSync(dir)) return acc;
@@ -95,10 +99,6 @@ function walkJsFiles(dir, acc = [], depth = 0) {
     return acc;
 }
 
-/**
- * Busca automática: nome do comando, aliases, stack path, require erróneo.
- * Retorna lista de candidatos { file, score, reason }
- */
 function searchProject(cmdName, error) {
     const needle = String(cmdName || '')
         .toLowerCase()
@@ -126,7 +126,7 @@ function searchProject(cmdName, error) {
 
         if (needle && base === needle) {
             score += 100;
-            reasons.push('nome do arquivo = comando');
+            reasons.push('nome do arquivo = módulo');
         } else if (needle && base.includes(needle)) {
             score += 40;
             reasons.push('nome parcial');
@@ -145,7 +145,6 @@ function searchProject(cmdName, error) {
             reasons.push('erro menciona o arquivo');
         }
 
-        // aliases no módulo (só se score baixo ainda)
         if (score < 50 && needle && file.includes(`${path.sep}commands${path.sep}`)) {
             try {
                 const raw = fs.readFileSync(file, 'utf8');
@@ -242,12 +241,12 @@ function errorEmbed({ cmdName, error, context, searchHits, status, extra }) {
         error: '🚨 Erro detectado',
         success: '✅ Módulo recarregado',
         fail: '❌ Falha ao recarregar',
-        info: '🔍 Busca no projeto'
+        info: '🔍 Aviso do sistema'
     };
 
     const stack = String(error?.stack || error?.message || error || 'desconhecido').slice(
         0,
-        700
+        900
     );
 
     const searchLines =
@@ -265,11 +264,11 @@ function errorEmbed({ cmdName, error, context, searchHits, status, extra }) {
         .setTitle(titles[status] || titles.error)
         .setDescription(
             [
-                `**Comando / módulo:** \`${cmdName || '?'}\``,
+                `**Origem:** \`${cmdName || '?'}\``,
                 context ? `**Contexto:** ${context}` : null,
                 extra || null,
                 '',
-                '**Busca automática (pastas)**',
+                '**Busca automática**',
                 ...searchLines,
                 '',
                 '**Erro**',
@@ -280,13 +279,72 @@ function errorEmbed({ cmdName, error, context, searchHits, status, extra }) {
                 .filter((x) => x != null)
                 .join('\n')
         )
-        .setFooter({ text: 'Aeternus · Auto-reparo · só aviso + scan' })
+        .setFooter({ text: 'Aeternus · Auto-aviso · todo erro no DM' })
         .setTimestamp();
 }
 
 /**
- * Fluxo: avisa → busca arquivos/pastas → tenta reload silencioso → 1 DM de resultado
+ * Reporta QUALQUER erro (sistema, música, comando, process)
+ * Sempre tenta mandar DM (com cooldown por chave)
  */
+async function reportError({
+    source = 'system',
+    error,
+    context = '',
+    tryReload = false
+} = {}) {
+    const name = String(source || 'system').toLowerCase().slice(0, 40);
+    const errMsg = error?.message || String(error || 'erro');
+    const key = `${name}:${errMsg.slice(0, 80)}`;
+
+    console.error(`[autoRepair:${name}]`, error?.stack || errMsg);
+
+    const searchHits = searchProject(name, error);
+
+    if (canDm(`any:${key}`)) {
+        await dmOwners(
+            errorEmbed({
+                cmdName: name,
+                error,
+                context: context || 'sistema / global',
+                searchHits,
+                status: 'error'
+            })
+        );
+    }
+
+    if (tryReload) {
+        let repaired = false;
+        let lastReload = null;
+        for (let i = 1; i <= MAX_ATTEMPTS; i++) {
+            lastReload = reloadCommand(name);
+            if (lastReload.ok) {
+                repaired = true;
+                break;
+            }
+            await new Promise((r) => setTimeout(r, 250 * i));
+        }
+        if (canDm(`res:${name}`)) {
+            await dmOwners(
+                errorEmbed({
+                    cmdName: name,
+                    error: {
+                        message: repaired
+                            ? `Recarregado: ${lastReload?.file || '?'}`
+                            : `Não recarregou. ${lastReload?.error || ''}`
+                    },
+                    context,
+                    searchHits,
+                    status: repaired ? 'success' : 'fail'
+                })
+            );
+        }
+        return { repaired, searchHits };
+    }
+
+    return { repaired: false, searchHits };
+}
+
 async function handleCommandError({ cmdName, error, context, message, interaction }) {
     const name = String(cmdName || 'unknown').toLowerCase();
     const errMsg = error?.message || String(error);
@@ -298,29 +356,13 @@ async function handleCommandError({ cmdName, error, context, message, interactio
     st.lastError = errMsg;
     state.set(name, st);
 
-    console.error(`[autoRepair] ${name}:`, error);
+    const result = await reportError({
+        source: name,
+        error,
+        context: context || 'comando',
+        tryReload: true
+    });
 
-    // busca automática em arquivos e pastas
-    const searchHits = searchProject(name, error);
-    console.log(
-        `[autoRepair] scan ${name}:`,
-        searchHits.map((h) => `${h.rel}(${h.score})`).join(', ') || 'nenhum'
-    );
-
-    // uma única notificação de erro + resultado da busca
-    if (canDm(`err:${name}`)) {
-        await dmOwners(
-            errorEmbed({
-                cmdName: name,
-                error,
-                context,
-                searchHits,
-                status: 'error'
-            })
-        );
-    }
-
-    // resposta leve ao usuário (sem spam)
     try {
         if (message?.reply) {
             await message.reply('❌ Erro ao executar. O dono foi avisado.').catch(() => {});
@@ -337,44 +379,56 @@ async function handleCommandError({ cmdName, error, context, message, interactio
         }
     } catch (_) {}
 
-    // tentativas de reload usando o melhor arquivo da busca (sem flood de DM)
-    let repaired = false;
-    let lastReload = null;
-    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
-        st.attempts += 1;
-        state.set(name, st);
-        lastReload = reloadCommand(name);
-        if (lastReload.ok) {
-            repaired = true;
-            st.attempts = 0;
-            state.set(name, st);
-            console.log(`[autoRepair] ${name} ok → ${lastReload.file}`);
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 300 * i));
-    }
+    return result;
+}
 
-    // um único aviso de resultado do reload
-    if (canDm(`res:${name}`)) {
-        await dmOwners(
-            errorEmbed({
-                cmdName: name,
-                error: {
-                    message: repaired
-                        ? `Recarregado: ${lastReload?.file || '?'}`
-                        : `Não recarregou após ${MAX_ATTEMPTS}x. Último: ${lastReload?.error || '?'}`
-                },
-                context,
-                searchHits,
-                status: repaired ? 'success' : 'fail',
-                extra: repaired
-                    ? 'O módulo foi re-registrado em memória.'
-                    : 'Revise o arquivo indicado na busca.'
-            })
-        );
-    }
+function installGlobalHooks() {
+    if (hooksInstalled) return;
+    hooksInstalled = true;
 
-    return { repaired, attempts: st.attempts, searchHits };
+    process.on('unhandledRejection', (err) => {
+        reportError({
+            source: 'unhandledRejection',
+            error: err,
+            context: 'Promise rejeitada sem catch'
+        }).catch(() => {});
+    });
+
+    process.on('uncaughtException', (err) => {
+        reportError({
+            source: 'uncaughtException',
+            error: err,
+            context: 'Exceção não capturada (processo)'
+        }).catch(() => {});
+    });
+
+    // intercepta console.error de sistemas (music, etc.) — só linhas com padrão de erro
+    const originalError = console.error.bind(console);
+    console.error = (...args) => {
+        originalError(...args);
+        try {
+            const text = args
+                .map((a) => (a instanceof Error ? a.stack || a.message : String(a)))
+                .join(' ');
+            // evita loop / spam de autoRepair
+            if (text.includes('[autoRepair')) return;
+            if (
+                /error|erro|cannot|failed|exception|undefined|null/i.test(text) &&
+                text.length > 15
+            ) {
+                const src =
+                    text.match(/\[(music|counting|player|guildModules|interaction|Jio|SoundCloud|Audio)[^\]]*\]/i)?.[0] ||
+                    'console';
+                reportError({
+                    source: String(src).replace(/[[\]]/g, '').slice(0, 32) || 'console',
+                    error: { message: text.slice(0, 500), stack: text.slice(0, 900) },
+                    context: 'console.error (sistema)'
+                }).catch(() => {});
+            }
+        } catch (_) {}
+    };
+
+    console.log('[autoRepair] hooks globais instalados (DM em qualquer erro)');
 }
 
 function getStatus() {
@@ -390,7 +444,6 @@ function getStatus() {
     return out.sort((a, b) => b.lastAt - a.lastAt);
 }
 
-/** Scan manual (comando reparo) */
 function scanAll(query) {
     return searchProject(query || '', null);
 }
@@ -398,10 +451,12 @@ function scanAll(query) {
 module.exports = {
     setClient,
     handleCommandError,
+    reportError,
     reloadCommand,
     searchProject,
     scanAll,
     ownerIds,
     getStatus,
+    installGlobalHooks,
     MAX_ATTEMPTS
 };
