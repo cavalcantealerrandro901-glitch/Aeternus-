@@ -10,7 +10,7 @@ const {
 const player = require('../utils/player');
 
 const invited = new Set();
-const INVITE_COOLDOWN = 1000 * 60 * 60 * 24; // 1 dia por usuário em memória
+const INVITE_COOLDOWN = 1000 * 60 * 60 * 24;
 const lastInvite = new Map();
 
 function inviteEmbed() {
@@ -44,7 +44,7 @@ function inviteRow() {
     );
 }
 
-async function sendInvite(user, reason = '') {
+async function sendInvite(user) {
     if (!user || user.bot) return false;
     if (player.has(user.id)) return false;
 
@@ -69,11 +69,10 @@ function setup(client) {
     client.on('guildMemberAdd', async (member) => {
         if (member.user.bot) return;
         if (player.has(member.id)) return;
-        setTimeout(() => sendInvite(member.user, 'join'), 2500);
+        setTimeout(() => sendInvite(member.user), 2500);
     });
 
-    // Ao ficar pronto: se não houver nenhum perfil, tenta convidar membros em cache
-    client.once('clientReady', async () => {
+    client.once('ready', async () => {
         try {
             if (player.count() > 0) {
                 console.log(`🎮 [player] ${player.count()} perfil(is) carregado(s)`);
@@ -86,7 +85,7 @@ function setup(client) {
                 if (!members) continue;
                 for (const m of members.values()) {
                     if (m.user.bot) continue;
-                    if (await sendInvite(m.user, 'bootstrap')) sent++;
+                    if (await sendInvite(m.user)) sent++;
                     if (sent >= 40) break;
                     await new Promise((r) => setTimeout(r, 400));
                 }
@@ -98,16 +97,14 @@ function setup(client) {
         }
     });
 
-    // Quem manda mensagem e não tem perfil: um nudge (não a cada msg)
     client.on('messageCreate', async (message) => {
         try {
             if (!message.guild || message.author.bot) return;
             if (player.has(message.author.id)) return;
             const last = lastInvite.get(message.author.id) || 0;
             if (Date.now() - last < INVITE_COOLDOWN) return;
-            // só 15% de chance para não spammar
             if (Math.random() > 0.15) return;
-            await sendInvite(message.author, 'chat');
+            await sendInvite(message.author);
         } catch (_) {}
     });
 
