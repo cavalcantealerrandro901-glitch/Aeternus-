@@ -1,3 +1,4 @@
+const autoRepair = require('../utils/autoRepair');
 const { Collection } = require('discord.js');
 
 /** Ponte slash → execute de prefixo (args em opção string) */
@@ -107,13 +108,14 @@ module.exports = {
                 }
             }
         } catch (e) {
-            console.error('[interaction]', e);
-            const payload = { content: '❌ Erro na interação.', ephemeral: true };
-            try {
-                if (interaction.replied || interaction.deferred)
-                    await interaction.followUp(payload);
-                else await interaction.reply(payload);
-            } catch (_) {}
+            const id = interaction.customId || interaction.commandName || '?';
+            const cmdHint = String(id).split(':')[0];
+            await autoRepair.handleCommandError({
+                cmdName: cmdHint,
+                error: e,
+                context: `interaction · ${interaction.guild?.name || 'DM'} · ${interaction.type}`,
+                interaction
+            });
         }
     }
 };
