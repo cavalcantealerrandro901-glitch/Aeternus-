@@ -15,8 +15,93 @@ const lastFight = new Map();
 const COOLDOWN_MS = 12_000;
 const BOT_ACCEPT_MS = 1200;
 const TURN_TIMEOUT_MS = 45_000;
+const SPECIAL_COOLDOWN_TURNS = 3;
 
-const MANA_COST = { attack: 0, heavy: 8, defend: 3, special: 14 };
+/** custos base (mago: especial exige mana atual > 100) */
+const MANA_COST = {
+    default: { attack: 0, heavy: 8, defend: 3, special: 14 },
+    mago: { attack: 5, heavy: 12, defend: 4, special: 100 }
+};
+
+/** rótulos dos botões por classe */
+const CLASS_MOVES = {
+    mago: {
+        attack: { label: 'Raio', emoji: '⚡' },
+        heavy: { label: 'Bola de Fogo', emoji: '🔥' },
+        defend: { label: 'Barreira', emoji: '🛡️' },
+        special: { label: 'Cataclisma', emoji: '🌊' }
+    },
+    arqueiro: {
+        attack: { label: 'Flecha', emoji: '🏹' },
+        heavy: { label: 'Chuva de Flechas', emoji: '🌪️' },
+        defend: { label: 'Esquiva', emoji: '💨' },
+        special: { label: 'Tiro Certeiro', emoji: '🎯' }
+    },
+    tanque: {
+        attack: { label: 'Investida', emoji: '💪' },
+        heavy: { label: 'Batida de Escudo', emoji: '🛡️' },
+        defend: { label: 'Fortificar', emoji: '🔒' },
+        special: { label: 'Muralha', emoji: '🏔️' }
+    },
+    healer: {
+        attack: { label: 'Toque Sagrado', emoji: '✨' },
+        heavy: { label: 'Onda de Luz', emoji: '🌟' },
+        defend: { label: 'Bênção', emoji: '💚' },
+        special: { label: 'Renascimento', emoji: '💊' }
+    },
+    guerreiro: {
+        attack: { label: 'Corte', emoji: '⚔️' },
+        heavy: { label: 'Golpe Brutal', emoji: '💥' },
+        defend: { label: 'Bloqueio', emoji: '🛡️' },
+        special: { label: 'Fúria', emoji: '😈' }
+    },
+    assassino: {
+        attack: { label: 'Punhalada', emoji: '🗡️' },
+        heavy: { label: 'Combo Sombrio', emoji: '🌑' },
+        defend: { label: 'Sombra', emoji: '💨' },
+        special: { label: 'Assassinato', emoji: '☠️' }
+    }
+};
+
+/** várias artes de batalha por classe (nunca repete a última) */
+const BATTLE_ART = {
+    mago: [
+        'https://placehold.co/600x280/4c1d95/e9d5ff/png?text=%F0%9F%A7%99+MAGO+EM+BATALHA+1&font=roboto',
+        'https://placehold.co/600x280/5b21b6/ddd6fe/png?text=%E2%9A%A1+RAIO+ARCANO+2&font=roboto',
+        'https://placehold.co/600x280/6d28d9/f5f3ff/png?text=%F0%9F%94%A5+INFERNO+MAGICO+3&font=roboto',
+        'https://placehold.co/600x280/7c3aed/ede9fe/png?text=%F0%9F%94%AE+ORB+DE+MANA+4&font=roboto'
+    ],
+    arqueiro: [
+        'https://placehold.co/600x280/14532d/bbf7d0/png?text=%F0%9F%8F%B9+ARQUEIRO+1&font=roboto',
+        'https://placehold.co/600x280/166534/86efac/png?text=%F0%9F%8C%B2+FLORESTA+2&font=roboto',
+        'https://placehold.co/600x280/15803d/dcfce7/png?text=%F0%9F%8C%AF+TIRO+CERTEIRO+3&font=roboto',
+        'https://placehold.co/600x280/16a34a/f0fdf4/png?text=%E2%98%81+CHUVA+DE+FLECHAS+4&font=roboto'
+    ],
+    tanque: [
+        'https://placehold.co/600x280/334155/e2e8f0/png?text=%F0%9F%9B%A1+TANQUE+1&font=roboto',
+        'https://placehold.co/600x280/475569/f1f5f9/png?text=%F0%9F%9B%A1+ESCUDO+2&font=roboto',
+        'https://placehold.co/600x280/1e293b/cbd5e1/png?text=%F0%9F%8F%94+MURALHA+3&font=roboto',
+        'https://placehold.co/600x280/0f172a/94a3b8/png?text=%F0%9F%94%92+FORTALEZA+4&font=roboto'
+    ],
+    healer: [
+        'https://placehold.co/600x280/9d174d/fce7f3/png?text=%F0%9F%92%8A+HEALER+1&font=roboto',
+        'https://placehold.co/600x280/be185d/fdf2f8/png?text=%E2%9C%A8+LUZ+SAGRADA+2&font=roboto',
+        'https://placehold.co/600x280/db2777/fce7f3/png?text=%F0%9F%92%9A+BENCAO+3&font=roboto',
+        'https://placehold.co/600x280/ec4899/fdf2f8/png?text=%F0%9F%8C%9F+CURA+4&font=roboto'
+    ],
+    guerreiro: [
+        'https://placehold.co/600x280/7f1d1d/fecaca/png?text=%E2%9A%94+GUERREIRO+1&font=roboto',
+        'https://placehold.co/600x280/991b1b/fee2e2/png?text=%F0%9F%92%A5+CAMPO+DE+BATALHA+2&font=roboto',
+        'https://placehold.co/600x280/b91c1c/fef2f2/png?text=%F0%9F%94%AA+ESPADA+3&font=roboto',
+        'https://placehold.co/600x280/dc2626/fff1f2/png?text=%F0%9F%98%88+FURIA+4&font=roboto'
+    ],
+    assassino: [
+        'https://placehold.co/600x280/1e1b4b/c7d2fe/png?text=%F0%9F%97%A1+ASSASSINO+1&font=roboto',
+        'https://placehold.co/600x280/312e81/e0e7ff/png?text=%F0%9F%8C%91+SOMBRAS+2&font=roboto',
+        'https://placehold.co/600x280/3730a3/eef2ff/png?text=%E2%98%A0+VENENO+3&font=roboto',
+        'https://placehold.co/600x280/4338ca/e0e7ff/png?text=%F0%9F%92%A8+EMBOSCADA+4&font=roboto'
+    ]
+};
 
 function fightKey(a, b) {
     return [a, b].sort().join(':');
@@ -28,11 +113,26 @@ function bar(cur, max, size = 10) {
     return '█'.repeat(filled) + '░'.repeat(size - filled);
 }
 
+function costsFor(classId) {
+    return MANA_COST[classId] || MANA_COST.default;
+}
+
+function movesFor(classId) {
+    return CLASS_MOVES[classId] || CLASS_MOVES.guerreiro;
+}
+
+function pickBattleArt(classId, lastUrl) {
+    const pool = BATTLE_ART[classId] || BATTLE_ART.guerreiro;
+    const options = pool.filter((u) => u !== lastUrl);
+    const list = options.length ? options : pool;
+    return list[Math.floor(Math.random() * list.length)];
+}
+
 function loadFighter(userId, isBot) {
     if (isBot) {
         const attrs = { forca: 8, defesa: 8, agilidade: 8, vida: 12 };
         const maxHp = 50 + attrs.vida * 8;
-        const maxMana = 40;
+        const maxMana = 50;
         const cls = player.getClass('guerreiro');
         return {
             id: userId,
@@ -46,19 +146,26 @@ function loadFighter(userId, isBot) {
             maxHp,
             mana: maxMana,
             maxMana,
-            defending: false
+            defending: false,
+            specialCd: 0,
+            lastArt: null
         };
     }
     const attrs = xp.getAttrs(userId);
     const maxHp = xp.maxHp(userId);
-    const maxMana = xp.maxMana(userId);
+    let maxMana = xp.maxMana(userId);
     const prof = player.get(userId);
-    const cls = player.getClass(prof?.classId || 'guerreiro');
+    const classId = prof?.classId || 'guerreiro';
+    const cls = player.getClass(classId);
+    // magos precisam poder ultrapassar 100 de mana no especial
+    if (classId === 'mago') {
+        maxMana = Math.max(maxMana, 120);
+    }
     return {
         id: userId,
         isBot: false,
         name: prof?.name || 'Jogador',
-        classId: prof?.classId || 'guerreiro',
+        classId,
         cls,
         photo: prof?.photoUrl || null,
         attrs,
@@ -66,7 +173,9 @@ function loadFighter(userId, isBot) {
         maxHp,
         mana: maxMana,
         maxMana,
-        defending: false
+        defending: false,
+        specialCd: 0,
+        lastArt: null
     };
 }
 
@@ -76,14 +185,42 @@ function calcDamage(attacker, defender, kind) {
     const agi = attacker.attrs.agilidade;
     let base = atk * 2 + Math.floor(Math.random() * (6 + atk));
     if (kind === 'heavy') base = Math.floor(base * 1.55);
-    if (kind === 'special') base = Math.floor(base * 1.9 + agi);
+    if (kind === 'special') base = Math.floor(base * 2.1 + agi * 1.2);
     let mitigation = def + Math.floor(Math.random() * 4);
     if (defender.defending) mitigation = Math.floor(mitigation * 1.8);
     let dmg = Math.max(1, base - Math.floor(mitigation * 0.7));
     const crit = Math.random() < Math.min(0.35, 0.05 + agi * 0.008);
     if (crit) dmg = Math.floor(dmg * 1.6);
-    if (kind === 'special' && Math.random() < 0.12) dmg = Math.floor(dmg * 0.4);
-    return { dmg, crit };
+    if (kind === 'special' && Math.random() < 0.1) dmg = Math.floor(dmg * 0.5);
+    // healer special: heal self instead of pure damage
+    if (kind === 'special' && attacker.classId === 'healer') {
+        const heal = Math.floor(dmg * 0.85);
+        attacker.hp = Math.min(attacker.maxHp, attacker.hp + heal);
+        dmg = Math.floor(dmg * 0.35);
+        return { dmg, crit, heal };
+    }
+    return { dmg, crit, heal: 0 };
+}
+
+function canUseSpecial(actor) {
+    if (actor.specialCd > 0) {
+        return { ok: false, reason: `⏳ Especial em cooldown (**${actor.specialCd}** turno(s)).` };
+    }
+    const costs = costsFor(actor.classId);
+    if (actor.classId === 'mago') {
+        if (actor.mana <= 100) {
+            return {
+                ok: false,
+                reason: `🧙 Mago precisa de **mais de 100** de mana (tem **${actor.mana}**).`
+            };
+        }
+    } else if (actor.mana < costs.special) {
+        return {
+            ok: false,
+            reason: `❌ Sem mana para o especial (precisa **${costs.special}**).`
+        };
+    }
+    return { ok: true };
 }
 
 function fightEmbed(fight) {
@@ -94,14 +231,17 @@ function fightEmbed(fight) {
         ? 0xfbbf24
         : turnF.cls?.color || a.cls?.color || 0xa78bfa;
 
-    const block = (f) =>
-        [
+    const block = (f) => {
+        const cd =
+            f.specialCd > 0 ? ` · especial CD **${f.specialCd}**` : '';
+        return [
             `**${f.cls?.emoji || '⚔️'} ${f.name}** · ${f.cls?.name || '?'}`,
             `<@${f.id}>`,
             `❤️ HP  ┌${bar(f.hp, f.maxHp)}┐ **${f.hp}/${f.maxHp}**`,
-            `🔵 Mana ┌${bar(f.mana, f.maxMana)}┐ **${f.mana}/${f.maxMana}**`,
+            `🔵 Mana ┌${bar(f.mana, f.maxMana)}┐ **${f.mana}/${f.maxMana}**${cd}`,
             `FOR ${f.attrs.forca} · DEF ${f.attrs.defesa} · AGI ${f.attrs.agilidade}`
         ].join('\n');
+    };
 
     const emb = new EmbedBuilder()
         .setColor(color)
@@ -118,42 +258,65 @@ function fightEmbed(fight) {
                 '',
                 fight.over
                     ? `🏆 **Vencedor:** <@${fight.winnerId}>`
-                    : `⏱️ **Vez de ${turnF.name}** (<@${fight.turn}>) — só essa pessoa usa os botões.`
+                    : `⏱️ **Vez de ${turnF.name}** (${turnF.cls?.emoji || ''} ${turnF.cls?.name || ''}) — só <@${fight.turn}> usa os botões.`
             ].join('\n')
         )
         .setFooter({
-            text:
-                fight.bet > 0
-                    ? `Aposta ${eter.formatPlain(fight.bet)} · Mana: 0 / ${MANA_COST.heavy} / ${MANA_COST.defend} / ${MANA_COST.special}`
-                    : `Mana: Ataque 0 · Pesado ${MANA_COST.heavy} · Def ${MANA_COST.defend} · Esp ${MANA_COST.special}`
+            text: fight.over
+                ? 'Duelo encerrado'
+                : turnF.classId === 'mago'
+                  ? 'Mago: especial exige >100 mana + cooldown'
+                  : `Especial: cooldown ${SPECIAL_COOLDOWN_TURNS} turnos após uso`
         })
         .setTimestamp();
 
-    // imagem da classe de quem está na vez (ou vencedor)
-    const theme = fight.over
-        ? (fight.winnerId === a.id ? a : b).cls
-        : turnF.cls;
-    if (theme?.banner) emb.setImage(theme.banner);
+    // arte de batalha da classe da vez (sempre sorteia outra)
+    const focus = fight.over ? (fight.winnerId === a.id ? a : b) : turnF;
+    const art = pickBattleArt(focus.classId, focus.lastArt);
+    focus.lastArt = art;
+    emb.setImage(art);
 
-    if (a.photo) emb.setThumbnail(a.photo);
-    else if (b.photo) emb.setThumbnail(b.photo);
+    if (turnF.photo) emb.setThumbnail(turnF.photo);
+    else if (a.photo) emb.setThumbnail(a.photo);
 
     return emb;
 }
 
-function attackRow(fightId, enabled) {
-    const mk = (act, label, emoji, style) =>
+function attackRow(fight, enabled) {
+    const turnF = fight.turn === fight.a.id ? fight.a : fight.b;
+    const moves = movesFor(turnF.classId);
+    const costs = costsFor(turnF.classId);
+    const fightId = fight.id;
+
+    const specialOk = canUseSpecial(turnF).ok;
+    const specialDisabled = !enabled || !specialOk;
+
+    const mk = (act, meta, style, disabled) =>
         new ButtonBuilder()
             .setCustomId(`pvp:act:${fightId}:${act}`)
-            .setLabel(label)
-            .setEmoji(emoji)
+            .setLabel(meta.label.slice(0, 80))
+            .setEmoji(meta.emoji)
             .setStyle(style)
-            .setDisabled(!enabled);
+            .setDisabled(!!disabled);
+
     return new ActionRowBuilder().addComponents(
-        mk('attack', 'Ataque', '⚔️', ButtonStyle.Primary),
-        mk('heavy', 'Pesado', '💥', ButtonStyle.Danger),
-        mk('defend', 'Defender', '🛡️', ButtonStyle.Secondary),
-        mk('special', 'Especial', '✨', ButtonStyle.Success)
+        mk('attack', moves.attack, ButtonStyle.Primary, !enabled),
+        mk('heavy', moves.heavy, ButtonStyle.Danger, !enabled),
+        mk('defend', moves.defend, ButtonStyle.Secondary, !enabled),
+        mk(
+            'special',
+            {
+                ...moves.special,
+                label:
+                    turnF.specialCd > 0
+                        ? `${moves.special.label} (${turnF.specialCd})`
+                        : turnF.classId === 'mago'
+                          ? `${moves.special.label} (>100)`
+                          : moves.special.label
+            },
+            ButtonStyle.Success,
+            specialDisabled
+        )
     );
 }
 
@@ -183,6 +346,10 @@ function clearTurnTimer(fight) {
     }
 }
 
+function tickCooldowns(fighter) {
+    if (fighter.specialCd > 0) fighter.specialCd -= 1;
+}
+
 function scheduleTurnTimeout(fight, channel) {
     clearTurnTimer(fight);
     if (fight.over) return;
@@ -193,6 +360,7 @@ function scheduleTurnTimeout(fight, channel) {
         fight.lastLog = `⏰ **${actor.name}** perdeu o turno por tempo.`;
         actor.defending = false;
         actor.mana = Math.min(actor.maxMana, actor.mana + 2);
+        tickCooldowns(actor);
         fight.turn = other.id;
         fight.round += 1;
         await pushState(fight, channel, !isBotTurn(fight));
@@ -208,7 +376,7 @@ async function pushState(fight, channel, buttonsOn) {
         await msg.edit({
             content: null,
             embeds: [fightEmbed(fight)],
-            components: [attackRow(fight.id, !!buttonsOn && !fight.over)]
+            components: [attackRow(fight, !!buttonsOn && !fight.over)]
         });
     } catch (_) {}
 }
@@ -236,26 +404,58 @@ async function endFight(fight, channel) {
 }
 
 function applyAction(fight, actor, target, kind) {
-    const cost = MANA_COST[kind] || 0;
-    if (actor.mana < cost) {
+    const costs = costsFor(actor.classId);
+    const moves = movesFor(actor.classId);
+
+    if (kind === 'special') {
+        const check = canUseSpecial(actor);
+        if (!check.ok) {
+            fight.lastLog = check.reason;
+            return false;
+        }
+    }
+
+    const cost =
+        kind === 'special' && actor.classId === 'mago'
+            ? Math.min(actor.mana, Math.max(101, costs.special))
+            : costs[kind] || 0;
+
+    if (actor.mana < cost && kind !== 'special') {
         fight.lastLog = `❌ **${actor.name}** sem mana (precisa **${cost}**).`;
         return false;
     }
-    actor.mana -= cost;
+    if (kind === 'special' && actor.classId === 'mago' && actor.mana <= 100) {
+        fight.lastLog = `🧙 Precisa de **mais de 100** de mana.`;
+        return false;
+    }
+
+    if (kind === 'special' && actor.classId === 'mago') {
+        // consome quase toda a mana acima de 100
+        actor.mana = Math.max(0, actor.mana - Math.max(100, costs.special));
+    } else {
+        actor.mana = Math.max(0, actor.mana - cost);
+    }
+
     actor.defending = false;
 
     if (kind === 'defend') {
         actor.defending = true;
-        fight.lastLog = `🛡️ **${actor.name}** entrou em guarda! (-${cost} mana)`;
+        fight.lastLog = `${moves.defend.emoji} **${actor.name}** usou **${moves.defend.label}**!`;
         return true;
     }
 
-    const { dmg, crit } = calcDamage(actor, target, kind);
+    if (kind === 'special') {
+        actor.specialCd = SPECIAL_COOLDOWN_TURNS;
+    }
+
+    const { dmg, crit, heal } = calcDamage(actor, target, kind);
     target.hp = Math.max(0, target.hp - dmg);
     target.defending = false;
-    const kindName =
-        kind === 'heavy' ? 'ataque pesado' : kind === 'special' ? 'golpe especial' : 'ataque';
-    fight.lastLog = `${crit ? '⚡ **CRÍTICO!** ' : ''}**${actor.name}** → **${kindName}** em **${target.name}** (**-${dmg}** HP)${cost ? ` · -${cost} mana` : ''}`;
+
+    const moveName = moves[kind]?.label || kind;
+    let log = `${crit ? '⚡ **CRÍTICO!** ' : ''}${moves[kind]?.emoji || ''} **${actor.name}** → **${moveName}** em **${target.name}** (**-${dmg}** HP)`;
+    if (heal) log += ` · curou **+${heal}** HP`;
+    fight.lastLog = log;
     return true;
 }
 
@@ -269,7 +469,8 @@ async function afterAction(fight, channel) {
     }
 
     const actor = fight.turn === fight.a.id ? fight.a : fight.b;
-    actor.mana = Math.min(actor.maxMana, actor.mana + 3);
+    actor.mana = Math.min(actor.maxMana, actor.mana + (actor.classId === 'mago' ? 6 : 4));
+    tickCooldowns(actor);
 
     fight.turn = fight.turn === fight.a.id ? fight.b.id : fight.a.id;
     fight.round += 1;
@@ -283,12 +484,13 @@ async function botPlay(fight, channel) {
     if (fight.over || !fights.has(fight.id) || !isBotTurn(fight)) return;
     const actor = fight.turn === fight.a.id ? fight.a : fight.b;
     const target = actor === fight.a ? fight.b : fight.a;
+    const costs = costsFor(actor.classId);
     const roll = Math.random();
     let kind = 'attack';
-    if (actor.hp < actor.maxHp * 0.35 && actor.mana >= MANA_COST.defend && roll < 0.35)
+    if (actor.hp < actor.maxHp * 0.35 && actor.mana >= costs.defend && roll < 0.35)
         kind = 'defend';
-    else if (actor.mana >= MANA_COST.special && roll < 0.22) kind = 'special';
-    else if (actor.mana >= MANA_COST.heavy && roll < 0.5) kind = 'heavy';
+    else if (canUseSpecial(actor).ok && roll < 0.2) kind = 'special';
+    else if (actor.mana >= costs.heavy && roll < 0.5) kind = 'heavy';
     if (!applyAction(fight, actor, target, kind)) applyAction(fight, actor, target, 'attack');
     await afterAction(fight, channel);
 }
@@ -338,7 +540,7 @@ async function startFight(channel, challengerId, targetId, bet, vsBot) {
 
     const msg = await channel.send({
         embeds: [fightEmbed(fight)],
-        components: [attackRow(id, !isBotTurn(fight))]
+        components: [attackRow(fight, !isBotTurn(fight))]
     });
     fight.messageId = msg.id;
 
@@ -350,7 +552,7 @@ async function startFight(channel, challengerId, targetId, bet, vsBot) {
 module.exports = {
     name: 'pvp',
     aliases: ['duelo', 'desafiar', 'luta'],
-    description: 'PVP por turnos — desafio em texto, combate em embed',
+    description: 'PVP por turnos — habilidades e artes por classe',
 
     async execute(message, args) {
         const target =
@@ -435,7 +637,6 @@ module.exports = {
             if (pending.get(key)?.at === now) pending.delete(key);
         }, 60_000);
 
-        // SEM embed — só texto + botão Aceitar
         const betLine =
             bet > 0
                 ? `Aposta: **${eter.formatPlain(bet)}** éter cada.`
@@ -481,14 +682,14 @@ module.exports = {
             if (!ok) {
                 await interaction.update({
                     embeds: [fightEmbed(fight)],
-                    components: [attackRow(fight.id, true)]
+                    components: [attackRow(fight, true)]
                 });
                 scheduleTurnTimeout(fight, interaction.channel);
                 return;
             }
             await interaction.update({
                 embeds: [fightEmbed(fight)],
-                components: [attackRow(fight.id, false)]
+                components: [attackRow(fight, false)]
             });
             await afterAction(fight, interaction.channel);
             return;
@@ -532,14 +733,12 @@ module.exports = {
             pending.delete(key);
             lastFight.set(key, Date.now());
 
-            // ainda sem embed de combate — só confirmação em texto
             await interaction.update({
                 content: `⚔️ ${interaction.user} **aceitou** o duelo! Abrindo o combate…`,
                 embeds: [],
                 components: []
             });
 
-            // agora sim o embed do PVP
             const started = await startFight(
                 interaction.channel,
                 challengerId,
