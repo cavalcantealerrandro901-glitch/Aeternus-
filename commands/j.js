@@ -11,7 +11,6 @@ const {
 const player = require('../utils/player');
 const xp = require('../utils/xp');
 
-/** userId -> { step, name?, classId?, photoUrl? } */
 const drafts = new Map();
 
 function classSelect(customId = 'j:class') {
@@ -30,42 +29,79 @@ function classSelect(customId = 'j:class') {
     );
 }
 
+function attrBar(n, max = 30) {
+    const v = Math.max(0, Math.min(max, Number(n) || 0));
+    const filled = Math.round((v / max) * 10);
+    return '█'.repeat(filled) + '░'.repeat(10 - filled);
+}
+
 function profileEmbed(user, profile) {
-    const cls = player.CLASSES[profile.classId] || { name: '?', emoji: '?' };
+    const cls = player.getClass(profile.classId);
     const st = xp.get(user.id);
     const prog = xp.progress(user.id);
     const maxMana = player.maxManaFromLevel(st.level, profile.classId);
     const inv = Array.isArray(profile.inventory) ? profile.inventory : [];
+    const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
 
     const emb = new EmbedBuilder()
-        .setColor(0xa78bfa)
-        .setTitle(`${cls.emoji} ${profile.name}`)
+        .setColor(cls.color || 0xa78bfa)
+        .setAuthor({
+            name: `${cls.emoji} ${cls.name}`,
+            iconURL: user.displayAvatarURL({ size: 64 })
+        })
+        .setTitle(`✨ ${profile.name}`)
         .setDescription(
             [
-                `**Jogador:** ${user}`,
-                `**Classe:** ${cls.emoji} ${cls.name}`,
-                `**Nível:** **${st.level}** · XP **${prog.current}/${prog.need}** (${prog.pct}%)`,
-                `**Mana máx.:** **${maxMana}** 🔵 (escala com o nível)`,
-                '',
-                '**Atributos**',
-                `⚔️ Força **${st.attrs.forca}** · 🛡️ Defesa **${st.attrs.defesa}**`,
-                `⚡ Agilidade **${st.attrs.agilidade}** · ❤️ Vida **${st.attrs.vida}**`,
-                `💪 HP combate: **${xp.maxHp(user.id)}**`,
-                '',
-                '**Inventário**',
-                inv.length
-                    ? inv
-                          .slice(-8)
-                          .map((i) => `${i.emoji || '🎁'} ${i.name}`)
-                          .join('\n')
-                    : '_Nenhum item ainda._'
+                `━━━━━━━━━━━━━━━━━━━━`,
+                `Conta Discord · ${user}`,
+                `Classe · **${cls.emoji} ${cls.name}**`,
+                `━━━━━━━━━━━━━━━━━━━━`
             ].join('\n')
         )
-        .setFooter({ text: 'Aeternus · O.j perfil' })
+        .addFields(
+            {
+                name: '📊 Progresso',
+                value: [
+                    `Nível **${st.level}**`,
+                    `XP ┌${attrBar(prog.pct, 100)}┐ **${prog.pct}%**`,
+                    `  ${prog.current} / ${prog.need}`
+                ].join('\n'),
+                inline: true
+            },
+            {
+                name: '💪 Combate',
+                value: [
+                    `❤️ HP **${xp.maxHp(user.id)}**`,
+                    `🔵 Mana **${maxMana}**`,
+                    `_escala com o nível_`
+                ].join('\n'),
+                inline: true
+            },
+            {
+                name: '📈 Atributos',
+                value: [
+                    `⚔️ Força   ┌${attrBar(st.attrs.forca)}┐ **${st.attrs.forca}**`,
+                    `🛡️ Defesa  ┌${attrBar(st.attrs.defesa)}┐ **${st.attrs.defesa}**`,
+                    `⚡ Agilidade ┌${attrBar(st.attrs.agilidade)}┐ **${st.attrs.agilidade}**`,
+                    `❤️ Vida    ┌${attrBar(st.attrs.vida)}┐ **${st.attrs.vida}**`
+                ].join('\n'),
+                inline: false
+            },
+            {
+                name: '🎫 Inventário',
+                value: inv.length
+                    ? inv
+                          .slice(-6)
+                          .map((i) => `${i.emoji || '🎁'} **${i.name}**`)
+                          .join('\n')
+                    : '_Nenhum item ainda — suba de nível (5% de drop)._',
+                inline: false
+            }
+        )
+        .setThumbnail(photo)
+        .setImage(cls.banner)
+        .setFooter({ text: `Aeternus · ${profile.name} · O.j perfil` })
         .setTimestamp();
-
-    if (profile.photoUrl) emb.setThumbnail(profile.photoUrl);
-    else emb.setThumbnail(user.displayAvatarURL({ size: 128 }));
 
     return emb;
 }
@@ -80,9 +116,7 @@ async function beginCreate(interaction) {
 
     drafts.set(interaction.user.id, { step: 'name' });
 
-    const modal = new ModalBuilder()
-        .setCustomId('j:name')
-        .setTitle('Nome do personagem');
+    const modal = new ModalBuilder().setCustomId('j:name').setTitle('Nome do personagem');
     modal.addComponents(
         new ActionRowBuilder().addComponents(
             new TextInputBuilder()
@@ -111,22 +145,14 @@ module.exports = {
             .replace(/\p{M}/gu, '');
 
         if (!sub || sub === 'help' || sub === 'ajuda') {
-            return message.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xa78bfa)
-                        .setTitle('🎮 Sistema de Jogador')
-                        .setDescription(
-                            [
-                                '`O.j perfil` — ver sua ficha',
-                                '`O.j perfil @user` — ver ficha de outro',
-                                '`O.j criar` — criar / refazer convite de perfil',
-                                '',
-                                'Sem perfil, o bot envia um **PV** pedindo nome, classe e foto.'
-                            ].join('\n')
-                        )
-                ]
-            });
+            return message.reply(
+                [
+                    '**Sistema de Jogador**',
+                    '`O.j perfil` — sua ficha',
+                    '`O.j perfil @user` — ficha de outro',
+                    '`O.j criar` — criar perfil (PV)'
+                ].join('\n')
+            );
         }
 
         if (sub === 'criar' || sub === 'create' || sub === 'start') {
@@ -135,41 +161,32 @@ module.exports = {
             }
             try {
                 await message.author.send({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor(0xa78bfa)
-                            .setTitle('🎮 Criar perfil')
-                            .setDescription('Clique para começar a criação do personagem.')
-                    ],
+                    content:
+                        '🎮 **Crie seu perfil Aeternus**\nClique no botão para escolher nome, classe e foto.',
                     components: [
                         new ActionRowBuilder().addComponents(
                             new ButtonBuilder()
                                 .setCustomId('j:start')
                                 .setLabel('Criar meu perfil')
                                 .setStyle(ButtonStyle.Primary)
+                                .setEmoji('✨')
                         )
                     ]
                 });
                 return message.reply('📬 Enviei um PV para você criar o perfil.');
             } catch {
-                return message.reply(
-                    '❌ Não consegui te mandar PV. Abra DMs e use o botão de novo.'
-                );
+                return message.reply('❌ Abra suas DMs e tente de novo.');
             }
         }
 
         if (sub === 'perfil' || sub === 'profile' || sub === 'ficha') {
-            const target =
-                message.mentions.users.first() ||
-                message.author;
+            const target = message.mentions.users.first() || message.author;
             const profile = player.get(target.id);
             if (!profile || !profile.name) {
                 if (target.id === message.author.id) {
-                    return message.reply(
-                        'Você ainda não tem perfil. Use `O.j criar` (abre o PV).'
-                    );
+                    return message.reply('Você ainda não tem perfil. Use `O.j criar`.');
                 }
-                return message.reply(`${target} ainda não criou perfil de jogador.`);
+                return message.reply(`${target} ainda não criou perfil.`);
             }
             return message.reply({ embeds: [profileEmbed(target, profile)] });
         }
@@ -181,9 +198,7 @@ module.exports = {
         const id = interaction.customId || '';
         if (!id.startsWith('j:')) return;
 
-        if (id === 'j:start') {
-            return beginCreate(interaction);
-        }
+        if (id === 'j:start') return beginCreate(interaction);
 
         if (id === 'j:class' && interaction.isStringSelectMenu()) {
             const draft = drafts.get(interaction.user.id);
@@ -201,20 +216,17 @@ module.exports = {
             draft.step = 'photo';
             drafts.set(interaction.user.id, draft);
 
-            const cls = player.CLASSES[classId];
+            const cls = player.getClass(classId);
             await interaction.update({
+                content: null,
                 embeds: [
                     new EmbedBuilder()
-                        .setColor(0x22d3ee)
-                        .setTitle(`${cls.emoji} Classe: ${cls.name}`)
+                        .setColor(cls.color)
+                        .setTitle(`${cls.emoji} ${draft.name} · ${cls.name}`)
                         .setDescription(
-                            [
-                                `Nome: **${draft.name}**`,
-                                '',
-                                'Agora envie **uma foto** neste PV (anexo de imagem).',
-                                'Ou clique em **Usar avatar do Discord**.'
-                            ].join('\n')
+                            'Envie **uma foto** neste PV (imagem anexa)\nou use o botão do avatar do Discord.'
                         )
+                        .setImage(cls.banner)
                 ],
                 components: [
                     new ActionRowBuilder().addComponents(
@@ -226,7 +238,6 @@ module.exports = {
                 ]
             });
 
-            // coletor de imagem no DM
             try {
                 const dm = interaction.channel;
                 const collector = dm.createMessageCollector({
@@ -243,11 +254,11 @@ module.exports = {
                         /\.(png|jpe?g|gif|webp)$/i.test(a.name || a.url)
                     );
                     if (!att) return;
-                    await finishProfile(interaction.user, {
-                        name: draft.name,
-                        classId: draft.classId,
-                        photoUrl: att.url
-                    }, dm);
+                    await finishProfile(
+                        interaction.user,
+                        { name: draft.name, classId: draft.classId, photoUrl: att.url },
+                        dm
+                    );
                     drafts.delete(interaction.user.id);
                 });
             } catch (_) {}
@@ -286,12 +297,7 @@ module.exports = {
         drafts.set(interaction.user.id, { step: 'class', name });
 
         await interaction.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0xa78bfa)
-                    .setTitle(`Olá, **${name}**!`)
-                    .setDescription('Escolha sua **classe** no menu abaixo.')
-            ],
+            content: `Olá, **${name}**! Escolha sua classe:`,
             components: [classSelect('j:class')],
             ephemeral: true
         });
@@ -301,15 +307,14 @@ module.exports = {
 async function finishProfile(user, data, channel, interaction) {
     try {
         if (player.has(user.id)) {
-            const msg = { content: 'Você já tinha perfil.', embeds: [] };
+            const msg = { content: 'Você já tinha perfil.', embeds: [], components: [] };
             if (interaction?.update) return interaction.update(msg);
             return channel.send(msg).catch(() => {});
         }
 
         const profile = player.create(user.id, data);
-        const cls = player.CLASSES[profile.classId];
+        const cls = player.getClass(profile.classId);
 
-        // aplica bônus de classe nos atributos base
         try {
             const dataXp = xp.all();
             const cur = dataXp[user.id] || { xp: 0, level: 0, attrs: { ...xp.BASE_ATTR } };
@@ -322,14 +327,11 @@ async function finishProfile(user, data, channel, interaction) {
         } catch (_) {}
 
         const emb = profileEmbed(user, profile).setTitle(
-            `✅ Perfil criado · ${cls.emoji} ${profile.name}`
+            `✅ ${profile.name} · perfil criado`
         );
 
         if (interaction?.update) {
-            await interaction.update({
-                embeds: [emb],
-                components: []
-            });
+            await interaction.update({ embeds: [emb], components: [], content: null });
         } else {
             await channel.send({ embeds: [emb] }).catch(() => {});
         }
