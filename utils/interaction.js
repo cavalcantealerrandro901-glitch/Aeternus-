@@ -3,6 +3,28 @@ const gifs = require('./gifs');
 
 const ACTIONS = {};
 
+/** mapa categoria do comando → endpoint nekos.best */
+const NEKOS = {
+    hug: 'hug',
+    kiss: 'kiss',
+    slap: 'slap',
+    pat: 'pat',
+    poke: 'poke',
+    bite: 'bite',
+    highfive: 'highfive',
+    cry: 'cry',
+    dance: 'dance',
+    bonk: 'baka',
+    abraco: 'hug',
+    beijo: 'kiss',
+    tapa: 'slap',
+    carinho: 'pat',
+    cutucar: 'poke',
+    morder: 'bite',
+    chorar: 'cry',
+    dancar: 'dance'
+};
+
 function register(def) {
     ACTIONS[def.name] = def;
     return {
@@ -19,11 +41,17 @@ function register(def) {
             const fromId = parts[3];
             const toId = parts[4];
             if (interaction.user.id !== fromId)
-                return interaction.reply({ content: 'Só quem recebeu pode devolver.', ephemeral: true });
+                return interaction.reply({
+                    content: 'Só quem recebeu pode devolver.',
+                    ephemeral: true
+                });
             const actionDef = ACTIONS[actionName] || def;
-            const fromUser = await interaction.client.users.fetch(fromId).catch(() => interaction.user);
+            const fromUser = await interaction.client.users
+                .fetch(fromId)
+                .catch(() => interaction.user);
             const toUser = await interaction.client.users.fetch(toId).catch(() => null);
-            if (!toUser) return interaction.reply({ content: 'Usuário inválido.', ephemeral: true });
+            if (!toUser)
+                return interaction.reply({ content: 'Usuário inválido.', ephemeral: true });
             await interaction.deferUpdate().catch(() => {});
             const fake = {
                 author: fromUser,
@@ -38,11 +66,31 @@ function register(def) {
     };
 }
 
+async function fetchNekos(key) {
+    const ep = NEKOS[key] || NEKOS.hug;
+    try {
+        const res = await fetch(`https://nekos.best/api/v2/${ep}`, {
+            headers: { Accept: 'application/json' }
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const url = data?.results?.[0]?.url;
+        return url || null;
+    } catch {
+        return null;
+    }
+}
+
 async function pickGif(def) {
     const key = def.gif || def.name;
+    // 1) API anime estável
+    const online = await fetchNekos(key);
+    if (online) return online;
+    // 2) pool local
     if (typeof gifs.pickAsync === 'function') {
         try {
-            return await gifs.pickAsync(key);
+            const a = await gifs.pickAsync(key);
+            if (a) return a;
         } catch (_) {}
     }
     return gifs.pick(key);
@@ -51,15 +99,14 @@ async function pickGif(def) {
 async function run(message, def, opts) {
     const author = message.author;
     let target = opts.forcedTarget || message.mentions?.users?.first?.() || null;
+
     if (!target && !def.solo) {
         return message.reply({
             embeds: [
                 new EmbedBuilder()
                     .setColor(def.color || 0xf472b6)
                     .setTitle(`${def.returnEmoji || '✨'}  ${def.name}`)
-                    .setDescription(
-                        `Mencione alguém:\n\`O.${def.name} @usuario\``
-                    )
+                    .setDescription(`Mencione alguém:\n\`O.${def.name} @usuario\``)
             ]
         });
     }
@@ -80,7 +127,7 @@ async function run(message, def, opts) {
             iconURL: author.displayAvatarURL({ size: 64 })
         })
         .setDescription(text)
-        .setFooter({ text: `Aeternus · ${gifs.count(def.gif || def.name)} GIFs anime` })
+        .setFooter({ text: 'Aeternus · interpretação anime' })
         .setTimestamp();
     if (gif) embed.setImage(gif);
     if (target) embed.setThumbnail(target.displayAvatarURL({ size: 64 }));
@@ -98,6 +145,7 @@ async function run(message, def, opts) {
             )
         );
     }
+
     await message.reply({ content, embeds: [embed], components });
 
     if (target?.bot) {
