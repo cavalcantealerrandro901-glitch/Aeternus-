@@ -9,11 +9,13 @@ function fmt(n) {
 
 module.exports = {
     name: 'depositar',
-    aliases: ['dep'],
+    aliases: ['dep', 'deposit', 'guardar'],
     description: 'Deposita éter no banco',
     async execute(message, args) {
         if (!args[0]) {
-            return message.reply('❌ Uso: `O.dep <valor|all|half>`\nEx.: `O.dep 1k` · `O.dep all`');
+            return message.reply(
+                '❌ Uso: `O.dep <valor|all|half>`\nEx.: `O.dep 1k` · `O.dep all`'
+            );
         }
 
         const wallet = eter.get(message.author.id);
@@ -26,8 +28,8 @@ module.exports = {
             return message.reply(`❌ ${bet.error}\nUso: \`O.dep <valor|all|half>\`);
         }
 
-        eter.remove(message.author.id, bet.amount, { reason: 'deposit' });
-        bank.add(message.author.id, bet.amount);
+        const res = bank.deposit(message.author.id, bet.amount, eter);
+        if (!res.ok) return message.reply(`❌ ${res.error}`);
 
         await message.reply({
             embeds: [
@@ -43,18 +45,18 @@ module.exports = {
                             '```',
                             '  CARTEIRA  ──►  COFRE',
                             '```',
-                            `Valor guardado: ✨ **${fmt(bet.amount)}**`
+                            `Valor guardado: ✨ **${fmt(res.amount)}**`
                         ].join('\n')
                     )
                     .addFields(
                         {
                             name: '💵 Carteira',
-                            value: `✨ **${fmt(eter.get(message.author.id))}**`,
+                            value: `✨ **${fmt(res.wallet)}**`,
                             inline: true
                         },
                         {
                             name: '🔒 Cofre',
-                            value: `✨ **${fmt(bank.get(message.author.id))}**`,
+                            value: `✨ **${fmt(res.bank)}**`,
                             inline: true
                         }
                     )
