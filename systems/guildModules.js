@@ -1,13 +1,13 @@
 /**
  * Sistemas configuráveis pelo painel (não-economia).
- * Lê getSettings(guildId) e reage a eventos.
  */
 const { EmbedBuilder, ChannelType } = require('discord.js');
 const { getSettings, setSettings } = require('../utils/settings');
 
 const stickyCount = new Map();
 const stickyMsgId = new Map();
-const lastCounter = new Map();
+/** channelId -> { current: number, lastUser: string|null } */
+const countRuntime = new Map();
 const antinukeHits = new Map();
 
 function fmt(tpl, map) {
@@ -43,26 +43,17 @@ function antinukeCheck(guildId, action, max, windowSec) {
     return st.n > (max || 3);
 }
 
-/** Mapeia dígitos de vários alfabetos → 0-9 */
 const DIGIT_MAP = {
-    // latim / fullwidth
     '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
     '０': 0, '１': 1, '２': 2, '３': 3, '４': 4, '５': 5, '６': 6, '７': 7, '８': 8, '９': 9,
-    // árabe-índico
     '٠': 0, '١': 1, '٢': 2, '٣': 3, '٤': 4, '٥': 5, '٦': 6, '٧': 7, '٨': 8, '٩': 9,
-    // persa / urdu
     '۰': 0, '۱': 1, '۲': 2, '۳': 3, '۴': 4, '۵': 5, '۶': 6, '۷': 7, '۸': 8, '۹': 9,
-    // devanágari
     '०': 0, '१': 1, '२': 2, '३': 3, '४': 4, '५': 5, '६': 6, '७': 7, '८': 8, '९': 9,
-    // bengali
     '০': 0, '১': 1, '২': 2, '৩': 3, '৪': 4, '৫': 5, '৬': 6, '৭': 7, '৮': 8, '৯': 9,
-    // tailandês
     '๐': 0, '๑': 1, '๒': 2, '๓': 3, '๔': 4, '๕': 5, '๖': 6, '๗': 7, '๘': 8, '๙': 9,
-    // myanmar
     '၀': 0, '၁': 1, '၂': 2, '၃': 3, '၄': 4, '၅': 5, '၆': 6, '၇': 7, '၈': 8, '၉': 9
 };
 
-/** Palavras → número (pt / en / es básico + chinês simples 1–10) */
 const WORD_NUMBERS = {
     zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, três: 3, quatro: 4, cinco: 5,
     seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13,
@@ -72,7 +63,7 @@ const WORD_NUMBERS = {
     one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
     eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
     seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, hundred: 100,
-    uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+    uno: 1, dos: 2, cuatro: 4, siete: 7, ocho: 8, nueve: 9, diez: 10,
     '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
     '零': 0
 };
@@ -85,20 +76,17 @@ function digitsToInt(str) {
     }
     if (!out.length) return null;
     const n = Number(out);
-    if (!Number.isSafeInteger(n)) return null;
+    if (!Number.isSafeInteger(n) || n < 0) return null;
     return n;
 }
 
-/** Aceita dígitos latinos e de outras línguas, ou palavras (um, two, 一…) */
 function parseCountMessage(content) {
     const raw = String(content || '').trim();
     if (!raw) return null;
 
-    // só dígitos (qualquer script mapeado)
     const asDigits = digitsToInt(raw);
     if (asDigits !== null) return asDigits;
 
-    // palavra única
     const key = raw
         .toLowerCase()
         .normalize('NFD')
@@ -106,18 +94,37 @@ function parseCountMessage(content) {
         .replace(/[^\p{L}\p{N}]/gu, '');
     if (WORD_NUMBERS[raw] !== undefined) return WORD_NUMBERS[raw];
     if (WORD_NUMBERS[key] !== undefined) return WORD_NUMBERS[key];
-
-    // chinês / caractere único já no mapa
-    if (raw.length <= 3 && WORD_NUMBERS[raw] !== undefined) return WORD_NUMBERS[raw];
-
     return null;
 }
 
-async function failCounting(message, ct, expected, reason) {
-    lastCounter.delete(message.channel.id);
-    setSettings(message.guild.id, {
-        counting: { ...ct, current: 0 }
-    });
+function getCountState(channelId, settingsCurrent) {
+    if (!countRuntime.has(channelId)) {
+        countRuntime.set(channelId, {
+            current: Math.max(0, Math.floor(Number(settingsCurrent) || 0)),
+            lastUser: null
+        });
+    }
+    return countRuntime.get(channelId);
+}
+
+function persistCount(guildId, ct, state) {
+    countRuntime.set(String(ct.channelId), state);
+    try {
+        setSettings(guildId, {
+            counting: {
+                enabled: ct.enabled !== false,
+                channelId: ct.channelId,
+                current: state.current,
+                allowSameUser: !!ct.allowSameUser
+            }
+        });
+    } catch (_) {}
+}
+
+async function failCounting(message, ct, state, expected, reason) {
+    state.current = 0;
+    state.lastUser = null;
+    persistCount(message.guild.id, ct, state);
 
     await message.react('❌').catch(() => {});
 
@@ -242,21 +249,18 @@ function setup(client) {
         // counting
         try {
             const ct = s.counting;
-            if (ct?.enabled && ct.channelId === message.channel.id) {
+            if (ct?.enabled && String(ct.channelId) === String(message.channel.id)) {
                 const num = parseCountMessage(message.content);
 
-                // não é número (em nenhum idioma) → ignora, não apaga
-                if (num === null) {
-                    // segue sticky / react
-                } else {
-                    const expected = (Number(ct.current) || 0) + 1;
-                    const sameUser =
-                        lastCounter.get(message.channel.id) === message.author.id;
+                if (num !== null) {
+                    const state = getCountState(message.channel.id, ct.current);
+                    const expected = state.current + 1;
 
-                    if (!ct.allowSameUser && sameUser) {
+                    if (!ct.allowSameUser && state.lastUser === message.author.id) {
                         await failCounting(
                             message,
                             ct,
+                            state,
                             expected,
                             'A mesma pessoa não pode contar duas vezes seguidas.'
                         );
@@ -267,20 +271,22 @@ function setup(client) {
                         await failCounting(
                             message,
                             ct,
+                            state,
                             expected,
                             `Você enviou **${num}**, mas o certo era **${expected}**.`
                         );
                         return;
                     }
 
-                    lastCounter.set(message.channel.id, message.author.id);
-                    setSettings(message.guild.id, {
-                        counting: { ...ct, current: expected }
-                    });
+                    state.current = expected;
+                    state.lastUser = message.author.id;
+                    persistCount(message.guild.id, ct, state);
                     await message.react('✅').catch(() => {});
                 }
             }
-        } catch (_) {}
+        } catch (e) {
+            console.error('[counting]', e);
+        }
 
         try {
             const st = s.sticky;
