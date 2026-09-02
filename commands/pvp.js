@@ -9,6 +9,7 @@ const { parseAmount } = require('../utils/parseAmount');
 const pending = new Map();
 const COOLDOWN_MS = 15_000;
 const lastFight = new Map();
+const BOT_ACCEPT_DELAY_MS = 1500;
 
 const HITS = [
     'desferiu um golpe preciso',
@@ -71,19 +72,84 @@ function disabledRow() {
     );
 }
 
+/**
+ * Resolve o duelo (aposta + combate + mensagem).
+ * vsBot: só o humano paga a aposta; se ganhar recebe 2x; se perder, perde a aposta.
+ */
+function settleFight(challengerId, targetId, bet, vsBot) {
+    if (bet > 0) {
+        if (vsBot) {
+            if (eter.get(challengerId) < bet) {
+                return { error: '❌ Você não tem éter suficiente.' };
+            }
+            eter.remove(challengerId, bet, { reason: 'pvp_bet' });
+        } else {
+            if (eter.get(challengerId) < bet || eter.get(targetId) < bet) {
+                return { error: '❌ Alguém ficou sem éter suficiente. Duelo cancelado.' };
+            }
+            eter.remove(challengerId, bet, { reason: 'pvp_bet' });
+            eter.remove(targetId, bet, { reason: 'pvp_bet' });
+        }
+    }
+
+    const result = rollFight(challengerId, targetId);
+
+    if (bet > 0) {
+        if (vsBot) {
+            if (result.winnerId === challengerId) {
+                eter.add(challengerId, bet * 2, { reason: 'pvp_win' });
+            }
+            // se o bot ganhou, a aposta já foi removida
+        } else {
+            eter.add(result.winnerId, bet * 2, { reason: 'pvp_win' });
+        }
+    }
+
+    const lines = [
+        `⚔️ **PVP** · <@${challengerId}> vs <@${targetId}>${vsBot ? ' · _bot_' : ''}`,
+        '',
+        ...result.log,
+        '',
+        `🏆 Vencedor: <@${result.winnerId}>`,
+        `💥 Derrotado: <@${result.loserId}>`
+    ];
+
+    if (bet > 0) {
+        if (vsBot) {
+            if (result.winnerId === challengerId) {
+                lines.push(
+                    `🎁 Você ganhou **${eter.formatPlain(bet * 2)}** éter!`
+                );
+            } else {
+                lines.push(
+                    `💸 Você perdeu **${eter.formatPlain(bet)}** éter.`
+                );
+            }
+        } else {
+            lines.push(
+                `🎁 Pot: **${eter.formatPlain(bet * 2)}** éter para o vencedor!`
+            );
+        }
+    } else {
+        lines.push('_Duelo amistoso — sem aposta._');
+    }
+
+    return { result, content: lines.join('\n') };
+}
+
 module.exports = {
     name: 'pvp',
     aliases: ['duelo', 'desafiar', 'luta'],
-    description: 'Desafia outro usuário para um PVP (texto + botão Aceitar)',
+    description: 'Desafia usuário ou bot para PVP (bots aceitam automaticamente)',
 
     async execute(message, args) {
         const target =
             message.mentions.users.first() ||
             (args[0] && (await message.client.users.fetch(args[0]).catch(() => null)));
 
-        if (!target || target.bot) {
+        if (!target) {
             return message.reply(
-                'Uso: `O.pvp @usuário [aposta]`\nExemplo: `O.pvp @fulano 500`'
+                'Uso: `O.pvp @usuário|@bot [aposta]`\nExemplo: `O.pvp @fulano 500`'
             );
         }
 
@@ -91,7 +157,9 @@ module.exports = {
             return message.reply('Você não pode duelar consigo mesmo.');
         }
 
-        const betRaw = args.find((a) => !/^<@!?\d+>$/.test(a) && a.toLowerCase() !== target.id);
+        const vsBot = !!target.bot;
+
+        const betRaw = args.find((a) => !/^<@!?\d+>$/.test(a) && a !== target.id);
         let bet = 0;
         if (betRaw) {
             const amount = parseAmount(betRaw, eter.get(message.author.id));
@@ -105,7 +173,8 @@ module.exports = {
             if (eter.get(message.author.id) < bet) {
                 return message.reply('Você não tem éter suficiente para essa aposta.');
             }
-            if (eter.get(target.id) < bet) {
+            // contra humano: os dois precisam ter saldo; contra bot: só o desafiante
+            if (!vsBot && eter.get(target.id) < bet) {
                 return message.reply(`${target} não tem éter suficiente para essa aposta.`);
             }
         }
@@ -120,6 +189,40 @@ module.exports = {
             return message.reply('Aguarde alguns segundos antes de outro duelo.');
         }
 
+        // —— vs BOT: aceita automaticamente ——
+        if (vsBot) {
+            lastFight.set(key, now);
+
+            const waitMsg = await message.channel.send({
+                content: [
+                    `⚔️ **Desafio PVP**`,
+                    `${message.author} desafiou ${target} *(bot)*!`,
+                    bet > 0
+                        ? `Aposta: **${eter.formatPlain(bet)}** éter (1x ou 2x se ganhar)`
+                        : 'Duelo amistoso (sem aposta).',
+                    '',
+                    `🤖 O bot está aceitando automaticamente…`
+                ].join('\n')
+            });
+
+            await new Promise((r) => setTimeout(r, BOT_ACCEPT_DELAY_MS));
+
+            const settled = settleFight(message.author.id, target.id, bet, true);
+            if (settled.error) {
+                return waitMsg.edit({ content: settled.error }).catch(() => {});
+            }
+
+            await waitMsg
+                .edit({
+                    content: `⚔️ ${target} **aceitou** automaticamente! Combate em andamento…`
+                })
+                .catch(() => {});
+
+            await message.channel.send({ content: settled.content }).catch(() => {});
+            return;
+        }
+
+        // —— vs HUMANO: botão Aceitar ——
         pending.set(key, {
             challengerId: message.author.id,
             targetId: target.id,
@@ -196,50 +299,23 @@ module.exports = {
                 });
             }
 
-            if (bet > 0) {
-                if (eter.get(challengerId) < bet || eter.get(targetId) < bet) {
-                    pending.delete(key);
-                    return interaction.update({
-                        content: '❌ Alguém ficou sem éter suficiente. Duelo cancelado.',
-                        components: [disabledRow()]
-                    });
-                }
-                eter.remove(challengerId, bet, { reason: 'pvp_bet' });
-                eter.remove(targetId, bet, { reason: 'pvp_bet' });
-            }
-
             pending.delete(key);
             lastFight.set(key, Date.now());
+
+            const settled = settleFight(challengerId, targetId, bet, false);
+            if (settled.error) {
+                return interaction.update({
+                    content: settled.error,
+                    components: [disabledRow()]
+                });
+            }
 
             await interaction.update({
                 content: `⚔️ ${interaction.user} **aceitou** o duelo! Preparando o combate…`,
                 components: [disabledRow()]
             });
 
-            const result = rollFight(challengerId, targetId);
-
-            if (bet > 0) {
-                eter.add(result.winnerId, bet * 2, { reason: 'pvp_win' });
-            }
-
-            const lines = [
-                `⚔️ **PVP** · <@${challengerId}> vs <@${targetId}>`,
-                '',
-                ...result.log,
-                '',
-                `🏆 Vencedor: <@${result.winnerId}>`,
-                `💥 Derrotado: <@${result.loserId}>`
-            ];
-
-            if (bet > 0) {
-                lines.push(
-                    `🎁 Pot: **${eter.formatPlain(bet * 2)}** éter para o vencedor!`
-                );
-            } else {
-                lines.push('_Duelo amistoso — sem aposta._');
-            }
-
-            await interaction.channel.send({ content: lines.join('\n') }).catch(() => {});
+            await interaction.channel.send({ content: settled.content }).catch(() => {});
         }
     }
 };
