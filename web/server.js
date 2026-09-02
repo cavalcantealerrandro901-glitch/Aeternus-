@@ -14,7 +14,9 @@ const sessions = new Map();
 const SETTINGS_KEYS = [
     'prefix', 'logs', 'welcome', 'leave', 'automod', 'tickets', 'music',
     'economy', 'xp', 'suggestions', 'reports', 'levels', 'starboard',
-    'autorole', 'verification', 'antinuke', 'drops', 'shop'
+    'autorole', 'verification', 'antinuke', 'drops', 'shop',
+    'birthday', 'counting', 'sticky', 'autoPublish', 'memberCounter',
+    'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub'
 ];
 
 function setup(client) {
