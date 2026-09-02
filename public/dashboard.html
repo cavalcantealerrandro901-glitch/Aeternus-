@@ -1,2 +1,59 @@
-<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"/><title>Aeternus Painel - ver commits settings/server; reabra O.painel apos deploy completo</title></head><body><p>Dashboard em atualizacao. Settings e API ja tem os 9+ sistemas. Force refresh apos proximo deploy do HTML completo.</p><script>location.replace('/dashboard?v=2')</script></body></html>
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Aeternus Painel</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#03030a;--card:rgba(18,18,36,.8);--line:rgba(255,255,255,.08);--t:#f8fafc;--m:#94a3b8;--v:#a78bfa}body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--t);display:flex;height:100vh}.side{width:250px;border-right:1px solid var(--line);padding:.8rem;overflow:auto;background:#0a0a16}.nb{display:block;width:100%;text-align:left;background:0;border:0;color:var(--m);padding:.5rem;border-radius:.6rem;cursor:pointer;margin:.1rem 0;font:inherit}.nb:hover,.nb.on{background:rgba(167,139,250,.2);color:#fff}.nb:disabled{opacity:.3}.main{flex:1;overflow:auto;padding:1.2rem}.panel{display:none}.panel.on{display:block}.card{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:1rem;margin-bottom:.8rem}.btn{background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:0;padding:.6rem 1rem;border-radius:.7rem;font-weight:700;cursor:pointer;margin-top:.6rem}.btn.ok{background:linear-gradient(135deg,#059669,#34d399)}.btn:disabled{opacity:.4}.tg{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.05)}input,select,textarea{width:100%;background:#000;border:1px solid var(--line);color:var(--t);padding:.5rem;border-radius:.5rem;margin:.2rem 0}.f{font-size:.7rem;color:var(--m)}.hint{color:var(--m);font-size:.85rem;margin:.4rem 0}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem}.sys{background:#0004;border:1px solid var(--line);border-radius:.8rem;padding:.8rem;cursor:pointer}.sys:hover{border-color:var(--v)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}.st{background:#0004;padding:.7rem;border-radius:.7rem;border:1px solid var(--line)}.st b{display:block;font-size:1.2rem}.daily{background:linear-gradient(145deg,rgba(139,92,246,.3),rgba(34,211,238,.1));border:1px solid rgba(167,139,250,.4);border-radius:1.2rem;padding:1.2rem;margin-bottom:1rem}.toast{position:fixed;bottom:1rem;right:1rem;padding:.7rem 1rem;border-radius:.7rem;background:#34d399;color:#042f1c;font-weight:700;opacity:0;transition:.3s}.toast.show{opacity:1}.sec{font-size:.65rem;color:#64748b;text-transform:uppercase;margin:.5rem 0 .2rem;letter-spacing:.1em}</style></head><body>
+<aside class="side"><div style="font-weight:800;margin-bottom:.8rem">✨ Aeternus</div>
+<button class="nb on" data-p="servers">🏠 Servidores</button>
+<button class="nb" data-p="me">❄️ Conta & Daily</button>
+<button class="nb" data-p="overview" disabled>📊 Visão geral</button>
+<button class="nb" data-p="sistemas" disabled>🧩 Sistemas</button>
+<button class="nb" data-p="prefixo" disabled>⌨️ Prefixo</button>
+<div class="sec">Módulos</div>
+<button class="nb" data-p="welcome" disabled>👋 Welcome</button>
+<button class="nb" data-p="leave" disabled>🚪 Despedida</button>
+<button class="nb" data-p="autorole" disabled>🎭 Autorole</button>
+<button class="nb" data-p="verification" disabled>✅ Verificação</button>
+<button class="nb" data-p="starboard" disabled>⭐ Starboard</button>
+<button class="nb" data-p="suggestions" disabled>💡 Sugestões</button>
+<button class="nb" data-p="reports" disabled>🚨 Denúncias</button>
+<button class="nb" data-p="tickets" disabled>🎫 Tickets</button>
+<button class="nb" data-p="antinuke" disabled>🛡️ Anti-nuke</button>
+<button class="nb" data-p="birthday" disabled>🎂 Aniversários</button>
+<button class="nb" data-p="counting" disabled>🔢 Contagem</button>
+<button class="nb" data-p="sticky" disabled>📌 Sticky</button>
+<button class="nb" data-p="memberCounter" disabled>👥 Contador</button>
+<button class="nb" data-p="autoReact" disabled>😊 Auto-react</button>
+<button class="nb" data-p="autoThread" disabled>💬 Auto-thread</button>
+<button class="nb" data-p="dmWelcome" disabled>📩 DM welcome</button>
+<button class="nb" data-p="mentionGuard" disabled>🚫 Menções</button>
+<button class="nb" data-p="voiceHub" disabled>🔊 Voice hub</button>
+<button class="nb" data-p="levels" disabled>📢 Anúncio nível</button>
+<div style="margin-top:1rem;font-size:.8rem;color:var(--m)" id="uchip"></div>
+<a href="/logout" style="color:#f87171;font-size:.8rem">Sair</a></aside>
+<div class="main">
+<section class="panel on" id="servers"><div id="gList" class="grid"></div></section>
+<section class="panel" id="me"><div class="daily"><h2>❄️ Daily · Éter</h2><p class="hint" id="dailyHint">…</p><div class="stats" id="dailyStats"></div>
+<button class="btn ok" id="dailyBtn" onclick="claimDaily()">Coletar daily</button></div>
+<div class="card"><h3>Carteira</h3><div class="stats" id="meStats"></div><p class="hint" id="meXpLabel"></p></div></section>
+<section class="panel" id="overview"><div class="stats" id="ovStats"></div><div class="card"><h3>Sistemas</h3><div class="grid" id="ovHub"></div></div></section>
+<section class="panel" id="sistemas"><div class="card"><h3>🧩 Hub de sistemas</h3><p class="hint">Configurações de servidor (não economia de comandos).</p><div class="grid" id="sysHub"></div></div></section>
+<section class="panel" id="prefixo"><div class="card"><h3>Prefixo</h3><input id="prefixInput" maxlength="8"/><button class="btn" onclick="savePrefix()">Salvar</button></div></section>
+<section class="panel" id="welcome"><div class="card"><h3>👋 Welcome</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="wEnabled"/></div><label class="f">Canal</label><select id="wChannel"></select><label class="f">Msg</label><textarea id="wMsg"></textarea><button class="btn" onclick="saveSys('welcome')">Salvar</button></div></section>
+<section class="panel" id="leave"><div class="card"><h3>🚪 Despedida</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="lvEnabled"/></div><label class="f">Canal</label><select id="lvChannel"></select><label class="f">Msg</label><textarea id="lvMsg"></textarea><button class="btn" onclick="saveSys('leave')">Salvar</button></div></section>
+<section class="panel" id="autorole"><div class="card"><h3>🎭 Autorole</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="arEnabled"/></div><label class="f">Cargo</label><select id="arRole"></select><button class="btn" onclick="saveSys('autorole')">Salvar</button></div></section>
+<section class="panel" id="verification"><div class="card"><h3>✅ Verificação</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="vfEnabled"/></div><label class="f">Canal</label><select id="vfChannel"></select><label class="f">Cargo</label><select id="vfRole"></select><button class="btn" onclick="saveSys('verification')">Salvar</button></div></section>
+<section class="panel" id="starboard"><div class="card"><h3>⭐ Starboard</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="sbEnabled"/></div><label class="f">Canal</label><select id="sbChannel"></select><label class="f">Mín</label><input type="number" id="sbMin" value="3"/><button class="btn" onclick="saveSys('starboard')">Salvar</button></div></section>
+<section class="panel" id="suggestions"><div class="card"><h3>💡 Sugestões</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="sgEnabled"/></div><label class="f">Canal</label><select id="sgChannel"></select><button class="btn" onclick="saveSys('suggestions')">Salvar</button></div></section>
+<section class="panel" id="reports"><div class="card"><h3>🚨 Denúncias</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="rpEnabled"/></div><label class="f">Canal</label><select id="rpChannel"></select><button class="btn" onclick="saveSys('reports')">Salvar</button></div></section>
+<section class="panel" id="tickets"><div class="card"><h3>🎫 Tickets</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="tkEnabled"/></div><label class="f">Categoria</label><select id="tkCat"></select><label class="f">Cargo</label><select id="tkRole"></select><button class="btn" onclick="saveSys('tickets')">Salvar</button></div></section>
+<section class="panel" id="antinuke"><div class="card"><h3>🛡️ Anti-nuke</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="anEnabled"/></div><label class="f">Máx bans</label><input type="number" id="anBans" value="3"/><button class="btn" onclick="saveSys('antinuke')">Salvar</button></div></section>
+<section class="panel" id="birthday"><div class="card"><h3>🎂 Aniversários</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="bdEnabled"/></div><label class="f">Canal</label><select id="bdChannel"></select><label class="f">Msg</label><textarea id="bdMsg"></textarea><button class="btn" onclick="saveSys('birthday')">Salvar</button></div></section>
+<section class="panel" id="counting"><div class="card"><h3>🔢 Contagem</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="ctEnabled"/></div><label class="f">Canal</label><select id="ctChannel"></select><button class="btn" onclick="saveSys('counting')">Salvar</button></div></section>
+<section class="panel" id="sticky"><div class="card"><h3>📌 Sticky</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="stEnabled"/></div><label class="f">Canal</label><select id="stChannel"></select><label class="f">Texto</label><textarea id="stContent"></textarea><button class="btn" onclick="saveSys('sticky')">Salvar</button></div></section>
+<section class="panel" id="memberCounter"><div class="card"><h3>👥 Contador</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="mcEnabled"/></div><label class="f">Canal</label><select id="mcChannel"></select><button class="btn" onclick="saveSys('memberCounter')">Salvar</button></div></section>
+<section class="panel" id="autoReact"><div class="card"><h3>😊 Auto-react</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="rxEnabled"/></div><label class="f">Canal</label><select id="rxChannel"></select><button class="btn" onclick="saveSys('autoReact')">Salvar</button></div></section>
+<section class="panel" id="autoThread"><div class="card"><h3>💬 Auto-thread</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="atEnabled"/></div><label class="f">Canal</label><select id="atChannel"></select><button class="btn" onclick="saveSys('autoThread')">Salvar</button></div></section>
+<section class="panel" id="dmWelcome"><div class="card"><h3>📩 DM welcome</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="dmEnabled"/></div><label class="f">Msg</label><textarea id="dmMsg"></textarea><button class="btn" onclick="saveSys('dmWelcome')">Salvar</button></div></section>
+<section class="panel" id="mentionGuard"><div class="card"><h3>🚫 Menções</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="mgEnabled"/></div><label class="f">Máx</label><input type="number" id="mgMax" value="5"/><button class="btn" onclick="saveSys('mentionGuard')">Salvar</button></div></section>
+<section class="panel" id="voiceHub"><div class="card"><h3>🔊 Voice hub</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="vhEnabled"/></div><label class="f">Canal</label><select id="vhChannel"></select><button class="btn" onclick="saveSys('voiceHub')">Salvar</button></div></section>
+<section class="panel" id="levels"><div class="card"><h3>📢 Anúncio nível</h3><div class="tg"><span>Ativo</span><input type="checkbox" id="lv2Enabled" checked/></div><label class="f">Canal</label><select id="lv2Channel"></select><button class="btn" onclick="saveSys('levels')">Salvar</button></div></section>
+</div><div class="toast" id="toast"></div>
+<script src="/dashboard-app.js"></script>
+</body></html>
