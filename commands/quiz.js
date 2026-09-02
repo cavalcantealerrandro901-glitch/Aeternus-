@@ -1,12 +1,11 @@
 const { EmbedBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 
-/** @type {Map<string, Session>} */
+/** @type {Map<string, object>} */
 const sessions = new Map();
 
 const TIME_MS = 30_000;
 const NEXT_DELAY_MS = 10_000;
-const MAX_ROUNDS = 10;
 const REWARD_MIN = 400;
 const REWARD_MAX = 1800;
 
@@ -172,7 +171,7 @@ const WIN_PHRASES = [
 
 const END_PHRASES = [
     'Quiz encerrado! Vejam quem brilhou:',
-    'Acabou o tempo da rodada final. Ranking:',
+    'Acabou o tempo. Ranking final:',
     'Fim de jogo! Placar oficial:',
     'Silêncio no estúdio… resultados:'
 ];
@@ -198,7 +197,9 @@ function resolveCategory(input) {
 function pickQuestion(catId, used) {
     const pool = BANK[catId] || BANK.geral;
     const available = pool.filter((_, i) => !used.has(`${catId}:${i}`));
+    // se acabou o banco, reinicia o ciclo de perguntas usadas
     const list = available.length ? available : pool;
+    if (!available.length) used.clear();
     const item = list[Math.floor(Math.random() * list.length)];
     const idx = pool.indexOf(item);
     if (idx >= 0) used.add(`${catId}:${idx}`);
@@ -209,11 +210,11 @@ function rewardAmount() {
     return REWARD_MIN + Math.floor(Math.random() * (REWARD_MAX - REWARD_MIN + 1));
 }
 
-function scoreLines(scores, client) {
+function scoreLines(scores) {
     const sorted = [...scores.entries()].sort((a, b) => b[1] - a[1]);
     if (!sorted.length) return '_Ninguém pontuou desta vez._';
     return sorted
-        .slice(0, 10)
+        .slice(0, 15)
         .map(([id, pts], i) => {
             const medal = ['🥇', '🥈', '🥉'][i] || `**${i + 1}.**`;
             return `${medal} <@${id}> — **${pts}** ponto${pts === 1 ? '' : 's'}`;
@@ -228,17 +229,20 @@ function questionEmbed(session, item) {
         .setTitle(`${meta.emoji} Quiz · ${meta.name}`)
         .setDescription(
             [
-                `**Pergunta ${session.round}/${session.maxRounds}**`,
+                `**Pergunta ${session.round}**`,
                 '',
                 `### ${item.q}`,
                 '',
                 `⏱️ **${TIME_MS / 1000}s** para responder neste canal`,
-                `🎁 Acerto: **${eter.format ? eter.format(session.reward) : session.reward + ' éter'}**`,
+                `🎁 Acerto: ${eter.format(session.reward)}`,
                 '',
-                '_Qualquer pessoa do canal pode responder. Erros são ignorados._'
+                '_Qualquer pessoa do canal pode responder. Erros são ignorados._',
+                '_O quiz só termina quando o tempo esgota sem acerto (ou com `O.quiz parar`)._'
             ].join('\n')
         )
-        .setFooter({ text: `Canal exclusivo · ${session.round > 1 ? 'Nova pergunta' : 'Quiz iniciado'}` })
+        .setFooter({
+            text: `Canal exclusivo · ${session.round > 1 ? 'Nova pergunta' : 'Quiz iniciado'}`
+        })
         .setTimestamp();
 }
 
@@ -271,12 +275,10 @@ async function endSession(channel, session, reason) {
             [
                 phrase,
                 reason === 'timeout'
-                    ? `_Tempo esgotado na pergunta ${session.round}._`
-                    : reason === 'done'
-                      ? `_Todas as ${session.maxRounds} perguntas foram respondidas!_`
-                      : reason === 'stop'
-                        ? '_Quiz interrompido._'
-                        : '',
+                    ? `_Tempo esgotado na pergunta ${session.round} · ${session.round} pergunta(s) no total._`
+                    : reason === 'stop'
+                      ? `_Quiz interrompido após ${session.round} pergunta(s)._`
+                      : '',
                 '',
                 '**Ranking da partida**',
                 scoreLines(session.scores),
@@ -348,20 +350,14 @@ function startCollector(channel, session) {
                                 `🎁 +**${session.reward.toLocaleString('pt-BR')}** éter`,
                                 `📊 Pontos de ${m.author}: **${prev + 1}**`,
                                 '',
-                                session.round >= session.maxRounds
-                                    ? '_Última pergunta! Preparando o ranking…_'
-                                    : `⏳ Próxima pergunta em **${NEXT_DELAY_MS / 1000}s**…`
+                                `⏳ Próxima pergunta em **${NEXT_DELAY_MS / 1000}s**…`
                             ].join('\n')
                         )
                 ]
             })
             .catch(() => {});
 
-        if (session.round >= session.maxRounds) {
-            setTimeout(() => endSession(channel, session, 'done'), 2500);
-            return;
-        }
-
+        // sem limite: sempre agenda a próxima até o tempo esgotar em alguma rodada
         setTimeout(async () => {
             if (!sessions.has(channel.id)) return;
             session.round += 1;
@@ -370,7 +366,6 @@ function startCollector(channel, session) {
             session.answers = item.a;
             session.currentQ = item.q;
 
-            // NOVA mensagem — não edita a antiga
             await channel.send({ embeds: [questionEmbed(session, item)] }).catch(() => {});
             startCollector(channel, session);
         }, NEXT_DELAY_MS);
@@ -379,7 +374,6 @@ function startCollector(channel, session) {
     collector.on('end', async (_, reason) => {
         if (reason === 'win' || reason === 'replace' || reason === 'end') return;
         if (!sessions.has(channel.id)) return;
-        // tempo esgotado sem acerto → encerramento com rank
         if (!session.answered) {
             await channel
                 .send({
@@ -418,8 +412,8 @@ function helpEmbed() {
                 `• Qualquer um pode responder`,
                 `• Acerto: marca o vencedor, espera **10s** e manda **nova** pergunta`,
                 `• Erro: o bot **não fala nada**`,
-                `• Sem acerto até o tempo acabar → ranking final`,
-                `• Até **${MAX_ROUNDS}** perguntas por partida`
+                `• **Sem limite de perguntas** — continua enquanto acertarem`,
+                `• Sem acerto em **${TIME_MS / 1000}s** → ranking final`
             ].join('\n')
         );
 }
@@ -427,7 +421,7 @@ function helpEmbed() {
 module.exports = {
     name: 'quiz',
     aliases: ['trivia', 'perguntas'],
-    description: 'Quiz por categoria com ranking no canal',
+    description: 'Quiz por categoria com ranking no canal (ilimitado até o tempo)',
 
     async execute(message, args) {
         const sub = norm(args[0] || '');
@@ -447,7 +441,7 @@ module.exports = {
 
         if (sessions.has(message.channel.id)) {
             return message.reply(
-                '❌ Já existe um quiz neste canal. Use `O.quiz parar` ou espere terminar.'
+                '❌ Já existe um quiz neste canal. Use `O.quiz parar` ou espere o tempo esgotar.'
             );
         }
 
@@ -466,7 +460,6 @@ module.exports = {
             scores: new Map(),
             used,
             round: 1,
-            maxRounds: MAX_ROUNDS,
             reward: rewardAmount(),
             answers: item.a,
             currentQ: item.q,
@@ -484,7 +477,8 @@ module.exports = {
                     .setDescription(
                         [
                             `Por **${message.author.username}** neste canal.`,
-                            `Até **${MAX_ROUNDS}** perguntas · **${TIME_MS / 1000}s** cada`,
+                            `**Sem limite** de perguntas · **${TIME_MS / 1000}s** por pergunta`,
+                            'Continua enquanto alguém acertar a tempo.',
                             'Acertos dão éter · erros são silenciosos',
                             '',
                             '_Boa sorte!_'
