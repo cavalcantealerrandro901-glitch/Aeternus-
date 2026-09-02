@@ -1,32 +1,63 @@
 const store = require('./store');
-const eter = require('./eter');
+
+const ATTR_KEYS = ['forca', 'defesa', 'agilidade', 'vida'];
+const ATTR_LABEL = {
+    forca: 'Força',
+    defesa: 'Defesa',
+    agilidade: 'Agilidade',
+    vida: 'Vida'
+};
+
+const BASE_ATTR = {
+    forca: 5,
+    defesa: 5,
+    agilidade: 5,
+    vida: 10
+};
 
 function all() {
     return store.load('xp.json', {});
 }
 
+function ensureAttrs(d) {
+    const a = d.attrs && typeof d.attrs === 'object' ? { ...d.attrs } : {};
+    for (const k of ATTR_KEYS) {
+        a[k] = Math.max(0, Math.floor(Number(a[k] ?? BASE_ATTR[k]) || BASE_ATTR[k]));
+    }
+    d.attrs = a;
+    return a;
+}
+
 function get(userId) {
-    const d = all()[userId] || { xp: 0, level: 0 };
-    return { xp: Number(d.xp || 0), level: Number(d.level || 0) };
+    const raw = all()[userId] || { xp: 0, level: 0 };
+    const d = {
+        xp: Number(raw.xp || 0),
+        level: Number(raw.level || 0),
+        attrs: ensureAttrs({ attrs: raw.attrs })
+    };
+    return d;
 }
 
 function xpForLevel(level) {
-    return 100 + Number(level || 0) * 85;
+    const lv = Math.max(0, Number(level) || 0);
+    // escala suave para níveis altos (999+)
+    return Math.floor(100 + lv * 85 + Math.pow(lv, 1.15) * 2);
 }
 
 function levelFromXp(totalXp) {
     let level = 0;
     let remain = Number(totalXp || 0);
+    // sem teto prático — 999+
     while (remain >= xpForLevel(level)) {
         remain -= xpForLevel(level);
         level++;
-        if (level > 500) break;
+        if (level > 10000) break;
     }
     return level;
 }
 
 function progress(userId) {
-    const { xp, level } = get(userId);
+    const { xp, level, attrs } = get(userId);
     let remain = Number(xp || 0);
     for (let lv = 0; lv < level; lv++) {
         remain -= xpForLevel(lv);
@@ -41,7 +72,8 @@ function progress(userId) {
         need,
         pct,
         toNext: Math.max(0, need - Math.floor(remain)),
-        mult: dailyMultiplier(level)
+        mult: dailyMultiplier(level),
+        attrs
     };
 }
 
@@ -49,32 +81,56 @@ function dailyMultiplier(level) {
     return 1 + Math.min(2, Number(level || 0) * 0.04);
 }
 
+/** +1 a +3 em um atributo aleatório por nível ganho */
+function rollAttrGain() {
+    const key = ATTR_KEYS[Math.floor(Math.random() * ATTR_KEYS.length)];
+    const amount = 1 + Math.floor(Math.random() * 3);
+    return { key, amount, label: ATTR_LABEL[key] };
+}
+
 function addXp(userId, amount) {
     const data = all();
-    const cur = data[userId] || { xp: 0, level: 0 };
+    const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR } };
+    ensureAttrs(cur);
+
     const before = levelFromXp(cur.xp);
     cur.xp = Math.max(0, Number(cur.xp || 0) + Number(amount || 0));
     const after = levelFromXp(cur.xp);
     cur.level = after;
-    data[userId] = cur;
-    store.save('xp.json', data);
 
-    let reward = 0;
+    const gains = [];
     if (after > before) {
         const levelsGained = after - before;
         for (let i = 0; i < levelsGained; i++) {
-            reward += 300 + Math.floor(Math.random() * 4701);
+            const g = rollAttrGain();
+            cur.attrs[g.key] = (cur.attrs[g.key] || 0) + g.amount;
+            gains.push(g);
         }
-        eter.add(userId, reward, { reason: `levelup:${before}->${after}` });
     }
 
+    data[userId] = cur;
+    store.save('xp.json', data);
+
     return {
-        ...cur,
+        xp: cur.xp,
+        level: cur.level,
+        attrs: { ...cur.attrs },
         leveled: after > before,
-        reward,
+        reward: 0, // não dá mais éter
+        attrGains: gains,
         oldLevel: before,
         progress: progress(userId)
     };
+}
+
+function getAttrs(userId) {
+    return get(userId).attrs;
+}
+
+/** HP máximo derivado de Vida */
+function maxHp(userId) {
+    const a = getAttrs(userId);
+    return 50 + a.vida * 8;
 }
 
 function leaderboard(limit = 10) {
@@ -108,5 +164,10 @@ module.exports = {
     progress,
     leaderboard,
     rankOf,
-    all
+    all,
+    getAttrs,
+    maxHp,
+    ATTR_KEYS,
+    ATTR_LABEL,
+    BASE_ATTR
 };
