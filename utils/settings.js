@@ -3,8 +3,8 @@ const store = require('./store');
 const DEFAULT = {
     prefix: 'O.',
     logs: { enabled: false, channelId: null, events: {} },
-    welcome: { enabled: false, channelId: null, message: '', embed: true },
-    leave: { enabled: false, channelId: null, message: '' },
+    welcome: { enabled: false, channelId: null, message: 'Bem-vindo {user} ao **{server}**!', embed: true },
+    leave: { enabled: false, channelId: null, message: '{user} saiu de **{server}**.' },
     automod: {
         enabled: true,
         antiSpam: true,
@@ -16,17 +16,35 @@ const DEFAULT = {
         minLength: 0,
         punish: 'delete'
     },
-    tickets: { enabled: false, categoryId: null, supportRoleId: null },
-    music: { categoryId: null },
+    tickets: {
+        enabled: false,
+        categoryId: null,
+        supportRoleId: null,
+        logChannelId: null,
+        maxOpen: 3
+    },
+    music: { enabled: true, categoryId: null },
     economy: { dailyMin: 5000, dailyMax: 50000, robEnabled: true, workEnabled: true },
     xp: { enabled: true, min: 30, max: 77, cooldownSec: 45 },
-    suggestions: { enabled: false, channelId: null },
-    reports: { enabled: false, channelId: null },
-    levels: { announceChannelId: null },
-    starboard: { enabled: false, channelId: null, minStars: 3 },
-    autorole: { enabled: false, roleId: null },
-    verification: { enabled: false, roleId: null, channelId: null },
-    antinuke: { enabled: false },
+    suggestions: { enabled: false, channelId: null, upvoteEmoji: '👍', downvoteEmoji: '👎' },
+    reports: { enabled: false, channelId: null, anon: true },
+    levels: { announceChannelId: null, enabled: true },
+    starboard: { enabled: false, channelId: null, minStars: 3, emoji: '⭐' },
+    autorole: { enabled: false, roleId: null, delaySec: 0 },
+    verification: {
+        enabled: false,
+        roleId: null,
+        channelId: null,
+        buttonLabel: 'Verificar',
+        message: 'Clique para se verificar e acessar o servidor.'
+    },
+    antinuke: {
+        enabled: false,
+        maxBans: 3,
+        maxKicks: 5,
+        maxChannels: 3,
+        windowSec: 30
+    },
     drops: {
         enabled: true,
         channelId: null,
@@ -42,13 +60,57 @@ const DEFAULT = {
         },
         extraEntries: []
     },
-    /** Loja — VIPs configuráveis no painel */
-    shop: {
-        enabled: true,
-        vips: [
-            // exemplo:
-            // { id: 'vip1', name: 'VIP Prata', desc: 'Cargo VIP', price: 5000, currency: 'cristais', roleId: '123', durationDays: 0 }
-        ]
+    shop: { enabled: true, vips: [] },
+    birthday: {
+        enabled: false,
+        channelId: null,
+        message: '🎂 Feliz aniversário, {user}!',
+        roleId: null
+    },
+    counting: {
+        enabled: false,
+        channelId: null,
+        current: 0,
+        allowSameUser: false
+    },
+    sticky: {
+        enabled: false,
+        channelId: null,
+        content: '',
+        every: 8
+    },
+    autoPublish: {
+        enabled: false,
+        channelIds: []
+    },
+    memberCounter: {
+        enabled: false,
+        channelId: null,
+        format: '👥 Membros: {count}'
+    },
+    autoReact: {
+        enabled: false,
+        channelId: null,
+        emojis: ['👍', '❤️']
+    },
+    autoThread: {
+        enabled: false,
+        channelId: null,
+        nameFormat: 'Discussão · {user}'
+    },
+    dmWelcome: {
+        enabled: false,
+        message: 'Olá {user}! Bem-vindo ao **{server}**.'
+    },
+    mentionGuard: {
+        enabled: false,
+        maxMentions: 5,
+        punish: 'delete'
+    },
+    voiceHub: {
+        enabled: false,
+        channelId: null,
+        createTemp: false
     }
 };
 
@@ -61,44 +123,51 @@ function deepMerge(a, b) {
     return out;
 }
 
+const MERGE_KEYS = [
+    'logs', 'welcome', 'leave', 'automod', 'tickets', 'music', 'economy', 'xp',
+    'suggestions', 'reports', 'levels', 'starboard', 'autorole', 'verification',
+    'antinuke', 'shop', 'birthday', 'counting', 'sticky', 'autoPublish',
+    'memberCounter', 'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub'
+];
+
 function getSettings(guildId) {
     const all = store.load('guilds.json', {});
     const g = all[guildId] || {};
-    return {
-        ...structuredClone(DEFAULT),
-        ...g,
-        logs: { ...DEFAULT.logs, ...(g.logs || {}) },
-        welcome: { ...DEFAULT.welcome, ...(g.welcome || {}) },
-        leave: { ...DEFAULT.leave, ...(g.leave || {}) },
-        automod: { ...DEFAULT.automod, ...(g.automod || {}) },
-        tickets: { ...DEFAULT.tickets, ...(g.tickets || {}) },
-        music: { ...DEFAULT.music, ...(g.music || {}) },
-        economy: { ...DEFAULT.economy, ...(g.economy || {}) },
-        xp: { ...DEFAULT.xp, ...(g.xp || {}) },
-        suggestions: { ...DEFAULT.suggestions, ...(g.suggestions || {}) },
-        reports: { ...DEFAULT.reports, ...(g.reports || {}) },
-        levels: { ...DEFAULT.levels, ...(g.levels || {}) },
-        starboard: { ...DEFAULT.starboard, ...(g.starboard || {}) },
-        autorole: { ...DEFAULT.autorole, ...(g.autorole || {}) },
-        verification: { ...DEFAULT.verification, ...(g.verification || {}) },
-        antinuke: { ...DEFAULT.antinuke, ...(g.antinuke || {}) },
-        drops: {
-            ...DEFAULT.drops,
-            ...(g.drops || {}),
-            requirements: {
-                ...DEFAULT.drops.requirements,
-                ...((g.drops && g.drops.requirements) || {})
-            },
-            extraEntries: Array.isArray(g.drops?.extraEntries)
-                ? g.drops.extraEntries
-                : DEFAULT.drops.extraEntries
+    const out = { ...structuredClone(DEFAULT), ...g };
+    for (const k of MERGE_KEYS) {
+        out[k] = { ...DEFAULT[k], ...(g[k] || {}) };
+    }
+    out.drops = {
+        ...DEFAULT.drops,
+        ...(g.drops || {}),
+        requirements: {
+            ...DEFAULT.drops.requirements,
+            ...((g.drops && g.drops.requirements) || {})
         },
-        shop: {
-            ...DEFAULT.shop,
-            ...(g.shop || {}),
-            vips: Array.isArray(g.shop?.vips) ? g.shop.vips : DEFAULT.shop.vips
-        }
+        extraEntries: Array.isArray(g.drops?.extraEntries)
+            ? g.drops.extraEntries
+            : DEFAULT.drops.extraEntries
     };
+    out.shop = {
+        ...DEFAULT.shop,
+        ...(g.shop || {}),
+        vips: Array.isArray(g.shop?.vips) ? g.shop.vips : DEFAULT.shop.vips
+    };
+    out.autoPublish = {
+        ...DEFAULT.autoPublish,
+        ...(g.autoPublish || {}),
+        channelIds: Array.isArray(g.autoPublish?.channelIds)
+            ? g.autoPublish.channelIds
+            : DEFAULT.autoPublish.channelIds
+    };
+    out.autoReact = {
+        ...DEFAULT.autoReact,
+        ...(g.autoReact || {}),
+        emojis: Array.isArray(g.autoReact?.emojis)
+            ? g.autoReact.emojis
+            : DEFAULT.autoReact.emojis
+    };
+    return out;
 }
 
 function setSettings(guildId, patch) {
@@ -111,12 +180,20 @@ function setSettings(guildId, patch) {
     if (patch.drops?.requirements?.requiredRoleIds) {
         all[guildId].drops = all[guildId].drops || {};
         all[guildId].drops.requirements = all[guildId].drops.requirements || {};
-        all[guildId].drops.requirements.requiredRoleIds = patch.drops.requirements.requiredRoleIds;
+        all[guildId].drops.requirements.requiredRoleIds =
+            patch.drops.requirements.requiredRoleIds;
     }
-    // VIPs: substitui lista inteira quando enviada
     if (patch.shop?.vips) {
         all[guildId].shop = all[guildId].shop || {};
         all[guildId].shop.vips = patch.shop.vips;
+    }
+    if (patch.autoPublish?.channelIds) {
+        all[guildId].autoPublish = all[guildId].autoPublish || {};
+        all[guildId].autoPublish.channelIds = patch.autoPublish.channelIds;
+    }
+    if (patch.autoReact?.emojis) {
+        all[guildId].autoReact = all[guildId].autoReact || {};
+        all[guildId].autoReact.emojis = patch.autoReact.emojis;
     }
     store.save('guilds.json', all);
     return getSettings(guildId);
