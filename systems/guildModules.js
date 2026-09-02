@@ -43,13 +43,101 @@ function antinukeCheck(guildId, action, max, windowSec) {
     return st.n > (max || 3);
 }
 
-/** Só número inteiro puro (ex: "42"). Texto normal não conta. */
-function parseCountMessage(content) {
-    const t = String(content || '').trim();
-    if (!/^\d+$/.test(t)) return null;
-    const n = Number(t);
+/** Mapeia dígitos de vários alfabetos → 0-9 */
+const DIGIT_MAP = {
+    // latim / fullwidth
+    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+    '０': 0, '１': 1, '２': 2, '３': 3, '４': 4, '５': 5, '６': 6, '７': 7, '８': 8, '９': 9,
+    // árabe-índico
+    '٠': 0, '١': 1, '٢': 2, '٣': 3, '٤': 4, '٥': 5, '٦': 6, '٧': 7, '٨': 8, '٩': 9,
+    // persa / urdu
+    '۰': 0, '۱': 1, '۲': 2, '۳': 3, '۴': 4, '۵': 5, '۶': 6, '۷': 7, '۸': 8, '۹': 9,
+    // devanágari
+    '०': 0, '१': 1, '२': 2, '३': 3, '४': 4, '५': 5, '६': 6, '७': 7, '८': 8, '९': 9,
+    // bengali
+    '০': 0, '১': 1, '২': 2, '৩': 3, '৪': 4, '৫': 5, '৬': 6, '৭': 7, '৮': 8, '৯': 9,
+    // tailandês
+    '๐': 0, '๑': 1, '๒': 2, '๓': 3, '๔': 4, '๕': 5, '๖': 6, '๗': 7, '๘': 8, '๙': 9,
+    // myanmar
+    '၀': 0, '၁': 1, '၂': 2, '၃': 3, '၄': 4, '၅': 5, '၆': 6, '၇': 7, '၈': 8, '၉': 9
+};
+
+/** Palavras → número (pt / en / es básico + chinês simples 1–10) */
+const WORD_NUMBERS = {
+    zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, três: 3, quatro: 4, cinco: 5,
+    seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13,
+    quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezasseis: 16, dezessete: 17,
+    dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50,
+    sessenta: 60, setenta: 70, oitenta: 80, noventa: 90, cem: 100, cento: 100,
+    one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+    seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, hundred: 100,
+    uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10,
+    '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+    '零': 0
+};
+
+function digitsToInt(str) {
+    let out = '';
+    for (const ch of str) {
+        if (DIGIT_MAP[ch] === undefined) return null;
+        out += String(DIGIT_MAP[ch]);
+    }
+    if (!out.length) return null;
+    const n = Number(out);
     if (!Number.isSafeInteger(n)) return null;
     return n;
+}
+
+/** Aceita dígitos latinos e de outras línguas, ou palavras (um, two, 一…) */
+function parseCountMessage(content) {
+    const raw = String(content || '').trim();
+    if (!raw) return null;
+
+    // só dígitos (qualquer script mapeado)
+    const asDigits = digitsToInt(raw);
+    if (asDigits !== null) return asDigits;
+
+    // palavra única
+    const key = raw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{M}/gu, '')
+        .replace(/[^\p{L}\p{N}]/gu, '');
+    if (WORD_NUMBERS[raw] !== undefined) return WORD_NUMBERS[raw];
+    if (WORD_NUMBERS[key] !== undefined) return WORD_NUMBERS[key];
+
+    // chinês / caractere único já no mapa
+    if (raw.length <= 3 && WORD_NUMBERS[raw] !== undefined) return WORD_NUMBERS[raw];
+
+    return null;
+}
+
+async function failCounting(message, ct, expected, reason) {
+    lastCounter.delete(message.channel.id);
+    setSettings(message.guild.id, {
+        counting: { ...ct, current: 0 }
+    });
+
+    await message.react('❌').catch(() => {});
+
+    const emb = new EmbedBuilder()
+        .setColor(0xf87171)
+        .setTitle('🔢 Contagem errada')
+        .setDescription(
+            [
+                `${message.author} errou a contagem.`,
+                '',
+                reason || 'Número incorreto.',
+                `O número certo era **${expected}**.`,
+                '',
+                'A contagem **reiniciou**. O próximo número é **1**.'
+            ].join('\n')
+        )
+        .setFooter({ text: message.guild.name })
+        .setTimestamp();
+
+    await message.channel.send({ embeds: [emb] }).catch(() => {});
 }
 
 function setup(client) {
@@ -151,23 +239,37 @@ function setup(client) {
             }
         } catch (_) {}
 
-        // counting — só age em mensagens que são números puros
+        // counting
         try {
             const ct = s.counting;
             if (ct?.enabled && ct.channelId === message.channel.id) {
                 const num = parseCountMessage(message.content);
 
-                // texto, emoji, comando, etc. → não apaga, não interfere
+                // não é número (em nenhum idioma) → ignora, não apaga
                 if (num === null) {
-                    // segue para sticky / auto-react etc.
+                    // segue sticky / react
                 } else {
                     const expected = (Number(ct.current) || 0) + 1;
                     const sameUser =
                         lastCounter.get(message.channel.id) === message.author.id;
 
-                    if (num !== expected || (!ct.allowSameUser && sameUser)) {
-                        // número errado ou mesmo user seguido → só apaga a tentativa
-                        await message.delete().catch(() => {});
+                    if (!ct.allowSameUser && sameUser) {
+                        await failCounting(
+                            message,
+                            ct,
+                            expected,
+                            'A mesma pessoa não pode contar duas vezes seguidas.'
+                        );
+                        return;
+                    }
+
+                    if (num !== expected) {
+                        await failCounting(
+                            message,
+                            ct,
+                            expected,
+                            `Você enviou **${num}**, mas o certo era **${expected}**.`
+                        );
                         return;
                     }
 
