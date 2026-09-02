@@ -38,8 +38,13 @@ function register(def) {
     };
 }
 
-function pickGif(def) {
+async function pickGif(def) {
     const key = def.gif || def.name;
+    if (typeof gifs.pickAsync === 'function') {
+        try {
+            return await gifs.pickAsync(key);
+        } catch (_) {}
+    }
     return gifs.pick(key);
 }
 
@@ -61,7 +66,7 @@ async function run(message, def, opts) {
     if (target && target.id === author.id && !def.allowSelf)
         return message.reply(def.selfMsg || 'Não pode usar em si mesmo.');
 
-    const gif = pickGif(def);
+    const gif = await pickGif(def);
     const text = target
         ? (def.target || '{author} → {target}')
               .replace(/{author}/g, `**${author.username}**`)
@@ -75,7 +80,7 @@ async function run(message, def, opts) {
             iconURL: author.displayAvatarURL({ size: 64 })
         })
         .setDescription(text)
-        .setFooter({ text: `Aeternus · ${gifs.count(def.gif || def.name)}+ GIFs locais` })
+        .setFooter({ text: `Aeternus · ${gifs.count(def.gif || def.name)} GIFs anime` })
         .setTimestamp();
     if (gif) embed.setImage(gif);
     if (target) embed.setThumbnail(target.displayAvatarURL({ size: 64 }));
@@ -98,7 +103,7 @@ async function run(message, def, opts) {
     if (target?.bot) {
         setTimeout(async () => {
             try {
-                const replyGif = pickGif(def);
+                const replyGif = await pickGif(def);
                 const botText = (def.botReply || '{bot} devolveu para {author}!')
                     .replace(/{bot}/g, `**${target.username}**`)
                     .replace(/{author}/g, `**${author.username}**`);
