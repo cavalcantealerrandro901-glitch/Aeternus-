@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Daily · Novel MAX · Aeternus</title>
+  <style>
+    :root {
+      --bg: #1a0c00;
+      --orange: #f97316;
+      --orange2: #fb923c;
+      --orange3: #fdba74;
+      --deep: #7c2d12;
+      --card: rgba(67, 20, 7, 0.75);
+      --text: #fff7ed;
+      --muted: #fdba74;
+      --line: rgba(251, 146, 60, 0.35);
+      --ok: #34d399;
+      --glow: 0 0 48px rgba(249, 115, 22, 0.45);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow-x: hidden;
+    }
+    .bg-layer {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(900px 520px at 20% -10%, rgba(249, 115, 22, 0.55), transparent 55%),
+        radial-gradient(700px 420px at 95% 15%, rgba(234, 88, 12, 0.35), transparent 50%),
+        radial-gradient(600px 400px at 50% 100%, rgba(124, 45, 18, 0.5), transparent 55%),
+        #1a0c00;
+    }
+    #particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+    .wrap { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+    .nav-menu { position: fixed; top: 16px; right: 16px; z-index: 50; }
+    .nav-toggle {
+      width: 48px; height: 48px; border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(67, 20, 7, 0.92); color: #fff; font-size: 1.3rem;
+      cursor: pointer; box-shadow: var(--glow); backdrop-filter: blur(10px);
+    }
+    .nav-panel {
+      display: none; position: absolute; top: 56px; right: 0; min-width: 220px;
+      background: rgba(28, 10, 2, 0.97); border: 1px solid var(--line);
+      border-radius: 14px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+    }
+    .nav-panel.open { display: block; }
+    .nav-panel a {
+      display: block; padding: 12px 16px; color: var(--text); text-decoration: none;
+      font-weight: 600; border-bottom: 1px solid rgba(124, 45, 18, 0.55);
+    }
+    .nav-panel a:hover, .nav-panel a.active { background: rgba(249, 115, 22, 0.25); color: #fff; }
+    .nav-panel a:last-child { border-bottom: 0; }
+    main {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 5rem 1.2rem 2rem;
+    }
+    .hero {
+      width: min(440px, 100%);
+      background: linear-gradient(160deg, rgba(154, 52, 18, 0.85), rgba(67, 20, 7, 0.9));
+      border: 1px solid var(--line);
+      border-radius: 1.5rem;
+      padding: 1.75rem 1.5rem 1.5rem;
+      box-shadow: var(--glow), 0 20px 50px rgba(0,0,0,0.45);
+      text-align: center;
+    }
+    .badge {
+      display: inline-block; font-size: 0.7rem; letter-spacing: 0.14em; font-weight: 800;
+      text-transform: uppercase; color: #7c2d12; background: linear-gradient(90deg, #fdba74, #fb923c);
+      padding: 0.35rem 0.75rem; border-radius: 999px; margin-bottom: 0.85rem;
+    }
+    h1 {
+      margin: 0 0 0.35rem; font-size: 1.85rem;
+      background: linear-gradient(90deg, #fff7ed, #fdba74);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .sub { color: var(--muted); font-size: 0.92rem; margin: 0 0 1.25rem; }
+    .user-row {
+      display: flex; align-items: center; gap: 0.75rem; justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .user-row img {
+      width: 48px; height: 48px; border-radius: 50%;
+      border: 2px solid var(--orange2); box-shadow: 0 0 16px rgba(249,115,22,0.5);
+    }
+    .user-row span { font-weight: 700; }
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .st {
+      background: rgba(0,0,0,0.28); border: 1px solid var(--line);
+      border-radius: 0.85rem; padding: 0.65rem 0.4rem;
+    }
+    .st span { display: block; font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .st b { display: block; font-size: 1.05rem; margin-top: 0.2rem; }
+    .hint { color: var(--muted); font-size: 0.88rem; min-height: 1.3em; margin: 0 0 1rem; }
+    .btn-claim {
+      width: 100%; border: 0; cursor: pointer; font-weight: 800; font-size: 1.05rem;
+      padding: 0.95rem 1rem; border-radius: 1rem;
+      background: linear-gradient(135deg, #ea580c, #f97316 45%, #fb923c);
+      color: #1c0902; box-shadow: 0 8px 28px rgba(249, 115, 22, 0.45);
+      transition: transform 0.15s, filter 0.15s;
+    }
+    .btn-claim:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
+    .btn-claim:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.3); }
+    .login-box { margin-top: 0.75rem; }
+    .login-box a {
+      color: #fdba74; font-weight: 700; text-decoration: none; border-bottom: 1px dashed var(--line);
+    }
+    footer.social {
+      position: relative; z-index: 1;
+      border-top: 1px solid var(--line);
+      background: rgba(12, 5, 0, 0.85);
+      padding: 1.25rem 1rem 1.5rem;
+      text-align: center;
+    }
+    footer.social h3 {
+      margin: 0 0 0.75rem; font-size: 0.75rem; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .social-links {
+      display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center;
+    }
+    .social-links a {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.55rem 0.9rem; border-radius: 999px;
+      border: 1px solid var(--line); background: rgba(67, 20, 7, 0.65);
+      color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.88rem;
+    }
+    .social-links a:hover { background: rgba(249, 115, 22, 0.3); border-color: var(--orange2); }
+    .social-links a.hidden { display: none; }
+    #toast {
+      position: fixed; bottom: 1.2rem; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #34d399; color: #042f1c; font-weight: 800; padding: 0.7rem 1.1rem;
+      border-radius: 0.75rem; opacity: 0; transition: 0.3s; z-index: 60; pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.err { background: #f87171; color: #450a0a; }
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <canvas id="particles"></canvas>
+
+  <div class="wrap">
+    <div class="nav-menu">
+      <button class="nav-toggle" id="navToggle" type="button" aria-label="Menu">☰</button>
+      <div class="nav-panel" id="navPanel">
+        <a href="/daily" class="active">✨ Daily</a>
+        <a href="/dashboard">⚙️ Painel</a>
+        <a href="/itens" id="linkItens">🛒 Loja</a>
+        <a href="/decoracoes" id="linkDecor">🎨 Decorações</a>
+        <a href="/efeitos" id="linkEfeitos">💫 Efeitos</a>
+        <a href="/login">🔐 Login</a>
+      </div>
+    </div>
+
+    <main>
+      <div class="hero">
+        <div class="badge">Novel MAX</div>
+        <h1>Daily</h1>
+        <p class="sub">Coleta diária de éter · Aeternus</p>
+        <div class="user-row" id="userRow" style="display:none">
+          <img id="userAv" alt="" />
+          <span id="userName"></span>
+        </div>
+        <div class="stats" id="stats">
+          <div class="st"><span>Streak</span><b id="stStreak">—</b></div>
+          <div class="st"><span>Faixa</span><b id="stRange">—</b></div>
+          <div class="st"><span>Saldo</span><b id="stBal">—</b></div>
+        </div>
+        <p class="hint" id="hint">Carregando…</p>
+        <button class="btn-claim" id="claimBtn" type="button" disabled>Coletar daily</button>
+        <div class="login-box" id="loginBox" style="display:none">
+          <a href="/login">Entrar com Discord</a> para coletar.
+        </div>
+      </div>
+    </main>
+
+    <footer class="social">
+      <h3>Comunidade & redes</h3>
+      <div class="social-links">
+        <a id="linkSupport" href="#" target="_blank" rel="noopener" class="hidden">💬 Servidor de suporte</a>
+        <a id="linkIg" href="#" target="_blank" rel="noopener" class="hidden">📸 Instagram</a>
+        <a id="linkX" href="#" target="_blank" rel="noopener" class="hidden">𝕏 Twitter / X</a>
+        <a id="linkYt" href="#" target="_blank" rel="noopener" class="hidden">▶️ YouTube</a>
+        <a id="linkTk" href="#" target="_blank" rel="noopener" class="hidden">🎵 TikTok</a>
+      </div>
+    </footer>
+  </div>
+  <div id="toast"></div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const guildId = params.get('guild') || '';
+    const $ = (id) => document.getElementById(id);
+
+    if (guildId) {
+      $('linkItens').href = '/itens?guild=' + guildId;
+      $('linkDecor').href = '/decoracoes?guild=' + guildId;
+      $('linkEfeitos').href = '/efeitos?guild=' + guildId;
+    }
+
+    $('navToggle').onclick = () => $('navPanel').classList.toggle('open');
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.nav-menu')) $('navPanel').classList.remove('open');
+    });
+
+    function toast(msg, err) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.className = 'show' + (err ? ' err' : '');
+      setTimeout(() => (t.className = ''), 2800);
+    }
+
+    function fmt(n) {
+      return Number(n || 0).toLocaleString('pt-BR');
+    }
+
+    async function loadSite() {
+      try {
+        const r = await fetch('/api/site');
+        if (!r.ok) return;
+        const j = await r.json();
+        const map = [
+          ['linkSupport', j.support],
+          ['linkIg', j.instagram],
+          ['linkX', j.twitter || j.x],
+          ['linkYt', j.youtube],
+          ['linkTk', j.tiktok]
+        ];
+        for (const [id, url] of map) {
+          const el = $(id);
+          if (url) {
+            el.href = url;
+            el.classList.remove('hidden');
+          }
+        }
+      } catch (_) {}
+    }
+
+    async function loadMe() {
+      try {
+        const r = await fetch('/api/me');
+        if (r.status === 401) {
+          $('hint').textContent = 'Faça login para ver e coletar o daily.';
+          $('loginBox').style.display = 'block';
+          $('claimBtn').disabled = true;
+          $('claimBtn').textContent = 'Login necessário';
+          return null;
+        }
+        if (!r.ok) throw new Error('me');
+        const j = await r.json();
+        $('userRow').style.display = 'flex';
+        const av = j.user?.avatar
+          ? `https://cdn.discordapp.com/avatars/${j.user.id}/${j.user.avatar}.png?size=128`
+          : `https://cdn.discordapp.com/embed/avatars/0.png`;
+        $('userAv').src = av;
+        $('userName').textContent = j.user?.global_name || j.user?.username || 'Você';
+        $('stBal').textContent = '✨ ' + fmt(j.economy?.eter);
+        return j;
+      } catch {
+        $('hint').textContent = 'Erro ao carregar conta.';
+        return null;
+      }
+    }
+
+    async function loadDaily() {
+      try {
+        const r = await fetch('/api/daily' + (guildId ? '?guildId=' + encodeURIComponent(guildId) : ''));
+        if (r.status === 401) return;
+        if (!r.ok) throw new Error('daily');
+        const j = await r.json();
+        $('stStreak').textContent = (j.streak || 0) + ' 🔥';
+        $('stRange').textContent = fmt(j.dailyMin) + '–' + fmt(j.dailyMax);
+        if (j.balance != null) $('stBal').textContent = '✨ ' + fmt(j.balance);
+        if (j.claimed) {
+          $('hint').textContent = j.leftText || 'Já coletado hoje. Volte amanhã.';
+          $('claimBtn').disabled = true;
+          $('claimBtn').textContent = 'Já coletado';
+        } else {
+          $('hint').textContent =
+            'Disponível · próxima sequência ' + (j.nextStreak || 1) +
+            (j.multiplier ? ' · ×' + Number(j.multiplier).toFixed(2) : '');
+          $('claimBtn').disabled = false;
+          $('claimBtn').textContent = 'Coletar daily ✨';
+        }
+      } catch {
+        $('hint').textContent = 'Não foi possível carregar o daily.';
+      }
+    }
+
+    $('claimBtn').onclick = async () => {
+      $('claimBtn').disabled = true;
+      try {
+        const r = await fetch('/api/daily/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ guildId: guildId || null })
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          toast(j.error || 'Não foi possível coletar.', true);
+          await loadDaily();
+          return;
+        }
+        toast('+' + fmt(j.amount || j.total || 0) + ' éter coletados!');
+        if (j.balance != null) $('stBal').textContent = '✨ ' + fmt(j.balance);
+        await loadDaily();
+      } catch {
+        toast('Erro de rede.', true);
+        $('claimBtn').disabled = false;
+      }
+    };
+
+    (function particles() {
+      const c = document.getElementById('particles');
+      const ctx = c.getContext('2d');
+      let w, h, dots;
+      function resize() {
+        w = c.width = innerWidth;
+        h = c.height = innerHeight;
+        dots = Array.from({ length: Math.min(50, Math.floor(w / 30)) }, () => ({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          r: Math.random() * 1.6 + 0.3,
+          s: Math.random() * 0.4 + 0.08,
+          a: Math.random() * 0.5 + 0.15
+        }));
+      }
+      function tick() {
+        ctx.clearRect(0, 0, w, h);
+        for (const d of dots) {
+          d.y -= d.s;
+          if (d.y < -4) { d.y = h + 4; d.x = Math.random() * w; }
+          ctx.beginPath();
+          ctx.fillStyle = `rgba(253, 186, 116, ${d.a})`;
+          ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        requestAnimationFrame(tick);
+      }
+      addEventListener('resize', resize);
+      resize();
+      tick();
+    })();
+
+    (async () => {
+      await loadSite();
+      await loadMe();
+      await loadDaily();
+    })();
+  </script>
+</body>
+</html>
