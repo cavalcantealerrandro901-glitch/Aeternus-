@@ -11,11 +11,11 @@ const shop = require('../utils/shop');
 module.exports = {
     name: 'daily',
     aliases: ['diario'],
-    description: 'Abre o daily no painel web',
+    description: 'Abre a página do daily (Novel MAX)',
 
     async execute(message) {
         const st = daily.status(message.author.id, message.guild?.id);
-        const panelUrl = shop.dashboardPanelUrl();
+        const panelUrl = shop.dailyPanelUrl();
 
         const claimed = !!st.claimed;
         const streakFire = st.streak >= 7 ? '🔥🔥🔥' : st.streak >= 3 ? '🔥🔥' : '🔥';
@@ -30,13 +30,13 @@ module.exports = {
             .setDescription(
                 [
                     '```',
-                    '  ╔══════════════════════════╗',
-                    '  ║     DAILY  ·  PAINEL     ║',
-                    '  ╚══════════════════════════╝',
+                    '  ╔═══════════════════════════╗',
+                    '  ║   DAILY  ·  NOVEL MAX    ║',
+                    '  ╚═══════════════════════════╝',
                     '```',
                     claimed
                         ? 'Você **já coletou** hoje. Volte após meia-noite (BRT).'
-                        : 'A coleta é **somente no painel web**.',
+                        : 'A coleta é **somente na página do Daily**.',
                     '',
                     `${streakFire} Sequência atual: **${st.streak || 0}** dia(s)`,
                     claimed
@@ -45,17 +45,17 @@ module.exports = {
                     `⭐ Multiplicador de nível: **×${Number(st.multiplier || 1).toFixed(2)}**`,
                     `💼 Saldo: ✨ **${eter.formatPlain(st.balance)}** éter`,
                     '',
-                    'Clique no botão abaixo para abrir o painel e coletar.'
+                    'Clique no botão para abrir a **página do Daily**.'
                 ]
                     .filter((x) => x != null)
                     .join('\n')
             )
-            .setFooter({ text: 'Daily só no painel · Aeternus MAX' })
+            .setFooter({ text: 'Daily · Novel MAX · Aeternus' })
             .setTimestamp();
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel(claimed ? 'Abrir painel' : 'Coletar no painel')
+                .setLabel(claimed ? 'Abrir Daily' : 'Coletar no Daily')
                 .setEmoji('✨')
                 .setStyle(ButtonStyle.Link)
                 .setURL(panelUrl),
