@@ -14,7 +14,7 @@ module.exports = {
                     .setTitle('🌐  Painel Aeternus')
                     .setDescription(
                         [
-                            'Controle o servidor, colete o **daily**, veja **Éter** e **XP**.',
+                            'Controle o servidor, veja **Éter** e **XP**. O **daily** fica na página Novel MAX.',
                             '',
                             'Abra com o botão abaixo (login Discord).'
                         ].join('\n')
@@ -29,10 +29,10 @@ module.exports = {
                         .setStyle(ButtonStyle.Link)
                         .setURL(url),
                     new ButtonBuilder()
-                        .setLabel('Decorações')
-                        .setEmoji('🎨')
+                        .setLabel('Daily Novel MAX')
+                        .setEmoji('🎁')
                         .setStyle(ButtonStyle.Link)
-                        .setURL(shop.decorPanelUrl(message.guild?.id))
+                        .setURL(shop.dailyPanelUrl())
                 )
             ]
         });
