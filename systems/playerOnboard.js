@@ -1,5 +1,5 @@
 /**
- * Convida usuários sem perfil de jogador via DM.
+ * Convida usuarios sem perfil de jogador via DM.
  */
 const {
     EmbedBuilder,
@@ -16,19 +16,19 @@ const lastInvite = new Map();
 function inviteEmbed() {
     return new EmbedBuilder()
         .setColor(0xa78bfa)
-        .setTitle('🎮 Crie seu perfil de jogador')
+        .setTitle('Crie seu perfil de jogador')
         .setDescription(
             [
-                'Você ainda **não tem um perfil** no Aeternus.',
+                'Voce ainda **nao tem um perfil** no Aeternus.',
                 '',
-                'No perfil você define:',
-                '• **Nome** de aventureiro',
-                '• **Classe** (Mago, Arqueiro, Tanque, Healer…)',
-                '• **Foto** do personagem',
+                'No perfil voce define:',
+                '- **Nome** de aventureiro',
+                '- **Classe** (Mago, Arqueiro, Tanque, Healer...)',
+                '- **Foto** do personagem',
                 '',
                 'Depois use `O.j perfil` no servidor para ver sua ficha.',
                 '',
-                'Clique no botão abaixo para começar.'
+                'Clique no botao abaixo para comecar.'
             ].join('\n')
         )
         .setFooter({ text: 'Aeternus · RPG' });
@@ -72,13 +72,13 @@ function setup(client) {
         setTimeout(() => sendInvite(member.user), 2500);
     });
 
-    client.once('ready', async () => {
+    const onReady = async () => {
         try {
             if (player.count() > 0) {
-                console.log(`🎮 [player] ${player.count()} perfil(is) carregado(s)`);
+                console.log('[player] ' + player.count() + ' perfil(is) carregado(s)');
                 return;
             }
-            console.log('🎮 [player] nenhum perfil — enviando convites iniciais…');
+            console.log('[player] nenhum perfil — enviando convites iniciais...');
             let sent = 0;
             for (const guild of client.guilds.cache.values()) {
                 const members = await guild.members.fetch().catch(() => null);
@@ -91,11 +91,14 @@ function setup(client) {
                 }
                 if (sent >= 40) break;
             }
-            console.log(`🎮 [player] convites iniciais enviados: ${sent}`);
+            console.log('[player] convites iniciais enviados: ' + sent);
         } catch (e) {
             console.error('[player onboard]', e);
         }
-    });
+    };
+
+    if (client.isReady && client.isReady()) onReady();
+    else client.once('clientReady', onReady);
 
     client.on('messageCreate', async (message) => {
         try {
@@ -108,7 +111,7 @@ function setup(client) {
         } catch (_) {}
     });
 
-    console.log('🎮 [playerOnboard] ativo');
+    console.log('[playerOnboard] ativo');
 }
 
 module.exports = { setup, sendInvite };
