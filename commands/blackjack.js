@@ -198,7 +198,7 @@ module.exports = {
     async execute(message, args) {
         const bet = resolveBet(args[0], eter.get(message.author.id), { label: '✨' });
         if (!bet.ok)
-            return message.reply(`❌ ${bet.error}\nUso: \`O.bj <valor|all|half>\`);
+            return message.reply(`❌ ${bet.error}\nUso: \`O.bj <valor|all|half>\``);
         if (sessions.has(message.author.id))
             return message.reply('Termine a mão atual primeiro.');
 
