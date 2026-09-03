@@ -158,6 +158,7 @@ function panelBase() {
     return (process.env.PANEL_URL || process.env.RENDER_EXTERNAL_URL || process.env.REDIRECT_URI?.replace(/\/auth\/discord\/callback.?$/, '') || 'https://aeternus-q7gt.onrender.com').replace(/\/$/, '');
 }
 function dashboardPanelUrl() { return `${panelBase()}/dashboard#me`; }
+function dailyPanelUrl() { return `${panelBase()}/daily`; }
 function decorPanelUrl(guildId) { const base = panelBase(); return guildId ? `${base}/decoracoes?guild=${guildId}` : `${base}/decoracoes`; }
 function itemsPanelUrl(guildId) { const base = panelBase(); return guildId ? `${base}/itens?guild=${guildId}` : `${base}/itens`; }
 function effectsPanelUrl(guildId) { const base = panelBase(); return guildId ? `${base}/efeitos?guild=${guildId}` : `${base}/efeitos`; }
@@ -167,5 +168,5 @@ module.exports = {
     GLOBAL_ITEMS, DECORATIONS, ITEMS, EFFECTS, catalog, decorations, effects, items, findItem, buy, equip,
     getInv, getEquippedDecoration, getEquippedTitle, getEquippedEffect, ownedDecorations, ownedEffects,
     getDailyBoost, guildVips, imageUrl, decorPanelUrl, itemsPanelUrl, effectsPanelUrl, shopPanelUrl,
-    dashboardPanelUrl, panelBase
+    dashboardPanelUrl, dailyPanelUrl, panelBase
 };
