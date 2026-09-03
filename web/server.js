@@ -51,6 +51,21 @@ function setup(client) {
         res.sendFile(path.join(__dirname, '..', 'public', 'efeitos.html'));
     });
 
+    app.get('/daily', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'daily.html'));
+    });
+
+    app.get('/api/site', (req, res) => {
+        res.json({
+            support: process.env.SUPPORT_SERVER_URL || process.env.DISCORD_SUPPORT || '',
+            instagram: process.env.INSTAGRAM_URL || process.env.INSTAGRAM || '',
+            twitter: process.env.TWITTER_URL || process.env.X_URL || '',
+            x: process.env.X_URL || process.env.TWITTER_URL || '',
+            youtube: process.env.YOUTUBE_URL || '',
+            tiktok: process.env.TIKTOK_URL || ''
+        });
+    });
+
     app.get('/login', (req, res) => {
         if (!CLIENT_ID) return res.status(500).send('CLIENT_ID missing');
         const url = new URL('https://discord.com/api/oauth2/authorize');
