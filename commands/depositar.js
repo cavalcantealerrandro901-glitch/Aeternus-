@@ -25,7 +25,7 @@ module.exports = {
 
         const bet = resolveBet(args[0], wallet, { label: '✨' });
         if (!bet.ok) {
-            return message.reply(`❌ ${bet.error}\nUso: \`O.dep <valor|all|half>\`);
+            return message.reply(`❌ ${bet.error}\nUso: \`O.dep <valor|all|half>\``);
         }
 
         const res = bank.deposit(message.author.id, bet.amount, eter);
