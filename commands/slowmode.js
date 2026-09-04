@@ -5,8 +5,8 @@ module.exports = {
     aliases: ['slow', 'modolento'],
     description: 'Modo lento do canal',
     data: new SlashCommandBuilder()
-        .setName('slowmode')
-        .setDescription('Definir modo lento')
+        .setName('modo-lento')
+        .setDescription('Modo lento')
         .addIntegerOption((o) =>
             o
                 .setName('segundos')
@@ -27,7 +27,7 @@ module.exports = {
         }
         try {
             await message.channel.setRateLimitPerUser(sec);
-            await message.reply(sec === 0 ? '⚡ Slowmode desativado.' : `🐢 Slowmode: **${sec}s**`);
+            await message.reply(sec === 0 ? '⚡ Slowmode desativado.' : `🐢 Modo lento: **${sec}s**`);
         } catch {
             await message.reply('❌ Não consegui alterar.');
         }
@@ -37,7 +37,7 @@ module.exports = {
         const sec = i.options.getInteger('segundos', true);
         try {
             await i.channel.setRateLimitPerUser(sec);
-            await i.reply(sec === 0 ? '⚡ Slowmode desativado.' : `🐢 Slowmode: **${sec}s**`);
+            await i.reply(sec === 0 ? '⚡ Slowmode desativado.' : `🐢 Modo lento: **${sec}s**`);
         } catch {
             await i.reply({ content: '❌ Não consegui alterar.', ephemeral: true });
         }

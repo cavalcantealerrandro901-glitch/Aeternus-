@@ -5,9 +5,11 @@ module.exports = {
     aliases: ['falar', 'dizer'],
     description: 'Fazer o bot falar',
     data: new SlashCommandBuilder()
-        .setName('say')
-        .setDescription('Fazer o bot falar')
-        .addStringOption((o) => o.setName('mensagem').setDescription('Texto').setRequired(true))
+        .setName('enviar-mensagem')
+        .setDescription('Enviar mensagem')
+        .addStringOption((o) =>
+            o.setName('mensagem').setDescription('Texto').setRequired(true)
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     async execute(message, args) {

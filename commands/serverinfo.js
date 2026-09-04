@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 
 function build(g) {
     return new EmbedBuilder()
@@ -23,13 +23,8 @@ module.exports = {
     name: 'serverinfo',
     aliases: ['si', 'server'],
     description: 'Info do servidor',
-    data: new SlashCommandBuilder().setName('serverinfo').setDescription('Info do servidor'),
 
     async execute(message) {
         await message.reply({ embeds: [build(message.guild)] });
-    },
-
-    async executeSlash(i) {
-        await i.reply({ embeds: [build(i.guild)] });
     }
 };

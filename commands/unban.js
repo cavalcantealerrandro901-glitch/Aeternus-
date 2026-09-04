@@ -2,11 +2,14 @@ const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'unban',
+    aliases: ['desbanir'],
     description: 'Desbanir usuário',
     data: new SlashCommandBuilder()
-        .setName('unban')
-        .setDescription('Desbanir usuário')
-        .addStringOption((o) => o.setName('id').setDescription('ID do usuário').setRequired(true))
+        .setName('desbanir')
+        .setDescription('Desbanir membro')
+        .addStringOption((o) =>
+            o.setName('id').setDescription('ID do usuário').setRequired(true)
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 
     async execute(message, args) {
