@@ -7,11 +7,11 @@ const {
 module.exports = {
     name: 'cargo',
     aliases: ['role', 'setcargo', 'togglecargo'],
-    description: 'Dá ou remove um cargo (toggle) — slash',
+    description: 'Dar ou remover cargo de um membro',
 
     data: new SlashCommandBuilder()
-        .setName('cargo')
-        .setDescription('Dá o cargo se o membro não tiver · remove se já tiver')
+        .setName('cargo-membro')
+        .setDescription('Dar ou remover cargo de um membro')
         .addUserOption((o) =>
             o.setName('membro').setDescription('Membro alvo').setRequired(true)
         )
@@ -41,7 +41,7 @@ module.exports = {
         const targetUser = interaction.options.getUser('membro', true);
         const role = interaction.options.getRole('cargo', true);
         const reason =
-            interaction.options.getString('motivo') || 'Alternância de cargo via /cargo';
+            interaction.options.getString('motivo') || 'Alternância de cargo via /cargo-membro';
 
         const me = interaction.guild.members.me;
         const author = interaction.member;
@@ -131,7 +131,7 @@ module.exports = {
             return interaction.editReply({
                 embeds: [
                     fail(
-                        `Falha ao ${has ? 'remover' : 'adicionar'} o cargo.\nVerifique hierarquia e permissões.\n\`${String(e.message || e).slice(0, 120)}\``
+                        `Falha ao ${has ? 'remover' : 'adicionar'} o cargo.\nVerifique hierarquia e permissões.`
                     )
                 ]
             });
@@ -143,48 +143,20 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor(color)
-            .setAuthor({
-                name: 'Aeternus · Gestão de Cargos',
-                iconURL: interaction.client.user.displayAvatarURL({ size: 64 })
-            })
             .setTitle(`${emoji}  Cargo ${verb}`)
             .setDescription(
                 [
-                    '```',
-                    has
-                        ? '  ║   ROLE  ·  REMOVED       ║'
-                        : '  ║   ROLE  ·  GRANTED       ║',
-                    '```',
-                    `**Membro:** ${member} \`${member.user.tag}\``,
-                    `**Cargo:** ${role} \`${role.name}\``,
-                    `**Ação:** ${has ? 'removido' : 'concedido'}`,
+                    `**Membro:** ${member}`,
+                    `**Cargo:** ${role}`,
                     `**Staff:** ${interaction.user}`,
-                    reason !== 'Alternância de cargo via /cargo'
+                    reason !== 'Alternância de cargo via /cargo-membro'
                         ? `**Motivo:** ${reason}`
                         : null
                 ]
                     .filter(Boolean)
                     .join('\n')
             )
-            .addFields(
-                {
-                    name: '🆔 IDs',
-                    value: [
-                        `Membro \`${member.id}\``,
-                        `Cargo \`${role.id}\``,
-                        `Staff \`${interaction.user.id}\``
-                    ].join('\n')
-                },
-                {
-                    name: '📌 Estado atual',
-                    value: has
-                        ? 'O membro **não possui** mais este cargo.'
-                        : 'O membro **possui** este cargo agora.'
-                }
-            )
-            .setThumbnail(member.user.displayAvatarURL({ size: 128 }))
-            .setFooter({ text: 'Toggle automático · /cargo membro:@user cargo:@role' })
-            .setTimestamp();
+            .setThumbnail(member.user.displayAvatarURL({ size: 128 }));
 
         await interaction.editReply({ embeds: [embed] });
     },
@@ -199,9 +171,7 @@ module.exports = {
             message.guild.roles.cache.get(args.find((a) => /^\d{17,20}$/.test(a)) || '');
 
         if (!member || !role) {
-            return message.reply(
-                'Uso: `/cargo membro:@user cargo:@role`\nPrefixo: `O.cargo @membro @cargo [motivo]`'
-            );
+            return message.reply('Uso: `O.cargo @membro @cargo`');
         }
 
         const me = message.guild.members.me;
@@ -241,7 +211,6 @@ module.exports = {
                     .setDescription(
                         `**Membro:** ${member}\n**Cargo:** ${role}\n**Staff:** ${message.author}`
                     )
-                    .setTimestamp()
             ]
         });
     }
@@ -250,7 +219,6 @@ module.exports = {
 function fail(text) {
     return new EmbedBuilder()
         .setColor(0xef4444)
-        .setTitle('❌  Não foi possível')
-        .setDescription(text)
-        .setTimestamp();
+        .setTitle('❌ Não foi possível')
+        .setDescription(text);
 }
