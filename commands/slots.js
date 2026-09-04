@@ -1,223 +1,73 @@
-const {
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    SlashCommandBuilder
-} = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
-const { againRow, fmt, C } = require('../utils/gameStyle');
+const { crystalResult, againRow } = require('../utils/gameStyle');
 
-const REELS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎', '㟾️'];
-const WEIGHTS = [28, 24, 18, 14, 10, 5, 1];
+const ICONS = ['🍒', '🍋', '🔔', '⭐', '💎', '㟾️'];
 
-function pick() {
-    const total = WEIGHTS.reduce((a, b) => a + b, 0);
-    let r = Math.random() * total;
-    for (let i = 0; i < REELS.length; i++) {
-        r -= WEIGHTS[i];
-        if (r <= 0) return REELS[i];
-    }
-    return REELS[0];
-}
-
-function multiplier(a, b, c) {
-    if (a === b && b === c) {
-        if (a === '㟾️') return 25;
-        if (a === '💎') return 18;
-        if (a === '⭐') return 12;
-        if (a === '🍉') return 8;
-        if (a === '🍇') return 6;
-        if (a === '🍋') return 5;
-        return 4;
-    }
-    if (a === b || b === c || a === c) {
-        const pair = a === b ? a : b === c ? b : a;
-        if (pair === '㟾️' || pair === '💎') return 2.5;
-        if (pair === '⭐') return 2;
-        return 1.5;
-    }
-    return 0;
-}
-
-function frame(a, b, c) {
-    return [
-        '```',
-        '  ╔════════════════════╗',
-        `  ║   ${a}  │  ${b}  │  ${c}   ║`,
-        '  ╚════════════════════╝',
-        '```'
-    ].join('\n');
-}
-
-function spin(amount, userId) {
+function play(amount, userId) {
     eter.remove(userId, amount, { reason: 'slots' });
-    const a = pick();
-    const b = pick();
-    const c = pick();
-    const mult = multiplier(a, b, c);
-    const payout = Math.floor(amount * mult);
+    const a = ICONS[Math.floor(Math.random() * ICONS.length)];
+    const b = ICONS[Math.floor(Math.random() * ICONS.length)];
+    const c = ICONS[Math.floor(Math.random() * ICONS.length)];
+    let mult = 0;
+    if (a === b && b === c) mult = a === '㟾️' ? 10 : a === '💎' ? 7 : 5;
+    else if (a === b || b === c || a === c) mult = 2;
+    const payout = amount * mult;
     if (payout > 0) eter.add(userId, payout, { reason: 'slots win' });
-    return { a, b, c, mult, payout, win: payout > 0, profit: payout - amount };
-}
-
-function vibe(r) {
-    if (r.mult >= 18) return '🌟 **MEGA JACKPOT!** As estrelas se alinharam.';
-    if (r.mult >= 8) return '🎉 **Grande vitória!** Os rolos te abençoaram.';
-    if (r.win) return '✨ **Vitória!** Mais uma rodada vencedora.';
-    return '💨 Os rolos giraram… a sorte volta na próxima.';
+    return { reels: `${a} ${b} ${c}`, mult, payout, win: mult > 0 };
 }
 
 function payload(r, amount, user, userId) {
-    const bal = eter.get(userId);
-    const color = r.mult >= 12 ? C.gold : r.win ? C.win : C.lose;
-    const title =
-        r.mult >= 18
-            ? '🎰  MEGA JACKPOT'
-            : r.win
-              ? '🎰  Slots · Vitória'
-              : '🎰  Slots · Derrota';
-
-    let money;
-    if (r.win) {
-        money = [
-            `✨ **Ganhou** + **${fmt(r.payout)}** (×${r.mult})`,
-            `📈 Lucro: ✨ **${fmt(r.profit)}**`
-        ].join('\n');
-    } else {
-        money = `💫 **Perdeu** − **${fmt(amount)}**`;
-    }
-
-    const emb = new EmbedBuilder()
-        .setColor(color)
-        .setAuthor({
-            name: `${user.username} · Cassino Aeternus`,
-            iconURL: user.displayAvatarURL({ size: 64 })
-        })
-        .setTitle(title)
-        .setDescription(
-            [
-                frame(r.a, r.b, r.c),
-                `Aposta: ✨ **${fmt(amount)}**`,
-                '',
-                vibe(r),
-                '',
-                money,
-                '',
-                `💼 Saldo: ✨ **${fmt(bal)}**`
-            ].join('\n')
-        )
-        .setFooter({ text: 'O.slots 1k · all · half  ·  㟾️㟾️㟾️ ×25 · Aeternus' })
-        .setTimestamp();
-
     return {
-        embeds: [emb],
-        components: [
-            againRow(`slots:again:${amount}:${userId}`, 'Girar de novo'),
-            new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`slots:again:${amount}:${userId}:x`)
-                    .setLabel('Tabela de prêmios')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('📜')
-            )
-        ]
+        embeds: [
+            crystalResult({
+                title: r.win ? 'Slots · Vitória' : 'Slots · Derrota',
+                win: r.win,
+                amount,
+                payout: r.payout,
+                balance: eter.get(userId),
+                user,
+                extra: r.reels
+            })
+        ],
+        components: [againRow(`slots:again:${amount}:${userId}`)]
     };
 }
 
-function tableEmbed() {
-    return new EmbedBuilder()
-        .setColor(0xa78bfa)
-        .setTitle('📜  Tabela · Slots Aeternus')
-        .setDescription(
-            [
-                '**Três iguais**',
-                '㟾️㟾️㟾️ → ×**25**',
-                '💎💎💎 → ×**18**',
-                '⭐⭐⭐ → ×**12**',
-                '🍉🍉🍉 → ×**8**',
-                '🍇🍇🍇 → ×**6**',
-                '🍋🍋🍋 → ×**5**',
-                '🍒🍒🍒 → ×**4**',
-                '',
-                '**Dois iguais** → ×**1.5** a ×**2.5**',
-                '',
-                '_Moeda: Éter ✨ · Boa sorte._'
-            ].join('\n')
-        );
+async function run(userId, user, amountRaw, reply) {
+    const bet = resolveBet(amountRaw, eter.get(userId), { label: '✨' });
+    if (!bet.ok) return reply(`❌ ${bet.error}`);
+    const r = play(bet.amount, userId);
+    return reply(payload(r, bet.amount, user, userId));
 }
 
 module.exports = {
     name: 'slots',
-    aliases: ['slot', 'caça-niquel', 'cacaniquel', 'slotmachine'],
-    description: 'Caça-níquel com éter',
+    aliases: ['slot', 'caca', 'cacaniqueis'],
+    description: 'Caça-níqueis',
     data: new SlashCommandBuilder()
         .setName('slots')
-        .setDescription('Gira os slots (éter)')
+        .setDescription('Caça-níqueis')
         .addStringOption((o) =>
-            o.setName('valor').setDescription('1k · 2.5m · all · half').setRequired(true)
+            o.setName('valor').setDescription('Valor, all ou half').setRequired(true)
         ),
-
     async execute(message, args) {
-        if (!args[0]) {
-            return message.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xa78bfa)
-                        .setTitle('🎰  Slots Aeternus')
-                        .setDescription(
-                            [
-                                'Uso: `O.slots <valor|all|half>`',
-                                '',
-                                '`O.slots 1k`',
-                                '`O.slots half`',
-                                '`O.slots all`',
-                                '',
-                                '㟾️㟾️㟾️ paga **×25** — o jackpot dos deuses.'
-                            ].join('\n')
-                        )
-                        .setFooter({ text: 'Apostas em Éter ✨' })
-                ]
-            });
-        }
-        const bet = resolveBet(args[0], eter.get(message.author.id), { label: '✨' });
-        if (!bet.ok) return message.reply(`❌ ${bet.error}`);
-        const r = spin(bet.amount, message.author.id);
-        return message.reply(payload(r, bet.amount, message.author, message.author.id));
+        await run(message.author.id, message.author, args[0], (p) => message.reply(p));
     },
-
-    async executeSlash(interaction) {
-        const bet = resolveBet(
-            interaction.options.getString('valor'),
-            eter.get(interaction.user.id),
-            { label: '✨' }
+    async executeSlash(i) {
+        await run(i.user.id, i.user, i.options.getString('valor'), (p) =>
+            typeof p === 'string' ? i.reply({ content: p, ephemeral: true }) : i.reply(p)
         );
-        if (!bet.ok) {
-            return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
-        }
-        const r = spin(bet.amount, interaction.user.id);
-        return interaction.reply(payload(r, bet.amount, interaction.user, interaction.user.id));
     },
-
     async handleComponent(interaction) {
-        const parts = interaction.customId.split(':');
-        if (parts[0] !== 'slots') return;
-
-        if (parts[4] === 'x' || interaction.customId.includes(':x')) {
-            return interaction.reply({ embeds: [tableEmbed()], ephemeral: true });
-        }
-
-        const amountStr = parts[2];
-        const owner = parts[3];
+        const [, , amountStr, owner] = interaction.customId.split(':');
         if (interaction.user.id !== owner) {
-            return interaction.reply({ content: 'Não é a sua partida.', ephemeral: true });
+            return interaction.reply({ content: 'Não é sua partida.', ephemeral: true });
         }
         const bet = resolveBet(amountStr, eter.get(owner), { label: '✨' });
-        if (!bet.ok) {
-            return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
-        }
-        const r = spin(bet.amount, owner);
-        return interaction.update(payload(r, bet.amount, interaction.user, owner));
+        if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
+        const r = play(bet.amount, owner);
+        await interaction.update(payload(r, bet.amount, interaction.user, owner));
     }
 };

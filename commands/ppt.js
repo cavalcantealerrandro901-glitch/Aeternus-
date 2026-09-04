@@ -1,146 +1,95 @@
-const {
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle
-} = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
-const { fmt, C, againRow } = require('../utils/gameStyle');
+const { crystalResult, againRow } = require('../utils/gameStyle');
 
-const OPTS = ['pedra', 'papel', 'tesoura'];
-const EMOJI = { pedra: '✊', papel: '🤚', tesoura: '✌️' };
-const BEATS = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
+const MOVES = ['pedra', 'papel', 'tesoura'];
+const WIN = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
 
 function play(choice, amount, userId) {
     eter.remove(userId, amount, { reason: 'ppt' });
-    const bot = OPTS[Math.floor(Math.random() * 3)];
-    let state = 'lose';
+    const bot = MOVES[Math.floor(Math.random() * 3)];
+    let result = 'empate';
+    if (choice === bot) result = 'empate';
+    else if (WIN[choice] === bot) result = 'win';
+    else result = 'lose';
     let payout = 0;
-    if (choice === bot) {
-        state = 'draw';
-        payout = amount;
-        eter.add(userId, amount, { reason: 'ppt draw' });
-    } else if (BEATS[choice] === bot) {
-        state = 'win';
+    if (result === 'win') {
         payout = amount * 2;
         eter.add(userId, payout, { reason: 'ppt win' });
+    } else if (result === 'empate) {
+        payout = amount;
+        eter.add(userId, amount, { reason: 'ppt draw' });
     }
-    return { bot, state, payout };
-}
-
-function vibe(state) {
-    if (state === 'win') return '🎉 **Você leu a jogada!** Vitória limpa.';
-    if (state === 'draw') return '🤝 **Empate.** As mentes se encontraram.';
-    return '😏 **O bot leu você.** Tente outra vez.';
+    return { bot, result, payout };
 }
 
 function payload(r, choice, amount, user, userId) {
-    const win = r.state === 'win' ? true : r.state === 'draw' ? 'draw' : false;
-    const color = win === true ? C.win : win === 'draw' ? C.draw : C.lose;
     const title =
-        r.state === 'win'
-            ? '✊  PPT · Vitória'
-            : r.state === 'draw'
-              ? '✊  PPT · Empate'
-              : '✊  PPT · Derrota';
-
-    let money;
-    if (r.state === 'win') money = `✨ **Ganhou** +✨ **${fmt(r.payout)}** (×2)`;
-    else if (r.state === 'draw') money = `🤝 Aposta devolvida ✨ **${fmt(amount)}**`;
-    else money = `💫 **Perdeu** −✨ **${fmt(amount)}**`;
-
+        r.result === 'win' ? 'PPT · Vitória' : r.result === 'empate' ? 'PPT · Empate' : 'PPT · Derrota';
     return {
         embeds: [
-            new EmbedBuilder()
-                .setColor(color)
-                .setAuthor({
-                    name: `${user.username} · Jokenpô`,
-                    iconURL: user.displayAvatarURL({ size: 64 })
-                })
-                .setTitle(title)
-                .setDescription(
-                    [
-                        '```',
-                        '  ╔═══════════════════════════╗',
-                        '  ║   PEDRA · PAPEL · TESOURA ║',
-                        '  ╚═══════════════════════════╝',
-                        '```',
-                        `Você ${EMOJI[choice]} **${choice}**  vs  Bot ${EMOJI[r.bot]} **${r.bot}**`,
-                        '',
-                        vibe(r.state),
-                        '',
-                        money,
-                        `💼 Saldo: ✨ **${fmt(eter.get(userId))}**`
-                    ].join('\n')
-                )
-                .setFooter({ text: 'O.ppt pedra|papel|tesoura <valor> · Aeternus' })
-                .setTimestamp()
+            crystalResult({
+                title,
+                win: r.result === 'win',
+                amount,
+                payout: r.payout,
+                balance: eter.get(userId),
+                user,
+                extra: `Você: **${choice}** · Bot: **${r.bot}**`
+            })
         ],
-        components: [
-            againRow(`ppt:again:${choice}:${amount}:${userId}`, 'Mesma jogada'),
-            new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`ppt:pick:pedra:${amount}:${userId}`)
-                    .setLabel('Pedra')
-                    .setEmoji('✊')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId(`ppt:pick:papel:${amount}:${userId}`)
-                    .setLabel('Papel')
-                    .setEmoji('🤚')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId(`ppt:pick:tesoura:${amount}:${userId}`)
-                    .setLabel('Tesoura')
-                    .setEmoji('✌️')
-                    .setStyle(ButtonStyle.Danger)
-            )
-        ]
+        components: [againRow(`ppt:again:${choice}:${amount}:${userId}`)]
     };
+}
+
+async function run(userId, user, choice, amountRaw, reply) {
+    choice = String(choice || '').toLowerCase();
+    if (!MOVES.includes(choice)) return reply('❌ Use pedra, papel ou tesoura.');
+    const bet = resolveBet(amountRaw, eter.get(userId), { label: '✨' });
+    if (!bet.ok) return reply(`❌ ${bet.error}`);
+    const r = play(choice, bet.amount, userId);
+    return reply(payload(r, choice, bet.amount, user, userId));
 }
 
 module.exports = {
     name: 'ppt',
     aliases: ['jokenpo', 'rps'],
-    description: 'Pedra papel tesoura (éter)',
+    description: 'Pedra, papel ou tesoura',
+    data: new SlashCommandBuilder()
+        .setName('ppt')
+        .setDescription('Pedra, papel ou tesoura')
+        .addStringOption((o) =>
+            o
+                .setName('jogada')
+                .setDescription('Sua jogada')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Pedra', value: 'pedra' },
+                    { name: 'Papel', value: 'papel' },
+                    { name: 'Tesoura', value: 'tesoura' }
+                )
+        )
+        .addStringOption((o) =>
+            o.setName('valor').setDescription('Valor, all ou half').setRequired(true)
+        ),
     async execute(message, args) {
-        const choice = (args[0] || '').toLowerCase();
-        if (!OPTS.includes(choice))
-            return message.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xa78bfa)
-                        .setTitle('✊  Pedra, Papel ou Tesoura')
-                        .setDescription(
-                            [
-                                'Uso: `O.ppt <pedra|papel|tesoura> <valor|all|half>`',
-                                '',
-                                '`O.ppt pedra 1k`',
-                                '`O.ppt papel half`',
-                                '`O.ppt tesoura all`',
-                                '',
-                                'Vitória paga **×2** · Empate devolve a aposta.'
-                            ].join('\n')
-                        )
-                ]
-            });
-        const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
-        if (!bet.ok) return message.reply(`❌ ${bet.error}`);
-        const r = play(choice, bet.amount, message.author.id);
-        await message.reply(payload(r, choice, bet.amount, message.author, message.author.id));
+        await run(message.author.id, message.author, args[0], args[1], (p) => message.reply(p));
+    },
+    async executeSlash(i) {
+        await run(
+            i.user.id,
+            i.user,
+            i.options.getString('jogada'),
+            i.options.getString('valor'),
+            (p) => (typeof p === 'string' ? i.reply({ content: p, ephemeral: true }) : i.reply(p))
+        );
     },
     async handleComponent(interaction) {
-        const parts = interaction.customId.split(':');
-        if (parts[0] !== 'ppt') return;
-        const mode = parts[1];
-        const choice = parts[2];
-        const amountStr = parts[3];
-        const owner = parts[4];
-        if (interaction.user.id !== owner)
+        const [, , choice, amountStr, owner] = interaction.customId.split(':');
+        if (interaction.user.id !== owner) {
             return interaction.reply({ content: 'Não é sua partida.', ephemeral: true });
-        if (!OPTS.includes(choice))
-            return interaction.reply({ content: 'Jogada inválida.', ephemeral: true });
+        }
         const bet = resolveBet(amountStr, eter.get(owner), { label: '✨' });
         if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
         const r = play(choice, bet.amount, owner);

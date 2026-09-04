@@ -1,3 +1,4 @@
+const { SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const { crystalResult, againRow } = require('../utils/gameStyle');
@@ -14,40 +15,61 @@ function payload(r, guess, amount, user, userId) {
     return {
         embeds: [
             crystalResult({
-                title: r.win ? '🎲  Dado · Vitória' : '🎲  Dado · Derrota',
+                title: r.win ? 'Dado · Vitória' : 'Dado · Derrota',
                 win: r.win,
                 amount,
                 payout: r.payout,
                 balance: eter.get(userId),
                 user,
-                extra: `Você apostou no **${guess}** · Saiu **${r.roll}**`
+                extra: `Aposta **${guess}** · Saiu **${r.roll}**`
             })
         ],
         components: [againRow(`dado:again:${guess}:${amount}:${userId}`)]
     };
 }
 
+async function run(userId, user, guess, amountRaw, reply) {
+    guess = parseInt(guess, 10);
+    if (!guess || guess < 1 || guess > 6) return reply('❌ Número de 1 a 6.');
+    const bet = resolveBet(amountRaw, eter.get(userId), { label: '✨' });
+    if (!bet.ok) return reply(`❌ ${bet.error}`);
+    const r = play(guess, bet.amount, userId);
+    return reply(payload(r, guess, bet.amount, user, userId));
+}
+
 module.exports = {
     name: 'dado',
     aliases: ['dice', 'roll'],
-    description: 'Aposta no dado 1-6 (éter)',
+    description: 'Aposta no dado 1–6',
+    data: new SlashCommandBuilder()
+        .setName('dado')
+        .setDescription('Aposta no dado 1–6')
+        .addIntegerOption((o) =>
+            o.setName('numero').setDescription('1 a 6').setRequired(true).setMinValue(1).setMaxValue(6)
+        )
+        .addStringOption((o) =>
+            o.setName('valor').setDescription('Valor, all ou half').setRequired(true)
+        ),
     async execute(message, args) {
-        const guess = parseInt(args[0], 10);
-        if (!guess || guess < 1 || guess > 6)
-            return message.reply('Uso: `O.dado <1-6> <valor|all|half>`');
-        const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
-        if (!bet.ok) return message.reply(`❌ ${bet.error}`);
-        const r = play(guess, bet.amount, message.author.id);
-        await message.reply(payload(r, guess, bet.amount, message.author, message.author.id));
+        await run(message.author.id, message.author, args[0], args[1], (p) => message.reply(p));
+    },
+    async executeSlash(i) {
+        await run(
+            i.user.id,
+            i.user,
+            i.options.getInteger('numero'),
+            i.options.getString('valor'),
+            (p) => (typeof p === 'string' ? i.reply({ content: p, ephemeral: true }) : i.reply(p))
+        );
     },
     async handleComponent(interaction) {
         const [, , guessStr, amountStr, owner] = interaction.customId.split(':');
-        if (interaction.user.id !== owner)
+        if (interaction.user.id !== owner) {
             return interaction.reply({ content: 'Não é sua partida.', ephemeral: true });
-        const guess = parseInt(guessStr, 10);
+        }
         const bet = resolveBet(amountStr, eter.get(owner), { label: '✨' });
         if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
-        const r = play(guess, bet.amount, owner);
-        await interaction.update(payload(r, guess, bet.amount, interaction.user, owner));
+        const r = play(parseInt(guessStr, 10), bet.amount, owner);
+        await interaction.update(payload(r, parseInt(guessStr, 10), bet.amount, interaction.user, owner));
     }
 };
