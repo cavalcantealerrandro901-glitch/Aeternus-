@@ -2,108 +2,105 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     StringSelectMenuBuilder,
-    ButtonBuilder,
-    ButtonStyle,
     SlashCommandBuilder
 } = require('discord.js');
 const { getPrefix } = require('../utils/settings');
-const { listCategories, getCategory } = require('../utils/commandCatalog');
+const {
+    listCategories,
+    getCategory,
+    findCommand
+} = require('../utils/commandCatalog');
 
 function introEmbed(client, prefix, guild) {
-    const name = client.user.username;
     return new EmbedBuilder()
         .setColor(0xa78bfa)
         .setAuthor({
-            name: `${name} · Central de Ajuda`,
+            name: `${client.user.username} · Ajuda`,
             iconURL: client.user.displayAvatarURL({ size: 64 })
         })
-        .setTitle('Olá — é um prazer ter você por aqui')
+        .setTitle('Central de ajuda')
         .setDescription(
             [
-                `Eu sou o **${name}**, um bot de economia, jogos e utilidades feito para deixar o servidor mais vivo.`,
+                `Prefixo: \`${prefix}\` · também funciona com **/**`,
+                guild ? `Servidor: **${guild.name}**` : null,
                 '',
-                '**Como funciono**',
-                '• Comandos por **prefixo** no chat',
-                '• Comandos por **barra /** (slash)',
-                '• Painel web para configurações do servidor',
-                '',
-                `**Prefixo neste servidor:** \`${prefix}\``,
-                guild ? `**Servidor:** ${guild.name}` : null,
-                '',
-                'Escolha uma **categoria** no menu abaixo.',
-                'Use os botões para alternar entre visão **Prefixo** e **Slash**.',
-                '',
-                `Atalho: \`${prefix}ajuda <categoria>\` · ex: \`${prefix}ajuda economia\``
+                'Escolha uma **categoria** no menu.',
+                `Detalhe de um comando: \`${prefix}ajuda <comando>\``,
+                `Ex.: \`${prefix}ajuda saldo\``
             ]
                 .filter((x) => x != null)
                 .join('\n')
         )
-        .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
-        .setFooter({ text: 'Aeternus · cordial · elegante' })
-        .setTimestamp();
+        .setThumbnail(client.user.displayAvatarURL({ size: 256 }));
 }
 
-function categoryEmbed(cat, prefix, mode) {
-    const isSlash = mode === 'slash';
-    const lines = cat.commands.map((c) => {
-        if (isSlash) return `• **/${c.name}** — ${c.desc}`;
-        return `• **${prefix}${c.name}** — ${c.desc}`;
-    });
-
+function categoryEmbed(cat, prefix) {
+    const lines = cat.commands.map(
+        (c) => `• **${prefix}${c.name}** · /${c.name} — ${c.desc}`
+    );
     return new EmbedBuilder()
         .setColor(0x8b5cf6)
         .setTitle(`${cat.emoji}  ${cat.label}`)
         .setDescription(
-            [
-                cat.description,
-                '',
-                isSlash ? '**Comandos slash /**' : `**Comandos com prefixo** \`${prefix}\``,
-                '',
-                lines.join('\n')
-            ].join('\n')
-        )
-        .setFooter({
-            text: isSlash
-                ? 'Visão Slash · use / no Discord'
-                : `Visão Prefixo · comece com ${prefix}`
-        })
-        .setTimestamp();
+            [cat.description, '', lines.join('\n'), '', `Detalhe: \`${prefix}ajuda <comando>\``].join(
+                '\n'
+            )
+        );
+}
+
+function commandEmbed(cmd, prefix, liveCmd) {
+    const usage = cmd.usage || cmd.name;
+    const example = cmd.example || `${prefix}${cmd.name}`;
+    const about = cmd.about || cmd.desc || liveCmd?.description || '—';
+    const aliases =
+        Array.isArray(liveCmd?.aliases) && liveCmd.aliases.length
+            ? liveCmd.aliases.map((a) => `\`${prefix}${a}\``).join(', ')
+            : null;
+
+    const emb = new EmbedBuilder()
+        .setColor(0x38bdf8)
+        .setTitle(`Comando · ${cmd.name}`)
+        .setDescription(about)
+        .addFields(
+            {
+                name: 'Uso (prefixo)',
+                value: `\`${prefix}${usage}\``,
+                inline: false
+            },
+            {
+                name: 'Slash',
+                value: `\`/${cmd.name}\``,
+                inline: true
+            },
+            {
+                name: 'Categoria',
+                value: `${cmd.category?.emoji || ''} ${cmd.category?.label || '—'}`,
+                inline: true
+            },
+            {
+                name: 'Exemplo',
+                value: `\`${example.replace(/^O\./, prefix)}\``,
+                inline: false
+            }
+        );
+    if (aliases) emb.setFooter({ text: `Aliases: ${liveCmd.aliases.join(', ')}` });
+    return emb;
 }
 
 function menuRow(selected) {
-    const menu = new StringSelectMenuBuilder()
-        .setCustomId('help:category')
-        .setPlaceholder('Escolha uma categoria…')
-        .addOptions(
-            listCategories().map((c) => ({
-                label: c.label,
-                value: c.id,
-                emoji: c.emoji,
-                description: c.description.slice(0, 100),
-                default: selected === c.id
-            }))
-        );
-    return new ActionRowBuilder().addComponents(menu);
-}
-
-function modeRow(mode, categoryId) {
-    const cat = categoryId || 'economia';
     return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`help:mode:prefix:${cat}`)
-            .setLabel('Prefixo')
-            .setEmoji('💬')
-            .setStyle(mode === 'prefix' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`help:mode:slash:${cat}`)
-            .setLabel('Slash /')
-            .setEmoji('⚡')
-            .setStyle(mode === 'slash' ? ButtonStyle.Primary : ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId('help:home')
-            .setLabel('Início')
-            .setEmoji('🏠')
-            .setStyle(ButtonStyle.Secondary)
+        new StringSelectMenuBuilder()
+            .setCustomId('help:category')
+            .setPlaceholder('Ver categorias…')
+            .addOptions(
+                listCategories().map((c) => ({
+                    label: c.label,
+                    value: c.id,
+                    emoji: c.emoji,
+                    description: String(c.description || '').slice(0, 100),
+                    default: selected === c.id
+                }))
+            )
     );
 }
 
@@ -112,7 +109,13 @@ async function sendHelp(ctx, args = []) {
     const guild = ctx.guild;
     const client = ctx.client;
     const prefix = getPrefix(guild?.id);
-    const sub = (args[0] || (isSlash ? ctx.options?.getString?.('categoria') : '') || '')
+    const sub = (
+        args[0] ||
+        (isSlash
+            ? ctx.options?.getString?.('comando') || ctx.options?.getString?.('categoria')
+            : '') ||
+        ''
+    )
         .toLowerCase()
         .trim();
 
@@ -125,42 +128,68 @@ async function sendHelp(ctx, args = []) {
     };
 
     if (sub) {
-        const cat = getCategory(sub);
-        if (!cat) {
+        const found = findCommand(sub);
+        if (found) {
+            const live =
+                client.commands?.get(found.name) ||
+                client.commands?.get(sub) ||
+                null;
             return reply({
-                content: `Categoria não encontrada. Use: ${listCategories()
-                    .map((c) => c.id)
-                    .join(', ')}`,
-                ephemeral: isSlash
+                embeds: [commandEmbed(found, prefix, live)],
+                components: [menuRow(found.category?.id)]
             });
         }
+
+        const cat = getCategory(sub);
+        if (cat) {
+            return reply({
+                embeds: [categoryEmbed(cat, prefix)],
+                components: [menuRow(cat.id)]
+            });
+        }
+
+        const liveOnly = client.commands?.get(sub);
+        if (liveOnly) {
+            const fake = {
+                name: liveOnly.name,
+                desc: liveOnly.description || liveOnly.name,
+                usage: liveOnly.name,
+                example: `${prefix}${liveOnly.name}`,
+                about: liveOnly.description || 'Comando do bot.',
+                category: null
+            };
+            return reply({
+                embeds: [commandEmbed(fake, prefix, liveOnly)],
+                components: [menuRow(null)]
+            });
+        }
+
         return reply({
-            embeds: [categoryEmbed(cat, prefix, 'prefix')],
-            components: [menuRow(cat.id), modeRow('prefix', cat.id)]
+            content: `Não encontrei \`${sub}\`.\nUse \`${prefix}ajuda\` ou uma categoria: ${listCategories()
+                .map((c) => c.id)
+                .join(', ')}.`,
+            ephemeral: isSlash
         });
     }
 
     return reply({
         embeds: [introEmbed(client, prefix, guild)],
-        components: [menuRow(null), modeRow('prefix', 'economia')]
+        components: [menuRow(null)]
     });
 }
 
 module.exports = {
     name: 'help',
     aliases: ['ajuda', 'comandos', 'cmds'],
-    description: 'Central de ajuda do Aeternus',
+    description: 'Central de ajuda',
     data: new SlashCommandBuilder()
         .setName('help')
-        .setDescription('Central de ajuda do Aeternus')
+        .setDescription('Central de ajuda')
         .addStringOption((o) =>
             o
-                .setName('categoria')
-                .setDescription('Filtrar por categoria')
+                .setName('comando')
+                .setDescription('Comando ou categoria (ex: saldo, economia)')
                 .setRequired(false)
-                .addChoices(
-                    ...listCategories().map((c) => ({ name: c.label, value: c.id }))
-                )
         ),
 
     async execute(message, args) {
@@ -172,35 +201,17 @@ module.exports = {
     },
 
     async handleComponent(interaction) {
+        if (!interaction.isStringSelectMenu()) return;
+        if (interaction.customId !== 'help:category') return;
+
         const prefix = getPrefix(interaction.guild?.id);
-        const id = interaction.customId;
-
-        if (id === 'help:home') {
-            return interaction.update({
-                embeds: [introEmbed(interaction.client, prefix, interaction.guild)],
-                components: [menuRow(null), modeRow('prefix', 'economia')]
-            });
+        const cat = getCategory(interaction.values?.[0]);
+        if (!cat) {
+            return interaction.reply({ content: 'Categoria inválida.', ephemeral: true });
         }
-
-        if (id === 'help:category' || interaction.isStringSelectMenu()) {
-            const catId = interaction.values?.[0];
-            const cat = getCategory(catId);
-            if (!cat) {
-                return interaction.reply({ content: 'Categoria inválida.', ephemeral: true });
-            }
-            return interaction.update({
-                embeds: [categoryEmbed(cat, prefix, 'prefix')],
-                components: [menuRow(cat.id), modeRow('prefix', cat.id)]
-            });
-        }
-
-        if (id.startsWith('help:mode:')) {
-            const [, , mode, catId] = id.split(':');
-            const cat = getCategory(catId) || getCategory('economia');
-            return interaction.update({
-                embeds: [categoryEmbed(cat, prefix, mode === 'slash' ? 'slash' : 'prefix')],
-                components: [menuRow(cat.id), modeRow(mode === 'slash' ? 'slash' : 'prefix', cat.id)]
-            });
-        }
+        return interaction.update({
+            embeds: [categoryEmbed(cat, prefix)],
+            components: [menuRow(cat.id)]
+        });
     }
 };
