@@ -1,48 +1,45 @@
 const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+
 module.exports = {
     name: 'role',
-    data: new SlashCommandBuilder().setName('role').setDescription('Gerenciar cargo'),
-    aliases: ['addrole', 'removerole'],
-    async execute(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles))
+    aliases: ['alternar-cargo'],
+    description: 'Alternar cargo',
+    data: new SlashCommandBuilder()
+        .setName('alternar-cargo')
+        .setDescription('Alternar cargo')
+        .addUserOption((o) => o.setName('membro').setDescription('Membro').setRequired(true))
+        .addRoleOption((o) => o.setName('cargo').setDescription('Cargo').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+
+    async execute(message) {
+        if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
             return message.reply('❌ Sem permissão.');
+        }
         const member = message.mentions.members.first();
-        const role =
-            message.mentions.roles.first() ||
-            message.guild.roles.cache.find((r) => r.name.toLowerCase() === args.slice(1).join(' ').toLowerCase());
-        if (!member || !role) return message.reply('Uso: O.role @user @cargo');
+        const role = message.mentions.roles.first();
+        if (!member || !role) return message.reply('Uso: `O.role @membro @cargo`');
+        const has = member.roles.cache.has(role.id);
         try {
-            if (member.roles.cache.has(role.id)) {
-                await member.roles.remove(role);
-                await message.reply(`➖ Cargo **${role.name}** removido de **${member.user.tag}**`);
-            } else {
-                await member.roles.add(role);
-                await message.reply(`➕ Cargo **${role.name}** dado a **${member.user.tag}**`);
-            }
+            if (has) await member.roles.remove(role);
+            else await member.roles.add(role);
+            await message.reply(has ? `➖ ${role} removido de ${member}` : `➕ ${role} dado a ${member}`);
         } catch {
-            await message.reply('❌ Não consegui alterar o cargo.');
+            await message.reply('❌ Falha na hierarquia/permissão.');
         }
     },
 
-    async executeSlash(interaction) {
-        const args = [];
+    async executeSlash(i) {
+        const user = i.options.getUser('membro', true);
+        const role = i.options.getRole('cargo', true);
+        const member = await i.guild.members.fetch(user.id).catch(() => null);
+        if (!member) return i.reply({ content: '❌ Membro não encontrado.', ephemeral: true });
+        const has = member.roles.cache.has(role.id);
         try {
-            const raw = interaction.options?.getString?.('args');
-            if (raw) args.push(...String(raw).trim().split(/\s+/).filter(Boolean));
-        } catch (_) {}
-        const fake = {
-            author: interaction.user,
-            member: interaction.member,
-            guild: interaction.guild,
-            channel: interaction.channel,
-            client: interaction.client,
-            mentions: {
-                users: { first: () => interaction.options?.getUser?.('usuario') || null },
-                members: { first: () => null },
-                roles: { first: () => null }
-            },
-            reply: (p) => interaction.reply(p)
-        };
-        return module.exports.execute(fake, args, interaction.client);
+            if (has) await member.roles.remove(role);
+            else await member.roles.add(role);
+            await i.reply(has ? `➖ ${role} removido de ${member}` : `➕ ${role} dado a ${member}`);
+        } catch {
+            await i.reply({ content: '❌ Falha na hierarquia/permissão.', ephemeral: true });
+        }
     }
 };

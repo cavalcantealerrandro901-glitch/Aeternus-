@@ -1,98 +1,62 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
-const eter = require('../utils/eter');
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    SlashCommandBuilder
+} = require('discord.js');
+const daily = require('../utils/daily');
 const shop = require('../utils/shop');
-const dailyUtil = require('../utils/daily');
 
 module.exports = {
     name: 'daily',
-    aliases: ['diario', 'recompensa'],
+    aliases: ['diario'],
     description: 'Recompensa diária',
-    data: new SlashCommandBuilder().setName('daily').setDescription('Recompensa diária'),
+    data: new SlashCommandBuilder().setName('diario').setDescription('Recompensa diaria'),
 
     async execute(message) {
-        const panelUrl =
-            shop.dailyPanelUrl?.(message.guild?.id) ||
-            shop.panelUrl?.(message.guild?.id) ||
-            'https://aeternus.onrender.com/daily';
-        let claimed = false;
-        try {
-            claimed = !!dailyUtil?.hasClaimed?.(message.author.id);
-        } catch (_) {}
-
-        const emb = new EmbedBuilder()
-            .setColor(0xf97316)
-            .setTitle('Daily')
-            .setDescription(
-                claimed
-                    ? 'Você já coletou hoje.\nAbra o painel para ver o status.'
-                    : 'Colete sua recompensa no painel Daily.'
-            );
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel(claimed ? 'Abrir Daily' : 'Coletar')
-                .setStyle(ButtonStyle.Link)
-                .setURL(panelUrl),
-            new ButtonBuilder()
-                .setCustomId('daily:saldo')
-                .setLabel('Saldo')
-                .setStyle(ButtonStyle.Secondary)
-        );
-
-        await message.reply({ embeds: [emb], components: [row] });
-    },
-
-    async executeSlash(interaction) {
-        const panelUrl =
-            shop.dailyPanelUrl?.(interaction.guild?.id) ||
-            shop.panelUrl?.(interaction.guild?.id) ||
-            'https://aeternus.onrender.com/daily';
-        let claimed = false;
-        try {
-            claimed = !!dailyUtil?.hasClaimed?.(interaction.user.id);
-        } catch (_) {}
-
-        await interaction.reply({
+        const st = daily.status(message.author.id, message.guild?.id);
+        const panelUrl = shop.dashboardPanelUrl?.() || shop.panelUrl?.(message.guild?.id) || 'https://aeternus.onrender.com';
+        const claimed = !!st.claimed;
+        await message.reply({
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0xf97316)
+                    .setColor(claimed ? 0xf59e0b : 0x22c55e)
                     .setTitle('Daily')
                     .setDescription(
                         claimed
-                            ? 'Você já coletou hoje.\nAbra o painel para ver o status.'
-                            : 'Colete sua recompensa no painel Daily.'
+                            ? 'Você já resgatou o daily de hoje.\nAbra o painel para ver detalhes.'
+                            : 'Resgate disponível no painel web.'
                     )
             ],
             components: [
                 new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setLabel(claimed ? 'Abrir Daily' : 'Coletar')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(panelUrl),
-                    new ButtonBuilder()
-                        .setCustomId('daily:saldo')
-                        .setLabel('Saldo')
-                        .setStyle(ButtonStyle.Secondary)
+                    new ButtonBuilder().setLabel('Abrir daily').setStyle(ButtonStyle.Link).setURL(panelUrl)
                 )
             ]
         });
     },
 
-    async handleComponent(interaction) {
-        if (interaction.customId !== 'daily:saldo') return;
-        const e = eter.get(interaction.user.id);
-        const xp = require('../utils/xp');
-        const x = xp.get(interaction.user.id);
-        return interaction.reply({
+    async executeSlash(i) {
+        const st = daily.status(i.user.id, i.guild?.id);
+        const panelUrl = shop.dashboardPanelUrl?.() || shop.panelUrl?.(i.guild?.id) || 'https://aeternus.onrender.com';
+        const claimed = !!st.claimed;
+        await i.reply({
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0xf97316)
-                    .setTitle('Carteira')
+                    .setColor(claimed ? 0xf59e0b : 0x22c55e)
+                    .setTitle('Daily')
                     .setDescription(
-                        `✨ **${eter.formatPlain(e)}** éter\nNível **${x.level || 0}** · XP **${eter.formatPlain(x.xp || 0)}**`
+                        claimed
+                            ? 'Você já resgatou o daily de hoje.'
+                            : 'Resgate disponível no painel web.'
                     )
             ],
-            ephemeral: true
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setLabel('Abrir daily').setStyle(ButtonStyle.Link).setURL(panelUrl)
+                )
+            ]
         });
     }
 };
