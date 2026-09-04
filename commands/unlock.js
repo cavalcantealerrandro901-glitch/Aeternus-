@@ -5,8 +5,8 @@ module.exports = {
     aliases: ['destrancar'],
     description: 'Destrancar canal',
     data: new SlashCommandBuilder()
-        .setName('unlock')
-        .setDescription('Destrancar canal de texto')
+        .setName('destrancar')
+        .setDescription('Destrancar canal')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
     async execute(message) {
@@ -25,7 +25,9 @@ module.exports = {
 
     async executeSlash(i) {
         try {
-            await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, { SendMessages: null });
+            await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, {
+                SendMessages: null
+            });
             await i.reply('🔓 Canal destrancado.');
         } catch {
             await i.reply({ content: '❌ Não consegui destrancar.', ephemeral: true });

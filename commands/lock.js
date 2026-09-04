@@ -1,12 +1,12 @@
-const { PermissionFlagsBits, SlashCommandBuilder, ChannelType } = require('discord.js');
+const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'lock',
     aliases: ['trancar'],
     description: 'Trancar canal',
     data: new SlashCommandBuilder()
-        .setName('lock')
-        .setDescription('Trancar canal de texto')
+        .setName('trancar')
+        .setDescription('Trancar canal')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
     async execute(message) {
@@ -25,7 +25,9 @@ module.exports = {
 
     async executeSlash(i) {
         try {
-            await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, { SendMessages: false });
+            await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, {
+                SendMessages: false
+            });
             await i.reply('🔒 Canal trancado.');
         } catch {
             await i.reply({ content: '❌ Não consegui trancar.', ephemeral: true });
