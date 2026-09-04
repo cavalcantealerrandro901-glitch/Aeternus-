@@ -17,7 +17,7 @@ function play(choice, amount, userId) {
     if (result === 'win') {
         payout = amount * 2;
         eter.add(userId, payout, { reason: 'ppt win' });
-    } else if (result === 'empate) {
+    } else if (result === 'empate') {
         payout = amount;
         eter.add(userId, amount, { reason: 'ppt draw' });
     }
