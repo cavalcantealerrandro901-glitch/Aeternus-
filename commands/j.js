@@ -12,8 +12,14 @@ const player = require('../utils/player');
 const xp = require('../utils/xp');
 
 const drafts = new Map();
-/** evita 2 collectors no mesmo usuário */
 const photoCollectors = new Map();
+
+const ATTR_META = [
+    { key: 'forca', label: 'Força', emoji: '⚔️' },
+    { key: 'defesa', label: 'Defesa', emoji: '🛡️' },
+    { key: 'agilidade', label: 'Agilidade', emoji: '⚡' },
+    { key: 'vida', label: 'Vida', emoji: '❤️' }
+];
 
 function classSelect(customId = 'j:class') {
     return new ActionRowBuilder().addComponents(
@@ -31,10 +37,10 @@ function classSelect(customId = 'j:class') {
     );
 }
 
-function attrBar(n, max = 30) {
+function attrBar(n, max = 40) {
     const v = Math.max(0, Math.min(max, Number(n) || 0));
-    const filled = Math.round((v / max) * 10);
-    return '█'.repeat(filled) + '░'.repeat(10 - filled);
+    const filled = Math.round((v / max) * 12);
+    return '█'.repeat(filled) + '░'.repeat(12 - filled);
 }
 
 function isImageAttachment(att) {
@@ -50,7 +56,6 @@ function pickImageUrl(message) {
         isImageAttachment
     );
     if (!att) return null;
-    // proxyURL costuma ser mais estável no Discord
     return att.proxyURL || att.url || null;
 }
 
@@ -61,68 +66,74 @@ function profileEmbed(user, profile) {
     const maxMana = player.maxManaFromLevel(st.level, profile.classId);
     const inv = Array.isArray(profile.inventory) ? profile.inventory : [];
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
+    const attrs = st.attrs || { forca: 0, defesa: 0, agilidade: 0, vida: 0 };
 
-    const emb = new EmbedBuilder()
+    const attrLines = ATTR_META.map((a) => {
+        const v = Number(attrs[a.key] || 0);
+        return `${a.emoji} **${a.label}**\n┌${attrBar(v)}┐ **${v}**`;
+    }).join('\n\n');
+
+    const invLines = inv.length
+        ? inv
+              .slice(-8)
+              .map((i) => `${i.emoji || '🎁'} ${i.name}`)
+              .join('\n')
+        : '_Nenhum item — 5% de drop ao subir de nível._';
+
+    return new EmbedBuilder()
         .setColor(cls.color || 0xa78bfa)
         .setAuthor({
-            name: `${cls.emoji} ${cls.name}`,
+            name: `${user.username}`,
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle(`✨ ${profile.name}`)
+        .setTitle(`${cls.emoji}  ${profile.name}`)
         .setDescription(
             [
-                `━━━━━━━━━━━━━━━━━━━━`,
-                `Conta Discord · ${user}`,
-                `Classe · **${cls.emoji} ${cls.name}**`,
-                `━━━━━━━━━━━━━━━━━━━━`
+                `**Classe** · ${cls.emoji} ${cls.name}`,
+                `**Conta** · ${user}`,
+                '',
+                `🎯 **Nível ${st.level}** · XP ${prog.current}/${prog.need} (**${prog.pct}%**)`,
+                `┌${attrBar(prog.pct, 100)}┐`,
+                '',
+                `❤️ HP **${xp.maxHp(user.id)}** · 🔵 Mana **${maxMana}**`
             ].join('\n')
         )
         .addFields(
             {
-                name: '📊 Progresso',
-                value: [
-                    `Nível **${st.level}**`,
-                    `XP ┌${attrBar(prog.pct, 100)}┐ **${prog.pct}%**`,
-                    `  ${prog.current} / ${prog.need}`
-                ].join('\n'),
-                inline: true
-            },
-            {
-                name: '💪 Combate',
-                value: [
-                    `❤️ HP **${xp.maxHp(user.id)}**`,
-                    `🔵 Mana **${maxMana}**`,
-                    `_escala com o nível_`
-                ].join('\n'),
-                inline: true
-            },
-            {
-                name: '📈 Atributos',
-                value: [
-                    `⚔️ Força   ┌${attrBar(st.attrs.forca)}┐ **${st.attrs.forca}**`,
-                    `🛡️ Defesa  ┌${attrBar(st.attrs.defesa)}┐ **${st.attrs.defesa}**`,
-                    `⚡ Agilidade ┌${attrBar(st.attrs.agilidade)}┐ **${st.attrs.agilidade}**`,
-                    `❤️ Vida    ┌${attrBar(st.attrs.vida)}┐ **${st.attrs.vida}**`
-                ].join('\n'),
+                name: '📈  Atributos',
+                value: attrLines,
                 inline: false
             },
             {
-                name: '🎫 Inventário',
-                value: inv.length
-                    ? inv
-                          .slice(-6)
-                          .map((i) => `${i.emoji || '🎁'} **${i.name}**`)
-                          .join('\n')
-                    : '_Nenhum item ainda — suba de nível (5% de drop)._',
+                name: '🎫  Inventário',
+                value: invLines,
                 inline: false
             }
         )
         .setThumbnail(photo)
-        .setImage(cls.banner)
-        .setFooter({ text: `Aeternus · ${profile.name} · O.j perfil` })
-        .setTimestamp();
+        .setImage(cls.banner);
+}
 
-    return emb;
+/** Botões + por atributo (só dono do perfil) */
+function attrButtons(ownerId) {
+    return new ActionRowBuilder().addComponents(
+        ...ATTR_META.map((a) =>
+            new ButtonBuilder()
+                .setCustomId(`j:attrplus:${a.key}:${ownerId}`)
+                .setLabel(`${a.label}`)
+                .setEmoji('➕')
+                .setStyle(ButtonStyle.Secondary)
+        )
+    );
+}
+
+function profilePayload(user, profile, viewerId) {
+    const embeds = [profileEmbed(user, profile)];
+    const components = [];
+    if (viewerId && String(viewerId) === String(user.id)) {
+        components.push(attrButtons(user.id));
+    }
+    return { embeds, components };
 }
 
 async function beginCreate(interaction) {
@@ -152,12 +163,10 @@ async function beginCreate(interaction) {
     await interaction.showModal(modal);
 }
 
-/** Abre o PV e espera a imagem anexada */
 async function startPhotoWait(user, draft) {
     const dm = await user.createDM();
     const cls = player.getClass(draft.classId);
 
-    // para collector anterior
     const old = photoCollectors.get(user.id);
     if (old) {
         try {
@@ -177,7 +186,7 @@ async function startPhotoWait(user, draft) {
                         'Envie **agora neste PV** uma **imagem** (anexo).',
                         'Formatos: PNG, JPG, GIF ou WEBP.',
                         '',
-                        'Assim que eu receber, **salvo no seu perfil na hora** e mostro a ficha.',
+                        'Assim que eu receber, **salvo no seu perfil na hora**.',
                         '',
                         '_Ou use o botão abaixo para usar seu avatar do Discord._'
                     ].join('\n')
@@ -221,8 +230,7 @@ async function startPhotoWait(user, draft) {
 
         await dm
             .send({
-                content:
-                    '📸 **Foto recebida!** Li a imagem e estou salvando no seu perfil agora…'
+                content: '📸 **Foto recebida!** Salvando no perfil…'
             })
             .catch(() => {});
 
@@ -304,7 +312,7 @@ module.exports = {
                 }
                 return message.reply(`${target} ainda não criou perfil.`);
             }
-            return message.reply({ embeds: [profileEmbed(target, profile)] });
+            return message.reply(profilePayload(target, profile, message.author.id));
         }
 
         return message.reply('Use `O.j perfil` ou `O.j criar`.');
@@ -315,6 +323,28 @@ module.exports = {
         if (!id.startsWith('j:')) return;
 
         if (id === 'j:start') return beginCreate(interaction);
+
+        // Botões + atributo — só o dono; ação fica para a próxima etapa
+        if (id.startsWith('j:attrplus:')) {
+            const parts = id.split(':');
+            const attrKey = parts[2];
+            const ownerId = parts[3];
+            const meta = ATTR_META.find((a) => a.key === attrKey);
+            if (!meta) {
+                return interaction.reply({ content: 'Atributo inválido.', ephemeral: true });
+            }
+            if (String(interaction.user.id) !== String(ownerId)) {
+                return interaction.reply({
+                    content: 'Só o dono do perfil pode usar estes botões.',
+                    ephemeral: true
+                });
+            }
+            // Placeholder até você definir a lógica
+            return interaction.reply({
+                content: `➕ **${meta.label}** — botão pronto. Aguardando a próxima instrução.`,
+                ephemeral: true
+            });
+        }
 
         if (id === 'j:class' && interaction.isStringSelectMenu()) {
             const draft = drafts.get(interaction.user.id);
@@ -334,18 +364,20 @@ module.exports = {
 
             const cls = player.getClass(classId);
 
-            await interaction.update({
-                content: null,
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(cls.color)
-                        .setTitle(`${cls.emoji} Classe escolhida: ${cls.name}`)
-                        .setDescription(
-                            `Personagem **${draft.name}**.\n\nVou te mandar (ou continuar) no **PV** para você enviar a **foto**.`
-                        )
-                ],
-                components: []
-            }).catch(() => {});
+            await interaction
+                .update({
+                    content: null,
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(cls.color)
+                            .setTitle(`${cls.emoji} Classe escolhida: ${cls.name}`)
+                            .setDescription(
+                                `Personagem **${draft.name}**.\n\nContinue no **PV** para enviar a **foto**.`
+                            )
+                    ],
+                    components: []
+                })
+                .catch(() => {});
 
             try {
                 await startPhotoWait(interaction.user, draft);
@@ -383,11 +415,13 @@ module.exports = {
                 extension: 'png'
             });
 
-            await interaction.update({
-                content: '🖼️ **Usando seu avatar do Discord** como foto do personagem…',
-                embeds: [],
-                components: []
-            }).catch(() => {});
+            await interaction
+                .update({
+                    content: '🖼️ **Usando seu avatar do Discord** como foto…',
+                    embeds: [],
+                    components: []
+                })
+                .catch(() => {});
 
             await finishProfile(
                 interaction.user,
@@ -417,9 +451,6 @@ module.exports = {
     }
 };
 
-/**
- * @param {boolean} fromPhoto se veio de foto enviada (mensagem de aviso extra)
- */
 async function finishProfile(user, data, channel, interaction, fromPhoto = false) {
     try {
         if (player.has(user.id)) {
@@ -448,13 +479,11 @@ async function finishProfile(user, data, channel, interaction, fromPhoto = false
 
         const emb = profileEmbed(user, profile);
         emb.setTitle(`✅ ${profile.name} · perfil criado`);
-        if (profile.photoUrl) {
-            emb.setThumbnail(profile.photoUrl);
-        }
+        if (profile.photoUrl) emb.setThumbnail(profile.photoUrl);
 
         const notice = fromPhoto
             ? profile.photoUrl
-                ? '✅ **Foto salva no perfil!** Aqui está sua ficha completa:\nUse `O.j perfil` no servidor quando quiser ver de novo.'
+                ? '✅ **Foto salva no perfil!** Use `O.j perfil` no servidor para ver de novo.'
                 : '✅ Perfil criado (sem foto customizada).'
             : '✅ **Perfil criado com sucesso!**';
 
@@ -462,13 +491,14 @@ async function finishProfile(user, data, channel, interaction, fromPhoto = false
             await interaction.update({
                 content: notice,
                 embeds: [emb],
-                components: []
+                components: attrButtons(user.id) ? [attrButtons(user.id)] : []
             });
         } else {
             await channel
                 .send({
                     content: notice,
-                    embeds: [emb]
+                    embeds: [emb],
+                    components: [attrButtons(user.id)]
                 })
                 .catch(() => {});
         }
