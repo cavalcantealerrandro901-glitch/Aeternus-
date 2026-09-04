@@ -95,11 +95,9 @@ module.exports = {
                 const parts = id.split(':');
                 let cmd = client.commands.get(parts[0]);
 
-                // aliases de customId → comando
                 if (!cmd && (parts[0] === 'bj' || parts[0] === 'blackjack')) {
                     cmd = client.commands.get('blackjack') || client.commands.get('bj');
                 }
-                if (!cmd && parts[0] === 'music') cmd = client.commands.get('play');
                 if (!cmd && parts[0] === 'pvp') cmd = client.commands.get('pvp');
                 if (!cmd && parts[0] === 'j') cmd = client.commands.get('j');
                 if (!cmd && parts[0] === 'rank') cmd = client.commands.get('rank');
