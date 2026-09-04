@@ -1,70 +1,81 @@
-const {
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle
-} = require('discord.js');
-const daily = require('../utils/daily');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const shop = require('../utils/shop');
+const dailyUtil = require('../utils/daily');
 
 module.exports = {
     name: 'daily',
-    aliases: ['diario'],
-    description: 'Abre a página do Daily (Novel MAX)',
+    aliases: ['diario', 'recompensa'],
+    description: 'Recompensa diária',
+    data: new SlashCommandBuilder().setName('daily').setDescription('Recompensa diária'),
 
     async execute(message) {
-        const st = daily.status(message.author.id, message.guild?.id);
-        const panelUrl = shop.dailyPanelUrl(message.guild?.id);
-
-        const claimed = !!st.claimed;
-        const streakFire = st.streak >= 7 ? '🔥🔥🔥' : st.streak >= 3 ? '🔥🔥' : '🔥';
+        const panelUrl =
+            shop.dailyPanelUrl?.(message.guild?.id) ||
+            shop.panelUrl?.(message.guild?.id) ||
+            'https://aeternus.onrender.com/daily';
+        let claimed = false;
+        try {
+            claimed = !!dailyUtil?.hasClaimed?.(message.author.id);
+        } catch (_) {}
 
         const emb = new EmbedBuilder()
-            .setColor(claimed ? 0x9a3412 : 0xf97316)
-            .setAuthor({
-                name: `${message.author.username} · Daily`,
-                iconURL: message.author.displayAvatarURL({ size: 64 })
-            })
-            .setTitle(claimed ? 'Daily já coletado' : 'Daily · Novel MAX')
+            .setColor(0xf97316)
+            .setTitle('Daily')
             .setDescription(
-                [
-                    '```',
-                    '  ╔═══════════════════════════╗',
-                    '  ║   DAILY  ·  NOVEL MAX    ║',
-                    '  ╚═══════════════════════════╝',
-                    '```',
-                    claimed
-                        ? 'Você **já coletou** hoje. Volte amanhã.'
-                        : 'A coleta é **somente na página laranja do Daily**.',
-                    '',
-                    `${streakFire} Sequência: **${st.streak || 0}** dia(s)`,
-                    claimed ? null : `Próxima sequência: **${st.nextStreak || 1}**`,
-                    `Multiplicador: **×${Number(st.multiplier || 1).toFixed(2)}**`,
-                    `Saldo: **${eter.formatPlain(st.balance)}** éter`,
-                    '',
-                    'Clique no botão para abrir a **página Novel MAX**.'
-                ]
-                    .filter((x) => x != null)
-                    .join('\n')
-            )
-            .setFooter({ text: 'Daily · Novel MAX · Aeternus' })
-            .setTimestamp();
+                claimed
+                    ? 'Você já coletou hoje.\nAbra o painel para ver o status.'
+                    : 'Colete sua recompensa no painel Daily.'
+            );
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setLabel(claimed ? 'Abrir Daily' : 'Coletar no Daily')
-                .setEmoji('✨')
+                .setLabel(claimed ? 'Abrir Daily' : 'Coletar')
                 .setStyle(ButtonStyle.Link)
                 .setURL(panelUrl),
             new ButtonBuilder()
                 .setCustomId('daily:saldo')
-                .setLabel('Ver saldo')
-                .setEmoji('💼')
+                .setLabel('Saldo')
                 .setStyle(ButtonStyle.Secondary)
         );
 
         await message.reply({ embeds: [emb], components: [row] });
+    },
+
+    async executeSlash(interaction) {
+        const panelUrl =
+            shop.dailyPanelUrl?.(interaction.guild?.id) ||
+            shop.panelUrl?.(interaction.guild?.id) ||
+            'https://aeternus.onrender.com/daily';
+        let claimed = false;
+        try {
+            claimed = !!dailyUtil?.hasClaimed?.(interaction.user.id);
+        } catch (_) {}
+
+        await interaction.reply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0xf97316)
+                    .setTitle('Daily')
+                    .setDescription(
+                        claimed
+                            ? 'Você já coletou hoje.\nAbra o painel para ver o status.'
+                            : 'Colete sua recompensa no painel Daily.'
+                    )
+            ],
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setLabel(claimed ? 'Abrir Daily' : 'Coletar')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(panelUrl),
+                    new ButtonBuilder()
+                        .setCustomId('daily:saldo')
+                        .setLabel('Saldo')
+                        .setStyle(ButtonStyle.Secondary)
+                )
+            ]
+        });
     },
 
     async handleComponent(interaction) {
@@ -76,9 +87,9 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xf97316)
-                    .setTitle('Sua carteira')
+                    .setTitle('Carteira')
                     .setDescription(
-                        `**${eter.formatPlain(e)}** éter\nNível **${x.level || 0}** · XP **${eter.formatPlain(x.xp || 0)}**`
+                        `✨ **${eter.formatPlain(e)}** éter\nNível **${x.level || 0}** · XP **${eter.formatPlain(x.xp || 0)}**`
                     )
             ],
             ephemeral: true
