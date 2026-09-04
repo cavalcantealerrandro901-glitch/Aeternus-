@@ -1,7 +1,5 @@
 /**
  * Auto-reparo + aviso de erros no DM do dono
- * - Qualquer erro de comando, sistema, unhandledRejection, uncaughtException
- * - Busca arquivos relacionados e tenta reload de comandos
  */
 const fs = require('fs');
 const path = require('path');
@@ -42,8 +40,9 @@ function ownerIds() {
 
     try {
         const app = clientRef?.application;
-        if (app?.owner?.id) return [app.owner.id];
-        if (app?.owner?.members) return [...app.owner.members.keys()];
+        const owner = app?.owner;
+        if (owner?.id) return [String(owner.id)];
+        if (owner?.members) return [...owner.members.keys()].map(String);
     } catch (_) {}
     return [];
 }
@@ -62,19 +61,22 @@ async function dmOwners(embed) {
         console.warn('[autoRepair] OWNER_ID não configurado — só log no console.');
         return false;
     }
-    // client precisa estar pronto
-    if (!clientRef.isReady?.() && clientRef.ws?.status !== 0) {
-        // ainda tenta
+
+    // Bot ainda não pronto (client.user null) → não tenta DM
+    if (!clientRef.user?.id) {
+        console.warn('[autoRepair] client ainda não ready — DM adiado.');
+        return false;
     }
+
     let sent = false;
     for (const id of ids) {
         try {
-            const user = await clientRef.users.fetch(id).catch(() => null);
-            if (!user) continue;
+            const user = await clientRef.users.fetch(String(id)).catch(() => null);
+            if (!user?.id) continue;
             await user.send({ embeds: [embed] });
             sent = true;
         } catch (e) {
-            console.warn(`[autoRepair] DM falhou ${id}:`, e.message);
+            console.warn(`[autoRepair] DM falhou ${id}:`, e?.message || e);
         }
     }
     return sent;
@@ -244,19 +246,13 @@ function errorEmbed({ cmdName, error, context, searchHits, status, extra }) {
         info: '🔍 Aviso do sistema'
     };
 
-    const stack = String(error?.stack || error?.message || error || 'desconhecido').slice(
-        0,
-        900
-    );
+    const stack = String(error?.stack || error?.message || error || 'desconhecido').slice(0, 900);
 
     const searchLines =
         searchHits?.length > 0
             ? searchHits
                   .slice(0, 5)
-                  .map(
-                      (h, i) =>
-                          `${i + 1}. \`${h.rel}\` (score ${h.score}) — ${h.reason}`
-                  )
+                  .map((h, i) => `${i + 1}. \`${h.rel}\` (score ${h.score}) — ${h.reason}`)
             : ['_Nenhum arquivo correspondente._'];
 
     return new EmbedBuilder()
@@ -279,22 +275,16 @@ function errorEmbed({ cmdName, error, context, searchHits, status, extra }) {
                 .filter((x) => x != null)
                 .join('\n')
         )
-        .setFooter({ text: 'Aeternus · Auto-aviso · todo erro no DM' })
         .setTimestamp();
 }
 
-/**
- * Reporta QUALQUER erro (sistema, música, comando, process)
- * Sempre tenta mandar DM (com cooldown por chave)
- */
-async function reportError({
-    source = 'system',
-    error,
-    context = '',
-    tryReload = false
-} = {}) {
+async function reportError({ source = 'system', error, context = '', tryReload = false } = {}) {
     const name = String(source || 'system').toLowerCase().slice(0, 40);
     const errMsg = error?.message || String(error || 'erro');
+
+    // ignora warnings inofensivos
+    if (/DeprecationWarning|DEP0\d+|ExperimentalWarning/i.test(errMsg)) return { repaired: false };
+
     const key = `${name}:${errMsg.slice(0, 80)}`;
 
     console.error(`[autoRepair:${name}]`, error?.stack || errMsg);
@@ -402,7 +392,6 @@ function installGlobalHooks() {
         }).catch(() => {});
     });
 
-    // intercepta console.error de sistemas (music, etc.) — só linhas com padrão de erro
     const originalError = console.error.bind(console);
     console.error = (...args) => {
         originalError(...args);
@@ -410,15 +399,16 @@ function installGlobalHooks() {
             const text = args
                 .map((a) => (a instanceof Error ? a.stack || a.message : String(a)))
                 .join(' ');
-            // evita loop / spam de autoRepair
             if (text.includes('[autoRepair')) return;
+            if (/DeprecationWarning|DEP0\d+|ExperimentalWarning/i.test(text)) return;
             if (
                 /error|erro|cannot|failed|exception|undefined|null/i.test(text) &&
                 text.length > 15
             ) {
                 const src =
-                    text.match(/\[(music|counting|player|guildModules|interaction|Jio|SoundCloud|Audio)[^\]]*\]/i)?.[0] ||
-                    'console';
+                    text.match(
+                        /\[(music|counting|player|guildModules|interaction|Jio|SoundCloud|Audio)[^\]]*\]/i
+                    )?.[0] || 'console';
                 reportError({
                     source: String(src).replace(/[[\]]/g, '').slice(0, 32) || 'console',
                     error: { message: text.slice(0, 500), stack: text.slice(0, 900) },

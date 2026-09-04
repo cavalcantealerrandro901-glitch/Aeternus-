@@ -8,9 +8,7 @@ const COLOR = 0xa78bfa;
 const COLOR_ERR = 0xef4444;
 const COLOR_WARN = 0xf59e0b;
 
-/** Carrega libs de criptografia de voz (obrigatório para conectar) */
 async function loadVoiceCrypto() {
-    // ordem: libsodium-wrappers (JS puro) → tweetnacl fallback
     try {
         const sodium = require('libsodium-wrappers');
         await sodium.ready;
@@ -33,7 +31,6 @@ async function loadVoiceCrypto() {
 function setup(client) {
     if (client.distube) return;
 
-    // inicia crypto em background; play espera se precisar
     client._voiceCryptoReady = loadVoiceCrypto();
 
     let DisTube;
@@ -44,7 +41,6 @@ function setup(client) {
         return;
     }
 
-    // opus: nativo ou JS
     try {
         require('@discordjs/opus');
         console.log('[music] opus: @discordjs/opus');
@@ -67,12 +63,13 @@ function setup(client) {
         }
     };
 
+    // yt-dlp DEVE ser o último plugin (recomendação oficial)
     tryPlugin('youtube', () => new (require('@distube/youtube').YouTubePlugin)());
     tryPlugin('soundcloud', () => new (require('@distube/soundcloud').SoundCloudPlugin)());
     tryPlugin('spotify', () => new (require('@distube/spotify').SpotifyPlugin)());
     tryPlugin('deezer', () => new (require('@distube/deezer').DeezerPlugin)());
-    tryPlugin('yt-dlp', () => new (require('@distube/yt-dlp').YtDlpPlugin)({ update: false }));
     tryPlugin('direct-link', () => new (require('@distube/direct-link').DirectLinkPlugin)());
+    tryPlugin('yt-dlp', () => new (require('@distube/yt-dlp').YtDlpPlugin)({ update: false }));
 
     let ffmpegPath;
     try {
@@ -88,7 +85,6 @@ function setup(client) {
         nsfw: false,
         emitAddListWhenCreatingQueue: true,
         emitAddSongWhenCreatingQueue: true,
-        // true = entra/troca de canal ao dar play (evita stuck)
         joinNewVoiceChannel: true,
         plugins
     };
@@ -149,9 +145,9 @@ function setup(client) {
         if (/30 seconds|connect to the voice/i.test(msg)) {
             tip +=
                 '\n\n**Dicas:**\n' +
-                '• Confira se o bot tem permissão **Conectar** e **Falar** no canal\n' +
-                '• No Render, voice UDP às vezes falha — tente reiniciar o deploy\n' +
-                '• Espere o log `[music] crypto: libsodium-wrappers OK`';
+                '• Permissões **Conectar** e **Falar** no canal\n' +
+                '• No Render, UDP de voz às vezes falha — reinicie o deploy\n' +
+                '• Confirme o log `[music] crypto: libsodium-wrappers OK`';
         }
         queue?.textChannel
             ?.send({
@@ -228,7 +224,6 @@ function needVoice(ctx, { memberNeed = true, botNeed = false, same = false, queu
     return null;
 }
 
-/** Garante crypto pronta antes de play */
 async function ensureCrypto(client) {
     if (client._voiceCryptoReady) await client._voiceCryptoReady;
 }
