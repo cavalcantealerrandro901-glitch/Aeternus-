@@ -37,23 +37,6 @@ const CATEGORIES = {
             { name: 'quiz', desc: 'Quiz', slash: true }
         ]
     },
-    musica: {
-        id: 'musica',
-        label: 'Música',
-        emoji: '🎵',
-        description: 'Player YouTube com fila e controles',
-        commands: [
-            { name: 'play', desc: 'Tocar música / adicionar à fila', slash: true },
-            { name: 'skip', desc: 'Pular faixa', slash: true },
-            { name: 'stop', desc: 'Parar e sair do canal', slash: true },
-            { name: 'queue', desc: 'Ver fila', slash: true },
-            { name: 'np', desc: 'Tocando agora', slash: true },
-            { name: 'pause', desc: 'Pausar', slash: true },
-            { name: 'resume', desc: 'Retomar', slash: true },
-            { name: 'loop', desc: 'Loop faixa/fila', slash: true },
-            { name: 'volume', desc: 'Volume 0–150', slash: true }
-        ]
-    },
     moderacao: {
         id: 'moderacao',
         label: 'Moderação',
