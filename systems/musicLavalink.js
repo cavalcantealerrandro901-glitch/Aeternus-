@@ -1,5 +1,5 @@
 /**
- * Lavalink + hooks no sistema de música
+ * Lavalink + hooks no sistema de música (multi-node)
  */
 const music = require('../utils/music');
 
@@ -68,7 +68,13 @@ function setup(client) {
                 return origGetQueueView(guildId);
             };
 
-            console.log('🎵 [lavalink] sistema de música com Lavalink ativo');
+            const nodes = lavalink.listNodes?.() || [];
+            console.log(
+                '🎵 [lavalink] ativo com ' +
+                    nodes.length +
+                    ' node(s): ' +
+                    nodes.map((n) => n.label + (n.active ? '*' : '')).join(', ')
+            );
         } catch (e) {
             console.error('[lavalink] init:', e.message);
         }
