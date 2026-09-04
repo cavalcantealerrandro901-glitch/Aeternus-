@@ -1,10 +1,11 @@
 /**
- * Cliente Lavalink v4 — multi-node com failover automático
- * Ver utils/lavalinkNodes.js para parsing do .env
+ * Cliente Lavalink v4 — multi-node com failover + cache de buscas
+ * Ver utils/lavalinkNodes.js e utils/musicCache.js
  */
 const axios = require('axios');
 const { EventEmitter } = require('events');
 const { parseNodesFromEnv } = require('./lavalinkNodes');
+const musicCache = require('./musicCache');
 
 let WebSocket;
 try {
@@ -88,7 +89,6 @@ class LavalinkManager extends EventEmitter {
 
     connect() {
         if (!this.enabled || this.connecting) return;
-
         const c = this.currentNode();
         if (!c) return;
 
@@ -114,7 +114,6 @@ class LavalinkManager extends EventEmitter {
 
         const proto = c.secure ? 'wss' : 'ws';
         const url = `${proto}://${c.hostname}:${c.port}/v4/websocket`;
-
         console.log(`[lavalink] conectando em ${c.label} (secure=${c.secure})…`);
 
         try {
@@ -143,14 +142,11 @@ class LavalinkManager extends EventEmitter {
             }
         }, 15000);
 
-        this.ws.on('open', () => {
-            console.log(`[lavalink] WS aberto: ${c.label}`);
-        });
+        this.ws.on('open', () => console.log(`[lavalink] WS aberto: ${c.label}`));
 
         this.ws.on('message', (data) => {
             try {
-                const msg = JSON.parse(String(data));
-                this.onMessage(msg);
+                this.onMessage(JSON.parse(String(data)));
             } catch (_) {}
         });
 
@@ -192,35 +188,27 @@ class LavalinkManager extends EventEmitter {
             const n = this.currentNode();
             console.log(`[lavalink] sessão pronta em ${n?.label}: ${this.sessionId}`);
             this.emit('ready', n);
-            for (const guildId of this.voiceStates.keys()) {
-                this.trySendVoiceUpdate(guildId);
-            }
+            for (const guildId of this.voiceStates.keys()) this.trySendVoiceUpdate(guildId);
             return;
         }
         if (msg.op === 'event') {
-            const guildId = msg.guildId;
             const type = msg.type;
-            if (
-                type === 'TrackEndEvent' ||
-                type === 'TrackStuckEvent' ||
-                type === 'TrackExceptionEvent'
-            ) {
+            if (type === 'TrackEndEvent' || type === 'TrackStuckEvent' || type === 'TrackExceptionEvent') {
                 if (type === 'TrackExceptionEvent') {
                     console.error('[lavalink] track exception:', msg.exception?.message || msg);
                 }
                 if (msg.reason === 'replaced') return;
-                this.emit('trackEnd', guildId, msg);
+                this.emit('trackEnd', msg.guildId, msg);
             }
-            if (type === 'TrackStartEvent') this.emit('trackStart', guildId, msg);
+            if (type === 'TrackStartEvent') this.emit('trackStart', msg.guildId, msg);
         }
     }
 
     onRaw(packet) {
         if (!packet?.t) return;
         if (packet.t === 'VOICE_SERVER_UPDATE') {
-            const guildId = packet.d.guild_id;
-            this.voiceServers.set(guildId, packet.d);
-            this.trySendVoiceUpdate(guildId);
+            this.voiceServers.set(packet.d.guild_id, packet.d);
+            this.trySendVoiceUpdate(packet.d.guild_id);
         }
         if (packet.t === 'VOICE_STATE_UPDATE') {
             if (packet.d.user_id !== this.client?.user?.id) return;
@@ -242,11 +230,7 @@ class LavalinkManager extends EventEmitter {
         if (!sessionId || !event) return;
         try {
             await this.patchPlayer(guildId, {
-                voice: {
-                    token: event.token,
-                    endpoint: event.endpoint,
-                    sessionId
-                }
+                voice: { token: event.token, endpoint: event.endpoint, sessionId }
             });
         } catch (e) {
             console.error('[lavalink] voice update:', e.message);
@@ -263,16 +247,12 @@ class LavalinkManager extends EventEmitter {
                 method,
                 url: `${base}${path}`,
                 data: body,
-                headers: {
-                    Authorization: c.password,
-                    'Content-Type': 'application/json'
-                },
+                headers: { Authorization: c.password, 'Content-Type': 'application/json' },
                 timeout: 12000,
                 validateStatus: () => true
             });
             if (res.status >= 400) {
-                const msg = res.data?.message || res.statusText || String(res.status);
-                throw new Error(`Lavalink HTTP ${res.status}: ${msg}`);
+                throw new Error(`Lavalink HTTP ${res.status}: ${res.data?.message || res.statusText}`);
             }
             return res.data;
         } catch (e) {
@@ -288,9 +268,7 @@ class LavalinkManager extends EventEmitter {
                     this.connect();
                     setTimeout(r, 8000);
                 });
-                if (this.isAvailable()) {
-                    return this.rest(method, path, body, { tryFailover: false });
-                }
+                if (this.isAvailable()) return this.rest(method, path, body, { tryFailover: false });
             }
             throw e;
         }
@@ -320,13 +298,15 @@ class LavalinkManager extends EventEmitter {
         const q = String(query || '').trim();
         if (!q) return null;
 
+        const cached = musicCache.get(q, 'll');
+        if (cached) return { ...cached, _cached: true };
+
         let identifier = q;
         const isUrl = /^https?:\/\//i.test(q);
         if (!isUrl) identifier = `ytsearch:${q}`;
 
-        const tryLoad = async (id) => {
-            return this.rest('GET', `/v4/loadtracks?identifier=${encodeURIComponent(id)}`);
-        };
+        const tryLoad = async (id) =>
+            this.rest('GET', `/v4/loadtracks?identifier=${encodeURIComponent(id)}`);
 
         try {
             let data = await tryLoad(identifier);
@@ -336,7 +316,9 @@ class LavalinkManager extends EventEmitter {
             ) {
                 data = await tryLoad(`scsearch:${q}`);
             }
-            return this.normalizeLoadResult(data, q);
+            const track = this.normalizeLoadResult(data, q);
+            if (track) musicCache.set(q, track, 'll');
+            return track;
         } catch (e) {
             console.error('[lavalink] search:', e.message);
             if (this.nodes.length > 1) {
@@ -363,7 +345,10 @@ class LavalinkManager extends EventEmitter {
                             data = await tryLoad(`scsearch:${q}`);
                         }
                         const track = this.normalizeLoadResult(data, q);
-                        if (track) return track;
+                        if (track) {
+                            musicCache.set(q, track, 'll');
+                            return track;
+                        }
                     } catch (e2) {
                         console.error('[lavalink] search failover:', e2.message);
                     }
@@ -377,21 +362,15 @@ class LavalinkManager extends EventEmitter {
         if (!data) return null;
         const loadType = data.loadType;
         let tracks = [];
-
-        if (loadType === 'track') {
-            tracks = data.data ? [data.data] : [];
-        } else if (loadType === 'search' || loadType === 'playlist') {
+        if (loadType === 'track') tracks = data.data ? [data.data] : [];
+        else if (loadType === 'search' || loadType === 'playlist') {
             tracks = Array.isArray(data.data?.tracks)
                 ? data.data.tracks
                 : Array.isArray(data.data)
                   ? data.data
                   : [];
-        } else if (loadType === 'empty' || loadType === 'error') {
-            return null;
-        } else if (Array.isArray(data.tracks)) {
-            tracks = data.tracks;
-        }
-
+        } else if (loadType === 'empty' || loadType === 'error') return null;
+        else if (Array.isArray(data.tracks)) tracks = data.tracks;
         if (!tracks.length) return null;
 
         const t = tracks[0];
@@ -434,23 +413,15 @@ class LavalinkManager extends EventEmitter {
     async join(guild, voiceChannel) {
         const guildId = guild.id;
         const channelId = voiceChannel.id;
-
         const sendOp4 = (chId) => {
             const payload = {
                 op: 4,
-                d: {
-                    guild_id: guildId,
-                    channel_id: chId,
-                    self_mute: false,
-                    self_deaf: true
-                }
+                d: { guild_id: guildId, channel_id: chId, self_mute: false, self_deaf: true }
             };
             try {
                 if (guild.shard?.send) guild.shard.send(payload);
                 else if (this.client.ws?.shards) {
-                    for (const s of this.client.ws.shards.values()) {
-                        s.send(payload);
-                    }
+                    for (const s of this.client.ws.shards.values()) s.send(payload);
                 }
             } catch (e) {
                 console.error('[lavalink] op4:', e.message);
@@ -464,7 +435,6 @@ class LavalinkManager extends EventEmitter {
         } catch (_) {}
 
         sendOp4(channelId);
-
         for (let i = 0; i < 30; i++) {
             if (this.voiceStates.has(guildId) && this.voiceServers.has(guildId)) {
                 await this.trySendVoiceUpdate(guildId);
@@ -472,21 +442,17 @@ class LavalinkManager extends EventEmitter {
             }
             await new Promise((r) => setTimeout(r, 200));
         }
-
         await this.trySendVoiceUpdate(guildId);
         if (!this.voiceStates.has(guildId)) {
-            throw new Error(
-                'Não consegui conectar na call (voice state). Verifique permissões de voz.'
-            );
+            throw new Error('Não consegui conectar na call (voice state). Verifique permissões de voz.');
         }
         return true;
     }
 
     async playEncoded(guildId, encoded, options = {}) {
-        const volume = options.volume ?? 100;
         await this.patchPlayer(guildId, {
             track: { encoded },
-            volume,
+            volume: options.volume ?? 100,
             paused: false
         });
     }
@@ -504,18 +470,12 @@ class LavalinkManager extends EventEmitter {
                     setTimeout(r, 6000);
                 });
             }
-            if (!this.isAvailable()) {
-                return { ok: false, error: 'Lavalink offline', fallback: true };
-            }
+            if (!this.isAvailable()) return { ok: false, error: 'Lavalink offline', fallback: true };
         }
-        if (!voiceChannel) {
-            return { ok: false, error: 'Entre em um canal de voz.' };
-        }
+        if (!voiceChannel) return { ok: false, error: 'Entre em um canal de voz.' };
 
         const track = await this.search(query);
-        if (!track) {
-            return { ok: false, error: null, fallback: true };
-        }
+        if (!track) return { ok: false, error: null, fallback: true };
         track.requestedBy = user || null;
 
         try {
@@ -543,7 +503,6 @@ class LavalinkManager extends EventEmitter {
                 };
             }
         }
-
         state.queue.push(track);
         return { ok: true, track, position: state.queue.length, playing: false, lavalink: true };
     }
@@ -592,9 +551,7 @@ class LavalinkManager extends EventEmitter {
     async setVolume(guildId, vol) {
         const state = this.getPlayerState(guildId);
         state.volume = Math.max(0, Math.min(150, Math.floor(Number(vol) || 100)));
-        if (state.current) {
-            await this.patchPlayer(guildId, { volume: state.volume }).catch(() => {});
-        }
+        if (state.current) await this.patchPlayer(guildId, { volume: state.volume }).catch(() => {});
         return state.volume;
     }
 
@@ -605,19 +562,12 @@ class LavalinkManager extends EventEmitter {
         state.paused = false;
         await this.destroyPlayer(guildId);
         try {
-            if (this.client) {
-                const guild = this.client.guilds.cache.get(guildId);
-                if (guild?.shard) {
-                    guild.shard.send({
-                        op: 4,
-                        d: {
-                            guild_id: guildId,
-                            channel_id: null,
-                            self_mute: false,
-                            self_deaf: false
-                        }
-                    });
-                }
+            const guild = this.client?.guilds?.cache?.get(guildId);
+            if (guild?.shard) {
+                guild.shard.send({
+                    op: 4,
+                    d: { guild_id: guildId, channel_id: null, self_mute: false, self_deaf: false }
+                });
             }
         } catch (_) {}
         this.voiceServers.delete(guildId);
@@ -652,9 +602,7 @@ class LavalinkManager extends EventEmitter {
 }
 
 const manager = new LavalinkManager();
-
 manager.on('trackEnd', (guildId) => {
     manager.playNext(guildId).catch(() => {});
 });
-
 module.exports = manager;
