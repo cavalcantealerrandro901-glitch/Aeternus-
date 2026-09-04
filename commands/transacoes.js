@@ -1,52 +1,46 @@
-const { EmbedBuilder } = require('discord.js');
-const tx = require('../utils/transactions');
-
-function fmt(n) {
-    return Number(n || 0).toLocaleString('pt-BR');
-}
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const eter = require('../utils/eter');
 
 module.exports = {
     name: 'transacoes',
-    aliases: ['transações', 'transactions', 'extrato-carteira', 'movimentos', 'tx'],
-    description: 'Histórico de entradas e saídas da carteira',
+    aliases: ['extrato', 'history', 'tx'],
+    description: 'Extrato de éter',
+    data: new SlashCommandBuilder().setName('transacoes').setDescription('Extrato de éter'),
+
     async execute(message) {
-        const user = message.mentions.users.first() || message.author;
-        const list = tx.list(user.id, 12);
+        await show(message.author, (p) => message.reply(p));
+    },
+    async executeSlash(i) {
+        await show(i.user, (p) => i.reply(p));
+    }
+};
 
-        if (!list.length) {
-            return message.reply(
-                `📭 Nenhuma movimentação registrada ainda para **${user.username}**.`
-            );
-        }
-
-        const lines = list.map((t, i) => {
-            const sign = t.type === 'in' ? '🟢 +' : '🔴 −';
-            const when = new Date(t.at).toLocaleString('pt-BR', {
-                timeZone: 'America/Sao_Paulo',
-                day: '2-digit',
-                month: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            let who = '';
-            if (t.to) who = ` → <@${t.to}>`;
-            if (t.from) who = ` ← <@${t.from}>`;
-            return `**${i + 1}.** ${sign}❄️ **${fmt(t.amount)}** · ${t.reason}${who}\n┗ _${when}_`;
-        });
-
-        await message.reply({
+async function show(user, reply) {
+    const hist = eter.history?.(user.id) || eter.getHistory?.(user.id) || [];
+    if (!hist.length) {
+        return reply({
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0x8b5cf6)
-                    .setAuthor({
-                        name: `${user.username} · Movimentações`,
-                        iconURL: user.displayAvatarURL({ size: 64 })
-                    })
-                    .setTitle('📒  Extrato da carteira')
-                    .setDescription(lines.join('\n\n'))
-                    .setFooter({ text: 'Entradas 🟢 · Saídas 🔴 · Aeternus' })
-                    .setTimestamp()
+                    .setColor(0xa78bfa)
+                    .setTitle('Extrato')
+                    .setDescription('Sem movimentações recentes.')
             ]
         });
     }
-};
+    const lines = hist
+        .slice(-12)
+        .reverse()
+        .map((h) => {
+            const sign = (h.amount || 0) >= 0 ? '+' : '';
+            const when = h.at ? `<t:${Math.floor(h.at / 1000)}:R>` : '';
+            return `✨ **${sign}${Number(h.amount || 0).toLocaleString('pt-BR')}** · ${h.reason || '—'} ${when}`;
+        });
+    return reply({
+        embeds: [
+            new EmbedBuilder()
+                .setColor(0xa78bfa)
+                .setTitle('Extrato')
+                .setDescription(lines.join('\n'))
+        ]
+    });
+}
