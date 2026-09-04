@@ -1,38 +1,31 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 const shop = require('../utils/shop');
 
 module.exports = {
     name: 'painel',
-    aliases: ['dashboard', 'panel', 'site'],
-    description: 'Link do painel web',
+    aliases: ['panel', 'dashboard'],
+    description: 'Link do painel',
+    data: new SlashCommandBuilder().setName('painel').setDescription('Link do painel'),
+
     async execute(message) {
-        const url = shop.dashboardPanelUrl();
+        const url = shop.panelUrl?.(message.guild?.id) || 'https://aeternus.onrender.com';
         await message.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0xa78bfa)
-                    .setTitle('🌐  Painel Aeternus')
-                    .setDescription(
-                        [
-                            'Controle o servidor, veja **Éter** e **XP**. O **daily** fica na página Novel MAX.',
-                            '',
-                            'Abra com o botão abaixo (login Discord).'
-                        ].join('\n')
-                    )
-                    .setFooter({ text: 'Control Center MAX' })
-            ],
+            content: 'Painel do servidor',
             components: [
                 new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setLabel('Abrir painel')
-                        .setEmoji('✨')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(url),
-                    new ButtonBuilder()
-                        .setLabel('Daily Novel MAX')
-                        .setEmoji('🎁')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(shop.dailyPanelUrl())
+                    new ButtonBuilder().setLabel('Abrir painel').setStyle(ButtonStyle.Link).setURL(url)
+                )
+            ]
+        });
+    },
+
+    async executeSlash(i) {
+        const url = shop.panelUrl?.(i.guild?.id) || 'https://aeternus.onrender.com';
+        await i.reply({
+            content: 'Painel do servidor',
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setLabel('Abrir painel').setStyle(ButtonStyle.Link).setURL(url)
                 )
             ]
         });
