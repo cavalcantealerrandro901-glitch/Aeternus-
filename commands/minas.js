@@ -4,26 +4,28 @@ const {
     ButtonBuilder,
     ButtonStyle
 } = require('discord.js');
-const flocos = require('../utils/flocos');
+const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
-const { fmt, betFooter, C } = require('../utils/gameStyle');
 
-/**
- * 4 colunas × 4 linhas = 16 casas
- * row4: Aleatório | Atualizar | Sacar
- * row5: Tentar novamente (quando termina)
- * (Discord max 5 ActionRows; texto entre botões só no embed)
- */
+/** Grade 4×4 · Discord max 5 rows de botões */
 const COLS = 4;
 const ROWS = 4;
-const TOTAL = COLS * ROWS;
+const TOTAL = COLS * ROWS; // 16
 const MAX_BOMBS = 11;
-const HOUSE = 0.96;
+const HOUSE = 0.97; // casa do bot
 const IDLE_MS = 7 * 60 * 1000;
-const BOMB_CHANCE = 0.26; // 26% de chance de bomba no botão aleatório
 
 const games = new Map();
 
+function fmt(n) {
+    return Number(n || 0).toLocaleString('pt-BR');
+}
+
+/**
+ * Multiplicador progressivo estilo Mines:
+ * - Cada gema (casa segura) multiplica pelo risco restante
+ * - Mais bombas ⇒ menos casas seguras ⇒ multi sobe mais rápido
+ */
 function multAt(opened, bombs) {
     if (opened <= 0) return 1;
     let m = 1;
@@ -34,6 +36,22 @@ function multAt(opened, bombs) {
         m *= tilesLeft / safeLeft;
     }
     return Number(Math.max(1, m * HOUSE).toFixed(2));
+}
+
+/** Multi extra ganho ao abrir a próxima gema (delta) */
+function multGainNext(opened, bombs) {
+    const cur = multAt(opened, bombs);
+    const next = multAt(opened + 1, bombs);
+    return Number(Math.max(0, next - cur).toFixed(2));
+}
+
+/** Multi médio por bomba (comparando 1 bomba vs N bombas na mesma quantidade de gemas) */
+function multPerBombHint(opened, bombs) {
+    if (opened <= 0 || bombs <= 1) return null;
+    const withBombs = multAt(opened, bombs);
+    const withOne = multAt(opened, 1);
+    const extra = withBombs - withOne;
+    return Number((extra / Math.max(1, bombs - 1)).toFixed(2));
 }
 
 function potentialAt(amount, opened, bombs) {
@@ -57,19 +75,19 @@ function touch(game, client) {
 async function autoEnd(game, client) {
     if (!games.has(game.id) || game.dead || game.cashed) return;
 
-    let note = '⏱️ **7 min sem interação** — partida encerrada.';
+    let note = '⏳ **7 min sem interação** — partida encerrada.';
     if (game.opened.size > 0 && !game.fun && game.amount > 0) {
         const win = potentialAt(game.amount, game.opened.size, game.bombCount);
         game.cashed = true;
         game._lastWin = win;
-        flocos.add(game.userId, win, { reason: 'mines auto' });
-        note += `\n💵 Saque automático: ❄️ **${fmt(win)}**`;
+        eter.add(game.userId, win, { reason: 'mines auto' });
+        note += `\n💵 Saque automático: ✨ **${fmt(win)}**`;
     } else if (game.opened.size > 0 && game.fun) {
         game.cashed = true;
         note += '\n🏁 Diversão encerrada.';
     } else {
         game.dead = true;
-        if (!game.fun) note += `\nPrejuízo: ❄️ **${fmt(game.amount)}** (nenhuma casa).`;
+        if (!game.fun) note += `\nPrejuízo: ✨ **${fmt(game.amount)}** (nenhuma casa).`;
     }
     clearTimer(game);
 
@@ -79,7 +97,6 @@ async function autoEnd(game, client) {
         if (msg) {
             await msg
                 .edit({
-                    content: `<@${game.userId}>`,
                     embeds: [panelEmbed(game, note)],
                     components: fullComponents(game, true)
                 })
@@ -92,24 +109,23 @@ function resultBanner(game) {
     if (!game.dead && !game.cashed) return null;
     if (game.fun) {
         return game.dead
-            ? '💢 *Mina…* Você pode tentar novamente.'
-            : '✨ *Campo encerrado no modo diversão.*';
+            ? '💥 **Boom!** Fim da diversão.'
+            : '🏁 **Encerrado** no modo diversão.';
     }
-    if (game.cashed && !game.dead) {
+    if (game.cashed) {
         const win = game._lastWin || potentialAt(game.amount, game.opened.size, game.bombCount);
         const profit = win - game.amount;
         return [
-            `🎉 **Você ganhou!**`,
-            `❄️ Recebeu **${fmt(win)}** flocos`,
+            '🎉 **Você ganhou!**',
+            `✨ Recebeu **${fmt(win)}**`,
             `📊 Lucro **+${fmt(Math.max(0, profit))}** · Multi ×**${multAt(game.opened.size, game.bombCount)}**`,
-            `💎 Gemas **${game.opened.size}** · 💣 Minas **${game.bombCount}**`
+            `💎 Gemas **${game.opened.size}** · 💣 Bombas **${game.bombCount}**`
         ].join('\n');
     }
-    // perdeu
     return [
-        `😢 **Você perdeu.**`,
-        `💸 Prejuízo de ❄️ **${fmt(game.amount)}** flocos`,
-        `_Tente novamente — a próxima pode ser sua._`
+        '💥 **Explodiu!**',
+        `✨ Prejuízo **${fmt(game.amount)}**`,
+        `💎 Gemas antes da bomba: **${game.opened.size}**`
     ].join('\n');
 }
 
@@ -120,6 +136,8 @@ function panelEmbed(game, extra) {
     const freeLeft = Math.max(0, safeTotal - opened);
     const curM = multAt(opened, bombs);
     const nextM = opened < safeTotal ? multAt(opened + 1, bombs) : curM;
+    const gain = multGainNext(opened, bombs);
+    const perBomb = multPerBombHint(opened, bombs);
     const curPay = potentialAt(game.amount, opened, bombs);
     const nextPay = potentialAt(game.amount, opened + 1, bombs);
 
@@ -127,36 +145,44 @@ function panelEmbed(game, extra) {
     let color = 0x38bdf8;
     if (game.dead) {
         status = '💥 Explodiu';
-        color = C.lose;
+        color = 0xef4444;
     } else if (game.cashed) {
         status = game.fun ? '🏁 Encerrado' : '💰 Sacado';
-        color = C.win;
+        color = 0x22c55e;
     }
-
-    // frase "meia apagada" (depois dos botões aleatório/atualizar, no embed)
-    const softPhrase =
-        game.dead || game.cashed
-            ? null
-            : '-# Toque em uma casa ou use **Aleatório**. O multi sobe a cada gema.';
 
     const lines = [
         `**${status}**`,
         '',
-        game.fun ? '🎮 Modo diversão · sem aposta' : `❄️ Aposta **${fmt(game.amount)}** flocos`,
-        `💎 Abertas **${opened}** / **${safeTotal}**  ·  💣 Minas **${bombs}**`,
-        `🟩 Livres **${freeLeft}** / **${safeTotal}**  ·  📦 Casas **${TOTAL}**`
+        game.fun
+            ? '🎮 Modo diversão · sem aposta'
+            : `✨ Aposta **${fmt(game.amount)}**`,
+        `💣 Bombas **${bombs}** / ${TOTAL}  ·  💎 Seguras **${safeTotal}**`,
+        `✅ Abertas **${opened}**  ·  🟢 Restam **${freeLeft}** gemas`
     ];
 
-    if (!game.fun) {
+    // Bloco de multiplicador
+    lines.push('', '**Multiplicador**');
+    lines.push(`📈 Atual **×${curM.toFixed(2)}**`);
+    if (!game.fun && opened > 0) {
+        lines.push(`💰 Saque agora ✨ **${fmt(curPay)}**`);
+    }
+    if (!game.dead && !game.cashed && opened < safeTotal) {
         lines.push(
-            `📈 Multi atual **×${curM}**${opened > 0 ? ` → ❄️ **${fmt(curPay)}**` : ''}`,
-            opened < safeTotal && !game.dead && !game.cashed
-                ? `⏭️ Próximo multi **×${nextM}** → ❄️ **${fmt(nextPay)}** _(abrir +1)_`
-                : null
+            `⏩ Próxima gema **×${nextM.toFixed(2)}** (×+${gain.toFixed(2)} por casa)` +
+                (game.fun ? '' : ` → ✨ **${fmt(nextPay)}**`)
         );
     }
+    if (perBomb != null && opened > 0) {
+        lines.push(`💣 Bônus médio por bomba extra ~**×+${perBomb}** (nas gemas atuais)`);
+    }
+    lines.push(
+        `_Quanto mais bombas, maior o multi a cada gema. Casa do bot: ${Math.round((1 - HOUSE) * 100)}%._`
+    );
 
-    if (softPhrase) lines.push('', softPhrase);
+    if (!game.dead && !game.cashed) {
+        lines.push('', '-# Toque numa casa ou **Aleatório**. **Sacar** garante o multi atual.');
+    }
 
     const banner = resultBanner(game);
     if (banner) lines.push('', banner);
@@ -165,13 +191,7 @@ function panelEmbed(game, extra) {
     return new EmbedBuilder()
         .setColor(color)
         .setTitle('💎  Mines · 4×4')
-        .setDescription(lines.filter((x) => x != null).join('\n'))
-        .setFooter({
-            text: game.fun
-                ? 'O.mines <1-11> · AFK 7 min'
-                : `Flocos ❄️ · AFK 7 min · ${betFooter()}`
-        })
-        .setTimestamp();
+        .setDescription(lines.join('\n'));
 }
 
 function boardRows(game, reveal = false) {
@@ -188,15 +208,21 @@ function boardRows(game, reveal = false) {
             let style = ButtonStyle.Secondary;
             if (ended) {
                 if (bomb) {
-                    label = `💣${num}`;
+                    label = `💣`;
                     style = ButtonStyle.Danger;
                 } else if (opened) {
-                    label = `💎${num}`;
+                    label = `💎`;
                     style = ButtonStyle.Success;
-                } else label = num;
+                } else {
+                    label = num;
+                    style = ButtonStyle.Secondary;
+                }
             } else if (opened) {
                 label = '💎';
                 style = ButtonStyle.Success;
+            } else {
+                label = num;
+                style = ButtonStyle.Primary;
             }
             row.addComponents(
                 new ButtonBuilder()
@@ -217,7 +243,7 @@ function controlsRow(game) {
     const canCash = game.opened.size > 0 && !ended;
 
     let cashLabel = game.fun ? 'Encerrar' : 'Sacar';
-    if (!game.fun && canCash) cashLabel = `Sacar ❄️ ${fmt(pot)}`;
+    if (!game.fun && canCash) cashLabel = `Sacar ✨ ${fmt(pot)}`;
 
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -252,11 +278,7 @@ function againRow(game) {
 
 function fullComponents(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
-    if (ended) {
-        // tabuleiro revelado + tentar novamente
-        return [...boardRows(game, true), againRow(game)];
-    }
-    // grade + controles (aleatório/atualizar/sacar em uma única row)
+    if (ended) return [...boardRows(game, true), againRow(game)];
     return [...boardRows(game, false), controlsRow(game)];
 }
 
@@ -284,44 +306,11 @@ function makeGame(userId, amount, bombCount, fun, meta = {}) {
     return g;
 }
 
-// Função para obter vizinhos de uma célula
-function getNeighbors(idx) {
-    const neighbors = [];
-    const row = Math.floor(idx / COLS);
-    const col = idx % COLS;
-
-    for (let r = Math.max(0, row - 1); r <= Math.min(ROWS - 1, row + 1); r++) {
-        for (let c = Math.max(0, col - 1); c <= Math.min(COLS - 1, col + 1); c++) {
-            const nIdx = r * COLS + c;
-            if (nIdx !== idx) neighbors.push(nIdx);
-        }
-    }
-    return neighbors;
-}
-
-// Função para abrir casas ao redor de uma bomba
-function openAdjacentCells(game, bombIdx) {
-    const neighbors = getNeighbors(bombIdx);
-    const toOpen = [];
-    
-    for (const nIdx of neighbors) {
-        if (!game.opened.has(nIdx) && !game.bombs.has(nIdx)) {
-            toOpen.push(nIdx);
-        }
-    }
-    
-    // Abrir as casas adjacentes
-    toOpen.forEach(idx => game.opened.add(idx));
-    return toOpen;
-}
-
 function openCell(game, idx) {
     if (game.dead || game.cashed || game.opened.has(idx)) return { ok: false };
     if (game.bombs.has(idx)) {
         game.dead = true;
         clearTimer(game);
-        // Abrir casas adjacentes à bomba
-        openAdjacentCells(game, idx);
         return { ok: true, bomb: true };
     }
     game.opened.add(idx);
@@ -332,7 +321,7 @@ function openCell(game, idx) {
         if (!game.fun && game.amount > 0) {
             win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
-            flocos.add(game.userId, win, { reason: 'mines clear' });
+            eter.add(game.userId, win, { reason: 'mines clear' });
         }
         return { ok: true, bomb: false, autoWin: true, win };
     }
@@ -340,31 +329,16 @@ function openCell(game, idx) {
 }
 
 function pickRandom(game) {
-    const safe = [];
-    const any = [];
+    const left = [];
     for (let i = 0; i < TOTAL; i++) {
-        if (game.opened.has(i)) continue;
-        any.push(i);
-        if (!game.bombs.has(i)) safe.push(i);
+        if (!game.opened.has(i)) left.push(i);
     }
-    
-    // 26% de chance de escolher uma bomba se houver disponível
-    if (any.length > 0 && game.bombs.size > 0 && Math.random() < BOMB_CHANCE) {
-        const bombPool = any.filter(i => game.bombs.has(i));
-        if (bombPool.length > 0) {
-            return bombPool[Math.floor(Math.random() * bombPool.length)];
-        }
-    }
-    
-    // Caso contrário, escolher uma casa segura ou qualquer uma
-    const pool = safe.length ? safe : any;
-    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+    if (!left.length) return null;
+    return left[Math.floor(Math.random() * left.length)];
 }
 
 function endPayload(game, note) {
-    clearTimer(game);
     return {
-        content: `<@${game.userId}>`,
         embeds: [panelEmbed(game, note || null)],
         components: fullComponents(game, true)
     };
@@ -372,74 +346,82 @@ function endPayload(game, note) {
 
 module.exports = {
     name: 'minas',
-    aliases: ['mines', 'mine', 'campo'],
-    description: 'Mines 4×4 em flocos',
+    aliases: ['mines', 'mine'],
+    description: 'Mines 4×4 em éter',
 
     async execute(message, args, client) {
-        const bombsRaw = parseInt(args[0], 10);
-        if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
+        const a0 = String(args[0] || '').toLowerCase();
+        if (!args.length || a0 === 'help' || a0 === 'ajuda') {
             return message.reply(
                 [
-                    '💎 **Mines 4×4** · moeda ❄️ flocos',
-                    '🎮 `O.mines <1-11>` — diversão',
-                    '❄️ `O.mines <bombas> <valor|all|half>` — aposta',
-                    '⏱️ AFK 7 min → saque automático se houver gemas.'
+                    '💎 **Mines 4×4** · éter ✨',
+                    '`O.minas <bombas 1-11> <valor>` — aposta',
+                    '`O.minas fun <bombas>` — sem aposta',
+                    '',
+                    '**Multi** sobe a cada gema. **Mais bombas = multi maior** por casa.',
+                    'Saque a qualquer momento depois da 1ª gema.'
                 ].join('\n')
             );
         }
 
-        let game;
-        if (args[1] == null || args[1] === '') {
-            game = makeGame(message.author.id, 0, bombsRaw, true);
+        let fun = false;
+        let bombCount = 3;
+        let amount = 0;
+
+        if (a0 === 'fun' || a0 === 'demo') {
+            fun = true;
+            bombCount = Math.min(MAX_BOMBS, Math.max(1, parseInt(args[1], 10) || 3));
         } else {
-            const bet = resolveBet(args[1], flocos.get(message.author.id), { label: '❄️' });
+            bombCount = Math.min(MAX_BOMBS, Math.max(1, parseInt(args[0], 10) || 3));
+            const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
             if (!bet.ok) return message.reply(`❌ ${bet.error}`);
-            flocos.remove(message.author.id, bet.amount, { reason: 'mines bet' });
-            game = makeGame(message.author.id, bet.amount, bombsRaw, false);
+            eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
+            amount = bet.amount;
         }
 
+        const game = makeGame(message.author.id, amount, bombCount, fun, {
+            channelId: message.channel.id
+        });
         const msg = await message.reply({
             embeds: [panelEmbed(game)],
             components: fullComponents(game)
         });
-        game.channelId = msg.channel.id;
         game.messageId = msg.id;
         touch(game, client || message.client);
     },
 
-    async handleComponent(interaction) {
-        const parts = interaction.customId.split(':');
+    async handleComponent(interaction, client) {
+        const parts = (interaction.customId || '').split(':');
+        if (parts[0] !== 'minas') return;
         const action = parts[1];
-        const game = games.get(parts[2]);
-        const client = interaction.client;
+        const gameId = parts[2];
+        const game = games.get(gameId);
 
         if (!game) {
-            return interaction.reply({
-                content: '⏱️ Jogo expirado.',
-                ephemeral: true
-            });
+            return interaction.reply({ content: 'Partida expirada.', ephemeral: true });
         }
         if (interaction.user.id !== game.userId) {
-            return interaction.reply({ content: 'Não é o seu Mines.', ephemeral: true });
+            return interaction.reply({ content: 'Não é a sua partida.', ephemeral: true });
         }
 
         if (action === 'again') {
-            let ng;
-            if (game.fun) {
-                ng = makeGame(game.userId, 0, game.bombCount, true);
-            } else {
-                const bet = resolveBet(String(game.amount), flocos.get(game.userId), { label: '❄️' });
+            let amount = game.amount;
+            const fun = game.fun;
+            const bombCount = game.bombCount;
+            if (!fun) {
+                const bet = resolveBet(String(game.amount), eter.get(game.userId), { label: '✨' });
                 if (!bet.ok) {
                     return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
                 }
-                flocos.remove(game.userId, bet.amount, { reason: 'mines again' });
-                ng = makeGame(game.userId, bet.amount, game.bombCount, false);
+                eter.remove(game.userId, bet.amount, { reason: 'mines again' });
+                amount = bet.amount;
             }
+            games.delete(gameId);
             clearTimer(game);
-            games.delete(parts[2]);
-
+            const ng = makeGame(game.userId, amount, bombCount, fun, {
+                channelId: interaction.channelId
+            });
             await interaction.update({
-                content: `<@${game.userId}> · nova mesa`,
                 embeds: [panelEmbed(ng)],
                 components: fullComponents(ng)
             });
@@ -471,7 +453,7 @@ module.exports = {
             const res = openCell(game, idx);
             if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
             return interaction.update({
-                embeds: [panelEmbed(game, `🎲 Abriu **#${idx + 1}**`)],
+                embeds: [panelEmbed(game, `🎲 Abriu **#${idx + 1}** · multi ×**${multAt(game.opened.size, game.bombCount)}**`)],
                 components: fullComponents(game)
             });
         }
@@ -490,7 +472,7 @@ module.exports = {
             game.cashed = true;
             const win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
-            flocos.add(game.userId, win, { reason: 'mines cash' });
+            eter.add(game.userId, win, { reason: 'mines cash' });
             return interaction.update(endPayload(game));
         }
 
