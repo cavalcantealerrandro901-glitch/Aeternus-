@@ -22,11 +22,11 @@ function buildEmbed(user) {
 
 module.exports = {
     name: 'saldo',
-    aliases: ['bal', 'atm', 'balance', 'carteira', 'eter'],
-    description: 'Ver éter e XP',
+    aliases: ['bal', 'atm', 'balance', 'carteira', 'eter', 'faldo'],
+    description: 'Ver saldo',
     data: new SlashCommandBuilder()
-        .setName('saldo')
-        .setDescription('Ver éter e XP')
+        .setName('faldo')
+        .setDescription('Ver saldo')
         .addUserOption((o) => o.setName('usuario').setDescription('Usuário').setRequired(false)),
 
     async execute(message) {
