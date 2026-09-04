@@ -1,9 +1,8 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 const gifs = require('./gifs');
 
 const ACTIONS = {};
 
-/** mapa categoria do comando → endpoint nekos.best */
 const NEKOS = {
     hug: 'hug',
     kiss: 'kiss',
@@ -27,12 +26,31 @@ const NEKOS = {
 
 function register(def) {
     ACTIONS[def.name] = def;
+    const data = new SlashCommandBuilder()
+        .setName(String(def.name).slice(0, 32))
+        .setDescription(String(def.description || def.name).slice(0, 100))
+        .addUserOption((o) =>
+            o.setName('usuario').setDescription('Membro').setRequired(false)
+        );
     return {
         name: def.name,
         aliases: def.aliases || [],
         description: def.description || def.name,
+        data,
         async execute(message) {
             await run(message, def, {});
+        },
+        async executeSlash(interaction) {
+            const target = interaction.options.getUser('usuario');
+            const fake = {
+                author: interaction.user,
+                client: interaction.client,
+                guild: interaction.guild,
+                channel: interaction.channel,
+                mentions: { users: { first: () => target || null } },
+                reply: (payload) => interaction.reply(payload)
+            };
+            await run(fake, def, { forcedTarget: target || null });
         },
         async handleComponent(interaction) {
             const parts = interaction.customId.split(':');
@@ -83,10 +101,8 @@ async function fetchNekos(key) {
 
 async function pickGif(def) {
     const key = def.gif || def.name;
-    // 1) API anime estável
     const online = await fetchNekos(key);
     if (online) return online;
-    // 2) pool local
     if (typeof gifs.pickAsync === 'function') {
         try {
             const a = await gifs.pickAsync(key);
@@ -106,7 +122,7 @@ async function run(message, def, opts) {
                 new EmbedBuilder()
                     .setColor(def.color || 0xf472b6)
                     .setTitle(`${def.returnEmoji || '✨'}  ${def.name}`)
-                    .setDescription(`Mencione alguém:\n\`O.${def.name} @usuario\``)
+                    .setDescription('Mencione alguém ou use a opção **usuario**.')
             ]
         });
     }
@@ -127,7 +143,6 @@ async function run(message, def, opts) {
             iconURL: author.displayAvatarURL({ size: 64 })
         })
         .setDescription(text)
-        .setFooter({ text: 'Aeternus · interpretação anime' })
         .setTimestamp();
     if (gif) embed.setImage(gif);
     if (target) embed.setThumbnail(target.displayAvatarURL({ size: 64 }));
@@ -158,7 +173,6 @@ async function run(message, def, opts) {
                 const botEmbed = new EmbedBuilder()
                     .setColor(def.color || 0xf472b6)
                     .setDescription(botText)
-                    .setFooter({ text: 'Aeternus · interpretação' })
                     .setTimestamp();
                 if (replyGif) botEmbed.setImage(replyGif);
                 const row = new ActionRowBuilder().addComponents(
