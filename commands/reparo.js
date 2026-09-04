@@ -1,10 +1,17 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const autoRepair = require('../utils/autoRepair');
 
 module.exports = {
     name: 'reparo',
-    aliases: ['autorepair', 'repair', 'reparos', 'scan'],
-    description: 'Status do auto-reparo e busca em arquivos (dono)',
+    aliases: ['autorepair', 'repair', 'scan'],
+    description: 'Status do auto-reparo',
+    data: new SlashCommandBuilder()
+        .setName('reparo')
+        .setDescription('Status do auto-reparo')
+        .addStringOption((o) =>
+            o.setName('busca').setDescription('Varrer arquivos por nome').setRequired(false)
+        ),
+
     async execute(message, args) {
         const owners = autoRepair.ownerIds();
         const isOwner =
@@ -40,26 +47,35 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xf59e0b)
-                    .setTitle('🔧 Auto-reparo')
+                    .setTitle('Auto-reparo')
                     .setDescription(
                         [
                             `**Donos:** ${owners.length ? owners.map((id) => `<@${id}>`).join(', ') : '_OWNER_ID não definido_'}`,
                             `**Máx. reload:** ${autoRepair.MAX_ATTEMPTS}`,
-                            '**Modo:** avisa no DM + busca em `commands/`, `utils/`, `systems/`, `events/`',
                             '',
                             '**Últimos erros**',
                             ...lines,
                             query ? '' : null,
                             query ? `**Scan \`${query}\`**` : null,
-                            query ? scanBlock : null,
-                            '',
-                            '_Uso:_ `O.reparo [nome]` para varrer arquivos._'
+                            query ? scanBlock : null
                         ]
                             .filter((x) => x != null)
                             .join('\n')
                     )
-                    .setTimestamp()
             ]
         });
+    },
+
+    async executeSlash(interaction) {
+        const q = interaction.options.getString('busca');
+        const fake = {
+            author: interaction.user,
+            member: interaction.member,
+            guild: interaction.guild,
+            channel: interaction.channel,
+            client: interaction.client,
+            reply: (p) => interaction.reply(p)
+        };
+        return module.exports.execute(fake, q ? [q] : [], interaction.client);
     }
 };
