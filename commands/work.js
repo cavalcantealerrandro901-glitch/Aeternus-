@@ -61,9 +61,7 @@ function resultEmbed(user, r) {
         })
         .setTitle(`${r.rank.emoji}  Turno concluído`)
         .setDescription(lines.join('\n'))
-        .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'O.work · O.trabalhar · O.job · /work' })
-        .setTimestamp();
+        .setThumbnail(user.displayAvatarURL({ size: 128 }));
 }
 
 function cooldownEmbed(user, leftText, st) {
@@ -87,9 +85,7 @@ function cooldownEmbed(user, leftText, st) {
                     ? `⏳ Próximo cargo: **${st.next.name}** (${st.jobsToNext} turnos)`
                     : '🌌 Cargo máximo alcançado.'
             ].join('\n')
-        )
-        .setFooter({ text: 'Cooldownos no painel · economia Aeternus' })
-        .setTimestamp();
+        );
 }
 
 function statusEmbed(user, st) {
@@ -122,9 +118,7 @@ function statusEmbed(user, st) {
                 ranksList
             ].join('\n')
         )
-        .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'O.work · O.work status · /work' })
-        .setTimestamp();
+        .setThumbnail(user.displayAvatarURL({ size: 128 }));
 }
 
 function rows(canWork) {
@@ -170,8 +164,8 @@ module.exports = {
     aliases: ['trabalhar', 'job', 'emprego', 'trabalho', 'wrk'],
     description: 'Trabalha e ganha éter conforme o cargo',
     data: new SlashCommandBuilder()
-        .setName('work')
-        .setDescription('Trabalha e ganha éter')
+        .setName('trabalho')
+        .setDescription('Trabalhar por eter')
         .addStringOption((o) =>
             o
                 .setName('acao')
