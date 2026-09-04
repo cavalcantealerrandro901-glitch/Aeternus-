@@ -183,7 +183,7 @@ module.exports = {
     aliases: ['ajuda', 'comandos', 'cmds'],
     description: 'Central de ajuda',
     data: new SlashCommandBuilder()
-        .setName('help')
+        .setName('ajuda')
         .setDescription('Central de ajuda')
         .addStringOption((o) =>
             o
