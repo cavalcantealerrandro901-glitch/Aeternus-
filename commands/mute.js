@@ -2,10 +2,10 @@ const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'mute',
-    aliases: ['timeout', 'silenciar'],
+    aliases: ['silenciar', 'timeout'],
     description: 'Silenciar membro',
     data: new SlashCommandBuilder()
-        .setName('mute')
+        .setName('silenciar')
         .setDescription('Silenciar membro')
         .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
         .addIntegerOption((o) =>
@@ -14,7 +14,7 @@ module.exports = {
                 .setDescription('Duração em minutos')
                 .setRequired(true)
                 .setMinValue(1)
-                .setMaxValue(10080)
+                .setMaxValue(40320)
         )
         .addStringOption((o) => o.setName('motivo').setDescription('Motivo').setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
@@ -25,12 +25,12 @@ module.exports = {
         }
         const member = message.mentions.members.first();
         if (!member) return message.reply('❌ Mencione o membro.');
-        const mins = parseInt(args[1], 10);
-        if (!mins || mins < 1) return message.reply('❌ Informe os minutos.');
-        const reason = args.slice(2).join(' ') || 'Sem motivo';
+        const mins = parseInt(args.find((a) => /^\d+$/.test(a)) || '0', 10);
+        if (!mins) return message.reply('❌ Informe os minutos.');
+        const reason = args.filter((a) => !a.startsWith('<@') && !/^\d+$/.test(a)).join(' ') || 'Sem motivo';
         try {
             await member.timeout(mins * 60 * 1000, reason);
-            await message.reply(`🔇 **${member.user.tag}** · ${mins} min`);
+            await message.reply(`🔇 ${member} silenciado por **${mins}** min.`);
         } catch {
             await message.reply('❌ Não consegui silenciar.');
         }
@@ -44,7 +44,7 @@ module.exports = {
         if (!member) return i.reply({ content: '❌ Membro não encontrado.', ephemeral: true });
         try {
             await member.timeout(mins * 60 * 1000, reason);
-            await i.reply(`🔇 **${user.tag}** · ${mins} min`);
+            await i.reply(`🔇 ${member} silenciado por **${mins}** min.`);
         } catch {
             await i.reply({ content: '❌ Não consegui silenciar.', ephemeral: true });
         }

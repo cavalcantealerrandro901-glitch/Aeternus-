@@ -6,43 +6,47 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-async function run(fromId, toUser, amountRaw, reply) {
-    if (!toUser) return reply('❌ Mencione o usuário.');
-    if (toUser.bot) return reply('❌ Não pode pagar bots.');
-    if (toUser.id === fromId) return reply('❌ Não pode pagar a si mesmo.');
-    if (!amountRaw) return reply('❌ Informe o valor.');
-    const wallet = eter.get(fromId);
-    const bet = resolveBet(amountRaw, wallet, { label: '✨' });
+async function run(fromId, targets, amountRaw, reply) {
+    if (!targets.length) return reply('❌ Mencione alguém.');
+    const bal = eter.get(fromId);
+    const bet = resolveBet(amountRaw, bal, { label: '✨' });
     if (!bet.ok) return reply(`❌ ${bet.error}`);
-    const res = eter.transfer(fromId, toUser.id, bet.amount);
-    if (res?.ok === false || res === false) return reply(`❌ ${res?.error || 'Saldo insuficiente.'}`);
+    const total = bet.amount * targets.length;
+    if (total > bal) return reply('❌ Saldo insuficiente para todos.');
+    const lines = [];
+    for (const u of targets) {
+        eter.remove(fromId, bet.amount, { reason: 'pay' });
+        eter.add(u.id, bet.amount, { reason: 'pay' });
+        lines.push(`✨ **${fmt(bet.amount)}** → **${u.username}**`);
+    }
     return reply({
         embeds: [
-            new EmbedBuilder()
-                .setColor(0xa78bfa)
-                .setTitle('Transferência')
-                .setDescription(`Você enviou ✨ **${fmt(bet.amount)}** para **${toUser.username}**`)
+            new EmbedBuilder().setColor(0x22c55e).setTitle('Transferência').setDescription(lines.join('\n'))
         ]
     });
 }
 
 module.exports = {
     name: 'pay',
-    aliases: ['pagar', 'enviar', 'pix'],
+    aliases: ['pagar', 'transferir', 'pix'],
     description: 'Transferir éter',
     data: new SlashCommandBuilder()
-        .setName('pay')
-        .setDescription('Transferir éter')
+        .setName('pagar')
+        .setDescription('Transferir eter')
         .addUserOption((o) => o.setName('usuario').setDescription('Destino').setRequired(true))
         .addStringOption((o) => o.setName('valor').setDescription('Valor').setRequired(true)),
+
     async execute(message, args) {
-        const user = message.mentions.users.first();
-        const amountRaw = args.find((a) => !a.startsWith('<@')) || args[1];
-        await run(message.author.id, user, amountRaw, (p) => message.reply(p));
+        const targets = [...message.mentions.users.values()].filter((u) => !u.bot && u.id !== message.author.id);
+        const amountRaw = args.filter((a) => !a.startsWith('<@')).pop();
+        await run(message.author.id, targets, amountRaw, (p) => message.reply(p));
     },
     async executeSlash(i) {
-        await run(i.user.id, i.options.getUser('usuario'), i.options.getString('valor'), (p) =>
-            typeof p === 'string' ? i.reply({ content: p, ephemeral: true }) : i.reply(p)
+        await run(
+            i.user.id,
+            [i.options.getUser('usuario', true)],
+            i.options.getString('valor', true),
+            (p) => (typeof p === 'string' ? i.reply({ content: p, ephemeral: true }) : i.reply(p))
         );
     }
 };

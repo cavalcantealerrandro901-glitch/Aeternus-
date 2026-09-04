@@ -1,6 +1,5 @@
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
-const bank = require('../utils/bank');
 const { resolveBet } = require('../utils/parseAmount');
 
 function fmt(n) {
@@ -8,42 +7,38 @@ function fmt(n) {
 }
 
 async function run(userId, amountRaw, reply) {
-    if (!amountRaw) return reply('❌ Informe o valor (`1k`, `all`, `half`).');
-    const wallet = eter.get(userId);
-    if (wallet <= 0) return reply('❌ Carteira vazia.');
-    const bet = resolveBet(amountRaw, wallet, { label: '✨' });
+    const bal = eter.get(userId);
+    const bet = resolveBet(amountRaw, bal, { label: '✨' });
     if (!bet.ok) return reply(`❌ ${bet.error}`);
-    const res = bank.deposit(userId, bet.amount, eter);
-    if (!res.ok) return reply(`❌ ${res.error}`);
+    if (typeof eter.deposit === 'function') eter.deposit(userId, bet.amount);
+    else {
+        eter.remove(userId, bet.amount, { reason: 'deposit' });
+        eter.addBank?.(userId, bet.amount);
+    }
     return reply({
         embeds: [
             new EmbedBuilder()
-                .setColor(0x34d399)
+                .setColor(0x22c55e)
                 .setTitle('Depósito')
-                .setDescription(`✨ **${fmt(res.amount)}** guardados`)
-                .addFields(
-                    { name: 'Carteira', value: `✨ **${fmt(res.wallet)}**`, inline: true },
-                    { name: 'Cofre', value: `✨ **${fmt(res.bank)}**`, inline: true }
-                )
+                .setDescription(`✨ **${fmt(bet.amount)}** guardados no cofre.`)
         ]
     });
 }
 
 module.exports = {
     name: 'depositar',
-    aliases: ['dep', 'deposit', 'guardar'],
-    description: 'Depositar éter no banco',
+    aliases: ['dep', 'deposit'],
+    description: 'Depositar éter',
     data: new SlashCommandBuilder()
-        .setName('depositar')
-        .setDescription('Depositar éter no banco')
-        .addStringOption((o) =>
-            o.setName('valor').setDescription('Valor, all ou half').setRequired(true)
-        ),
+        .setName('depositar-eter')
+        .setDescription('Depositar eter')
+        .addStringOption((o) => o.setName('valor').setDescription('Valor, all ou half').setRequired(true)),
+
     async execute(message, args) {
         await run(message.author.id, args[0], (p) => message.reply(p));
     },
     async executeSlash(i) {
-        await run(i.user.id, i.options.getString('valor'), (p) =>
+        await run(i.user.id, i.options.getString('valor', true), (p) =>
             typeof p === 'string' ? i.reply({ content: p, ephemeral: true }) : i.reply(p)
         );
     }

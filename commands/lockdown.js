@@ -1,46 +1,58 @@
-const { PermissionFlagsBits, SlashCommandBuilder, ChannelType } = require('discord.js');
+const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'lockdown',
-    description: 'Trancar todos os canais de texto',
+    aliases: ['bloqueio'],
+    description: 'Bloquear canais de texto',
     data: new SlashCommandBuilder()
-        .setName('lockdown')
-        .setDescription('Trancar/destrancar o servidor')
+        .setName('bloqueio')
+        .setDescription('Bloquear canais')
         .addStringOption((o) =>
             o
-                .setName('acao')
-                .setDescription('lock ou unlock')
+                .setName('modo')
+                .setDescription('on ou off')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Trancar', value: 'lock' },
-                    { name: 'Destrancar', value: 'unlock' }
+                    { name: 'Ativar', value: 'on' },
+                    { name: 'Desativar', value: 'off' }
                 )
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-            return message.reply('❌ Sem permissão.');
+            return message.reply('❌ Só administradores.');
         }
-        const action = (args[0] || 'lock').toLowerCase();
-        await doLockdown(message.guild, action === 'unlock', (p) => message.reply(p));
+        const mode = (args[0] || '').toLowerCase();
+        if (!['on', 'off', 'ativar', 'desativar'].includes(mode)) {
+            return message.reply('Uso: `O.lockdown on|off`');
+        }
+        const lock = mode === 'on' || mode === 'ativar';
+        let n = 0;
+        for (const ch of message.guild.channels.cache.values()) {
+            if (!ch.isTextBased?.() || ch.isThread?.()) continue;
+            try {
+                await ch.permissionOverwrites.edit(message.guild.roles.everyone, {
+                    SendMessages: lock ? false : null
+                });
+                n++;
+            } catch (_) {}
+        }
+        await message.reply(lock ? `🔒 Bloqueio em **${n}** canais.` : `🔓 Bloqueio removido de **${n}** canais.`);
     },
+
     async executeSlash(i) {
-        const unlock = i.options.getString('acao') === 'unlock';
-        await doLockdown(i.guild, unlock, (p) => i.reply(p));
+        const lock = i.options.getString('modo', true) === 'on';
+        let n = 0;
+        for (const ch of i.guild.channels.cache.values()) {
+            if (!ch.isTextBased?.() || ch.isThread?.()) continue;
+            try {
+                await ch.permissionOverwrites.edit(i.guild.roles.everyone, {
+                    SendMessages: lock ? false : null
+                });
+                n++;
+            } catch (_) {}
+        }
+        await i.reply(lock ? `🔒 Bloqueio em **${n}** canais.` : `🔓 Bloqueio removido de **${n}** canais.`);
     }
 };
-
-async function doLockdown(guild, unlock, reply) {
-    let n = 0;
-    for (const ch of guild.channels.cache.values()) {
-        if (ch.type !== ChannelType.GuildText && ch.type !== ChannelType.GuildAnnouncement) continue;
-        try {
-            await ch.permissionOverwrites.edit(guild.roles.everyone, {
-                SendMessages: unlock ? null : false
-            });
-            n++;
-        } catch (_) {}
-    }
-    return reply(unlock ? `🔓 **${n}** canais destrancados.` : `🔒 **${n}** canais trancados.`);
-}
