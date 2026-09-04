@@ -2,10 +2,11 @@ const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'unmute',
+    aliases: ['dessilenciar'],
     description: 'Remover silêncio',
     data: new SlashCommandBuilder()
-        .setName('unmute')
-        .setDescription('Remover silêncio')
+        .setName('dessilenciar')
+        .setDescription('Remover silencio')
         .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
@@ -17,7 +18,7 @@ module.exports = {
         if (!member) return message.reply('❌ Mencione o membro.');
         try {
             await member.timeout(null);
-            await message.reply(`🔊 **${member.user.tag}**`);
+            await message.reply(`✅ ${member} dessilenciado.`);
         } catch {
             await message.reply('❌ Não consegui.');
         }
@@ -29,7 +30,7 @@ module.exports = {
         if (!member) return i.reply({ content: '❌ Membro não encontrado.', ephemeral: true });
         try {
             await member.timeout(null);
-            await i.reply(`🔊 **${user.tag}**`);
+            await i.reply(`✅ ${member} dessilenciado.`);
         } catch {
             await i.reply({ content: '❌ Não consegui.', ephemeral: true });
         }

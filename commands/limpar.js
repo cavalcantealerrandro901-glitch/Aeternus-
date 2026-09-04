@@ -5,8 +5,8 @@ module.exports = {
     aliases: ['clear', 'purge'],
     description: 'Apagar mensagens',
     data: new SlashCommandBuilder()
-        .setName('limpar')
-        .setDescription('Apagar mensagens do canal')
+        .setName('limpar-chat')
+        .setDescription('Limpar mensagens')
         .addIntegerOption((o) =>
             o
                 .setName('quantidade')

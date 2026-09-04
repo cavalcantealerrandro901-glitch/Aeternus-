@@ -5,7 +5,7 @@ module.exports = {
     name: 'painel',
     aliases: ['panel', 'dashboard'],
     description: 'Link do painel',
-    data: new SlashCommandBuilder().setName('painel').setDescription('Link do painel'),
+    data: new SlashCommandBuilder().setName('painel-web').setDescription('Link do painel'),
 
     async execute(message) {
         const url = shop.panelUrl?.(message.guild?.id) || 'https://aeternus.onrender.com';

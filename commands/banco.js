@@ -1,23 +1,25 @@
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
-const bank = require('../utils/bank');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
 function build(user) {
-    const w = eter.get(user.id);
-    const b = bank.get(user.id);
+    const wallet = eter.get(user.id);
+    const bank = eter.getBank?.(user.id) ?? 0;
     return new EmbedBuilder()
         .setColor(0x38bdf8)
-        .setAuthor({ name: user.username, iconURL: user.displayAvatarURL({ size: 64 }) })
         .setTitle('Banco')
-        .addFields(
-            { name: 'Carteira', value: `✨ **${fmt(w)}**`, inline: true },
-            { name: 'Cofre', value: `✨ **${fmt(b)}**`, inline: true },
-            { name: 'Total', value: `✨ **${fmt(w + b)}**`, inline: true }
-        );
+        .setDescription(
+            [
+                `**${user.username}**`,
+                `✨ Carteira: **${fmt(wallet)}**`,
+                `🏦 Cofre: **${fmt(bank)}**`,
+                `💰 Total: **${fmt(wallet + bank)}**`
+            ].join('\n')
+        )
+        .setThumbnail(user.displayAvatarURL({ size: 128 }));
 }
 
 module.exports = {
@@ -25,7 +27,7 @@ module.exports = {
     aliases: ['bank', 'cofre'],
     description: 'Ver banco',
     data: new SlashCommandBuilder()
-        .setName('banco')
+        .setName('ver-banco')
         .setDescription('Ver banco')
         .addUserOption((o) => o.setName('usuario').setDescription('Usuário').setRequired(false)),
 

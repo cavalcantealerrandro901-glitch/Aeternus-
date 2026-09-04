@@ -1,19 +1,12 @@
 const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const store = require('../utils/store');
 
-function addWarn(guildId, userId, modId, reason) {
-    const key = `warns:${guildId}:${userId}`;
-    const list = store.get(key) || [];
-    list.push({ reason, modId, at: Date.now() });
-    store.set(key, list);
-    return list.length;
-}
-
 module.exports = {
     name: 'warn',
+    aliases: ['advertir', 'aviso'],
     description: 'Advertir membro',
     data: new SlashCommandBuilder()
-        .setName('warn')
+        .setName('advertir')
         .setDescription('Advertir membro')
         .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
         .addStringOption((o) => o.setName('motivo').setDescription('Motivo').setRequired(false))
@@ -23,16 +16,20 @@ module.exports = {
         if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
             return message.reply('❌ Sem permissão.');
         }
-        const user = message.mentions.users.first();
-        if (!user) return message.reply('❌ Mencione o membro.');
+        const member = message.mentions.members.first();
+        if (!member) return message.reply('❌ Mencione o membro.');
         const reason = args.slice(1).join(' ') || 'Sem motivo';
-        const total = addWarn(message.guild.id, user.id, message.author.id, reason);
+        const key = `warns_${message.guild.id}`;
+        const data = store.load(key, {});
+        if (!data[member.id]) data[member.id] = [];
+        data[member.id].push({ reason, at: Date.now(), by: message.author.id });
+        store.save(key, data);
         await message.reply({
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0xfbbf24)
-                    .setTitle('Warn')
-                    .setDescription(`**${user.tag}**\n${reason}\nTotal: **${total}**`)
+                    .setColor(0xf59e0b)
+                    .setTitle('Advertência')
+                    .setDescription(`**${member.user.tag}**\n${reason}\nTotal: **${data[member.id].length}**`)
             ]
         });
     },
@@ -40,13 +37,17 @@ module.exports = {
     async executeSlash(i) {
         const user = i.options.getUser('usuario', true);
         const reason = i.options.getString('motivo') || 'Sem motivo';
-        const total = addWarn(i.guild.id, user.id, i.user.id, reason);
+        const key = `warns_${i.guild.id}`;
+        const data = store.load(key, {});
+        if (!data[user.id]) data[user.id] = [];
+        data[user.id].push({ reason, at: Date.now(), by: i.user.id });
+        store.save(key, data);
         await i.reply({
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0xfbbf24)
-                    .setTitle('Warn')
-                    .setDescription(`**${user.tag}**\n${reason}\nTotal: **${total}**`)
+                    .setColor(0xf59e0b)
+                    .setTitle('Advertência')
+                    .setDescription(`**${user.tag}**\n${reason}\nTotal: **${data[user.id].length}**`)
             ]
         });
     }

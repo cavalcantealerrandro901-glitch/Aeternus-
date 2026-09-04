@@ -22,7 +22,7 @@ async function run(userId, reply) {
         embeds: [
             new EmbedBuilder()
                 .setColor(0x34d399)
-                .setTitle('Beg')
+                .setTitle('Pedir')
                 .setDescription(
                     `Você ganhou ✨ **${fmt(amount)}**\nSaldo: ✨ **${fmt(eter.get(userId))}**`
                 )
@@ -32,9 +32,9 @@ async function run(userId, reply) {
 
 module.exports = {
     name: 'beg',
-    aliases: ['mendigar'],
+    aliases: ['mendigar', 'pedir'],
     description: 'Pedir éter',
-    data: new SlashCommandBuilder().setName('beg').setDescription('Pedir éter'),
+    data: new SlashCommandBuilder().setName('pedir').setDescription('Pedir eter'),
     async execute(message) {
         await run(message.author.id, (p) => message.reply(p));
     },
