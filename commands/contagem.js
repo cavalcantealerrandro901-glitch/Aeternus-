@@ -7,8 +7,8 @@ module.exports = {
     aliases: ['counting', 'setcount'],
     description: 'Definir número da contagem',
     data: new SlashCommandBuilder()
-        .setName('contagem')
-        .setDescription('Definir número da contagem')
+        .setName('alterar-contador')
+        .setDescription('Alterar contador')
         .addIntegerOption((o) =>
             o.setName('numero').setDescription('Próximo número esperado').setRequired(false)
         )
