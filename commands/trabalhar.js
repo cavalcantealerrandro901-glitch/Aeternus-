@@ -1,5 +1,5 @@
-const { EmbedBuilder } = require('discord.js');
-const flocos = require('../utils/flocos');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const eter = require('../utils/eter');
 const store = require('../utils/store');
 
 const JOBS = [
@@ -14,18 +14,20 @@ const CD = 45 * 60 * 1000;
 
 module.exports = {
     name: 'trabalhar',
-    aliases: ['work', 'job'],
-    description: 'Trabalha por flocos',
+    aliases: ['job'],
+    description: 'Trabalhar por éter',
+    data: new SlashCommandBuilder().setName('trabalhar').setDescription('Trabalhar por éter'),
+
     async execute(message) {
         const cds = store.load('workcd.json', {});
         const last = cds[message.author.id] || 0;
         if (Date.now() - last < CD) {
             const m = Math.ceil((CD - (Date.now() - last)) / 60000);
-            return message.reply({ embeds: [new EmbedBuilder().setColor(0xf59e0b).setDescription(`⏳ Descanso: **${m}** min.`)] });
+            return message.reply(`⏳ Descanso: **${m}** min.`);
         }
         const [job, min, max] = JOBS[Math.floor(Math.random() * JOBS.length)];
         const pay = min + Math.floor(Math.random() * (max - min + 1));
-        flocos.add(message.author.id, pay);
+        eter.add(message.author.id, pay, { reason: 'trabalhar' });
         cds[message.author.id] = Date.now();
         store.save('workcd.json', cds);
 
@@ -33,10 +35,23 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xfbbf24)
-                    .setTitle('💼 Expediente concluído')
-                    .setDescription(`Cargo: **${job}**\nPagamento: ${flocos.format(pay)}`)
-                    .setFooter({ text: 'Cooldown: 45 minutos' })
+                    .setTitle('Trabalho')
+                    .setDescription(
+                        `Cargo: **${job}**\n✨ **+${pay.toLocaleString('pt-BR')}**`
+                    )
             ]
         });
+    },
+
+    async executeSlash(interaction) {
+        const fake = {
+            author: interaction.user,
+            member: interaction.member,
+            guild: interaction.guild,
+            channel: interaction.channel,
+            client: interaction.client,
+            reply: (p) => interaction.reply(p)
+        };
+        return module.exports.execute(fake, [], interaction.client);
     }
 };
