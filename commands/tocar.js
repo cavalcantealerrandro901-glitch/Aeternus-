@@ -1,84 +1,79 @@
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
-const {
-    needVoice,
-    voiceState,
-    ensureCrypto,
-    COLOR_ERR
-} = require('../systems/music');
+const music = require('../systems/music');
 
 module.exports = {
     name: 'tocar',
     aliases: ['play', 'p', 'musica'],
-    description: 'Tocar música',
+    description: 'Tocar música (Lavalink)',
     data: new SlashCommandBuilder()
         .setName('tocar')
         .setDescription('Tocar música')
         .addStringOption((o) =>
-            o
-                .setName('busca')
-                .setDescription('Nome ou URL (YouTube, Spotify, SoundCloud…)')
-                .setRequired(true)
+            o.setName('busca').setDescription('Nome ou URL').setRequired(true)
         ),
 
     async execute(message, args) {
-        if (!message.client.distube) {
-            return message.reply('❌ Sistema de música não carregou. Veja os logs do bot.');
-        }
-        const err = needVoice(message, { memberNeed: true });
-        if (err) return message.reply(err);
         const query = args.join(' ').trim();
         if (!query) return message.reply('Uso: `O.tocar <nome ou url>`');
-
-        const { memberVC } = voiceState(message);
         try {
-            await ensureCrypto(message.client);
             await message.channel.sendTyping();
-            await message.client.distube.play(memberVC, query, {
-                member: message.member,
-                textChannel: message.channel,
-                message
-            });
-        } catch (e) {
-            const msg = String(e.message || e);
-            let tip = msg.slice(0, 400);
-            if (/30 seconds|connect to the voice/i.test(msg)) {
-                tip +=
-                    '\n\nConfira permissões **Conectar/Falar**, reinicie o deploy e veja se o log mostra `crypto: libsodium-wrappers OK`.';
+            const res = await music.play(message, query);
+            if (res.started) {
+                const t = res.track;
+                const emb = new EmbedBuilder()
+                    .setColor(music.COLOR)
+                    .setTitle('🎵 Tocando')
+                    .setDescription(`[**${t.title}**](${t.uri || '#'})`)
+                    .addFields(
+                        { name: 'Duração', value: music.formatMs(t.length), inline: true },
+                        { name: 'Fila', value: String(res.added), inline: true }
+                    );
+                if (t.artwork) emb.setThumbnail(t.artwork);
+                await message.reply({ embeds: [emb] });
+            } else {
+                await message.reply(
+                    `➕ **${res.track.title}** (+${res.added}) na fila.`
+                );
             }
+        } catch (e) {
             await message.reply({
                 embeds: [
-                    new EmbedBuilder().setColor(COLOR_ERR).setTitle('❌ Erro').setDescription(tip)
+                    new EmbedBuilder()
+                        .setColor(music.COLOR_ERR)
+                        .setTitle('❌ Música')
+                        .setDescription(String(e.message || e).slice(0, 500))
                 ]
             });
         }
     },
 
     async executeSlash(i) {
-        if (!i.client.distube) {
-            return i.reply({ content: '❌ Sistema de música não carregou.', ephemeral: true });
-        }
-        const err = needVoice(i, { memberNeed: true });
-        if (err) return i.reply({ content: err, ephemeral: true });
         const query = i.options.getString('busca', true);
-        const { memberVC } = voiceState(i);
         await i.deferReply();
         try {
-            await ensureCrypto(i.client);
-            await i.client.distube.play(memberVC, query, {
-                member: i.member,
-                textChannel: i.channel
-            });
-            await i.editReply({ content: `🎵 Buscando: **${query.slice(0, 80)}**` });
-        } catch (e) {
-            const msg = String(e.message || e);
-            let tip = msg.slice(0, 400);
-            if (/30 seconds|connect to the voice/i.test(msg)) {
-                tip +=
-                    '\n\nConfira permissões **Conectar/Falar** e o log `crypto: libsodium-wrappers OK`.';
+            const res = await music.play(i, query);
+            if (res.started) {
+                const t = res.track;
+                const emb = new EmbedBuilder()
+                    .setColor(music.COLOR)
+                    .setTitle('🎵 Tocando')
+                    .setDescription(`[**${t.title}**](${t.uri || '#'})`)
+                    .addFields(
+                        { name: 'Duração', value: music.formatMs(t.length), inline: true },
+                        { name: 'Fila', value: String(res.added), inline: true }
+                    );
+                if (t.artwork) emb.setThumbnail(t.artwork);
+                await i.editReply({ embeds: [emb] });
+            } else {
+                await i.editReply(`➕ **${res.track.title}** (+${res.added}) na fila.`);
             }
+        } catch (e) {
             await i.editReply({
                 embeds: [
-                    new EmbedBuilder().setColor(COLOR_ERR).setTitle('❌ Erro').setDescription(tip)
+                    new EmbedBuilder()
+                        .setColor(music.COLOR_ERR)
+                        .setTitle('❌ Música')
+                        .setDescription(String(e.message || e).slice(0, 500))
                 ]
             });
         }
