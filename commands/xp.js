@@ -43,7 +43,6 @@ function profileEmbed(user, p, rankInfo) {
         '⏳ Faltam **' + fmt(p.toNext) + '** XP para o nível ' + (p.level + 1),
         '',
         '🎁 **Multiplicador do Daily:** ×**' + p.mult.toFixed(2) + '**',
-        '_Cada nível aumenta o daily (máx. ×3.00)._',
         '',
         rankInfo
             ? '🏅 **Ranking global:** #**' + rankInfo.rank + '** de ' + rankInfo.total
@@ -58,9 +57,7 @@ function profileEmbed(user, p, rankInfo) {
         })
         .setTitle(title.emoji + '  Nível ' + p.level)
         .setDescription(lines.join('\n'))
-        .setThumbnail(user.displayAvatarURL({ size: 256 }))
-        .setFooter({ text: 'O.xp · O.level · O.nivel · /xp  ·  converse no chat para ganhar XP' })
-        .setTimestamp();
+        .setThumbnail(user.displayAvatarURL({ size: 256 }));
 }
 
 function leaderboardEmbed(client, list) {
@@ -82,14 +79,12 @@ function leaderboardEmbed(client, list) {
                   ' XP'
               );
           })
-        : ['_Ainda ninguém no ranking. Converse no chat!_'];
+        : ['_Ainda ninguém no ranking._'];
 
     return new EmbedBuilder()
         .setColor(0xfbbf24)
         .setTitle('🏆  Ranking de XP')
-        .setDescription(lines.join('\n'))
-        .setFooter({ text: 'Top 10 · XP global do bot' })
-        .setTimestamp();
+        .setDescription(lines.join('\n'));
 }
 
 function helpEmbed() {
@@ -99,23 +94,14 @@ function helpEmbed() {
         .setDescription(
             [
                 'Ganhe XP **conversando** nos chats do servidor.',
-                'Há anti-spam: mensagens muito seguidas dão menos XP.',
-                '',
-                '**Por mensagem:** cerca de **30–77** XP',
-                '**Ao subir de nível:** ❄️ **300–5.000** flocos',
-                '**Daily:** multiplicador sobe com o nível (até ×3)',
                 '',
                 '**Comandos**',
                 '`O.xp` — seu progresso',
                 '`O.xp @user` — ver outro membro',
                 '`O.xp rank` — ranking',
-                '`O.xp info` — como funciona',
-                '',
-                'Aliases: `level` · `nivel` · `lvl` · `rankxp`'
+                '`O.xp info` — como funciona'
             ].join('\n')
-        )
-        .setFooter({ text: 'Aeternus · progressão' })
-        .setTimestamp();
+        );
 }
 
 function rows() {
@@ -153,10 +139,10 @@ function parseSub(args) {
 module.exports = {
     name: 'xp',
     aliases: ['level', 'nivel', 'nível', 'lvl', 'rankxp', 'experiencia', 'experiência'],
-    description: 'Mostra XP, nível, ranking e multiplicador do daily',
+    description: 'Mostra XP, nível e ranking',
     data: new SlashCommandBuilder()
-        .setName('xp')
-        .setDescription('Mostra experiência e nível')
+        .setName('nivel')
+        .setDescription('Ver nivel e XP')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Ver XP de outro usuário').setRequired(false)
         )
@@ -185,7 +171,6 @@ module.exports = {
         }
 
         const user = message.mentions.users.first() || message.author;
-        // se o 1º arg for menção, parseSub já trata como me
         const p = xp.progress(user.id);
         const rankInfo = xp.rankOf(user.id);
         return message.reply({
