@@ -1,5 +1,10 @@
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
-const { needVoice, voiceState, COLOR, COLOR_ERR } = require('../systems/music');
+const {
+    needVoice,
+    voiceState,
+    ensureCrypto,
+    COLOR_ERR
+} = require('../systems/music');
 
 module.exports = {
     name: 'tocar',
@@ -9,7 +14,10 @@ module.exports = {
         .setName('tocar')
         .setDescription('Tocar música')
         .addStringOption((o) =>
-            o.setName('busca').setDescription('Nome ou URL (YouTube, Spotify, SoundCloud…)').setRequired(true)
+            o
+                .setName('busca')
+                .setDescription('Nome ou URL (YouTube, Spotify, SoundCloud…)')
+                .setRequired(true)
         ),
 
     async execute(message, args) {
@@ -23,6 +31,7 @@ module.exports = {
 
         const { memberVC } = voiceState(message);
         try {
+            await ensureCrypto(message.client);
             await message.channel.sendTyping();
             await message.client.distube.play(memberVC, query, {
                 member: message.member,
@@ -30,12 +39,15 @@ module.exports = {
                 message
             });
         } catch (e) {
+            const msg = String(e.message || e);
+            let tip = msg.slice(0, 400);
+            if (/30 seconds|connect to the voice/i.test(msg)) {
+                tip +=
+                    '\n\nConfira permissões **Conectar/Falar**, reinicie o deploy e veja se o log mostra `crypto: libsodium-wrappers OK`.';
+            }
             await message.reply({
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor(COLOR_ERR)
-                        .setTitle('❌ Erro')
-                        .setDescription(String(e.message || e).slice(0, 500))
+                    new EmbedBuilder().setColor(COLOR_ERR).setTitle('❌ Erro').setDescription(tip)
                 ]
             });
         }
@@ -51,18 +63,22 @@ module.exports = {
         const { memberVC } = voiceState(i);
         await i.deferReply();
         try {
+            await ensureCrypto(i.client);
             await i.client.distube.play(memberVC, query, {
                 member: i.member,
                 textChannel: i.channel
             });
             await i.editReply({ content: `🎵 Buscando: **${query.slice(0, 80)}**` });
         } catch (e) {
+            const msg = String(e.message || e);
+            let tip = msg.slice(0, 400);
+            if (/30 seconds|connect to the voice/i.test(msg)) {
+                tip +=
+                    '\n\nConfira permissões **Conectar/Falar** e o log `crypto: libsodium-wrappers OK`.';
+            }
             await i.editReply({
                 embeds: [
-                    new EmbedBuilder()
-                        .setColor(COLOR_ERR)
-                        .setTitle('❌ Erro')
-                        .setDescription(String(e.message || e).slice(0, 500))
+                    new EmbedBuilder().setColor(COLOR_ERR).setTitle('❌ Erro').setDescription(tip)
                 ]
             });
         }
