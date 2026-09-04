@@ -36,8 +36,8 @@ module.exports = {
     aliases: ['addeter', 'givemoney'],
     description: 'Adicionar éter (admin)',
     data: new SlashCommandBuilder()
-        .setName('addmoney')
-        .setDescription('Adicionar éter (admin)')
+        .setName('adicionar-eter')
+        .setDescription('Adicionar éter')
         .addUserOption((o) => o.setName('usuario').setDescription('Usuário').setRequired(true))
         .addStringOption((o) => o.setName('valor').setDescription('Valor').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),

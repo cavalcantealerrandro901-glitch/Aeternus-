@@ -60,8 +60,8 @@ module.exports = {
     aliases: ['roubar', 'steal'],
     description: 'Roubar éter de alguém',
     data: new SlashCommandBuilder()
-        .setName('rob')
-        .setDescription('Roubar éter de alguém')
+        .setName('roubar')
+        .setDescription('Roubar éter')
         .addUserOption((o) => o.setName('usuario').setDescription('Alvo').setRequired(true)),
     async execute(message) {
         await run(message.author.id, message.mentions.users.first(), (p) => message.reply(p));
