@@ -1,36 +1,37 @@
-const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { rerollDrop } = require('../systems/drops');
 
 module.exports = {
     name: 'reroll',
-    aliases: ['resortear', 'redraw'],
-    description: 'Re-sorteia um drop finalizado pelo ID',
-    async execute(message, args, client) {
-        if (
-            !message.member.permissions.has(PermissionFlagsBits.ManageGuild) &&
-            !message.member.permissions.has(PermissionFlagsBits.Administrator)
-        ) {
-            return message.reply('❌ Precisa de **Gerenciar Servidor**.');
+    data: new SlashCommandBuilder().setName('reroll').setDescription('Reroll de drop'),
+    description: 'Sorteia de novo um drop',
+    async execute(message, args) {
+        const msgId = args[0];
+        if (!msgId) return message.reply('Uso: O.reroll <id da mensagem do drop>');
+        try {
+            const result = await rerollDrop(message, msgId);
+            if (result?.error) return message.reply(`❌ ${result.error}`);
+            await message.reply(result?.text || '✅ Reroll feito.');
+        } catch (e) {
+            await message.reply(`❌ ${e.message}`);
         }
+    },
 
-        const id = (args[0] || '').replace(/\D/g, '');
-        if (!id) {
-            return message.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0x8b5cf6)
-                        .setTitle('🔁 Reroll')
-                        .setDescription(
-                            'Uso: `reroll <id>` ou `O.reroll <id>`\nO ID aparece no final de cada drop.'
-                        )
-                ]
-            });
-        }
-
-        const result = await rerollDrop(client || message.client, id);
-        if (!result.ok) {
-            return message.reply(`❌ ${result.error}`);
-        }
-        await message.reply(`✅ Reroll do drop \`${id}\` executado.`).catch(() => {});
+    async executeSlash(interaction) {
+        const args = [];
+        try {
+            const raw = interaction.options?.getString?.('args');
+            if (raw) args.push(...String(raw).trim().split(/\s+/).filter(Boolean));
+        } catch (_) {}
+        const fake = {
+            author: interaction.user,
+            member: interaction.member,
+            guild: interaction.guild,
+            channel: interaction.channel,
+            client: interaction.client,
+            mentions: { users: { first: () => null }, members: { first: () => null } },
+            reply: (p) => interaction.reply(p)
+        };
+        return module.exports.execute(fake, args, interaction.client);
     }
 };
