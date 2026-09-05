@@ -33,15 +33,11 @@ function parseNodes() {
 
     if (raw.trim()) {
         for (const part of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
-            // host:port:password:secure|true|false
             const bits = part.split(':');
             if (bits.length < 3) continue;
             const secureFlag = String(bits[bits.length - 1]).toLowerCase();
             const isSecure =
                 secureFlag === 'secure' || secureFlag === 'true' || secureFlag === '1';
-            // password may contain ':' rarely — take port as number near end
-            // format: host:port:password:secure
-            // host can be hostname only (no port in host)
             const host = bits[0];
             const port = parseInt(bits[1], 10);
             const password = bits.slice(2, -1).join(':') || bits[2];
@@ -59,7 +55,6 @@ function parseNodes() {
         });
     }
 
-    // fallback: nodes públicos conhecidos (podem cair) + default Hjgaming
     if (!list.length) {
         list.push(
             {
@@ -82,10 +77,6 @@ function parseNodes() {
 
     return list;
 }
-
-/**
- * @typedef {{ host: string, port: number, password: string, secure: boolean, ws?: WebSocket, sessionId?: string, ready?: boolean, reconnecting?: boolean, label: string }}
- */
 
 function nodeLabel(n) {
     return `${n.host}:${n.port}`;
@@ -117,7 +108,6 @@ function setup(client) {
 
     console.log(`[lavalink] ${nodes.length} node(s): ${nodes.map((n) => n.label).join(' | ')}`);
 
-    // voice state → lavalink
     client.on('raw', (packet) => {
         if (!packet?.t) return;
         if (packet.t === 'VOICE_SERVER_UPDATE' || packet.t === 'VOICE_STATE_UPDATE') {
@@ -127,15 +117,12 @@ function setup(client) {
         }
     });
 
-    // conecta o primeiro node
     connectNode(activeIdx);
 
     client.once('clientReady', () => {
-        // reconecta com user id correto se já tentou cedo
         const n = currentNode();
         if (n && !n.ready) connectNode(activeIdx);
     });
-    // discord.js v14 ready
     client.once('ready', () => {
         const n = currentNode();
         if (n && !n.ready) connectNode(activeIdx);
@@ -260,23 +247,79 @@ async function rest(method, path, body) {
     }
 }
 
-async function loadTracks(query) {
-    let identifier = query;
-    if (!/^(https?:\/\/|ytsearch:|scsearch:|spsearch:)/i.test(query)) {
-        identifier = `ytsearch:${query}`;
-    }
+async function loadTracksOnce(identifier) {
     const n = currentNode();
     if (!n) throw new Error('Node indisponível');
     const url = `${httpBase(n)}/v4/loadtracks?identifier=${encodeURIComponent(identifier)}`;
     const res = await axios.get(url, {
         headers: { Authorization: n.password },
-        timeout: 25000,
+        timeout: 30000,
         validateStatus: () => true
     });
+    if (res.status === 401) throw new Error('Senha Lavalink incorreta (401).');
     if (res.status >= 400) {
-        throw new Error(res.data?.message || `loadtracks HTTP ${res.status}`);
+        const msg = res.data?.message || res.data?.error || `loadtracks HTTP ${res.status}`;
+        throw new Error(String(msg));
     }
     return res.data;
+}
+
+function extractTracks(data) {
+    if (!data) return { tracks: [], error: 'Resposta vazia do Lavalink' };
+    const loadType = data.loadType;
+    if (loadType === 'track') return { tracks: data.data ? [data.data] : [], error: null };
+    if (loadType === 'search') return { tracks: Array.isArray(data.data) ? data.data : [], error: null };
+    if (loadType === 'playlist') return { tracks: data.data?.tracks || [], error: null };
+    if (loadType === 'empty') return { tracks: [], error: 'Nenhum resultado' };
+    if (loadType === 'error') {
+        const msg =
+            data.data?.message ||
+            data.data?.cause ||
+            data.exception?.message ||
+            'Erro ao buscar faixa';
+        return { tracks: [], error: String(msg) };
+    }
+    if (Array.isArray(data.tracks)) return { tracks: data.tracks, error: null };
+    return { tracks: [], error: `loadType desconhecido: ${loadType}` };
+}
+
+/** Tenta várias fontes — YouTube costuma falhar; SoundCloud como fallback */
+async function loadTracks(query) {
+    const q = String(query || '').trim();
+    if (!q) throw new Error('Busca vazia');
+
+    const attempts = [];
+    if (/^https?:\/\//i.test(q)) {
+        attempts.push(q);
+    } else if (/^(ytsearch|scsearch|spsearch|ytmsearch|amsearch|dzsearch):/i.test(q)) {
+        attempts.push(q);
+    } else {
+        attempts.push(`ytsearch:${q}`);
+        attempts.push(`scsearch:${q}`);
+        attempts.push(`ytsearch:${q} audio`);
+    }
+
+    const errors = [];
+    for (const id of attempts) {
+        try {
+            console.log(`[lavalink] loadtracks: ${id.slice(0, 80)}`);
+            const data = await loadTracksOnce(id);
+            const { tracks, error } = extractTracks(data);
+            if (tracks.length) return { data, tracks };
+            if (error) errors.push(`${id.split(':')[0]}: ${error}`);
+        } catch (e) {
+            errors.push(`${String(id).slice(0, 40)}: ${e.message}`);
+        }
+    }
+
+    const detail = errors.slice(0, 4).join('\n');
+    throw new Error(
+        `Não achei a música.\n${detail}\n\n` +
+            `Dicas:\n` +
+            `• Tente um **link** do YouTube/SoundCloud\n` +
+            `• Use \\'O.tocar scsearch:nome da musica\\'\n` +
+            `• Abra o dashboard do Lavalink no Render (acordar o serviço)`
+    );
 }
 
 function getPlayer(guildId) {
@@ -335,8 +378,8 @@ async function leaveVoice(guildId) {
     });
 }
 
-const voiceServers = new Map(); // guildId -> { token, endpoint }
-const voiceStates = new Map(); // guildId -> session_id
+const voiceServers = new Map();
+const voiceStates = new Map();
 
 async function handleVoicePacket(packet) {
     if (packet.t === 'VOICE_SERVER_UPDATE') {
@@ -468,7 +511,6 @@ function mapTrack(t, requester) {
     };
 }
 
-/** API pública dos comandos */
 async function play(ctx, query) {
     const guild = ctx.guild;
     const member = ctx.member;
@@ -492,21 +534,11 @@ async function play(ctx, query) {
     if (!n?.ready || !n.sessionId) {
         connectNode(activeIdx);
         throw new Error(
-            'Lavalink ainda não conectou. Configure `LAVALINK_NODES` (deploy: Hjgaming/lavalink-server) e aguarde o log de sessão.'
+            'Lavalink ainda não conectou. Configure `LAVALINK_NODES` e aguarde o log de sessão.'
         );
     }
 
-    const data = await loadTracks(query);
-    const loadType = data.loadType;
-    let tracks = [];
-
-    if (loadType === 'track') tracks = [data.data];
-    else if (loadType === 'search') tracks = data.data || [];
-    else if (loadType === 'playlist') tracks = data.data?.tracks || [];
-    else if (loadType === 'error') {
-        throw new Error(data.data?.message || 'Erro ao buscar');
-    }
-
+    const { tracks } = await loadTracks(query);
     if (!tracks.length) throw new Error('Nada encontrado.');
 
     const p = getPlayer(guild.id);
@@ -514,8 +546,6 @@ async function play(ctx, query) {
     p.voiceChannelId = voice.id;
 
     await joinVoice(guild.id, voice.id);
-
-    // espera voice update um pouco
     await new Promise((r) => setTimeout(r, 800));
 
     const mapped = tracks.slice(0, 50).map((t) => mapTrack(t, `${user}`));
