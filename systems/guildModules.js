@@ -410,8 +410,27 @@ async function announceLevel(message, res) {
     try {
         const s = getSettings(message.guild.id).levels;
         if (s?.enabled === false) return null;
-        return null;
-    } catch (_) {
+
+        const gains = Array.isArray(res.attrGains) ? res.attrGains : [];
+        const gainText = gains.length
+            ? gains
+                  .map((g) => `+${g.amount} ${g.label || ATTR_LABEL[g.key] || g.key}`)
+                  .join(' · ')
+            : 'atributos reforçados';
+
+        const items = Array.isArray(res.items) ? res.items : [];
+        const itemText = items.length
+            ? '\n🎁 Item: ' + items.map((i) => `${i.emoji || ''} **${i.name}**`).join(', ')
+            : '';
+
+        const text = `⭐ ${message.author} nível **${res.level}**!\n💪 ${gainText}${itemText}`;
+
+        if (s?.announceChannelId) {
+            const ch = await message.guild.channels.fetch(s.announceChannelId).catch(() => null);
+            if (ch?.isTextBased()) return ch.send(text).catch(() => null);
+        }
+        return message.channel.send(text).catch(() => null);
+    } catch {
         return null;
     }
 }
