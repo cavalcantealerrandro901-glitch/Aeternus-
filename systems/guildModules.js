@@ -4,6 +4,7 @@
 const { EmbedBuilder, ChannelType } = require('discord.js');
 const { getSettings, setSettings } = require('../utils/settings');
 const { ATTR_LABEL } = require('../utils/xp');
+const { parseCountMessage } = require('../utils/countParse');
 
 const stickyCount = new Map();
 const stickyMsgId = new Map();
@@ -43,54 +44,6 @@ function antinukeCheck(guildId, action, max, windowSec) {
     return st.n > (max || 3);
 }
 
-const DIGIT_MAP = {
-    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-    '０': 0, '１': 1, '２': 2, '３': 3, '４': 4, '５': 5, '６': 6, '７': 7, '８': 8, '９': 9,
-    '٠': 0, '١': 1, '٢': 2, '٣': 3, '٤': 4, '٥': 5, '٦': 6, '٧': 7, '٨': 8, '٩': 9,
-    '۰': 0, '۱': 1, '۲': 2, '۳': 3, '۴': 4, '۵': 5, '۶': 6, '۷': 7, '۸': 8, '۹': 9,
-    '०': 0, '१': 1, '२': 2, '३': 3, '४': 4, '५': 5, '६': 6, '७': 7, '८': 8, '९': 9,
-    '০': 0, '১': 1, '২': 2, '৩': 3, '৪': 4, '৫': 5, '৬': 6, '৭': 7, '৮': 8, '৯': 9,
-    '๐': 0, '๑': 1, '๒': 2, '๓': 3, '๔': 4, '๕': 5, '๖': 6, '๗': 7, '๘': 8, '๙': 9,
-    '၀': 0, '၁': 1, '၂': 2, '၃': 3, '၄': 4, '၅': 5, '၆': 6, '၇': 7, '၈': 8, '၉': 9
-};
-
-const WORD_NUMBERS = {
-    zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, três: 3, quatro: 4, cinco: 5,
-    seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13,
-    quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezasseis: 16, dezessete: 17,
-    dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50,
-    sessenta: 60, setenta: 70, oitenta: 80, noventa: 90, cem: 100, cento: 100,
-    one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-    eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
-    seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, hundred: 100,
-    uno: 1, dos: 2, cuatro: 4, siete: 7, ocho: 8, nueve: 9, diez: 10,
-    '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
-    '零': 0
-};
-
-function digitsToInt(str) {
-    let out = '';
-    for (const ch of str) {
-        if (DIGIT_MAP[ch] === undefined) return null;
-        out += String(DIGIT_MAP[ch]);
-    }
-    if (!out.length) return null;
-    const n = Number(out);
-    if (!Number.isSafeInteger(n) || n < 0) return null;
-    return n;
-}
-
-function parseCountMessage(content) {
-    const raw = String(content || '').trim();
-    if (!raw) return null;
-    const asDigits = digitsToInt(raw);
-    if (asDigits !== null) return asDigits;
-    const key = raw.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}]/gu, '');
-    if (WORD_NUMBERS[raw] !== undefined) return WORD_NUMBERS[raw];
-    if (WORD_NUMBERS[key] !== undefined) return WORD_NUMBERS[key];
-    return null;
-}
-
 function getCountState(channelId, settingsCurrent) {
     if (!countRuntime.has(channelId)) {
         countRuntime.set(channelId, {
@@ -127,7 +80,7 @@ async function failCounting(message, ct, state, expected, reason) {
                     .setColor(0xf87171)
                     .setTitle('🔢 Contagem errada')
                     .setDescription(
-                        `${message.author} errou.\n${reason || ''}\nCerto: **${expected}**. Reiniciou em **1**.`
+                        `${message.author} errou.\n${reason || ''}\nEsperado: **${expected}**. A contagem voltou para **1**.`
                     )
             ]
         })
@@ -457,27 +410,8 @@ async function announceLevel(message, res) {
     try {
         const s = getSettings(message.guild.id).levels;
         if (s?.enabled === false) return null;
-
-        const gains = Array.isArray(res.attrGains) ? res.attrGains : [];
-        const gainText = gains.length
-            ? gains
-                  .map((g) => `+${g.amount} ${g.label || ATTR_LABEL[g.key] || g.key}`)
-                  .join(' · ')
-            : 'atributos reforçados';
-
-        const items = Array.isArray(res.items) ? res.items : [];
-        const itemText = items.length
-            ? '\n🎁 Item: ' + items.map((i) => `${i.emoji || ''} **${i.name}**`).join(', ')
-            : '';
-
-        const text = `⭐ ${message.author} nível **${res.level}**!\n💪 ${gainText}${itemText}`;
-
-        if (s?.announceChannelId) {
-            const ch = await message.guild.channels.fetch(s.announceChannelId).catch(() => null);
-            if (ch?.isTextBased()) return ch.send(text).catch(() => null);
-        }
-        return message.channel.send(text).catch(() => null);
-    } catch {
+        return null;
+    } catch (_) {
         return null;
     }
 }
