@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 
 function build(user, member, guild) {
     return new EmbedBuilder()
@@ -23,7 +23,7 @@ function build(user, member, guild) {
                 name: 'Cargos',
                 value:
                     member?.roles.cache
-                        .filter((r) => r.id !== guild.id)
+                        .filter((r) => r.id !== guild?.id)
                         .map((r) => r.toString())
                         .slice(0, 12)
                         .join(' ') || 'Nenhum'
@@ -35,10 +35,22 @@ module.exports = {
     name: 'userinfo',
     aliases: ['whois', 'ui', 'user'],
     description: 'Info do usuário',
+    data: new SlashCommandBuilder()
+        .setName('userinfo')
+        .setDescription('Informações de um usuário')
+        .addUserOption((o) => o.setName('usuario').setDescription('Usuário').setRequired(false)),
 
     async execute(message) {
         const user = message.mentions.users.first() || message.author;
         const member = await message.guild.members.fetch(user.id).catch(() => null);
         await message.reply({ embeds: [build(user, member, message.guild)] });
+    },
+
+    async executeSlash(i) {
+        const user = i.options.getUser('usuario') || i.user;
+        const member = i.guild
+            ? await i.guild.members.fetch(user.id).catch(() => null)
+            : null;
+        await i.reply({ embeds: [build(user, member, i.guild)] });
     }
 };
