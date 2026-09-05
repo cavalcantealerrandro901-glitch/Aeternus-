@@ -2,6 +2,63 @@ const fs = require('fs');
 const path = require('path');
 const { SlashCommandBuilder } = require('discord.js');
 
+const SLASH_NAME_MAP = {
+    addmoney: 'adicionar-eter',
+    removemoney: 'remover-eter',
+    afk: 'ausente',
+    ban: 'banir-membro',
+    kick: 'expulsar-membro',
+    mute: 'silenciar',
+    unmute: 'dessilenciar',
+    unban: 'desbanir',
+    warn: 'advertir',
+    warns: 'advertencias',
+    lock: 'trancar',
+    unlock: 'destrancar',
+    slowmode: 'modo-lento',
+    say: 'enviar-mensagem',
+    saldo: 'ver_saldo',
+    banco: 'ver-banco',
+    depositar: 'depositar-eter',
+    sacar: 'sacar-eter',
+    beg: 'pedir',
+    rob: 'roubar',
+    pay: 'pagar',
+    daily: 'diario',
+    work: 'trabalho',
+    crime: 'cometer-crime',
+    slots: 'caca-niqueis',
+    cara: 'cara-coroa',
+    ppt: 'jokenpo',
+    dado: 'apostar-dado',
+    help: 'ajuda',
+    ping: 'latencia',
+    contagem: 'alterar-contador',
+    limpar: 'limpar-chat',
+    embed: 'criar-embed',
+    painel: 'painel-web',
+    verificar: 'verificacao',
+    msg: 'mensagens',
+    invites: 'convites',
+    ranking: 'ranking-servidor',
+    resgatar: 'resgatar-codigo',
+    calc: 'calculadora',
+    j: 'jogador',
+    lockdown: 'bloqueio',
+    cargo: 'cargo-membro',
+    role: 'alternar-cargo',
+    xp: 'nivel',
+    blackjack: 'blackjack',
+    minas: 'minas',
+    quiz: 'quiz',
+    pvp: 'pvp',
+    rank: 'rank',
+    drop: 'drop',
+    avatar: 'avatar',
+    serverinfo: 'serverinfo',
+    userinfo: 'userinfo'
+};
+
 function sanitizeSlashName(name) {
     return String(name || '')
         .toLowerCase()
@@ -12,7 +69,7 @@ function sanitizeSlashName(name) {
 
 function ensureSlashData(cmd) {
     if (cmd.data) return;
-    const n = sanitizeSlashName(cmd.name);
+    const n = sanitizeSlashName(SLASH_NAME_MAP[cmd.name] || cmd.name);
     if (!n || n.length < 1) return;
 
     try {
