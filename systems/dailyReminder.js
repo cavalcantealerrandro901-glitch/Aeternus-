@@ -1,18 +1,20 @@
 /**
- * Lembrete de daily por DM — 1 aviso por usuário por dia (BRT).
+ * Lembrete de daily por DM — dispara à meia-noite (Brasília), 1x por dia.
  *
  * ENV:
- *   DAILY_REMINDER=off     → desliga
- *   DAILY_REMINDER_HOUR=12 → hora BRT preferencial (0-23), padrão 12
+ *   DAILY_REMINDER=off  → desliga
  */
 const { EmbedBuilder } = require('discord.js');
 const store = require('../utils/store');
 const daily = require('../utils/daily');
 const eter = require('../utils/eter');
 
-const COLOR = 0x22c55e;
-const INTERVAL_MS = 30 * 60 * 1000; // 30 min
-const BATCH_DELAY_MS = 1200; // espaço entre DMs (rate limit)
+const COLOR = 0xa78bfa;
+const CHECK_MS = 60 * 1000; // verifica a cada 1 min
+const BATCH_DELAY_MS = 1200;
+
+/** Evita rodar duas vezes no mesmo minuto de virada */
+let lastRunDay = null;
 
 function reminders() {
     return store.load('daily_reminders.json', {});
@@ -22,19 +24,22 @@ function saveReminders(data) {
     store.save('daily_reminders.json', data);
 }
 
-function hourBRT() {
-    const parts = new Intl.DateTimeFormat('en-US', {
+function nowBRT() {
+    const fmt = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'America/Sao_Paulo',
-        hour: 'numeric',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: false
-    }).formatToParts(new Date());
-    return Number(parts.find((p) => p.type === 'hour')?.value || 0);
-}
-
-function preferredHour() {
-    const h = parseInt(process.env.DAILY_REMINDER_HOUR || '12', 10);
-    if (Number.isNaN(h)) return 12;
-    return Math.max(0, Math.min(23, h));
+    });
+    const parts = Object.fromEntries(fmt.formatToParts(new Date()).map((p) => [p.type, p.value]));
+    return {
+        day: `${parts.year}-${parts.month}-${parts.day}`,
+        hour: Number(parts.hour),
+        minute: Number(parts.minute)
+    };
 }
 
 function isEnabled() {
@@ -42,39 +47,41 @@ function isEnabled() {
     return v !== 'off' && v !== '0' && v !== 'false' && v !== 'no';
 }
 
-/** Usuários que já interagiram com economia / daily */
 function candidateIds() {
     const ids = new Set();
     try {
-        const d = store.load('daily.json', {});
-        for (const id of Object.keys(d || {})) ids.add(id);
+        for (const id of Object.keys(store.load('daily.json', {}) || {})) ids.add(id);
     } catch (_) {}
     try {
-        const e = eter.all ? eter.all() : store.load('eter.json', {});
+        const e = typeof eter.all === 'function' ? eter.all() : store.load('eter.json', {});
         for (const id of Object.keys(e || {})) ids.add(id);
     } catch (_) {}
     try {
-        const x = store.load('xp.json', {});
-        for (const id of Object.keys(x || {})) ids.add(id);
+        for (const id of Object.keys(store.load('xp.json', {}) || {})) ids.add(id);
     } catch (_) {}
     return [...ids].filter((id) => /^\d{16,20}$/.test(id));
 }
 
-function buildEmbed() {
+function buildEmbed(user) {
+    const name = user?.username || 'viajante';
+
     return new EmbedBuilder()
         .setColor(COLOR)
-        .setTitle('Daily disponível')
+        .setTitle('✦ Um novo ciclo começou')
         .setDescription(
             [
-                'Sua **recompensa diária** ainda não foi resgatada hoje.',
+                `Olá, **${name}**.`,
                 '',
-                'Use no servidor:',
-                '`O.daily` ou `/diario`',
+                'A meia-noite abriu a **recompensa diária**.',
+                'Éter fresco, sequência intacta — se você resgatar hoje.',
                 '',
-                'Resgate até meia-noite (Brasília) para manter a sequência.'
+                'No servidor, use:',
+                '**`O.daily`**  ou  **`/diario`**',
+                '',
+                '_Quanto mais dias seguidos, mais a jornada conta._'
             ].join('\n')
         )
-        .setFooter({ text: 'Aeternus · lembrete automático (1x por dia)' });
+        .setFooter({ text: 'Aeternus · só este aviso por dia' });
 }
 
 async function sendOne(client, userId, today) {
@@ -88,22 +95,20 @@ async function sendOne(client, userId, today) {
         const user = await client.users.fetch(userId).catch(() => null);
         if (!user || user.bot) return { ok: false, reason: 'invalid' };
 
-        await user.send({ embeds: [buildEmbed()] });
+        await user.send({ embeds: [buildEmbed(user)] });
 
         map[userId] = today;
-        // limpa registros antigos (> 3 dias)
-        const cutoff = (() => {
-            const d = new Date(today + 'T12:00:00');
-            d.setDate(d.getDate() - 3);
-            return d.toLocaleDateString('en-CA');
-        })();
+
+        // limpa avisos com mais de 4 dias
+        const cut = new Date(today + 'T12:00:00');
+        cut.setDate(cut.getDate() - 4);
+        const cutoff = cut.toLocaleDateString('en-CA');
         for (const [uid, day] of Object.entries(map)) {
-            if (day < cutoff) delete map[uid];
+            if (String(day) < cutoff) delete map[uid];
         }
         saveReminders(map);
         return { ok: true };
     } catch (e) {
-        // DM fechada / bloqueado — marca o dia para não insistir
         const code = e?.code || e?.rawError?.code;
         if (code === 50007 || code === 50001) {
             map[userId] = today;
@@ -114,32 +119,34 @@ async function sendOne(client, userId, today) {
     }
 }
 
-async function runPass(client) {
+async function runMidnightPass(client) {
     if (!isEnabled()) return;
-    if (!client?.isReady?.() && !client?.user) return;
+    if (!client?.user) return;
 
-    const hour = hourBRT();
-    const prefer = preferredHour();
-    // só dispara a partir da hora configurada até 22h BRT
-    if (hour < prefer || hour >= 23) return;
+    const { day, hour, minute } = nowBRT();
 
-    const today = daily.todayKey();
+    // Janela: 00:00–00:04 BRT (várias tentativas se o bot reiniciar)
+    if (hour !== 0 || minute > 4) return;
+    if (lastRunDay === day) return;
+
+    lastRunDay = day;
+    console.log(`[dailyReminder] meia-noite BRT · ${day} · enviando DMs…`);
+
     const ids = candidateIds();
-    if (!ids.length) return;
-
     let sent = 0;
     let skipped = 0;
 
     for (const id of ids) {
-        const r = await sendOne(client, id, today);
-        if (r.ok) sent++;
-        else skipped++;
-        if (r.ok) await new Promise((res) => setTimeout(res, BATCH_DELAY_MS));
+        const r = await sendOne(client, id, day);
+        if (r.ok) {
+            sent++;
+            await new Promise((res) => setTimeout(res, BATCH_DELAY_MS));
+        } else {
+            skipped++;
+        }
     }
 
-    if (sent > 0) {
-        console.log(`[dailyReminder] ${sent} DM(s) enviada(s) · ${skipped} ignorado(s) · ${today}`);
-    }
+    console.log(`[dailyReminder] concluído · ${sent} enviada(s) · ${skipped} ignorado(s)`);
 }
 
 function setup(client) {
@@ -148,24 +155,22 @@ function setup(client) {
         return;
     }
 
-    const start = () => {
-        runPass(client).catch((e) => console.error('[dailyReminder]', e.message));
-        setInterval(() => {
-            runPass(client).catch((e) => console.error('[dailyReminder]', e.message));
-        }, INTERVAL_MS);
+    const tick = () => {
+        runMidnightPass(client).catch((e) => console.error('[dailyReminder]', e.message));
     };
 
-    if (client.isReady?.() || client.user) {
-        // pequena espera após boot
-        setTimeout(start, 20_000);
-    } else {
-        client.once('clientReady', () => setTimeout(start, 20_000));
-        client.once('ready', () => setTimeout(start, 20_000));
+    const start = () => {
+        tick();
+        setInterval(tick, CHECK_MS);
+    };
+
+    if (client.user) setTimeout(start, 15_000);
+    else {
+        client.once('clientReady', () => setTimeout(start, 15_000));
+        client.once('ready', () => setTimeout(start, 15_000));
     }
 
-    console.log(
-        `[dailyReminder] ativo · a partir das ${preferredHour()}h BRT · intervalo 30min`
-    );
+    console.log('[dailyReminder] ativo · disparo à meia-noite (Brasília)');
 }
 
-module.exports = { setup, runPass };
+module.exports = { setup, runMidnightPass };
