@@ -27,16 +27,16 @@ const EMOJI_POOL = [
 
 const OPEN_PHRASES = [
     'Escolha seu emoji. O destino escolhe o resto.',
-    'Uma arena aberta \u2014 entre quem quiser arriscar.',
-    'Poucos emojis. Um vencedor. Sessenta segundos de tens\u00e3o.',
-    'A sorte n\u00e3o avisa. S\u00f3 marca quem fica de p\u00e9.'
+    'Uma arena aberta — entre quem quiser arriscar.',
+    'Poucos emojis. Um vencedor. Sessenta segundos de tensão.',
+    'A sorte não avisa. Só marca quem fica de pé.'
 ];
 
 const RUN_PHRASES = [
-    'Os emojis est\u00e3o em jogo. Ningu\u00e9m sai at\u00e9 o fim.',
-    'O rel\u00f3gio corre. O vencedor ainda n\u00e3o tem nome.',
-    'Sessenta segundos. Um ser\u00e1 escolhido.',
-    'A arena fechou as portas. S\u00f3 resta esperar.'
+    'Os emojis estão em jogo. Ninguém sai até o fim.',
+    'O relógio corre. O vencedor ainda não tem nome.',
+    'Sessenta segundos. Um será escolhido.',
+    'A arena fechou as portas. Só resta esperar.'
 ];
 
 function fmt(n) {
@@ -53,29 +53,48 @@ function randomEmoji(used) {
     return pick(pool);
 }
 
+/**
+ * Sintaxe:
+ *   O.emojibet              → diversão, até 50
+ *   O.emojibet 5            → diversão, até 5
+ *   O.emojibet 1k           → aposta 1k, até 50
+ *   O.emojibet 10 1k        → aposta 1k, até 10 pessoas
+ */
 function parseMode(args) {
-    const a0 = String(args?.[0] || '').toLowerCase().trim();
-    const a1 = String(args?.[1] || '').trim();
-
-    let fun = false;
+    const list = (args || []).map((a) => String(a).trim()).filter(Boolean);
+    let fun = true;
     let amountRaw = null;
     let maxPlayers = MAX_PLAYERS;
 
-    if (!a0 || ['fun', 'diversao', 'divers\u00e3o', 'brincadeira', 'free', 'gratis', 'gr\u00e1tis'].includes(a0)) {
-        fun = true;
-    } else if (/^\d{1,2}$/.test(a0) && Number(a0) >= MIN_PLAYERS && Number(a0) <= MAX_PLAYERS && !args?.[1]) {
-        fun = true;
-        maxPlayers = Number(a0);
-    } else {
-        amountRaw = a0;
+    if (list.length === 0) {
+        return { fun: true, amountRaw: null, maxPlayers: MAX_PLAYERS };
     }
 
-    if (a1 && /^\d{1,2}$/.test(a1)) {
-        const n = Number(a1);
+    if (list.length === 1) {
+        const a = list[0].toLowerCase();
+        if (/^\d{1,2}$/.test(a)) {
+            const n = Number(a);
+            if (n >= MIN_PLAYERS && n <= MAX_PLAYERS) {
+                return { fun: true, amountRaw: null, maxPlayers: n };
+            }
+        }
+        if (['fun', 'diversao', 'diversão', 'brincadeira', 'free', 'gratis', 'grátis'].includes(a)) {
+            return { fun: true, amountRaw: null, maxPlayers: MAX_PLAYERS };
+        }
+        // valor de aposta
+        return { fun: false, amountRaw: list[0], maxPlayers: MAX_PLAYERS };
+    }
+
+    // 2+ args: primeiro = quantidade de pessoas, segundo = valor
+    const pRaw = list[0];
+    const vRaw = list[1];
+    if (/^\d{1,2}$/.test(pRaw)) {
+        const n = Number(pRaw);
         if (n >= MIN_PLAYERS && n <= MAX_PLAYERS) maxPlayers = n;
     }
-
-    return { fun, amountRaw, amount: 0, maxPlayers };
+    fun = false;
+    amountRaw = vRaw;
+    return { fun, amountRaw, maxPlayers };
 }
 
 function listPlayers(session) {
@@ -91,30 +110,34 @@ function buildEmbed(session, phase) {
         lines.push(pick(OPEN_PHRASES));
         lines.push('');
         if (session.fun) {
-            lines.push('**Modo:** divers\u00e3o \u00b7 sem aposta');
+            lines.push('**Modo:** diversão · sem aposta');
         } else {
-            lines.push(`**Aposta:** \u2728 **${fmt(session.amount)}** por pessoa`);
-            lines.push(`**Potencial:** \u2728 **${fmt(session.amount * Math.max(players.length, 1))}**`);
+            lines.push(`**Aposta:** ✨ **${fmt(session.amount)}** por pessoa`);
+            lines.push(`**Potencial:** ✨ **${fmt(session.amount * Math.max(players.length, 1))}**`);
         }
-        lines.push(`**Jogadores:** ${players.length}/${cap} \u00b7 m\u00ednimo **${MIN_PLAYERS}**`);
+        lines.push(`**Vagas:** ${players.length}/${cap} · mínimo **${MIN_PLAYERS}**`);
         lines.push('');
         if (!players.length) {
-            lines.push('_Ningu\u00e9m entrou ainda. Seja o primeiro._');
+            lines.push('_Ninguém entrou ainda. Seja o primeiro._');
         } else {
             for (const p of players) {
                 lines.push(`${p.emoji}  **${p.tag}**`);
             }
         }
         lines.push('');
-        lines.push('_Participar \u00b7 depois Iniciar \u00b7 60s de disputa._');
+        lines.push(
+            players.length >= cap
+                ? '_Mesa cheia — a batalha começa agora._'
+                : '_Participar · Iniciar · ao encher as vagas, começa sozinho._'
+        );
     } else if (phase === 'running') {
         lines.push(pick(RUN_PHRASES));
         lines.push('');
         lines.push(`**Tempo:** ~${Math.max(1, Math.ceil((session.endsAt - Date.now()) / 1000))}s`);
         if (!session.fun) {
-            lines.push(`**Po\u00e7o:** \u2728 **${fmt(session.amount * players.length)}**`);
+            lines.push(`**Poço:** ✨ **${fmt(session.amount * players.length)}**`);
         } else {
-            lines.push('**Modo:** divers\u00e3o');
+            lines.push('**Modo:** diversão');
         }
         lines.push('');
         for (const p of players) {
@@ -125,9 +148,7 @@ function buildEmbed(session, phase) {
         const winner = ordered[0];
         lines.push(pick(['A sorte falou.', 'Um emoji sobrou no topo.', 'Fim da rodada.']));
         lines.push('');
-        if (winner) {
-            lines.push(`**1.** ${winner.emoji}  **${winner.tag}**`);
-        }
+        if (winner) lines.push(`**1.** ${winner.emoji}  **${winner.tag}**`);
         for (let i = 1; i < ordered.length; i++) {
             const p = ordered[i];
             lines.push(`**${i + 1}.** ${p.emoji}  **${p.tag}**`);
@@ -136,10 +157,10 @@ function buildEmbed(session, phase) {
 
     const title =
         phase === 'result'
-            ? '\ud83c\udfb2 EmojiBet \u00b7 Resultado'
+            ? '🎲 EmojiBet · Resultado'
             : phase === 'running'
-              ? '\ud83c\udfb2 EmojiBet \u00b7 Em jogo'
-              : '\ud83c\udfb2 EmojiBet';
+              ? '🎲 EmojiBet · Em jogo'
+              : '🎲 EmojiBet';
 
     const color =
         phase === 'result' ? 0xfbbf24 : phase === 'running' ? 0x38bdf8 : 0xa78bfa;
@@ -150,8 +171,8 @@ function buildEmbed(session, phase) {
         .setDescription(lines.join('\n'))
         .setFooter({
             text: session.fun
-                ? `Host: ${session.hostTag} \u00b7 divers\u00e3o`
-                : `Host: ${session.hostTag} \u00b7 \u2728 ${fmt(session.amount)}`
+                ? `Host: ${session.hostTag} · diversão · até ${session.maxPlayers}`
+                : `Host: ${session.hostTag} · ✨ ${fmt(session.amount)} · até ${session.maxPlayers}`
         });
 }
 
@@ -197,7 +218,7 @@ async function finish(client, sessionId) {
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x64748b)
-                            .setTitle('\ud83c\udfb2 EmojiBet cancelado')
+                            .setTitle('🎲 EmojiBet cancelado')
                             .setDescription('Poucos jogadores. Aposta devolvida (se houver).')
                     ],
                     components: []
@@ -237,17 +258,16 @@ async function finish(client, sessionId) {
         let text;
         if (session.fun) {
             text = [
-                `${winner.emoji} <@${winner.id}> saiu ganhando \u2014 **uma partida valendo nada**.`,
-                losers.length ? `${loserMentions} sa\u00edram de m\u00e3os abanando.` : null
+                `${winner.emoji} <@${winner.id}> saiu ganhando — **uma partida valendo nada**.`,
+                losers.length ? `${loserMentions} saíram de mãos abanando.` : null
             ]
                 .filter(Boolean)
                 .join('\n');
         } else {
-            // emoji do ganhador = o que ele "tirou" na arena contra os outros
             text = [
-                `${winner.emoji} <@${winner.id}> ficou com o emoji da vit\u00f3ria e levou \u2728 **${fmt(pot)}**.`,
+                `${winner.emoji} <@${winner.id}> ficou com o emoji da vitória e levou ✨ **${fmt(pot)}**.`,
                 losers.length
-                    ? `${loserMentions} perderam \u2728 **${fmt(session.amount)}** cada.`
+                    ? `${loserMentions} perderam ✨ **${fmt(session.amount)}** cada.`
                     : null
             ]
                 .filter(Boolean)
@@ -262,31 +282,52 @@ async function finish(client, sessionId) {
     sessions.delete(sessionId);
 }
 
-async function startGame(interaction, session) {
+/** Inicia a rodada (botão ou auto ao encher) */
+async function beginRound(client, session, interaction = null) {
     if (session.phase !== 'lobby') {
-        return interaction.reply({ content: 'Esta rodada j\u00e1 come\u00e7ou ou terminou.', ephemeral: true });
+        if (interaction) {
+            return interaction.reply({
+                content: 'Esta rodada já começou ou terminou.',
+                ephemeral: true
+            });
+        }
+        return;
     }
-    if (interaction.user.id !== session.hostId) {
-        return interaction.reply({
-            content: 'S\u00f3 quem abriu a mesa pode iniciar.',
-            ephemeral: true
-        });
-    }
+
     const players = listPlayers(session);
     if (players.length < MIN_PLAYERS) {
-        return interaction.reply({
-            content: `Precisa de pelo menos **${MIN_PLAYERS}** jogadores.`,
-            ephemeral: true
-        });
+        if (interaction) {
+            return interaction.reply({
+                content: `Precisa de pelo menos **${MIN_PLAYERS}** jogadores.`,
+                ephemeral: true
+            });
+        }
+        return;
     }
 
     session.phase = 'running';
     session.endsAt = Date.now() + DURATION_MS;
 
-    await interaction.update({
+    const payload = {
         embeds: [buildEmbed(session, 'running')],
         components: [lobbyRow(session.id, true)]
-    });
+    };
+
+    try {
+        if (interaction && !interaction.replied && !interaction.deferred) {
+            await interaction.update(payload);
+        } else {
+            const ch = await client.channels.fetch(session.channelId).catch(() => null);
+            const msg = ch ? await ch.messages.fetch(session.messageId).catch(() => null) : null;
+            if (msg) await msg.edit(payload);
+        }
+    } catch (_) {
+        try {
+            const ch = await client.channels.fetch(session.channelId).catch(() => null);
+            const msg = ch ? await ch.messages.fetch(session.messageId).catch(() => null) : null;
+            if (msg) await msg.edit(payload);
+        } catch (_) {}
+    }
 
     const iv = setInterval(async () => {
         const s = sessions.get(session.id);
@@ -295,23 +336,26 @@ async function startGame(interaction, session) {
             return;
         }
         try {
-            const ch = await interaction.client.channels.fetch(s.channelId).catch(() => null);
+            const ch = await client.channels.fetch(s.channelId).catch(() => null);
             const msg = ch ? await ch.messages.fetch(s.messageId).catch(() => null) : null;
             if (msg) {
-                await msg.edit({ embeds: [buildEmbed(s, 'running')], components: [lobbyRow(s.id, true)] });
+                await msg.edit({
+                    embeds: [buildEmbed(s, 'running')],
+                    components: [lobbyRow(s.id, true)]
+                });
             }
         } catch (_) {}
     }, 10_000);
 
     setTimeout(() => {
         clearInterval(iv);
-        finish(interaction.client, session.id);
+        finish(client, session.id);
     }, DURATION_MS);
 }
 
 async function createSession(user, channel, mode) {
     let amount = 0;
-    let fun = !!mode.fun;
+    const fun = !!mode.fun;
     const maxPlayers = Math.min(
         MAX_PLAYERS,
         Math.max(MIN_PLAYERS, Number(mode.maxPlayers) || MAX_PLAYERS)
@@ -319,10 +363,10 @@ async function createSession(user, channel, mode) {
 
     if (!fun) {
         const bal = eter.get(user.id);
-        const bet = resolveBet(mode.amountRaw, bal, { label: '\u2728' });
+        const bet = resolveBet(mode.amountRaw, bal, { label: '✨' });
         if (!bet.ok) return { ok: false, error: bet.error };
         amount = bet.amount;
-        if (amount < 1) return { ok: false, error: 'Aposta inv\u00e1lida.' };
+        if (amount < 1) return { ok: false, error: 'Aposta inválida.' };
     }
 
     const sessionId = `${channel.id}_${Date.now().toString(36)}`;
@@ -372,46 +416,55 @@ async function createSession(user, channel, mode) {
 module.exports = {
     name: 'emojibet',
     aliases: ['emoji', 'emojijogo', 'eb'],
-    description: 'Batalha de emojis \u2014 aposta ou divers\u00e3o',
+    description: 'Batalha de emojis — aposta ou diversão',
     data: new SlashCommandBuilder()
         .setName('emojibet')
-        .setDescription('Batalha de emojis (aposta ou divers\u00e3o)')
-        .addStringOption((o) =>
-            o
-                .setName('valor')
-                .setDescription('Aposta em \u00e9ter, ou "fun" para divers\u00e3o')
-                .setRequired(false)
-        )
+        .setDescription('Batalha de emojis (aposta ou diversão)')
         .addIntegerOption((o) =>
             o
-                .setName('jogadores')
-                .setDescription('M\u00e1ximo de jogadores (2\u201350, padr\u00e3o 50)')
+                .setName('pessoas')
+                .setDescription('Quantidade máxima de jogadores (2–50)')
                 .setRequired(false)
                 .setMinValue(2)
                 .setMaxValue(50)
+        )
+        .addStringOption((o) =>
+            o
+                .setName('valor')
+                .setDescription('Aposta em éter (omitir = diversão)')
+                .setRequired(false)
         ),
 
     async execute(message, args) {
         const mode = parseMode(args || []);
-        if (!args?.length) mode.fun = true;
-
         const created = await createSession(message.author, message.channel, mode);
-        if (!created.ok) return message.reply(`\u274c ${created.error}`);
+        if (!created.ok) return message.reply(`❌ ${created.error}`);
 
         const sent = await message.reply(created.payload);
         created.session.messageId = sent.id;
+
+        // se o host sozinho já preenche o limite (só se max=1, impossível) — não
+        // se maxPlayers === 1 não existe; host precisa de mais gente
     },
 
     async executeSlash(i) {
+        const pessoas = i.options.getInteger('pessoas');
         const valor = i.options.getString('valor');
-        const jog = i.options.getInteger('jogadores');
-        const mode = parseMode(valor ? [valor] : []);
-        if (!valor) mode.fun = true;
-        if (jog != null) mode.maxPlayers = jog;
+
+        let mode;
+        if (pessoas != null && valor) {
+            mode = { fun: false, amountRaw: valor, maxPlayers: pessoas };
+        } else if (valor && pessoas == null) {
+            mode = { fun: false, amountRaw: valor, maxPlayers: MAX_PLAYERS };
+        } else if (pessoas != null && !valor) {
+            mode = { fun: true, amountRaw: null, maxPlayers: pessoas };
+        } else {
+            mode = { fun: true, amountRaw: null, maxPlayers: MAX_PLAYERS };
+        }
 
         const created = await createSession(i.user, i.channel, mode);
         if (!created.ok) {
-            return i.reply({ content: `\u274c ${created.error}`, ephemeral: true });
+            return i.reply({ content: `❌ ${created.error}`, ephemeral: true });
         }
 
         await i.reply(created.payload);
@@ -437,12 +490,14 @@ module.exports = {
 
         if (action === 'join') {
             if (session.phase !== 'lobby') {
-                return interaction.reply({ content: 'As entradas est\u00e3o fechadas.', ephemeral: true });
+                return interaction.reply({ content: 'As entradas estão fechadas.', ephemeral: true });
             }
             if (session.players.has(interaction.user.id)) {
-                return interaction.reply({ content: 'Voc\u00ea j\u00e1 est\u00e1 na mesa.', ephemeral: true });
+                return interaction.reply({ content: 'Você já está na mesa.', ephemeral: true });
             }
-            if (session.players.size >= (session.maxPlayers || MAX_PLAYERS)) {
+
+            const cap = session.maxPlayers || MAX_PLAYERS;
+            if (session.players.size >= cap) {
                 return interaction.reply({ content: 'Mesa cheia.', ephemeral: true });
             }
 
@@ -450,7 +505,7 @@ module.exports = {
                 const bal = eter.get(interaction.user.id);
                 if (bal < session.amount) {
                     return interaction.reply({
-                        content: `Saldo insuficiente. Precisa de \u2728 **${fmt(session.amount)}**.`,
+                        content: `Saldo insuficiente. Precisa de ✨ **${fmt(session.amount)}**.`,
                         ephemeral: true
                     });
                 }
@@ -466,6 +521,15 @@ module.exports = {
                 paid: !session.fun
             });
 
+            // Mesa cheia → começa na hora
+            if (session.players.size >= cap) {
+                await interaction.update({
+                    embeds: [buildEmbed(session, 'lobby')],
+                    components: [lobbyRow(sessionId, true)]
+                }).catch(() => {});
+                return beginRound(interaction.client, session, null);
+            }
+
             return interaction.update({
                 embeds: [buildEmbed(session, 'lobby')],
                 components: [lobbyRow(sessionId, false)]
@@ -473,7 +537,13 @@ module.exports = {
         }
 
         if (action === 'start') {
-            return startGame(interaction, session);
+            if (interaction.user.id !== session.hostId) {
+                return interaction.reply({
+                    content: 'Só quem abriu a mesa pode iniciar.',
+                    ephemeral: true
+                });
+            }
+            return beginRound(interaction.client, session, interaction);
         }
     }
 };
