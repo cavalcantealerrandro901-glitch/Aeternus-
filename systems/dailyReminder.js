@@ -1,19 +1,17 @@
 /**
- * Lembrete de daily por DM — dispara à meia-noite (Brasília), 1x por dia.
+ * Lembrete de daily por DM — meia-noite (Brasília), 1x por dia.
+ * Mensagens personalizadas por nome, sequência, nível e saldo.
  *
- * ENV:
- *   DAILY_REMINDER=off  → desliga
+ * ENV: DAILY_REMINDER=off para desligar
  */
 const { EmbedBuilder } = require('discord.js');
 const store = require('../utils/store');
 const daily = require('../utils/daily');
 const eter = require('../utils/eter');
 
-const COLOR = 0xa78bfa;
-const CHECK_MS = 60 * 1000; // verifica a cada 1 min
+const CHECK_MS = 60 * 1000;
 const BATCH_DELAY_MS = 1200;
 
-/** Evita rodar duas vezes no mesmo minuto de virada */
 let lastRunDay = null;
 
 function reminders() {
@@ -62,26 +60,175 @@ function candidateIds() {
     return [...ids].filter((id) => /^\d{16,20}$/.test(id));
 }
 
-function buildEmbed(user) {
-    const name = user?.username || 'viajante';
+function fmt(n) {
+    if (typeof eter.formatPlain === 'function') return eter.formatPlain(n);
+    return Number(n || 0).toLocaleString('pt-BR');
+}
 
-    return new EmbedBuilder()
-        .setColor(COLOR)
-        .setTitle('✦ Um novo ciclo começou')
-        .setDescription(
+function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * Monta embed personalizado com base no perfil do usuário.
+ */
+function buildEmbed(user, st) {
+    const name = user?.username || 'viajante';
+    const streak = Number(st.nextStreak || st.streak || 0);
+    const level = Number(st.level || 0);
+    const bal = Number(st.balance || 0);
+    const min = st.dailyMin ?? 5000;
+    const max = st.dailyMax ?? 50000;
+    const mult = Number(st.multiplier || 1);
+
+    let color = 0xa78bfa;
+    let title;
+    let body;
+
+    // --- variantes por situação ---
+    if (streak >= 30) {
+        color = 0xfbbf24;
+        title = pick([
+            '👑 Lenda da sequência',
+            '✦ Trinta dias e além',
+            '🌟 Constância rara'
+        ]);
+        body = pick([
+            [
+                `**${name}**, sua marca é difícil de ignorar.`,
+                `Hoje a sequência pode chegar a **${streak} dias**.`,
+                '',
+                'O éter de hoje espera por quem não quebra o ritmo.',
+                `Faixa estimada: ✨ **${fmt(min)} – ${fmt(max)}**` +
+                    (mult > 1 ? ` · bônus ×${mult.toFixed(2)}` : '') +
+                    '.',
+                '',
+                'Resgate agora: **`O.daily`** ou **`/diario`**'
+            ].join('\n'),
+            [
+                `A madrugada reconhece **${name}**.`,
+                `**${streak} dias** de caminho — continue.',
+                '',
+                'Um único resgate mantém tudo o que você construiu.',
+                '',
+                '→ **`O.daily`**  ·  **`/diario`**'
+            ].join('\n')
+        ]);
+    } else if (streak >= 7) {
+        color = 0x34d399;
+        title = pick([
+            '🔥 Semana em chamas',
+            '✦ Sequência firme',
+            '💪 Ritmo conquistado'
+        ]);
+        body = pick([
+            [
+                `**${name}**, você já segura **${Math.max(streak - 1, 1)}+ dias** seguidos.`,
+                `Hoje pode ser o dia **${streak}**.`,
+                '',
+                'Não deixe a meia-noite passar em branco.',
+                `Recompensa na faixa ✨ **${fmt(min)} – ${fmt(max)}**.`,
+                '',
+                '**`O.daily`** ou **`/diario`** — e a sequência segue.'
+            ].join('\n'),
+            [
+                `Bom recomeço de ciclo, **${name}**.`,
+                `Sua sequência está viva. O próximo passo é **${streak}**.`,
+                '',
+                'Resgate em segundos e siga o dia mais leve.',
+                '',
+                '→ **`/diario`**'
+            ].join('\n')
+        ]);
+    } else if (streak <= 1 && !st.last) {
+        color = 0x60a5fa;
+        title = pick(['✨ Primeiro passo', '🌕 Novo no éter', '✦ Comece aqui']);
+        body = pick([
             [
                 `Olá, **${name}**.`,
                 '',
-                'A meia-noite abriu a **recompensa diária**.',
-                'Éter fresco, sequência intacta — se você resgatar hoje.',
+                'Todo dia o Aeternus libera uma recompensa só sua.',
+                `Hoje, algo entre ✨ **${fmt(min)}** e **${fmt(max)}** pode ser seu.`,
                 '',
-                'No servidor, use:',
-                '**`O.daily`**  ou  **`/diario`**',
+                'É rápido — e abre a sua sequência.',
                 '',
-                '_Quanto mais dias seguidos, mais a jornada conta._'
+                'Use **`O.daily`** ou **`/diario`** no servidor.'
+            ].join('\n'),
+            [
+                `**${name}**, a porta do daily acabou de abrir.`,
+                '',
+                'Sem compromisso com o passado — só o primeiro resgate.',
+                'Depois, cada dia conta.',
+                '',
+                '→ **`O.daily`**'
             ].join('\n')
-        )
-        .setFooter({ text: 'Aeternus · só este aviso por dia' });
+        ]);
+    } else if (streak <= 1) {
+        // quebrou sequência ou voltando
+        color = 0xf472b6;
+        title = pick(['🔄 De volta ao ciclo', '✦ Recomeço', '🌓 Outra chance']);
+        body = pick([
+            [
+                `**${name}**, um novo dia limpa a contagem — e reabre o prêmio.`,
+                '',
+                'Resgatar hoje é recomeçar a sequência do zero, com éter na conta.',
+                `Faixa: ✨ **${fmt(min)} – ${fmt(max)}**.`,
+                '',
+                '**`O.daily`** · **`/diario`**'
+            ].join('\n'),
+            [
+                `A meia-noite não pergunta o que ficou para trás, **${name}**.`,
+                'Só oferecee o que você faz agora.',
+                '',
+                'Colete o daily e comece de novo.',
+                '',
+                '→ **`/diario`**'
+            ].join('\n')
+        ]);
+    } else {
+        // 2–6 dias
+        color = 0xa78bfa;
+        title = pick([
+            '✦ Um novo ciclo começou',
+            '🌑 Daily à espera',
+            '✨ Éter da madrugada'
+        ]);
+        body = pick([
+            [
+                `Olá, **${name}**.`,
+                '',
+                `Sua sequência está em **${Math.max(streak - 1, 1)} dia(s)**.`,
+                `Resgate hoje e avance para **${streak}**.`,
+                '',
+                `Estimativa: ✨ **${fmt(min)} – ${fmt(max)}**` +
+                    (mult > 1 ? ` (bônus ×${mult.toFixed(2)})` : '') +
+                    '.',
+                '',
+                '**`O.daily`** ou **`/diario`**'
+            ].join('\n'),
+            [
+                `**${name}**, a recompensa diária abriu com a meia-noite.`,
+                '',
+                level > 0 ? `Nível **${level}** · saldo **✨ ${fmt(bal)}**.` : `Saldo atual: **✨ ${fmt(bal)}**.`,
+                'Um comando é o bastante para garantir o dia.',
+                '',
+                '→ **`O.daily`**  ·  **`/diario`**'
+            ].join('\n'),
+            [
+                `Madrugada quieta, **${name}** — e o daily já é seu se quiser.`,
+                '',
+                `Sequência à vista: **${streak}**. Não quebre o fio.`,
+                '',
+                'Resgate: **`/diario`**'
+            ].join('\n')
+        ]);
+    }
+
+    return new EmbedBuilder()
+        .setColor(color)
+        .setTitle(title)
+        .setDescription(body)
+        .setFooter({ text: 'Aeternus · aviso único à meia-noite' });
 }
 
 async function sendOne(client, userId, today) {
@@ -95,11 +242,9 @@ async function sendOne(client, userId, today) {
         const user = await client.users.fetch(userId).catch(() => null);
         if (!user || user.bot) return { ok: false, reason: 'invalid' };
 
-        await user.send({ embeds: [buildEmbed(user)] });
+        await user.send({ embeds: [buildEmbed(user, st)] });
 
         map[userId] = today;
-
-        // limpa avisos com mais de 4 dias
         const cut = new Date(today + 'T12:00:00');
         cut.setDate(cut.getDate() - 4);
         const cutoff = cut.toLocaleDateString('en-CA');
@@ -124,13 +269,11 @@ async function runMidnightPass(client) {
     if (!client?.user) return;
 
     const { day, hour, minute } = nowBRT();
-
-    // Janela: 00:00–00:04 BRT (várias tentativas se o bot reiniciar)
     if (hour !== 0 || minute > 4) return;
     if (lastRunDay === day) return;
 
     lastRunDay = day;
-    console.log(`[dailyReminder] meia-noite BRT · ${day} · enviando DMs…`);
+    console.log(`[dailyReminder] meia-noite BRT · ${day} · DMs personalizadas…`);
 
     const ids = candidateIds();
     let sent = 0;
@@ -141,12 +284,10 @@ async function runMidnightPass(client) {
         if (r.ok) {
             sent++;
             await new Promise((res) => setTimeout(res, BATCH_DELAY_MS));
-        } else {
-            skipped++;
-        }
+        } else skipped++;
     }
 
-    console.log(`[dailyReminder] concluído · ${sent} enviada(s) · ${skipped} ignorado(s)`);
+    console.log(`[dailyReminder] ok · ${sent} enviada(s) · ${skipped} ignorado(s)`);
 }
 
 function setup(client) {
@@ -170,7 +311,7 @@ function setup(client) {
         client.once('ready', () => setTimeout(start, 15_000));
     }
 
-    console.log('[dailyReminder] ativo · disparo à meia-noite (Brasília)');
+    console.log('[dailyReminder] ativo · meia-noite BRT · mensagens personalizadas');
 }
 
 module.exports = { setup, runMidnightPass };
