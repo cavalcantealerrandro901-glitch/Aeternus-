@@ -15,11 +15,14 @@ const MAX_BOMBS = 11;
 const HOUSE = 0.97; // casa do bot
 const IDLE_MS = 7 * 60 * 1000;
 
-/** Imagens de resultado: sacar (ganhou) / bomba (perdeu) */
-const IMG_WIN =
-    'https://image.pollinations.ai/prompt/victory%20cash%20out%20mines%20game%20green%20gems%20gold%20coins%20celebration%20glow%20discord%20banner?width=960&height=540&nologo=true&seed=77001&model=flux';
-const IMG_LOSE =
-    'https://image.pollinations.ai/prompt/minesweeper%20bomb%20explosion%20red%20loss%20dark%20game%20over%20discord%20banner?width=960&height=540&nologo=true&seed=77002&model=flux';
+/** Imagens próprias (Render env) — thumbnail canto superior direito */
+function minesResultThumb(kind) {
+    const win = String(process.env.MINES_IMG_WIN || process.env.MINES_WIN_IMAGE || '').trim();
+    const lose = String(process.env.MINES_IMG_LOSE || process.env.MINES_LOSE_IMAGE || '').trim();
+    const url = kind === 'win' ? win : lose;
+    if (!url || !/^https?:\/\//i.test(url)) return null;
+    return url.slice(0, 512);
+}
 
 const games = new Map();
 
@@ -27,11 +30,6 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-/**
- * Multiplicador progressivo estilo Mines:
- * - Cada gema (casa segura) multiplica pelo risco restante
- * - Mais bombas ⇒ menos casas seguras ⇒ multi sobe mais rápido
- */
 function multAt(opened, bombs) {
     if (opened <= 0) return 1;
     let m = 1;
@@ -196,10 +194,13 @@ function panelEmbed(game, extra) {
         .setTitle('💎  Mines · 4×4')
         .setDescription(lines.join('\n'));
 
+    // Thumbnail no canto superior direito (links nas env do Render)
     if (game.cashed && !game.fun) {
-        emb.setImage(IMG_WIN);
+        const u = minesResultThumb('win');
+        if (u) emb.setThumbnail(u);
     } else if (game.dead) {
-        emb.setImage(IMG_LOSE);
+        const u = minesResultThumb('lose');
+        if (u) emb.setThumbnail(u);
     }
 
     return emb;
