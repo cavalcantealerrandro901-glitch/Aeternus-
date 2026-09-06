@@ -4,12 +4,11 @@ FROM node:20-bookworm-slim
 ENV NODE_ENV=production \
     DEBIAN_FRONTEND=noninteractive \
     FFMPEG_PATH=/usr/bin/ffmpeg \
-    YTDLP_PATH=/usr/local/bin/yt-dlp \
-    YTDLP_NO_DOWNLOAD=1
+    YTDLP_PATH=/usr/local/bin/yt-dlp
 
 WORKDIR /app
 
-# Sistema: FFmpeg, Python, certs, libs nativas
+# Sistema: FFmpeg, Python (com `python` no PATH), certs, build nativo
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
@@ -24,14 +23,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     automake \
     pkg-config \
     libsodium-dev \
+  && ln -sf /usr/bin/python3 /usr/bin/python \
   && rm -rf /var/lib/apt/lists/*
 
-# yt-dlp (binário oficial)
+# yt-dlp oficial (não usa o pacote npm yt-dlp-exec)
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
       -o /usr/local/bin/yt-dlp \
   && chmod a+rx /usr/local/bin/yt-dlp \
   && yt-dlp --version \
-  && ffmpeg -version | head -1
+  && ffmpeg -version | head -1 \
+  && python --version
 
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev && npm cache clean --force
