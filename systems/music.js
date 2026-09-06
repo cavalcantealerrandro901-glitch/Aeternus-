@@ -1,324 +1,66 @@
 /**
- * Cliente Lavalink v4 multi-node (compatível com Hjgaming/lavalink-server)
+ * Musica sem Lavalink - @discordjs/voice + YouTube
  *
  * ENV:
- *   LAVALINK_NODES=host1:443:senha:secure,host2:2333:senha:insecure
- *   ou
- *   LAVALINK_HOST + LAVALINK_PORT + LAVALINK_PASSWORD + LAVALINK_SECURE
- *
- * Deploy o servidor: https://github.com/Hjgaming/lavalink-server
- * Senha padrão do repo: arbotixop007
+ *   YOUTUBE_API_KEY=...   (YouTube Data API v3 - busca oficial)
+ *   Sem a key: busca via yt-dlp (ytsearch)
  */
-const WebSocket = require('ws');
-const axios = require('axios');
+const {
+    joinVoiceChannel,
+    createAudioPlayer,
+    createAudioResource,
+    AudioPlayerStatus,
+    entersState,
+    VoiceConnectionStatus,
+    getVoiceConnection,
+    StreamType
+} = require('@discordjs/voice');
 const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const axios = require('axios');
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
 
 const COLOR = 0xa78bfa;
 const COLOR_ERR = 0xef4444;
 const COLOR_WARN = 0xf59e0b;
 
-/** @type {import('discord.js').Client | null} */
 let clientRef = null;
-
-/** @type {any[]} */
-let nodes = [];
-let activeIdx = 0;
-
-/** guildId -> player state */
 const players = new Map();
+let ytdlpPath = null;
+let ffmpegPath = null;
 
-function parseNodes() {
-    const raw = process.env.LAVALINK_NODES || '';
-    const list = [];
-
-    if (raw.trim()) {
-        for (const part of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
-            const bits = part.split(':');
-            if (bits.length < 3) continue;
-            const secureFlag = String(bits[bits.length - 1]).toLowerCase();
-            const isSecure =
-                secureFlag === 'secure' || secureFlag === 'true' || secureFlag === '1';
-            const host = bits[0];
-            const port = parseInt(bits[1], 10);
-            const password = bits.slice(2, -1).join(':') || bits[2];
-            if (!host || !port || !password) continue;
-            list.push({ host, port, password, secure: isSecure });
-        }
-    }
-
-    if (!list.length && process.env.LAVALINK_HOST) {
-        list.push({
-            host: process.env.LAVALINK_HOST,
-            port: parseInt(process.env.LAVALINK_PORT || '443', 10),
-            password: process.env.LAVALINK_PASSWORD || 'arbotixop007',
-            secure: String(process.env.LAVALINK_SECURE || 'true').toLowerCase() !== 'false'
-        });
-    }
-
-    if (!list.length) {
-        list.push(
-            {
-                host: process.env.LAVALINK_FALLBACK_HOST || 'lavalinkv4.serenetia.com',
-                port: 443,
-                password: process.env.LAVALINK_FALLBACK_PASS || 'https://discord.gg/PKR7nMMmB3',
-                secure: true
-            },
-            {
-                host: 'free-lava.heavencloud.in',
-                port: 4000,
-                password: 'youshallnotpass',
-                secure: false
-            }
-        );
-        console.warn(
-            '[lavalink] Sem LAVALINK_NODES no .env — usando nodes públicos (instáveis). Deploy: https://github.com/Hjgaming/lavalink-server'
-        );
-    }
-
-    return list;
-}
-
-function nodeLabel(n) {
-    return `${n.host}:${n.port}`;
-}
-
-function httpBase(n) {
-    return `${n.secure ? 'https' : 'http'}://${n.host}:${n.port}`;
-}
-
-function wsUrl(n) {
-    return `${n.secure ? 'wss' : 'ws'}://${n.host}:${n.port}/v4/websocket`;
-}
-
-function currentNode() {
-    return nodes[activeIdx] || nodes[0] || null;
-}
-
-function setup(client) {
-    clientRef = client;
-    const configs = parseNodes();
-    nodes = configs.map((c) => ({
-        ...c,
-        label: nodeLabel(c),
-        ws: null,
-        sessionId: null,
-        ready: false,
-        reconnecting: false
-    }));
-
-    console.log(`[lavalink] ${nodes.length} node(s): ${nodes.map((n) => n.label).join(' | ')}`);
-
-    client.on('raw', (packet) => {
-        if (!packet?.t) return;
-        if (packet.t === 'VOICE_SERVER_UPDATE' || packet.t === 'VOICE_STATE_UPDATE') {
-            handleVoicePacket(packet).catch((e) =>
-                console.error('[lavalink] voice packet:', e.message)
-            );
-        }
-    });
-
-    connectNode(activeIdx);
-
-    client.once('clientReady', () => {
-        const n = currentNode();
-        if (n && !n.ready) connectNode(activeIdx);
-    });
-    client.once('ready', () => {
-        const n = currentNode();
-        if (n && !n.ready) connectNode(activeIdx);
-    });
-}
-
-function connectNode(idx) {
-    const n = nodes[idx];
-    if (!n || !clientRef) return;
-    if (n.ws && (n.ws.readyState === WebSocket.OPEN || n.ws.readyState === WebSocket.CONNECTING))
-        return;
-
-    const userId = clientRef.user?.id;
-    if (!userId) {
-        console.log(`[lavalink] aguardando ready para conectar ${n.label}…`);
-        return;
-    }
-
-    console.log(`[lavalink] conectando em ${n.label} (secure=${n.secure})…`);
-
+function resolveBins() {
     try {
-        const ws = new WebSocket(wsUrl(n), {
-            headers: {
-                Authorization: n.password,
-                'User-Id': userId,
-                'Client-Name': 'Aeternus/2.0',
-                'Client-Version': '2.0.0'
-            },
-            handshakeTimeout: 15000
-        });
-        n.ws = ws;
-        n.ready = false;
-        n.sessionId = null;
-
-        ws.on('open', () => {
-            console.log(`[lavalink] WS aberto: ${n.label}`);
-        });
-
-        ws.on('message', (data) => {
-            let msg;
-            try {
-                msg = JSON.parse(String(data));
-            } catch {
-                return;
-            }
-            if (msg.op === 'ready') {
-                n.sessionId = msg.sessionId;
-                n.ready = true;
-                n.reconnecting = false;
-                activeIdx = idx;
-                console.log(`[lavalink] sessão pronta em ${n.label}: ${n.sessionId}`);
-            }
-            if (msg.op === 'event') {
-                handlePlayerEvent(msg).catch(() => {});
-            }
-        });
-
-        ws.on('error', (err) => {
-            console.error(`[lavalink] WS erro (${n.label}):`, err.message);
-        });
-
-        ws.on('close', (code) => {
-            console.warn(`[lavalink] WS fechado (${code}) em ${n.label}`);
-            n.ready = false;
-            n.sessionId = null;
-            n.ws = null;
-            if (!n.reconnecting) {
-                n.reconnecting = true;
-                setTimeout(() => failover('reconnect'), 3000);
-            }
-        });
-    } catch (e) {
-        console.error('[lavalink] connect fail:', e.message);
-        setTimeout(() => failover('connect-fail'), 4000);
+        ffmpegPath = require('ffmpeg-static');
+    } catch {
+        ffmpegPath = 'ffmpeg';
     }
-}
-
-function failover(reason) {
-    if (!nodes.length) return;
-    const prev = activeIdx;
-    activeIdx = (activeIdx + 1) % nodes.length;
-    console.log(
-        `[lavalink] failover (${reason}): ${nodes[prev]?.label} → ${nodes[activeIdx]?.label}`
-    );
-    connectNode(activeIdx);
-}
-
-async function rest(method, path, body) {
-    const n = currentNode();
-    if (!n?.sessionId && path.includes('/sessions/')) {
-        throw new Error('Sessão Lavalink indisponível');
-    }
-    if (!n) throw new Error('Nenhum node Lavalink');
-
-    const url = `${httpBase(n)}${path}`;
     try {
-        const res = await axios({
-            method,
-            url,
-            data: body,
-            headers: {
-                Authorization: n.password,
-                'Content-Type': 'application/json'
-            },
-            timeout: 20000,
-            validateStatus: () => true
-        });
-        if (res.status >= 400) {
-            const msg =
-                res.data?.message ||
-                res.data?.error ||
-                `Lavalink HTTP ${res.status}`;
-            throw new Error(String(msg));
-        }
-        return res.data;
-    } catch (e) {
-        if (e.message?.includes('Lavalink HTTP') || e.code === 'ECONNREFUSED') {
-            console.error(`[lavalink] REST falhou em ${n.label}:`, e.message);
-            failover('rest');
-        }
-        throw e;
+        const ytdlp = require('yt-dlp-exec');
+        const cand = path.join(
+            process.cwd(),
+            'node_modules',
+            'yt-dlp-exec',
+            'bin',
+            process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
+        );
+        ytdlpPath = fs.existsSync(cand) ? cand : 'yt-dlp';
+        resolveBins._ytdlp = ytdlp;
+    } catch {
+        ytdlpPath = 'yt-dlp';
+        resolveBins._ytdlp = null;
     }
 }
 
-async function loadTracksOnce(identifier) {
-    const n = currentNode();
-    if (!n) throw new Error('Node indisponível');
-    const url = `${httpBase(n)}/v4/loadtracks?identifier=${encodeURIComponent(identifier)}`;
-    const res = await axios.get(url, {
-        headers: { Authorization: n.password },
-        timeout: 30000,
-        validateStatus: () => true
-    });
-    if (res.status === 401) throw new Error('Senha Lavalink incorreta (401).');
-    if (res.status >= 400) {
-        const msg = res.data?.message || res.data?.error || `loadtracks HTTP ${res.status}`;
-        throw new Error(String(msg));
-    }
-    return res.data;
-}
-
-function extractTracks(data) {
-    if (!data) return { tracks: [], error: 'Resposta vazia do Lavalink' };
-    const loadType = data.loadType;
-    if (loadType === 'track') return { tracks: data.data ? [data.data] : [], error: null };
-    if (loadType === 'search') return { tracks: Array.isArray(data.data) ? data.data : [], error: null };
-    if (loadType === 'playlist') return { tracks: data.data?.tracks || [], error: null };
-    if (loadType === 'empty') return { tracks: [], error: 'Nenhum resultado' };
-    if (loadType === 'error') {
-        const msg =
-            data.data?.message ||
-            data.data?.cause ||
-            data.exception?.message ||
-            'Erro ao buscar faixa';
-        return { tracks: [], error: String(msg) };
-    }
-    if (Array.isArray(data.tracks)) return { tracks: data.tracks, error: null };
-    return { tracks: [], error: `loadType desconhecido: ${loadType}` };
-}
-
-async function loadTracks(query) {
-    const q = String(query || '').trim();
-    if (!q) throw new Error('Busca vazia');
-
-    const attempts = [];
-    if (/^https?:\/\//i.test(q)) {
-        attempts.push(q);
-    } else if (/^(ytsearch|scsearch|spsearch|ytmsearch|amsearch|dzsearch):/i.test(q)) {
-        attempts.push(q);
-    } else {
-        attempts.push(`ytsearch:${q}`);
-        attempts.push(`scsearch:${q}`);
-        attempts.push(`ytsearch:${q} audio`);
-    }
-
-    const errors = [];
-    for (const id of attempts) {
-        try {
-            console.log(`[lavalink] loadtracks: ${id.slice(0, 80)}`);
-            const data = await loadTracksOnce(id);
-            const { tracks, error } = extractTracks(data);
-            if (tracks.length) return { data, tracks };
-            if (error) errors.push(`${id.split(':')[0]}: ${error}`);
-        } catch (e) {
-            errors.push(`${String(id).slice(0, 40)}: ${e.message}`);
-        }
-    }
-
-    const detail = errors.slice(0, 4).join('\n');
-    throw new Error(
-        `Não achei a música.\n${detail}\n\n` +
-            `Dicas:\n` +
-            `• Tente um **link** do YouTube/SoundCloud\n` +
-            `• Use 'O.tocar scsearch:nome da musica'\n` +
-            `• Abra o dashboard do Lavalink no Render (acordar o serviço)`
-    );
+function formatMs(ms) {
+    if (!ms || ms < 0) return '-';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const ss = String(s % 60).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    return h > 0 ? h + ':' + mm + ':' + ss : m + ':' + ss;
 }
 
 function getPlayer(guildId) {
@@ -330,184 +72,253 @@ function getPlayer(guildId) {
             textChannelId: null,
             voiceChannelId: null,
             volume: 80,
-            paused: false
+            paused: false,
+            player: null,
+            connection: null
         });
     }
     return players.get(guildId);
 }
 
-async function updatePlayer(guildId, payload) {
-    const n = currentNode();
-    if (!n?.sessionId) throw new Error('Sessão Lavalink indisponível');
-    return rest('PATCH', `/v4/sessions/${n.sessionId}/players/${guildId}?noReplace=false`, payload);
+async function searchYoutubeApi(query, max) {
+    max = max || 5;
+    const key = String(process.env.YOUTUBE_API_KEY || '').trim();
+    if (!key) return null;
+
+    const { data } = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+        params: {
+            part: 'snippet',
+            type: 'video',
+            maxResults: max,
+            q: query,
+            key: key
+        },
+        timeout: 12000
+    });
+
+    return (data.items || [])
+        .map(function (it) {
+            const id = it.id && it.id.videoId;
+            if (!id) return null;
+            const sn = it.snippet || {};
+            const thumbs = sn.thumbnails || {};
+            return {
+                title: sn.title || 'YouTube',
+                uri: 'https://www.youtube.com/watch?v=' + id,
+                url: 'https://www.youtube.com/watch?v=' + id,
+                length: 0,
+                artwork: (thumbs.high && thumbs.high.url) || (thumbs.default && thumbs.default.url) || null,
+                author: sn.channelTitle || '',
+                id: id
+            };
+        })
+        .filter(Boolean);
 }
 
-async function destroyPlayer(guildId) {
-    const n = currentNode();
-    players.delete(guildId);
-    if (!n?.sessionId) return;
+async function searchYtdlp(query, max) {
+    max = max || 5;
+    const ytdlp = resolveBins._ytdlp;
+    const input = /^https?:\/\//i.test(query) ? query : 'ytsearch' + max + ':' + query;
+
+    if (ytdlp) {
+        const raw = await ytdlp(input, {
+            dumpSingleJson: true,
+            noWarnings: true,
+            noCheckCertificates: true,
+            preferFreeFormats: true,
+            skipDownload: true,
+            flatPlaylist: true
+        });
+        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const entries = data.entries || (data.id ? [data] : []);
+        return entries.slice(0, max).map(function (e) {
+            return {
+                title: e.title || e.fulltitle || 'YouTube',
+                uri: e.webpage_url || e.url || (e.id ? 'https://www.youtube.com/watch?v=' + e.id : ''),
+                url: e.webpage_url || e.url || (e.id ? 'https://www.youtube.com/watch?v=' + e.id : ''),
+                length: Math.floor((e.duration || 0) * 1000),
+                artwork: e.thumbnail || null,
+                author: e.uploader || e.channel || '',
+                id: e.id
+            };
+        });
+    }
+
+    return new Promise(function (resolve, reject) {
+        const args = [input, '--dump-single-json', '--no-warnings', '--skip-download', '--flat-playlist', '--no-check-certificates'];
+        const proc = spawn(ytdlpPath || 'yt-dlp', args, { windowsHide: true });
+        let out = '';
+        let err = '';
+        proc.stdout.on('data', function (d) { out += d; });
+        proc.stderr.on('data', function (d) { err += d; });
+        proc.on('close', function (code) {
+            if (code !== 0 && !out) return reject(new Error(err.slice(0, 200) || 'yt-dlp search fail'));
+            try {
+                const data = JSON.parse(out);
+                const entries = data.entries || (data.id ? [data] : []);
+                resolve(
+                    entries.slice(0, max).map(function (e) {
+                        return {
+                            title: e.title || 'YouTube',
+                            uri: e.webpage_url || e.url || (e.id ? 'https://www.youtube.com/watch?v=' + e.id : ''),
+                            url: e.webpage_url || e.url || (e.id ? 'https://www.youtube.com/watch?v=' + e.id : ''),
+                            length: Math.floor((e.duration || 0) * 1000),
+                            artwork: e.thumbnail || null,
+                            author: e.uploader || '',
+                            id: e.id
+                        };
+                    })
+                );
+            } catch (e) {
+                reject(e);
+            }
+        });
+    });
+}
+
+async function resolveQuery(query) {
+    const q = String(query || '').trim();
+    if (!q) throw new Error('Busca vazia');
+
+    if (/^https?:\/\//i.test(q)) {
+        return [{ title: q, uri: q, url: q, length: 0, artwork: null, author: '', id: null }];
+    }
+
     try {
-        await rest('DELETE', `/v4/sessions/${n.sessionId}/players/${guildId}`);
+        const api = await searchYoutubeApi(q, 5);
+        if (api && api.length) {
+            console.log('[music] busca YouTube API: ' + api.length + ' resultado(s)');
+            return api;
+        }
+    } catch (e) {
+        console.warn('[music] YouTube API:', (e.response && e.response.data && e.response.data.error && e.response.data.error.message) || e.message);
+    }
+
+    console.log('[music] busca via yt-dlp...');
+    const list = await searchYtdlp(q, 5);
+    if (!list.length) throw new Error('Nada encontrado no YouTube.');
+    return list;
+}
+
+function createYtdlpStream(url) {
+    const args = [
+        url,
+        '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
+        '-o', '-',
+        '--no-playlist',
+        '--no-warnings',
+        '--quiet',
+        '--no-check-certificates'
+    ];
+    const proc = spawn(ytdlpPath || 'yt-dlp', args, {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+    proc.stderr.on('data', function () {});
+    return proc;
+}
+
+function ensurePlayer(guildId) {
+    const st = getPlayer(guildId);
+    if (st.player) return st.player;
+
+    const player = createAudioPlayer();
+    st.player = player;
+
+    player.on(AudioPlayerStatus.Idle, function () {
+        playNext(guildId).catch(function (e) {
+            console.error('[music] next:', e.message);
+        });
+    });
+    player.on('error', function (err) {
+        console.error('[music] player error:', err.message);
+        playNext(guildId).catch(function () {});
+    });
+
+    return player;
+}
+
+function connectVoice(guild, channel) {
+    const st = getPlayer(guild.id);
+    let connection = getVoiceConnection(guild.id);
+
+    if (!connection || st.voiceChannelId !== channel.id) {
+        connection = joinVoiceChannel({
+            channelId: channel.id,
+            guildId: guild.id,
+            adapterCreator: guild.voiceAdapterCreator,
+            selfDeaf: true
+        });
+        st.voiceChannelId = channel.id;
+        st.connection = connection;
+        connection.on('error', function (e) {
+            console.error('[music] voice:', e.message);
+        });
+    }
+
+    const player = ensurePlayer(guild.id);
+    connection.subscribe(player);
+    return connection;
+}
+
+async function playTrack(guildId, track) {
+    const st = getPlayer(guildId);
+    const player = ensurePlayer(guildId);
+    st.current = track;
+    st.paused = false;
+
+    const url = track.uri || track.url;
+    if (!url) throw new Error('URL invalida');
+
+    const proc = createYtdlpStream(url);
+    const resource = createAudioResource(proc.stdout, {
+        inputType: StreamType.Arbitrary,
+        inlineVolume: true
+    });
+    if (resource.volume) {
+        resource.volume.setVolume((st.volume || 80) / 100);
+    }
+
+    player.play(resource);
+
+    try {
+        const ch = st.textChannelId
+            ? await clientRef.channels.fetch(st.textChannelId).catch(function () { return null; })
+            : null;
+        if (ch) {
+            const emb = new EmbedBuilder()
+                .setColor(COLOR)
+                .setTitle('Tocando')
+                .setDescription('[**' + track.title + '**](' + (track.uri || track.url || '#') + ')')
+                .addFields(
+                    { name: 'Duracao', value: formatMs(track.length), inline: true },
+                    { name: 'Pedido por', value: track.requester || '-', inline: true },
+                    { name: 'Fila', value: String(st.queue.length), inline: true }
+                );
+            if (track.artwork) emb.setThumbnail(track.artwork);
+            ch.send({ embeds: [emb] }).catch(function () {});
+        }
     } catch (_) {}
 }
 
-async function joinVoice(guildId, channelId) {
-    if (!clientRef) return;
-    clientRef.ws.send({
-        op: 4,
-        d: {
-            guild_id: guildId,
-            channel_id: channelId,
-            self_mute: false,
-            self_deaf: true
-        }
-    });
-}
-
-async function leaveVoice(guildId) {
-    if (!clientRef) return;
-    clientRef.ws.send({
-        op: 4,
-        d: {
-            guild_id: guildId,
-            channel_id: null,
-            self_mute: false,
-            self_deaf: false
-        }
-    });
-}
-
-const voiceServers = new Map();
-const voiceStates = new Map();
-
-async function handleVoicePacket(packet) {
-    if (packet.t === 'VOICE_SERVER_UPDATE') {
-        const d = packet.d;
-        voiceServers.set(d.guild_id, { token: d.token, endpoint: d.endpoint });
-        await trySendVoiceUpdate(d.guild_id);
-    }
-    if (packet.t === 'VOICE_STATE_UPDATE') {
-        const d = packet.d;
-        if (d.user_id !== clientRef?.user?.id) return;
-        if (d.channel_id) {
-            voiceStates.set(d.guild_id, d.session_id);
-            const p = getPlayer(d.guild_id);
-            p.voiceChannelId = d.channel_id;
-            await trySendVoiceUpdate(d.guild_id);
-        } else {
-            voiceStates.delete(d.guild_id);
-            voiceServers.delete(d.guild_id);
-        }
-    }
-}
-
-async function trySendVoiceUpdate(guildId) {
-    const server = voiceServers.get(guildId);
-    const sessionId = voiceStates.get(guildId);
-    const n = currentNode();
-    if (!server || !sessionId || !n?.sessionId) return;
-
-    try {
-        await updatePlayer(guildId, {
-            voice: {
-                token: server.token,
-                endpoint: server.endpoint,
-                sessionId
-            }
-        });
-    } catch (e) {
-        console.error('[lavalink] voice update:', e.message);
-    }
-}
-
-async function playTrack(guildId, encoded) {
-    return updatePlayer(guildId, {
-        track: { encoded },
-        volume: getPlayer(guildId).volume,
-        paused: false
-    });
-}
-
 async function playNext(guildId) {
-    const p = getPlayer(guildId);
-    if (!p.queue.length) {
-        p.current = null;
+    const st = getPlayer(guildId);
+    if (!st.queue.length) {
+        st.current = null;
         try {
-            await updatePlayer(guildId, { track: { encoded: null } });
+            const ch = st.textChannelId
+                ? await clientRef.channels.fetch(st.textChannelId).catch(function () { return null; })
+                : null;
+            if (ch) {
+                ch.send({
+                    embeds: [new EmbedBuilder().setColor(COLOR).setDescription('Fila terminou.')]
+                }).catch(function () {});
+            }
         } catch (_) {}
-        const ch = p.textChannelId
-            ? await clientRef.channels.fetch(p.textChannelId).catch(() => null)
-            : null;
-        ch?.send({
-            embeds: [new EmbedBuilder().setColor(COLOR).setDescription('Fila terminou.')]
-        }).catch(() => {});
         return;
     }
-    const next = p.queue.shift();
-    p.current = next;
-    await playTrack(guildId, next.encoded);
-    const ch = p.textChannelId
-        ? await clientRef.channels.fetch(p.textChannelId).catch(() => null)
-        : null;
-    if (ch) {
-        const emb = new EmbedBuilder()
-            .setColor(COLOR)
-            .setTitle('🎵 Tocando')
-            .setDescription(`[**${next.title}**](${next.uri || next.url || '#'})`)
-            .addFields(
-                { name: 'Duração', value: formatMs(next.length), inline: true },
-                { name: 'Pedido por', value: next.requester || '—', inline: true },
-                { name: 'Fila', value: `${p.queue.length}`, inline: true }
-            );
-        if (next.artwork) emb.setThumbnail(next.artwork);
-        ch.send({ embeds: [emb] }).catch(() => {});
-    }
-}
-
-async function handlePlayerEvent(msg) {
-    const guildId = msg.guildId;
-    if (!guildId) return;
-    const type = msg.type;
-    if (type === 'TrackEndEvent') {
-        if (msg.reason === 'replaced') return;
-        await playNext(guildId);
-    }
-    if (type === 'TrackStuckEvent' || type === 'TrackExceptionEvent') {
-        const chId = getPlayer(guildId).textChannelId;
-        const ch = chId ? await clientRef.channels.fetch(chId).catch(() => null) : null;
-        ch?.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(COLOR_ERR)
-                    .setDescription(`Erro na faixa: ${msg.exception?.message || msg.reason || type}`)
-            ]
-        }).catch(() => {});
-        await playNext(guildId);
-    }
-}
-
-function formatMs(ms) {
-    if (!ms || ms < 0) return '—';
-    const s = Math.floor(ms / 1000);
-    const m = Math.floor(s / 60);
-    const h = Math.floor(m / 60);
-    const ss = String(s % 60).padStart(2, '0');
-    const mm = String(m % 60).padStart(2, '0');
-    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
-}
-
-function mapTrack(t, requester) {
-    const info = t.info || {};
-    return {
-        encoded: t.encoded,
-        title: info.title || 'Desconhecido',
-        uri: info.uri || '',
-        url: info.uri || '',
-        length: info.length || 0,
-        artwork: info.artworkUrl || info.thumbnail || null,
-        author: info.author || '',
-        requester: requester || '—'
-    };
+    const next = st.queue.shift();
+    await playTrack(guildId, next);
 }
 
 async function play(ctx, query) {
@@ -515,88 +326,88 @@ async function play(ctx, query) {
     const member = ctx.member;
     const channel = ctx.channel;
     const user = ctx.user || ctx.author;
-    if (!guild || !member) throw new Error('Só em servidor');
+    if (!guild || !member) throw new Error('So em servidor');
 
-    const voice = member.voice?.channel;
+    const voice = member.voice && member.voice.channel;
     if (!voice) throw new Error('Entre em um canal de voz primeiro.');
 
     const me = guild.members.me;
     if (me) {
         const perms = voice.permissionsFor(me);
         if (perms && !perms.has(PermissionsBitField.Flags.Connect))
-            throw new Error('Sem permissão de **Conectar**.');
+            throw new Error('Sem permissao de Conectar.');
         if (perms && !perms.has(PermissionsBitField.Flags.Speak))
-            throw new Error('Sem permissão de **Falar**.');
+            throw new Error('Sem permissao de Falar.');
     }
 
-    // Aguarda sessão Lavalink (até ~12s)
-    let n = currentNode();
-    if (!n?.ready || !n.sessionId) {
-        if (n) connectNode(activeIdx);
-        for (let i = 0; i < 24; i++) {
-            await new Promise((r) => setTimeout(r, 500));
-            n = currentNode();
-            if (n?.ready && n.sessionId) break;
+    resolveBins();
+
+    const results = await resolveQuery(query);
+    const first = results[0];
+    if (!first) throw new Error('Nada encontrado.');
+
+    const track = Object.assign({}, first, { requester: String(user) });
+
+    const st = getPlayer(guild.id);
+    st.textChannelId = channel.id;
+    st.voiceChannelId = voice.id;
+
+    connectVoice(guild, voice);
+
+    try {
+        const conn = getVoiceConnection(guild.id);
+        if (conn) {
+            await entersState(conn, VoiceConnectionStatus.Ready, 20000);
         }
-    }
-    if (!n?.ready || !n.sessionId) {
-        throw new Error(
-            'Lavalink offline. No Render, defina:\n' +
-                '`LAVALINK_NODES=seu-host.onrender.com:443:SUA_SENHA:secure`\n' +
-                'e reinicie. No log deve aparecer: **sessão pronta**.'
-        );
+    } catch (e) {
+        throw new Error('Nao consegui conectar na call a tempo (20s).');
     }
 
-    const { tracks } = await loadTracks(query);
-    if (!tracks.length) throw new Error('Nada encontrado.');
-
-    const p = getPlayer(guild.id);
-    p.textChannelId = channel.id;
-    p.voiceChannelId = voice.id;
-
-    await joinVoice(guild.id, voice.id);
-    await new Promise((r) => setTimeout(r, 800));
-
-    const mapped = tracks.slice(0, 50).map((t) => mapTrack(t, `${user}`));
-    const wasEmpty = !p.current;
+    const wasEmpty = !st.current;
 
     if (wasEmpty) {
-        p.current = mapped[0];
-        p.queue.push(...mapped.slice(1));
-        await playTrack(guild.id, mapped[0].encoded);
-        return { started: true, track: mapped[0], added: mapped.length - 1 };
+        await playTrack(guild.id, track);
+        return { started: true, track: track, added: 0 };
     }
 
-    p.queue.push(...mapped);
-    return { started: false, track: mapped[0], added: mapped.length };
+    st.queue.push(track);
+    return { started: false, track: track, added: 1 };
 }
 
 async function skip(guildId) {
-    const p = getPlayer(guildId);
-    if (!p.current) throw new Error('Nada tocando.');
-    await playNext(guildId);
+    const st = getPlayer(guildId);
+    if (!st.current) throw new Error('Nada tocando.');
+    if (st.player) st.player.stop(true);
 }
 
 async function stop(guildId) {
-    const p = getPlayer(guildId);
-    p.queue = [];
-    p.current = null;
-    await destroyPlayer(guildId);
-    await leaveVoice(guildId);
+    const st = getPlayer(guildId);
+    st.queue = [];
+    st.current = null;
+    try {
+        if (st.player) st.player.stop(true);
+    } catch (_) {}
+    const conn = getVoiceConnection(guildId);
+    try {
+        if (conn) conn.destroy();
+    } catch (_) {}
+    st.connection = null;
+    st.player = null;
+    players.delete(guildId);
 }
 
 async function pause(guildId, paused) {
-    const p = getPlayer(guildId);
-    if (!p.current) throw new Error('Nada tocando.');
-    p.paused = paused;
-    await updatePlayer(guildId, { paused });
+    const st = getPlayer(guildId);
+    if (!st.current || !st.player) throw new Error('Nada tocando.');
+    st.paused = !!paused;
+    if (paused) st.player.pause();
+    else st.player.unpause();
 }
 
 async function setVolume(guildId, vol) {
-    const p = getPlayer(guildId);
-    p.volume = Math.max(0, Math.min(100, vol));
-    await updatePlayer(guildId, { volume: p.volume });
-    return p.volume;
+    const st = getPlayer(guildId);
+    st.volume = Math.max(0, Math.min(100, vol));
+    return st.volume;
 }
 
 function queueInfo(guildId) {
@@ -605,27 +416,52 @@ function queueInfo(guildId) {
 
 function status() {
     return {
-        nodes: nodes.map((n) => ({
-            label: n.label,
-            ready: !!n.ready,
-            sessionId: n.sessionId || null,
-            active: n === currentNode()
-        })),
-        active: currentNode()?.label || null
+        engine: 'discord.js-voice + yt-dlp',
+        youtubeApi: !!String(process.env.YOUTUBE_API_KEY || '').trim(),
+        guilds: players.size
     };
 }
 
+function setup(client) {
+    clientRef = client;
+    resolveBins();
+    console.log(
+        '[music] voice ativo · YouTube API=' +
+            (status().youtubeApi ? 'sim' : 'nao (yt-dlp)') +
+            ' · ffmpeg=' +
+            (ffmpegPath || '?')
+    );
+
+    client.on('voiceStateUpdate', function (oldS, newS) {
+        try {
+            if (!client.user) return;
+            const guild = newS.guild || oldS.guild;
+            if (!guild) return;
+            const conn = getVoiceConnection(guild.id);
+            if (!conn) return;
+            const chanId = conn.joinConfig && conn.joinConfig.channelId;
+            if (!chanId) return;
+            const ch = guild.channels.cache.get(chanId);
+            if (!ch || !ch.isVoiceBased()) return;
+            const humans = ch.members.filter(function (m) { return !m.user.bot; });
+            if (humans.size === 0) {
+                stop(guild.id).catch(function () {});
+            }
+        } catch (_) {}
+    });
+}
+
 module.exports = {
-    setup,
-    play,
-    skip,
-    stop,
-    pause,
-    setVolume,
-    queueInfo,
-    status,
-    formatMs,
-    COLOR,
-    COLOR_ERR,
-    COLOR_WARN
+    setup: setup,
+    play: play,
+    skip: skip,
+    stop: stop,
+    pause: pause,
+    setVolume: setVolume,
+    queueInfo: queueInfo,
+    status: status,
+    formatMs: formatMs,
+    COLOR: COLOR,
+    COLOR_ERR: COLOR_ERR,
+    COLOR_WARN: COLOR_WARN
 };
