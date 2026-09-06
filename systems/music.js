@@ -20,7 +20,7 @@ const COLOR_WARN = 0xf59e0b;
 /** @type {import('discord.js').Client | null} */
 let clientRef = null;
 
-/** @type {NodeState[]} */
+/** @type {any[]} */
 let nodes = [];
 let activeIdx = 0;
 
@@ -75,14 +75,19 @@ function parseNodes() {
         );
     }
 
-    return list.map((n) => ({
-        ...n,
-        label: `${n.host}:${n.port}`,
-        ws: null,
-        sessionId: null,
-        ready: false,
-        reconnecting: false
-    }));
+    return list;
+}
+
+function nodeLabel(n) {
+    return `${n.host}:${n.port}`;
+}
+
+function httpBase(n) {
+    return `${n.secure ? 'https' : 'http'}://${n.host}:${n.port}`;
+}
+
+function wsUrl(n) {
+    return `${n.secure ? 'wss' : 'ws'}://${n.host}:${n.port}/v4/websocket`;
 }
 
 function currentNode() {
@@ -91,88 +96,103 @@ function currentNode() {
 
 function setup(client) {
     clientRef = client;
-    nodes = parseNodes();
-    activeIdx = 0;
-    if (!nodes.length) {
-        console.warn('[lavalink] nenhum node configurado');
-        return;
-    }
+    const configs = parseNodes();
+    nodes = configs.map((c) => ({
+        ...c,
+        label: nodeLabel(c),
+        ws: null,
+        sessionId: null,
+        ready: false,
+        reconnecting: false
+    }));
+
     console.log(`[lavalink] ${nodes.length} node(s): ${nodes.map((n) => n.label).join(' | ')}`);
-    connectNode(activeIdx);
 
     client.on('raw', (packet) => {
-        if (!packet || !packet.t) return;
+        if (!packet?.t) return;
         if (packet.t === 'VOICE_SERVER_UPDATE' || packet.t === 'VOICE_STATE_UPDATE') {
-            handleVoiceUpdate(packet).catch(() => {});
+            handleVoicePacket(packet).catch((e) =>
+                console.error('[lavalink] voice packet:', e.message)
+            );
         }
     });
 
-    setInterval(() => {
+    connectNode(activeIdx);
+
+    client.once('clientReady', () => {
         const n = currentNode();
         if (n && !n.ready) connectNode(activeIdx);
-    }, 30000);
+    });
+    client.once('ready', () => {
+        const n = currentNode();
+        if (n && !n.ready) connectNode(activeIdx);
+    });
 }
 
 function connectNode(idx) {
     const n = nodes[idx];
-    if (!n || !clientRef?.user) return;
+    if (!n || !clientRef) return;
+    if (n.ws && (n.ws.readyState === WebSocket.OPEN || n.ws.readyState === WebSocket.CONNECTING))
+        return;
+
+    const userId = clientRef.user?.id;
+    if (!userId) {
+        console.log(`[lavalink] aguardando ready para conectar ${n.label}…`);
+        return;
+    }
+
+    console.log(`[lavalink] conectando em ${n.label} (secure=${n.secure})…`);
 
     try {
-        if (n.ws) {
-            try {
-                n.ws.removeAllListeners();
-                n.ws.close();
-            } catch (_) {}
-            n.ws = null;
-        }
-
-        const proto = n.secure ? 'wss' : 'ws';
-        const url = `${proto}://${n.host}:${n.port}/v4/websocket`;
-        console.log(`[lavalink] conectando em ${n.label} (secure=${n.secure})…`);
-
-        const ws = new WebSocket(url, {
+        const ws = new WebSocket(wsUrl(n), {
             headers: {
                 Authorization: n.password,
-                'User-Id': clientRef.user.id,
-                'Client-Name': 'Aeternus/1.0'
-            }
+                'User-Id': userId,
+                'Client-Name': 'Aeternus/2.0',
+                'Client-Version': '2.0.0'
+            },
+            handshakeTimeout: 15000
         });
         n.ws = ws;
+        n.ready = false;
+        n.sessionId = null;
 
         ws.on('open', () => {
             console.log(`[lavalink] WS aberto: ${n.label}`);
         });
 
-        ws.on('message', (raw) => {
+        ws.on('message', (data) => {
             let msg;
             try {
-                msg = JSON.parse(String(raw));
-            } catch {\n                return;
+                msg = JSON.parse(String(data));
+            } catch {
+                return;
             }
             if (msg.op === 'ready') {
                 n.sessionId = msg.sessionId;
                 n.ready = true;
                 n.reconnecting = false;
+                activeIdx = idx;
                 console.log(`[lavalink] sessão pronta em ${n.label}: ${n.sessionId}`);
-            } else if (msg.op === 'event') {
-                handlePlayerEvent(msg).catch(() => {});
-            } else if (msg.op === 'playerUpdate') {
-                // ignore
             }
+            if (msg.op === 'event') {
+                handlePlayerEvent(msg).catch(() => {});
+            }
+        });
+
+        ws.on('error', (err) => {
+            console.error(`[lavalink] WS erro (${n.label}):`, err.message);
         });
 
         ws.on('close', (code) => {
             console.warn(`[lavalink] WS fechado (${code}) em ${n.label}`);
             n.ready = false;
             n.sessionId = null;
+            n.ws = null;
             if (!n.reconnecting) {
                 n.reconnecting = true;
                 setTimeout(() => failover('reconnect'), 3000);
             }
-        });
-
-        ws.on('error', (e) => {
-            console.error(`[lavalink] WS erro (${n.label}):`, e.message);
         });
     } catch (e) {
         console.error('[lavalink] connect fail:', e.message);
@@ -182,23 +202,22 @@ function connectNode(idx) {
 
 function failover(reason) {
     if (!nodes.length) return;
-    const prev = currentNode();
+    const prev = activeIdx;
     activeIdx = (activeIdx + 1) % nodes.length;
-    const next = currentNode();
-    console.warn(
-        `[lavalink] failover (${reason}): ${prev?.label || '?'} → ${next?.label || '?'}`
+    console.log(
+        `[lavalink] failover (${reason}): ${nodes[prev]?.label} → ${nodes[activeIdx]?.label}`
     );
     connectNode(activeIdx);
 }
 
 async function rest(method, path, body) {
     const n = currentNode();
-    if (!n) throw new Error('Sem node Lavalink');
-    if (!n.sessionId && path.includes('/sessions/')) {
+    if (!n?.sessionId && path.includes('/sessions/')) {
         throw new Error('Sessão Lavalink indisponível');
     }
-    const proto = n.secure ? 'https' : 'http';
-    const url = `${proto}://${n.host}:${n.port}${path}`;
+    if (!n) throw new Error('Nenhum node Lavalink');
+
+    const url = `${httpBase(n)}${path}`;
     try {
         const res = await axios({
             method,
@@ -208,19 +227,19 @@ async function rest(method, path, body) {
                 Authorization: n.password,
                 'Content-Type': 'application/json'
             },
-            timeout: 15000,
+            timeout: 20000,
             validateStatus: () => true
         });
         if (res.status >= 400) {
             const msg =
                 res.data?.message ||
                 res.data?.error ||
-                (typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {}));
-            throw new Error(`Lavalink HTTP ${res.status}: ${msg || 'Bad Request'}`);
+                `Lavalink HTTP ${res.status}`;
+            throw new Error(String(msg));
         }
         return res.data;
     } catch (e) {
-        if (e.message?.startsWith('Lavalink HTTP')) {
+        if (e.message?.includes('Lavalink HTTP') || e.code === 'ECONNREFUSED') {
             console.error(`[lavalink] REST falhou em ${n.label}:`, e.message);
             failover('rest');
         }
@@ -230,61 +249,76 @@ async function rest(method, path, body) {
 
 async function loadTracksOnce(identifier) {
     const n = currentNode();
-    if (!n) throw new Error('Sem node');
-    const proto = n.secure ? 'https' : 'http';
-    const url = `${proto}://${n.host}:${n.port}/v4/loadtracks?identifier=${encodeURIComponent(identifier)}`;
+    if (!n) throw new Error('Node indisponível');
+    const url = `${httpBase(n)}/v4/loadtracks?identifier=${encodeURIComponent(identifier)}`;
     const res = await axios.get(url, {
         headers: { Authorization: n.password },
-        timeout: 20000,
+        timeout: 30000,
         validateStatus: () => true
     });
+    if (res.status === 401) throw new Error('Senha Lavalink incorreta (401).');
     if (res.status >= 400) {
-        throw new Error(`loadtracks ${res.status}`);
+        const msg = res.data?.message || res.data?.error || `loadtracks HTTP ${res.status}`;
+        throw new Error(String(msg));
     }
     return res.data;
 }
 
-function mapLoad(data) {
-    if (!data) return { tracks: [], error: 'empty' };
+function extractTracks(data) {
+    if (!data) return { tracks: [], error: 'Resposta vazia do Lavalink' };
     const loadType = data.loadType;
-    if (loadType === 'track') return { tracks: [data.data], error: null };
-    if (loadType === 'search') return { tracks: data.data || [], error: null };
+    if (loadType === 'track') return { tracks: data.data ? [data.data] : [], error: null };
+    if (loadType === 'search') return { tracks: Array.isArray(data.data) ? data.data : [], error: null };
     if (loadType === 'playlist') return { tracks: data.data?.tracks || [], error: null };
-    if (loadType === 'empty') return { tracks: [], error: 'empty' };
-    if (loadType === 'error') return { tracks: [], error: data.data?.message || 'error' };
-    return { tracks: [], error: loadType || 'unknown' };
+    if (loadType === 'empty') return { tracks: [], error: 'Nenhum resultado' };
+    if (loadType === 'error') {
+        const msg =
+            data.data?.message ||
+            data.data?.cause ||
+            data.exception?.message ||
+            'Erro ao buscar faixa';
+        return { tracks: [], error: String(msg) };
+    }
+    if (Array.isArray(data.tracks)) return { tracks: data.tracks, error: null };
+    return { tracks: [], error: `loadType desconhecido: ${loadType}` };
 }
 
 async function loadTracks(query) {
     const q = String(query || '').trim();
-    if (!q) return { tracks: [] };
-
-    const isUrl = /^https?:\/\//i.test(q);
-    const hasPrefix = /^(ytsearch|ytmsearch|scsearch|spsearch|amsearch|dzsearch):/i.test(q);
+    if (!q) throw new Error('Busca vazia');
 
     const attempts = [];
-    if (isUrl || hasPrefix) attempts.push(q);
-    else {
+    if (/^https?:\/\//i.test(q)) {
+        attempts.push(q);
+    } else if (/^(ytsearch|scsearch|spsearch|ytmsearch|amsearch|dzsearch):/i.test(q)) {
+        attempts.push(q);
+    } else {
         attempts.push(`ytsearch:${q}`);
         attempts.push(`scsearch:${q}`);
-        attempts.push(`ytmsearch:${q}`);
+        attempts.push(`ytsearch:${q} audio`);
     }
 
-    let lastErr = null;
+    const errors = [];
     for (const id of attempts) {
         try {
+            console.log(`[lavalink] loadtracks: ${id.slice(0, 80)}`);
             const data = await loadTracksOnce(id);
-            const mapped = mapLoad(data);
-            if (mapped.tracks.length) return mapped;
-            lastErr = mapped.error;
+            const { tracks, error } = extractTracks(data);
+            if (tracks.length) return { data, tracks };
+            if (error) errors.push(`${id.split(':')[0]}: ${error}`);
         } catch (e) {
-            lastErr = e.message;
+            errors.push(`${String(id).slice(0, 40)}: ${e.message}`);
         }
     }
-    if (lastErr) {
-        console.warn('[lavalink] busca falhou:', lastErr);
-    }
-    return { tracks: [] };
+
+    const detail = errors.slice(0, 4).join('\n');
+    throw new Error(
+        `Não achei a música.\n${detail}\n\n` +
+            `Dicas:\n` +
+            `• Tente um **link** do YouTube/SoundCloud\n` +
+            `• Use 'O.tocar scsearch:nome da musica'\n` +
+            `• Abra o dashboard do Lavalink no Render (acordar o serviço)`
+    );
 }
 
 function getPlayer(guildId) {
@@ -295,23 +329,11 @@ function getPlayer(guildId) {
             current: null,
             textChannelId: null,
             voiceChannelId: null,
-            volume: 100,
+            volume: 80,
             paused: false
         });
     }
     return players.get(guildId);
-}
-
-function mapTrack(t, requester) {
-    const info = t.info || t;
-    return {
-        encoded: t.encoded || t.track,
-        title: info.title || 'Desconhecido',
-        author: info.author || '',
-        uri: info.uri || '',
-        length: info.length || 0,
-        requester
-    };
 }
 
 async function updatePlayer(guildId, payload) {
@@ -321,35 +343,70 @@ async function updatePlayer(guildId, payload) {
 }
 
 async function destroyPlayer(guildId) {
-    players.delete(guildId);
     const n = currentNode();
+    players.delete(guildId);
     if (!n?.sessionId) return;
     try {
         await rest('DELETE', `/v4/sessions/${n.sessionId}/players/${guildId}`);
     } catch (_) {}
 }
 
-const voiceStates = new Map();
-const voiceServers = new Map();
+async function joinVoice(guildId, channelId) {
+    if (!clientRef) return;
+    clientRef.ws.send({
+        op: 4,
+        d: {
+            guild_id: guildId,
+            channel_id: channelId,
+            self_mute: false,
+            self_deaf: true
+        }
+    });
+}
 
-async function handleVoiceUpdate(packet) {
-    const d = packet.d;
-    if (!d) return;
-    if (packet.t === 'VOICE_STATE_UPDATE') {
-        if (d.user_id !== clientRef?.user?.id) return;
-        voiceStates.set(d.guild_id, d.session_id);
-        await sendVoiceUpdate(d.guild_id);
-    } else if (packet.t === 'VOICE_SERVER_UPDATE') {
+async function leaveVoice(guildId) {
+    if (!clientRef) return;
+    clientRef.ws.send({
+        op: 4,
+        d: {
+            guild_id: guildId,
+            channel_id: null,
+            self_mute: false,
+            self_deaf: false
+        }
+    });
+}
+
+const voiceServers = new Map();
+const voiceStates = new Map();
+
+async function handleVoicePacket(packet) {
+    if (packet.t === 'VOICE_SERVER_UPDATE') {
+        const d = packet.d;
         voiceServers.set(d.guild_id, { token: d.token, endpoint: d.endpoint });
-        await sendVoiceUpdate(d.guild_id);
+        await trySendVoiceUpdate(d.guild_id);
+    }
+    if (packet.t === 'VOICE_STATE_UPDATE') {
+        const d = packet.d;
+        if (d.user_id !== clientRef?.user?.id) return;
+        if (d.channel_id) {
+            voiceStates.set(d.guild_id, d.session_id);
+            const p = getPlayer(d.guild_id);
+            p.voiceChannelId = d.channel_id;
+            await trySendVoiceUpdate(d.guild_id);
+        } else {
+            voiceStates.delete(d.guild_id);
+            voiceServers.delete(d.guild_id);
+        }
     }
 }
 
-async function sendVoiceUpdate(guildId) {
-    const n = currentNode();
+async function trySendVoiceUpdate(guildId) {
     const server = voiceServers.get(guildId);
     const sessionId = voiceStates.get(guildId);
+    const n = currentNode();
     if (!server || !sessionId || !n?.sessionId) return;
+
     try {
         await updatePlayer(guildId, {
             voice: {
@@ -363,51 +420,48 @@ async function sendVoiceUpdate(guildId) {
     }
 }
 
-async function joinVoice(guildId, channelId) {
-    const guild = clientRef.guilds.cache.get(guildId);
-    if (!guild) throw new Error('Guild não encontrada');
-    const shard = guild.shard || clientRef.ws;
-    // @ts-ignore
-    clientRef.ws.shards?.first?.()?.send?.({
-        op: 4,
-        d: {
-            guild_id: guildId,
-            channel_id: channelId,
-            self_mute: false,
-            self_deaf: true
-        }
-    });
-    // fallback
-    try {
-        guild.shard?.send({
-            op: 4,
-            d: {
-                guild_id: guildId,
-                channel_id: channelId,
-                self_mute: false,
-                self_deaf: true
-            }
-        });
-    } catch (_) {}
-}
-
 async function playTrack(guildId, encoded) {
-    await updatePlayer(guildId, {
-        encodedTrack: encoded,
-        volume: getPlayer(guildId).volume
+    return updatePlayer(guildId, {
+        track: { encoded },
+        volume: getPlayer(guildId).volume,
+        paused: false
     });
 }
 
 async function playNext(guildId) {
     const p = getPlayer(guildId);
-    const next = p.queue.shift();
-    if (!next) {
+    if (!p.queue.length) {
         p.current = null;
-        return false;
+        try {
+            await updatePlayer(guildId, { track: { encoded: null } });
+        } catch (_) {}
+        const ch = p.textChannelId
+            ? await clientRef.channels.fetch(p.textChannelId).catch(() => null)
+            : null;
+        ch?.send({
+            embeds: [new EmbedBuilder().setColor(COLOR).setDescription('Fila terminou.')]
+        }).catch(() => {});
+        return;
     }
+    const next = p.queue.shift();
     p.current = next;
     await playTrack(guildId, next.encoded);
-    return true;
+    const ch = p.textChannelId
+        ? await clientRef.channels.fetch(p.textChannelId).catch(() => null)
+        : null;
+    if (ch) {
+        const emb = new EmbedBuilder()
+            .setColor(COLOR)
+            .setTitle('🎵 Tocando')
+            .setDescription(`[**${next.title}**](${next.uri || next.url || '#'})`)
+            .addFields(
+                { name: 'Duração', value: formatMs(next.length), inline: true },
+                { name: 'Pedido por', value: next.requester || '—', inline: true },
+                { name: 'Fila', value: `${p.queue.length}`, inline: true }
+            );
+        if (next.artwork) emb.setThumbnail(next.artwork);
+        ch.send({ embeds: [emb] }).catch(() => {});
+    }
 }
 
 async function handlePlayerEvent(msg) {
@@ -415,13 +469,45 @@ async function handlePlayerEvent(msg) {
     if (!guildId) return;
     const type = msg.type;
     if (type === 'TrackEndEvent') {
-        const reason = msg.reason;
-        if (reason === 'replaced') return;
-        await playNext(guildId);
-    } else if (type === 'TrackExceptionEvent' || type === 'TrackStuckEvent') {
-        console.warn('[lavalink] track error', type, msg);
+        if (msg.reason === 'replaced') return;
         await playNext(guildId);
     }
+    if (type === 'TrackStuckEvent' || type === 'TrackExceptionEvent') {
+        const chId = getPlayer(guildId).textChannelId;
+        const ch = chId ? await clientRef.channels.fetch(chId).catch(() => null) : null;
+        ch?.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(COLOR_ERR)
+                    .setDescription(`Erro na faixa: ${msg.exception?.message || msg.reason || type}`)
+            ]
+        }).catch(() => {});
+        await playNext(guildId);
+    }
+}
+
+function formatMs(ms) {
+    if (!ms || ms < 0) return '—';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const ss = String(s % 60).padStart(2, '0');
+    const mm = String(m % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
+function mapTrack(t, requester) {
+    const info = t.info || {};
+    return {
+        encoded: t.encoded,
+        title: info.title || 'Desconhecido',
+        uri: info.uri || '',
+        url: info.uri || '',
+        length: info.length || 0,
+        artwork: info.artworkUrl || info.thumbnail || null,
+        author: info.author || '',
+        requester: requester || '—'
+    };
 }
 
 async function play(ctx, query) {
@@ -443,7 +529,7 @@ async function play(ctx, query) {
             throw new Error('Sem permissão de **Falar**.');
     }
 
-    // Aguarda sessão Lavalink (até ~12s) em vez de falhar na hora
+    // Aguarda sessão Lavalink (até ~12s)
     let n = currentNode();
     if (!n?.ready || !n.sessionId) {
         if (n) connectNode(activeIdx);
@@ -485,14 +571,61 @@ async function play(ctx, query) {
     return { started: false, track: mapped[0], added: mapped.length };
 }
 
+async function skip(guildId) {
+    const p = getPlayer(guildId);
+    if (!p.current) throw new Error('Nada tocando.');
+    await playNext(guildId);
+}
+
+async function stop(guildId) {
+    const p = getPlayer(guildId);
+    p.queue = [];
+    p.current = null;
+    await destroyPlayer(guildId);
+    await leaveVoice(guildId);
+}
+
+async function pause(guildId, paused) {
+    const p = getPlayer(guildId);
+    if (!p.current) throw new Error('Nada tocando.');
+    p.paused = paused;
+    await updatePlayer(guildId, { paused });
+}
+
+async function setVolume(guildId, vol) {
+    const p = getPlayer(guildId);
+    p.volume = Math.max(0, Math.min(100, vol));
+    await updatePlayer(guildId, { volume: p.volume });
+    return p.volume;
+}
+
+function queueInfo(guildId) {
+    return getPlayer(guildId);
+}
+
+function status() {
+    return {
+        nodes: nodes.map((n) => ({
+            label: n.label,
+            ready: !!n.ready,
+            sessionId: n.sessionId || null,
+            active: n === currentNode()
+        })),
+        active: currentNode()?.label || null
+    };
+}
+
 module.exports = {
     setup,
     play,
-    getPlayer,
-    destroyPlayer,
-    playNext,
-    updatePlayer,
-    loadTracks,
-    currentNode,
-    nodes: () => nodes
+    skip,
+    stop,
+    pause,
+    setVolume,
+    queueInfo,
+    status,
+    formatMs,
+    COLOR,
+    COLOR_ERR,
+    COLOR_WARN
 };
