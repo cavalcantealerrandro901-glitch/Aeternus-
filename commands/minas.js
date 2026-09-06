@@ -15,6 +15,12 @@ const MAX_BOMBS = 11;
 const HOUSE = 0.97; // casa do bot
 const IDLE_MS = 7 * 60 * 1000;
 
+/** Imagens de resultado: sacar (ganhou) / bomba (perdeu) */
+const IMG_WIN =
+    'https://image.pollinations.ai/prompt/victory%20cash%20out%20mines%20game%20green%20gems%20gold%20coins%20celebration%20glow%20discord%20banner?width=960&height=540&nologo=true&seed=77001&model=flux';
+const IMG_LOSE =
+    'https://image.pollinations.ai/prompt/minesweeper%20bomb%20explosion%20red%20loss%20dark%20game%20over%20discord%20banner?width=960&height=540&nologo=true&seed=77002&model=flux';
+
 const games = new Map();
 
 function fmt(n) {
@@ -38,14 +44,12 @@ function multAt(opened, bombs) {
     return Number(Math.max(1, m * HOUSE).toFixed(2));
 }
 
-/** Multi extra ganho ao abrir a próxima gema (delta) */
 function multGainNext(opened, bombs) {
     const cur = multAt(opened, bombs);
     const next = multAt(opened + 1, bombs);
     return Number(Math.max(0, next - cur).toFixed(2));
 }
 
-/** Multi médio por bomba (comparando 1 bomba vs N bombas na mesma quantidade de gemas) */
 function multPerBombHint(opened, bombs) {
     if (opened <= 0 || bombs <= 1) return null;
     const withBombs = multAt(opened, bombs);
@@ -161,7 +165,6 @@ function panelEmbed(game, extra) {
         `✅ Abertas **${opened}**  ·  🟢 Restam **${freeLeft}** gemas`
     ];
 
-    // Bloco de multiplicador
     lines.push('', '**Multiplicador**');
     lines.push(`📈 Atual **×${curM.toFixed(2)}**`);
     if (!game.fun && opened > 0) {
@@ -188,10 +191,18 @@ function panelEmbed(game, extra) {
     if (banner) lines.push('', banner);
     if (extra) lines.push('', extra);
 
-    return new EmbedBuilder()
+    const emb = new EmbedBuilder()
         .setColor(color)
         .setTitle('💎  Mines · 4×4')
         .setDescription(lines.join('\n'));
+
+    if (game.cashed && !game.fun) {
+        emb.setImage(IMG_WIN);
+    } else if (game.dead) {
+        emb.setImage(IMG_LOSE);
+    }
+
+    return emb;
 }
 
 function boardRows(game, reveal = false) {
@@ -453,7 +464,12 @@ module.exports = {
             const res = openCell(game, idx);
             if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
             return interaction.update({
-                embeds: [panelEmbed(game, `🎲 Abriu **#${idx + 1}** · multi ×**${multAt(game.opened.size, game.bombCount)}**`)],
+                embeds: [
+                    panelEmbed(
+                        game,
+                        `🎲 Abriu **#${idx + 1}** · multi ×**${multAt(game.opened.size, game.bombCount)}**`
+                    )
+                ],
                 components: fullComponents(game)
             });
         }
