@@ -2,10 +2,9 @@
  * Musica sem Lavalink - @discordjs/voice + YouTube
  *
  * ENV:
- *   YOUTUBE_API_KEY=...   (YouTube Data API v3 - busca oficial)
+ *   YOUTUBE_API_KEY=...
  *   FFMPEG_PATH=/usr/bin/ffmpeg
  *   YTDLP_PATH=/usr/local/bin/yt-dlp
- *   Sem API key: busca via yt-dlp (ytsearch)
  */
 const {
     joinVoiceChannel,
@@ -89,7 +88,7 @@ function formatMs(ms) {
 function getPlayer(guildId) {
     if (!players.has(guildId)) {
         players.set(guildId, {
-            guildId,
+            guildId: guildId,
             queue: [],
             current: null,
             textChannelId: null,
@@ -107,18 +106,10 @@ async function searchYoutubeApi(query, max) {
     max = max || 5;
     const key = String(process.env.YOUTUBE_API_KEY || '').trim();
     if (!key) return null;
-
     const { data } = await axios.get('https://www.googleapis.com/youtube/v3/search', {
-        params: {
-            part: 'snippet',
-            type: 'video',
-            maxResults: max,
-            q: query,
-            key: key
-        },
+        params: { part: 'snippet', type: 'video', maxResults: max, q: query, key: key },
         timeout: 12000
     });
-
     return (data.items || [])
         .map(function (it) {
             const id = it.id && it.id.videoId;
@@ -142,7 +133,6 @@ async function searchYtdlp(query, max) {
     max = max || 5;
     const ytdlp = resolveBins._ytdlp;
     const input = /^https?:\/\//i.test(query) ? query : 'ytsearch' + max + ':' + query;
-
     if (ytdlp) {
         const raw = await ytdlp(input, {
             dumpSingleJson: true,
@@ -166,7 +156,6 @@ async function searchYtdlp(query, max) {
             };
         });
     }
-
     return new Promise(function (resolve, reject) {
         const args = [input, '--dump-single-json', '--no-warnings', '--skip-download', '--flat-playlist', '--no-check-certificates'];
         const proc = spawn(ytdlpPath || 'yt-dlp', args, { windowsHide: true });
@@ -202,21 +191,18 @@ async function searchYtdlp(query, max) {
 async function resolveQuery(query) {
     const q = String(query || '').trim();
     if (!q) throw new Error('Busca vazia');
-
     if (/^https?:\/\//i.test(q)) {
         return [{ title: q, uri: q, url: q, length: 0, artwork: null, author: '', id: null }];
     }
-
     try {
         const api = await searchYoutubeApi(q, 5);
         if (api && api.length) {
-            console.log('[music] busca YouTube API: ' + api.length + ' resultado(s)');
+            console.log('[music] busca YouTube API: ' + api.length);
             return api;
         }
     } catch (e) {
         console.warn('[music] YouTube API:', (e.response && e.response.data && e.response.data.error && e.response.data.error.message) || e.message);
     }
-
     console.log('[music] busca via yt-dlp...');
     const list = await searchYtdlp(q, 5);
     if (!list.length) throw new Error('Nada encontrado no YouTube.');
@@ -225,46 +211,30 @@ async function resolveQuery(query) {
 
 function createYtdlpStream(url) {
     const args = [
-        url,
-        '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
-        '-o', '-',
-        '--no-playlist',
-        '--no-warnings',
-        '--quiet',
-        '--no-check-certificates'
+        url, '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
+        '-o', '-', '--no-playlist', '--no-warnings', '--quiet', '--no-check-certificates'
     ];
-    const proc = spawn(ytdlpPath || 'yt-dlp', args, {
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe']
-    });
-    proc.stderr.on('data', function () {});
-    return proc;
+    return spawn(ytdlpPath || 'yt-dlp', args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 function ensurePlayer(guildId) {
     const st = getPlayer(guildId);
     if (st.player) return st.player;
-
     const player = createAudioPlayer();
     st.player = player;
-
     player.on(AudioPlayerStatus.Idle, function () {
-        playNext(guildId).catch(function (e) {
-            console.error('[music] next:', e.message);
-        });
+        playNext(guildId).catch(function (e) { console.error('[music] next:', e.message); });
     });
     player.on('error', function (err) {
         console.error('[music] player error:', err.message);
         playNext(guildId).catch(function () {});
     });
-
     return player;
 }
 
 function connectVoice(guild, channel) {
     const st = getPlayer(guild.id);
     let connection = getVoiceConnection(guild.id);
-
     if (!connection || st.voiceChannelId !== channel.id) {
         connection = joinVoiceChannel({
             channelId: channel.id,
@@ -274,40 +244,27 @@ function connectVoice(guild, channel) {
         });
         st.voiceChannelId = channel.id;
         st.connection = connection;
-        connection.on('error', function (e) {
-            console.error('[music] voice:', e.message);
-        });
+        connection.on('error', function (e) { console.error('[music] voice:', e.message); });
     }
-
-    const player = ensurePlayer(guild.id);
-    connection.subscribe(player);
+    connection.subscribe(ensurePlayer(guild.id));
     return connection;
 }
 
-async function playTrack(guildId, track) {
+async function playTrack(guildId, track, opts) {
+    opts = opts || {};
     const st = getPlayer(guildId);
     const player = ensurePlayer(guildId);
     st.current = track;
     st.paused = false;
-
     const url = track.uri || track.url;
     if (!url) throw new Error('URL invalida');
-
     const proc = createYtdlpStream(url);
-    const resource = createAudioResource(proc.stdout, {
-        inputType: StreamType.Arbitrary,
-        inlineVolume: true
-    });
-    if (resource.volume) {
-        resource.volume.setVolume((st.volume || 80) / 100);
-    }
-
+    const resource = createAudioResource(proc.stdout, { inputType: StreamType.Arbitrary, inlineVolume: true });
+    if (resource.volume) resource.volume.setVolume((st.volume || 80) / 100);
     player.play(resource);
-
+    if (opts.announce === false) return;
     try {
-        const ch = st.textChannelId
-            ? await clientRef.channels.fetch(st.textChannelId).catch(function () { return null; })
-            : null;
+        const ch = st.textChannelId ? await clientRef.channels.fetch(st.textChannelId).catch(function () { return null; }) : null;
         if (ch) {
             const emb = new EmbedBuilder()
                 .setColor(COLOR)
@@ -329,19 +286,12 @@ async function playNext(guildId) {
     if (!st.queue.length) {
         st.current = null;
         try {
-            const ch = st.textChannelId
-                ? await clientRef.channels.fetch(st.textChannelId).catch(function () { return null; })
-                : null;
-            if (ch) {
-                ch.send({
-                    embeds: [new EmbedBuilder().setColor(COLOR).setDescription('Fila terminou.')]
-                }).catch(function () {});
-            }
+            const ch = st.textChannelId ? await clientRef.channels.fetch(st.textChannelId).catch(function () { return null; }) : null;
+            if (ch) ch.send({ embeds: [new EmbedBuilder().setColor(COLOR).setDescription('Fila terminou.')] }).catch(function () {});
         } catch (_) {}
         return;
     }
-    const next = st.queue.shift();
-    await playTrack(guildId, next);
+    await playTrack(guildId, st.queue.shift());
 }
 
 async function play(ctx, query) {
@@ -350,49 +300,33 @@ async function play(ctx, query) {
     const channel = ctx.channel;
     const user = ctx.user || ctx.author;
     if (!guild || !member) throw new Error('So em servidor');
-
     const voice = member.voice && member.voice.channel;
     if (!voice) throw new Error('Entre em um canal de voz primeiro.');
-
     const me = guild.members.me;
     if (me) {
         const perms = voice.permissionsFor(me);
-        if (perms && !perms.has(PermissionsBitField.Flags.Connect))
-            throw new Error('Sem permissao de Conectar.');
-        if (perms && !perms.has(PermissionsBitField.Flags.Speak))
-            throw new Error('Sem permissao de Falar.');
+        if (perms && !perms.has(PermissionsBitField.Flags.Connect)) throw new Error('Sem permissao de Conectar.');
+        if (perms && !perms.has(PermissionsBitField.Flags.Speak)) throw new Error('Sem permissao de Falar.');
     }
-
     resolveBins();
-
     const results = await resolveQuery(query);
     const first = results[0];
     if (!first) throw new Error('Nada encontrado.');
-
     const track = Object.assign({}, first, { requester: String(user) });
-
     const st = getPlayer(guild.id);
     st.textChannelId = channel.id;
     st.voiceChannelId = voice.id;
-
     connectVoice(guild, voice);
-
     try {
         const conn = getVoiceConnection(guild.id);
-        if (conn) {
-            await entersState(conn, VoiceConnectionStatus.Ready, 20000);
-        }
+        if (conn) await entersState(conn, VoiceConnectionStatus.Ready, 20000);
     } catch (e) {
         throw new Error('Nao consegui conectar na call a tempo (20s).');
     }
-
-    const wasEmpty = !st.current;
-
-    if (wasEmpty) {
-        await playTrack(guild.id, track);
+    if (!st.current) {
+        await playTrack(guild.id, track, { announce: false });
         return { started: true, track: track, added: 0 };
     }
-
     st.queue.push(track);
     return { started: false, track: track, added: 1 };
 }
@@ -407,13 +341,9 @@ async function stop(guildId) {
     const st = getPlayer(guildId);
     st.queue = [];
     st.current = null;
-    try {
-        if (st.player) st.player.stop(true);
-    } catch (_) {}
+    try { if (st.player) st.player.stop(true); } catch (_) {}
     const conn = getVoiceConnection(guildId);
-    try {
-        if (conn) conn.destroy();
-    } catch (_) {}
+    try { if (conn) conn.destroy(); } catch (_) {}
     st.connection = null;
     st.player = null;
     players.delete(guildId);
@@ -433,9 +363,7 @@ async function setVolume(guildId, vol) {
     return st.volume;
 }
 
-function queueInfo(guildId) {
-    return getPlayer(guildId);
-}
+function queueInfo(guildId) { return getPlayer(guildId); }
 
 function status() {
     return {
@@ -451,12 +379,9 @@ function setup(client) {
     console.log(
         '[music] voice ativo · YouTube API=' +
             (status().youtubeApi ? 'sim' : 'nao (yt-dlp)') +
-            ' · ffmpeg=' +
-            (ffmpegPath || '?') +
-            ' · yt-dlp=' +
-            (ytdlpPath || '?')
+            ' · ffmpeg=' + (ffmpegPath || '?') +
+            ' · yt-dlp=' + (ytdlpPath || '?')
     );
-
     client.on('voiceStateUpdate', function (oldS, newS) {
         try {
             if (!client.user) return;
@@ -469,9 +394,7 @@ function setup(client) {
             const ch = guild.channels.cache.get(chanId);
             if (!ch || !ch.isVoiceBased()) return;
             const humans = ch.members.filter(function (m) { return !m.user.bot; });
-            if (humans.size === 0) {
-                stop(guild.id).catch(function () {});
-            }
+            if (humans.size === 0) stop(guild.id).catch(function () {});
         } catch (_) {}
     });
 }
