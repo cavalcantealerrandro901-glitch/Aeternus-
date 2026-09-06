@@ -1,0 +1,19 @@
+# Deploy Docker no Render
+# No dashboard: Environment = Docker (não Native Node)
+services:
+  - type: web
+    name: aeternus-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: FFMPEG_PATH
+        value: /usr/bin/ffmpeg
+      - key: YTDLP_PATH
+        value: /usr/local/bin/yt-dlp

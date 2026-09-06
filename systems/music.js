@@ -3,7 +3,9 @@
  *
  * ENV:
  *   YOUTUBE_API_KEY=...   (YouTube Data API v3 - busca oficial)
- *   Sem a key: busca via yt-dlp (ytsearch)
+ *   FFMPEG_PATH=/usr/bin/ffmpeg
+ *   YTDLP_PATH=/usr/local/bin/yt-dlp
+ *   Sem API key: busca via yt-dlp (ytsearch)
  */
 const {
     joinVoiceChannel,
@@ -31,11 +33,32 @@ let ytdlpPath = null;
 let ffmpegPath = null;
 
 function resolveBins() {
-    try {
-        ffmpegPath = require('ffmpeg-static');
-    } catch {
-        ffmpegPath = 'ffmpeg';
+    const envFfmpeg = String(process.env.FFMPEG_PATH || '').trim();
+    const envYtdlp = String(process.env.YTDLP_PATH || '').trim();
+
+    if (envFfmpeg && fs.existsSync(envFfmpeg)) {
+        ffmpegPath = envFfmpeg;
+    } else {
+        try {
+            ffmpegPath = require('ffmpeg-static');
+        } catch {
+            ffmpegPath = 'ffmpeg';
+        }
     }
+
+    if (envYtdlp && fs.existsSync(envYtdlp)) {
+        ytdlpPath = envYtdlp;
+        resolveBins._ytdlp = null;
+        return;
+    }
+
+    const systemYtdlp = ['/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp'].find((p) => fs.existsSync(p));
+    if (systemYtdlp) {
+        ytdlpPath = systemYtdlp;
+        resolveBins._ytdlp = null;
+        return;
+    }
+
     try {
         const ytdlp = require('yt-dlp-exec');
         const cand = path.join(
@@ -429,7 +452,9 @@ function setup(client) {
         '[music] voice ativo · YouTube API=' +
             (status().youtubeApi ? 'sim' : 'nao (yt-dlp)') +
             ' · ffmpeg=' +
-            (ffmpegPath || '?')
+            (ffmpegPath || '?') +
+            ' · yt-dlp=' +
+            (ytdlpPath || '?')
     );
 
     client.on('voiceStateUpdate', function (oldS, newS) {
