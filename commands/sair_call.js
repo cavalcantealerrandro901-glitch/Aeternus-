@@ -3,18 +3,18 @@ const music = require('../systems/music');
 
 module.exports = {
     name: 'sair',
-    aliases: ['leave', 'disconnect', 'dc'],
-    description: 'Sair da call',
+    aliases: ['leave', 'disconnect', 'dc', 'saircall'],
+    description: 'Sair do canal de voz',
     data: new SlashCommandBuilder().setName('sair_call').setDescription('Sair do canal de voz'),
 
     async execute(message) {
         try {
             await music.stop(message.guild.id);
             await message.reply({
-                embeds: [new EmbedBuilder().setColor(music.COLOR).setDescription('👋 Sai da call.')]
+                embeds: [new EmbedBuilder().setColor(music.COLOR).setDescription('Saí da call.')]
             });
         } catch (e) {
-            await message.reply(`❌ ${e.message}`);
+            await message.reply(`\u274c ${e.message}`);
         }
     },
 
@@ -22,10 +22,10 @@ module.exports = {
         try {
             await music.stop(i.guild.id);
             await i.reply({
-                embeds: [new EmbedBuilder().setColor(music.COLOR).setDescription('👋 Sai da call.')]
+                embeds: [new EmbedBuilder().setColor(music.COLOR).setDescription('Saí da call.')]
             });
         } catch (e) {
-            await i.reply({ content: `❌ ${e.message}`, ephemeral: true });
+            await i.reply({ content: `\u274c ${e.message}`, flags: 64 });
         }
     }
 };

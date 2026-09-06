@@ -3,18 +3,18 @@ const music = require('../systems/music');
 
 module.exports = {
     name: 'pular',
-    aliases: ['skip', 's'],
-    description: 'Pular música',
-    data: new SlashCommandBuilder().setName('pular').setDescription('Pular música'),
+    aliases: ['skip', 's', 'next'],
+    description: 'Pular a música atual',
+    data: new SlashCommandBuilder().setName('pular').setDescription('Pular a música atual'),
 
     async execute(message) {
         try {
             await music.skip(message.guild.id);
             await message.reply({
-                embeds: [new EmbedBuilder().setColor(music.COLOR).setDescription('⏭️ Pulou.')]
+                embeds: [new EmbedBuilder().setColor(music.COLOR).setDescription('Próxima música.')]
             });
         } catch (e) {
-            await message.reply(`❌ ${e.message}`);
+            await message.reply(`\u274c ${e.message}`);
         }
     },
 
@@ -22,10 +22,10 @@ module.exports = {
         try {
             await music.skip(i.guild.id);
             await i.reply({
-                embeds: [new EmbedBuilder().setColor(music.COLOR).setDescription('⏭️ Pulou.')]
+                embeds: [new EmbedBuilder().setColor(music.COLOR).setDescription('Próxima música.')]
             });
         } catch (e) {
-            await i.reply({ content: `❌ ${e.message}`, ephemeral: true });
+            await i.reply({ content: `\u274c ${e.message}`, flags: 64 });
         }
     }
 };
