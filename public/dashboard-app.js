@@ -38,7 +38,6 @@ function show(id) {
   $(id)?.classList.add('on');
   const b = [...document.querySelectorAll('.nb')].find((x) => x.dataset.p === id);
   if (b) b.classList.add('on');
-  if (id === 'me') loadDaily();
 }
 
 document.querySelectorAll('.nb').forEach((b) => {
@@ -72,11 +71,8 @@ async function loadMe() {
   if (r.status === 401) return (location.href = '/login');
   const j = await r.json();
   const u = j.user || j;
-  if ($('uchip'))
-    $('uchip').textContent = u.global_name || u.username || 'Conta';
+  if ($('uchip')) $('uchip').textContent = u.global_name || u.username || 'Conta';
 }
-
-async function loadDaily() {}
 
 async function loadGuilds() {
   const r = await fetch('/api/guilds');
@@ -116,7 +112,12 @@ async function sel(id) {
     $('rrChannel').value = data.reactionRoles?.channelId || '';
   }
   if ($('rrRole')) fill($('rrRole'), roles, 'Cargo VIP');
+  if ($('rrMsg'))
+    $('rrMsg').value =
+      data.reactionRoles?.message ||
+      'Reaja com o emoji do VIP que deseja receber.';
   rrRenderList();
+  rrPreview();
 
   if ($('prefixInput')) $('prefixInput').value = s.prefix || 'O.';
   if ($('ovStats'))
@@ -171,12 +172,14 @@ function rrAdd() {
   if ($('rrEmoji')) $('rrEmoji').value = '';
   if ($('rrLabel')) $('rrLabel').value = '';
   rrRenderList();
+  rrPreview();
   toast('Adicionado à lista — clique Salvar');
 }
 
 function rrRemove(i) {
   rrRoles.splice(i, 1);
   rrRenderList();
+  rrPreview();
 }
 
 async function rrSave() {
@@ -185,6 +188,7 @@ async function rrSave() {
     enabled: $('rrEnabled')?.checked !== false,
     channelId: val('rrChannel') || null,
     allowMultiple: !!$('rrMulti')?.checked,
+    message: (val('rrMsg') || '').trim() || 'Reaja com o emoji do VIP que deseja receber.',
     roles: rrRoles
   };
   const r = await fetch('/api/guild/' + gid + '/reaction-roles', {
@@ -196,6 +200,7 @@ async function rrSave() {
   if (j.ok) {
     if (j.config?.roles) rrRoles = j.config.roles;
     rrRenderList();
+    rrPreview();
     toast('Salvo!');
   } else toast(j.error || 'Erro ao salvar');
 }
@@ -215,6 +220,34 @@ async function rrPublish() {
       $('rrHint').textContent =
         'Mensagem no canal. Membros já podem reagir para receber o cargo.';
   } else toast(j.error || 'Erro ao publicar');
+}
+
+function rrPreview() {
+  const body = $('rrPrevBody');
+  const emos = $('rrPrevEmojis');
+  if (!body) return;
+  const msg =
+    (val('rrMsg') || '').trim() ||
+    'Reaja com o emoji do VIP que deseja receber.';
+  const multi = !!$('rrMulti')?.checked;
+  let text = msg + '\n';
+  if (rrRoles.length) {
+    text += '\n';
+    for (const r of rrRoles) {
+      text += r.emoji + ' → ' + (r.label || 'VIP') + '\n';
+    }
+  } else {
+    text += '\n(Nenhum VIP na lista ainda)';
+  }
+  text += multi
+    ? '\nVocê pode escolher mais de um VIP.'
+    : '\nApenas um VIP por vez. Ao escolher outro, o anterior é removido.';
+  body.textContent = text.trim();
+  if (emos) {
+    emos.innerHTML = rrRoles.length
+      ? rrRoles.map((r) => '<span>' + r.emoji + '</span>').join('')
+      : '';
+  }
 }
 
 renderHub();
