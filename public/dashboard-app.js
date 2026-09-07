@@ -1,4 +1,4 @@
-let gid = null, data = null;
+let gid = null, data = null, rrRoles = [];
 const $ = (id) => document.getElementById(id);
 const val = (id) => $(id)?.value ?? '';
 
@@ -21,7 +21,8 @@ const SYS_HUB = [
   ['dmWelcome', '📩', 'DM welcome'],
   ['mentionGuard', '🚫', 'Menções'],
   ['voiceHub', '🔊', 'Voice hub'],
-  ['levels', '📢', 'Anúncio nível']
+  ['levels', '📢', 'Anúncio nível'],
+  ['reactionRoles', '💎', 'Cargos VIP']
 ];
 
 function toast(m) {
@@ -70,59 +71,12 @@ async function loadMe() {
   const r = await fetch('/api/me');
   if (r.status === 401) return (location.href = '/login');
   const j = await r.json();
-  const u = j.user;
-  $('uchip').textContent =
-    (u.global_name || u.username) + ' · ✨ ' + fmt(j.economy?.eter);
-  $('meStats').innerHTML = `<div class="st"><span class="f">Éter</span><b>${fmt(
-    j.economy?.eter
-  )}</b></div><div class="st"><span class="f">Nível</span><b>${
-    j.economy?.xp?.level || 0
-  }</b></div><div class="st"><span class="f">XP</span><b>${fmt(
-    j.economy?.xp?.xp
-  )}</b></div>`;
-  const p = j.economy?.progress;
-  if (p)
-    $('meXpLabel').textContent = `${fmt(p.current)}/${fmt(p.need)} XP (${p.pct}%)`;
+  const u = j.user || j;
+  if ($('uchip'))
+    $('uchip').textContent = u.global_name || u.username || 'Conta';
 }
 
-async function loadDaily() {
-  const r = await fetch('/api/daily' + (gid ? '?guildId=' + gid : ''));
-  const j = await r.json();
-  $('dailyStats').innerHTML = `<div class="st"><span class="f">Streak</span><b>${
-    j.streak || 0
-  }</b></div><div class="st"><span class="f">Faixa</span><b>${fmt(j.dailyMin)}–${fmt(
-    j.dailyMax
-  )}</b></div><div class="st"><span class="f">Mult</span><b>×${(
-    j.multiplier || 1
-  ).toFixed(2)}</b></div>`;
-  if (j.available === false) {
-    $('dailyHint').textContent = j.leftText || 'Já coletado';
-    $('dailyBtn').disabled = true;
-    $('dailyBtn').textContent = 'Já coletado';
-  } else {
-    $('dailyHint').textContent = 'Disponível · seq. ' + (j.nextStreak || 1);
-    $('dailyBtn').disabled = false;
-    $('dailyBtn').textContent = 'Coletar daily ✨';
-  }
-}
-
-async function claimDaily() {
-  $('dailyBtn').disabled = true;
-  const r = await fetch('/api/daily/claim', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ guildId: gid })
-  });
-  const j = await r.json();
-  if (!j.ok) {
-    toast(j.error || 'Erro');
-    $('dailyBtn').disabled = false;
-    return;
-  }
-  toast('+' + fmt(j.amount) + ' éter');
-  loadMe();
-  loadDaily();
-}
+async function loadDaily() {}
 
 async function loadGuilds() {
   const r = await fetch('/api/guilds');
@@ -131,7 +85,7 @@ async function loadGuilds() {
     (j.guilds || [])
       .map(
         (g) =>
-          `<div class="sys" onclick="sel('${g.id}')"><b>${g.name}</b><div class="hint">${g.memberCount} membros</div></div>`
+          `<div class="sys" onclick="sel('${g.id}')"><b>${g.name}</b><div class="hint">${g.memberCount || ''} membros</div></div>`
       )
       .join('') || '<p class="hint">Nenhum servidor</p>';
 }
@@ -144,72 +98,33 @@ async function sel(id) {
   document.querySelectorAll('.nb').forEach((b) => {
     if (b.dataset.p !== 'servers' && b.dataset.p !== 'me') b.disabled = false;
   });
-  const s = data.settings,
+  const s = data.settings || {},
     ch = data.channels || [],
     roles = data.roles || [],
     cats = data.categories || [];
   document.querySelectorAll('select').forEach((sel) => {
-    if (/Role|arRole|vfRole|tkRole/.test(sel.id)) fill(sel, roles, 'Cargo');
+    if (/Role|arRole|vfRole|tkRole|rrRole/.test(sel.id)) fill(sel, roles, 'Cargo');
     else if (sel.id === 'tkCat') fill(sel, cats, 'Categoria');
     else fill(sel, ch, 'Canal');
   });
-  const on = (id, v) => {
-    if ($(id)) $(id).checked = !!v;
-  };
-  on('wEnabled', s.welcome?.enabled);
-  on('lvEnabled', s.leave?.enabled);
-  on('arEnabled', s.autorole?.enabled);
-  on('vfEnabled', s.verification?.enabled);
-  on('sbEnabled', s.starboard?.enabled);
-  on('sgEnabled', s.suggestions?.enabled);
-  on('rpEnabled', s.reports?.enabled);
-  on('tkEnabled', s.tickets?.enabled);
-  on('anEnabled', s.antinuke?.enabled);
-  on('bdEnabled', s.birthday?.enabled);
-  on('ctEnabled', s.counting?.enabled);
-  on('stEnabled', s.sticky?.enabled);
-  on('mcEnabled', s.memberCounter?.enabled);
-  on('rxEnabled', s.autoReact?.enabled);
-  on('atEnabled', s.autoThread?.enabled);
-  on('dmEnabled', s.dmWelcome?.enabled);
-  on('mgEnabled', s.mentionGuard?.enabled);
-  on('vhEnabled', s.voiceHub?.enabled);
-  on('lv2Enabled', s.levels?.enabled !== false);
-  const set = (id, v) => {
-    if ($(id)) $(id).value = v ?? '';
-  };
-  set('wChannel', s.welcome?.channelId);
-  set('wMsg', s.welcome?.message);
-  set('lvChannel', s.leave?.channelId);
-  set('lvMsg', s.leave?.message);
-  set('arRole', s.autorole?.roleId);
-  set('vfChannel', s.verification?.channelId);
-  set('vfRole', s.verification?.roleId);
-  set('sbChannel', s.starboard?.channelId);
-  set('sbMin', s.starboard?.minStars || 3);
-  set('sgChannel', s.suggestions?.channelId);
-  set('rpChannel', s.reports?.channelId);
-  set('tkCat', s.tickets?.categoryId);
-  set('tkRole', s.tickets?.supportRoleId);
-  set('anBans', s.antinuke?.maxBans || 3);
-  set('bdChannel', s.birthday?.channelId);
-  set('bdMsg', s.birthday?.message);
-  set('ctChannel', s.counting?.channelId);
-  set('stChannel', s.sticky?.channelId);
-  set('stContent', s.sticky?.content);
-  set('mcChannel', s.memberCounter?.channelId);
-  set('rxChannel', s.autoReact?.channelId);
-  set('atChannel', s.autoThread?.channelId);
-  set('dmMsg', s.dmWelcome?.message);
-  set('mgMax', s.mentionGuard?.maxMentions || 5);
-  set('vhChannel', s.voiceHub?.channelId);
-  set('lv2Channel', s.levels?.announceChannelId);
-  set('prefixInput', s.prefix || 'O.');
-  $('ovStats').innerHTML = `<div class="st"><span class="f">Prefixo</span><b>${
-    s.prefix || 'O.'
-  }</b></div><div class="st"><span class="f">Membros</span><b>${fmt(
-    data.memberCount
-  )}</b></div><div class="st"><span class="f">Sistemas</span><b>19</b></div>`;
+
+  rrRoles = Array.isArray(data.reactionRoles?.roles) ? data.reactionRoles.roles.slice() : [];
+  if ($('rrEnabled')) $('rrEnabled').checked = data.reactionRoles?.enabled !== false;
+  if ($('rrMulti')) $('rrMulti').checked = !!data.reactionRoles?.allowMultiple;
+  if ($('rrChannel')) {
+    fill($('rrChannel'), ch, 'Canal');
+    $('rrChannel').value = data.reactionRoles?.channelId || '';
+  }
+  if ($('rrRole')) fill($('rrRole'), roles, 'Cargo VIP');
+  rrRenderList();
+
+  if ($('prefixInput')) $('prefixInput').value = s.prefix || 'O.';
+  if ($('ovStats'))
+    $('ovStats').innerHTML = `<div class="st"><span class="f">Prefixo</span><b>${
+      s.prefix || 'O.'
+    }</b></div><div class="st"><span class="f">Membros</span><b>${fmt(
+      data.memberCount
+    )}</b></div>`;
   renderHub();
   show('overview');
   toast('Servidor pronto');
@@ -230,124 +145,76 @@ function savePrefix() {
   save({ prefix: (val('prefixInput') || 'O.').slice(0, 8) });
 }
 
-function saveSys(id) {
-  const P = {
-    welcome: () => ({
-      welcome: {
-        enabled: $('wEnabled').checked,
-        channelId: val('wChannel') || null,
-        message: val('wMsg'),
-        embed: true
-      }
-    }),
-    leave: () => ({
-      leave: {
-        enabled: $('lvEnabled').checked,
-        channelId: val('lvChannel') || null,
-        message: val('lvMsg')
-      }
-    }),
-    autorole: () => ({
-      autorole: { enabled: $('arEnabled').checked, roleId: val('arRole') || null }
-    }),
-    verification: () => ({
-      verification: {
-        enabled: $('vfEnabled').checked,
-        channelId: val('vfChannel') || null,
-        roleId: val('vfRole') || null
-      }
-    }),
-    starboard: () => ({
-      starboard: {
-        enabled: $('sbEnabled').checked,
-        channelId: val('sbChannel') || null,
-        minStars: +val('sbMin') || 3
-      }
-    }),
-    suggestions: () => ({
-      suggestions: {
-        enabled: $('sgEnabled').checked,
-        channelId: val('sgChannel') || null
-      }
-    }),
-    reports: () => ({
-      reports: {
-        enabled: $('rpEnabled').checked,
-        channelId: val('rpChannel') || null,
-        anon: true
-      }
-    }),
-    tickets: () => ({
-      tickets: {
-        enabled: $('tkEnabled').checked,
-        categoryId: val('tkCat') || null,
-        supportRoleId: val('tkRole') || null
-      }
-    }),
-    antinuke: () => ({
-      antinuke: { enabled: $('anEnabled').checked, maxBans: +val('anBans') || 3 }
-    }),
-    birthday: () => ({
-      birthday: {
-        enabled: $('bdEnabled').checked,
-        channelId: val('bdChannel') || null,
-        message: val('bdMsg')
-      }
-    }),
-    counting: () => ({
-      counting: {
-        enabled: $('ctEnabled').checked,
-        channelId: val('ctChannel') || null
-      }
-    }),
-    sticky: () => ({
-      sticky: {
-        enabled: $('stEnabled').checked,
-        channelId: val('stChannel') || null,
-        content: val('stContent')
-      }
-    }),
-    memberCounter: () => ({
-      memberCounter: {
-        enabled: $('mcEnabled').checked,
-        channelId: val('mcChannel') || null
-      }
-    }),
-    autoReact: () => ({
-      autoReact: {
-        enabled: $('rxEnabled').checked,
-        channelId: val('rxChannel') || null
-      }
-    }),
-    autoThread: () => ({
-      autoThread: {
-        enabled: $('atEnabled').checked,
-        channelId: val('atChannel') || null
-      }
-    }),
-    dmWelcome: () => ({
-      dmWelcome: { enabled: $('dmEnabled').checked, message: val('dmMsg') }
-    }),
-    mentionGuard: () => ({
-      mentionGuard: {
-        enabled: $('mgEnabled').checked,
-        maxMentions: +val('mgMax') || 5
-      }
-    }),
-    voiceHub: () => ({
-      voiceHub: {
-        enabled: $('vhEnabled').checked,
-        channelId: val('vhChannel') || null
-      }
-    }),
-    levels: () => ({
-      levels: {
-        enabled: $('lv2Enabled').checked,
-        announceChannelId: val('lv2Channel') || null
-      }
-    })
+function rrRenderList() {
+  const el = $('rrList');
+  if (!el) return;
+  if (!rrRoles.length) {
+    el.innerHTML = '<span class="hint">Nenhum VIP na lista</span>';
+    return;
+  }
+  el.innerHTML = rrRoles
+    .map(
+      (r, i) =>
+        `<div class="tg"><span>${r.emoji} <b>${r.label || 'VIP'}</b></span>` +
+        `<button type="button" class="btn" style="margin:0;padding:.3rem .6rem" onclick="rrRemove(${i})">Remover</button></div>`
+    )
+    .join('');
+}
+
+function rrAdd() {
+  const roleId = val('rrRole');
+  const emoji = val('rrEmoji').trim();
+  const label = val('rrLabel').trim() || 'VIP';
+  if (!roleId || !emoji) return toast('Escolha cargo e emoji');
+  rrRoles = rrRoles.filter((r) => r.roleId !== roleId && r.emoji !== emoji);
+  rrRoles.push({ roleId, emoji, label });
+  if ($('rrEmoji')) $('rrEmoji').value = '';
+  if ($('rrLabel')) $('rrLabel').value = '';
+  rrRenderList();
+  toast('Adicionado à lista — clique Salvar');
+}
+
+function rrRemove(i) {
+  rrRoles.splice(i, 1);
+  rrRenderList();
+}
+
+async function rrSave() {
+  if (!gid) return toast('Escolha servidor');
+  const body = {
+    enabled: $('rrEnabled')?.checked !== false,
+    channelId: val('rrChannel') || null,
+    allowMultiple: !!$('rrMulti')?.checked,
+    roles: rrRoles
   };
-  if (P[id]) save(P[id]());
+  const r = await fetch('/api/guild/' + gid + '/reaction-roles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json();
+  if (j.ok) {
+    if (j.config?.roles) rrRoles = j.config.roles;
+    rrRenderList();
+    toast('Salvo!');
+  } else toast(j.error || 'Erro ao salvar');
+}
+
+async function rrPublish() {
+  if (!gid) return toast('Escolha servidor');
+  await rrSave();
+  const r = await fetch('/api/guild/' + gid + '/reaction-roles/publish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}'
+  });
+  const j = await r.json();
+  if (j.ok) {
+    toast('Painel publicado!');
+    if ($('rrHint'))
+      $('rrHint').textContent =
+        'Mensagem no canal. Membros já podem reagir para receber o cargo.';
+  } else toast(j.error || 'Erro ao publicar');
 }
 
 renderHub();
