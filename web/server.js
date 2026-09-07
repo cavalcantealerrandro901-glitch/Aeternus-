@@ -2,6 +2,19 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const axios = require('axios');
+const crypto = require('crypto');
+
+/** @type {Map<string, {user: object, access: string, exp: number}>} */
+const sessions = new Map();
+
+function cleanSessions() {
+    const now = Date.now();
+    for (const [k, v] of sessions) {
+        if (!v || v.exp < now) sessions.delete(k);
+    }
+}
+setInterval(cleanSessions, 60 * 60 * 1000).unref?.();
+
 const store = require('../utils/store');
 const { mountReactionRoutes, getSettings, setSettings } = require('./reactionRoutes');
 
@@ -41,12 +54,43 @@ function setup(client) {
 
     function sessionUser(req) {
         try {
-            const raw = req.signedCookies?.aeternus_user;
-            if (!raw) return null;
-            return JSON.parse(raw);
+            const sid =
+                req.signedCookies?.aeternus_sid ||
+                req.cookies?.aeternus_sid ||
+                null;
+            if (!sid) return null;
+            const s = sessions.get(String(sid));
+            if (!s || s.exp < Date.now()) {
+                if (sid) sessions.delete(String(sid));
+                return null;
+            }
+            return s.user;
         } catch {
             return null;
         }
+    }
+
+    function createSession(user, accessToken) {
+        cleanSessions();
+        const sid = crypto.randomBytes(24).toString('hex');
+        sessions.set(sid, {
+            user,
+            access: accessToken || null,
+            exp: Date.now() + 7 * 864e5
+        });
+        return sid;
+    }
+
+    function setSessionCookie(res, sid) {
+        res.cookie('aeternus_sid', sid, {
+            signed: true,
+            httpOnly: true,
+            maxAge: 7 * 864e5,
+            sameSite: 'lax',
+            secure: true,
+            path: '/'
+        });
+        res.clearCookie('aeternus_user', { path: '/' });
     }
 
     app.get('/api/health', (_req, res) => {
@@ -59,7 +103,8 @@ function setup(client) {
         });
     });
 
-    app.get('/login', (_req, res) => {
+    app.get('/login', (req, res) => {
+        if (sessionUser(req)) return res.redirect('/dashboard');
         const cid = CLIENT_ID();
         if (!cid) return res.status(500).send('CLIENT_ID não configurado');
         if (!CLIENT_SECRET()) {
@@ -67,11 +112,11 @@ function setup(client) {
                 .status(500)
                 .send('CLIENT_SECRET não configurado no Render (Environment)');
         }
-        const url =
+        const urlConsent =
             `https://discord.com/api/oauth2/authorize?client_id=${cid}` +
             `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
             `&response_type=code&scope=identify%20guilds`;
-        res.redirect(url);
+        res.redirect(urlConsent);
     });
 
     app.get('/auth/discord/callback', async (req, res) => {
@@ -114,13 +159,8 @@ function setup(client) {
                     icon: g.icon
                 }))
             };
-            res.cookie('aeternus_user', JSON.stringify(user), {
-                signed: true,
-                httpOnly: true,
-                maxAge: 7 * 864e5,
-                sameSite: 'lax',
-                secure: true
-            });
+            const sid = createSession(user, access);
+            setSessionCookie(res, sid);
             res.redirect('/dashboard');
         } catch (e) {
             console.error('[web auth]', e.response?.data || e.message);
@@ -138,7 +178,13 @@ function setup(client) {
     });
 
     app.get('/logout', (req, res) => {
-        res.clearCookie('aeternus_user');
+        try {
+            const sid =
+                req.signedCookies?.aeternus_sid || req.cookies?.aeternus_sid;
+            if (sid) sessions.delete(String(sid));
+        } catch (_) {}
+        res.clearCookie('aeternus_sid', { path: '/' });
+        res.clearCookie('aeternus_user', { path: '/' });
         res.redirect('/');
     });
 
