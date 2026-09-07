@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Aeternus Painel</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#03030a;--card:rgba(18,18,36,.8);--line:rgba(255,255,255,.08);--t:#f8fafc;--m:#94a3b8;--v:#a78bfa}body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--t);display:flex;height:100vh}.side{width:250px;border-right:1px solid var(--line);padding:.8rem;overflow:auto;background:#0a0a16}.nb{display:block;width:100%;text-align:left;background:0;border:0;color:var(--m);padding:.5rem;border-radius:.6rem;cursor:pointer;margin:.1rem 0;font:inherit}.nb:hover,.nb.on{background:rgba(167,139,250,.2);color:#fff}.nb:disabled{opacity:.3}.main{flex:1;overflow:auto;padding:1.2rem}.panel{display:none}.panel.on{display:block}.card{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:1rem;margin-bottom:.8rem}.btn{background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:0;padding:.6rem 1rem;border-radius:.7rem;font-weight:700;cursor:pointer;margin-top:.6rem;margin-right:.4rem}.btn.ok{background:linear-gradient(135deg,#059669,#34d399)}.btn:disabled{opacity:.4}.tg{display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.05)}input,select,textarea{width:100%;background:#000;border:1px solid var(--line);color:var(--t);padding:.5rem;border-radius:.5rem;margin:.2rem 0}.f{font-size:.7rem;color:var(--m)}.hint{color:var(--m);font-size:.85rem;margin:.4rem 0}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem}.sys{background:#0004;border:1px solid var(--line);border-radius:.8rem;padding:.8rem;cursor:pointer}.sys:hover{border-color:var(--v)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}.st{background:#0004;padding:.7rem;border-radius:.7rem;border:1px solid var(--line)}.st b{display:block;font-size:1.2rem}.toast{position:fixed;bottom:1rem;right:1rem;padding:.7rem 1rem;border-radius:.7rem;background:#34d399;color:#042f1c;font-weight:700;opacity:0;transition:.3s}.toast.show{opacity:1}.sec{font-size:.65rem;color:#64748b;text-transform:uppercase;margin:.5rem 0 .2rem;letter-spacing:.1em}</style></head><body>
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Aeternus Painel</title><style>*{box-sizing:border-box;margin:0;padding:0}:root{--bg:#03030a;--card:rgba(18,18,36,.8);--line:rgba(255,255,255,.08);--t:#f8fafc;--m:#94a3b8;--v:#a78bfa}body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--t);display:flex;height:100vh}.side{width:250px;border-right:1px solid var(--line);padding:.8rem;overflow:auto;background:#0a0a16}.nb{display:block;width:100%;text-align:left;background:0;border:0;color:var(--m);padding:.5rem;border-radius:.6rem;cursor:pointer;margin:.1rem 0;font:inherit}.nb:hover,.nb.on{background:rgba(167,139,250,.2);color:#fff}.nb:disabled{opacity:.3}.main{flex:1;overflow:auto;padding:1.2rem}.panel{display:none}.panel.on{display:block}.card{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:1rem;margin-bottom:.8rem}.btn{background:linear-gradient(135deg,#7c3aed,#8b5cf6);color:#fff;border:0;padding:.6rem 1rem;border-radius:.7rem;font-weight:700;cursor:pointer;margin-top:.6rem;margin-right:.4rem}.btn.ok{background:linear-gradient(135deg,#059669,#34d399)}.btn:disabled{opacity:.4}.tg{display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.05)}input,select,textarea{width:100%;background:#000;border:1px solid var(--line);color:var(--t);padding:.5rem;border-radius:.5rem;margin:.2rem 0}.f{font-size:.7rem;color:var(--m)}.hint{color:var(--m);font-size:.85rem;margin:.4rem 0}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem}.sys{background:#0004;border:1px solid var(--line);border-radius:.8rem;padding:.8rem;cursor:pointer}.sys:hover{border-color:var(--v)}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}.st{background:#0004;padding:.7rem;border-radius:.7rem;border:1px solid var(--line)}.st b{display:block;font-size:1.2rem}.toast{position:fixed;bottom:1rem;right:1rem;padding:.7rem 1rem;border-radius:.7rem;background:#34d399;color:#042f1c;font-weight:700;opacity:0;transition:.3s}.toast.show{opacity:1}.sec{font-size:.65rem;color:#64748b;text-transform:uppercase;margin:.5rem 0 .2rem;letter-spacing:.1em}.rr-prev{background:#1e1f22;border:1px solid #3f4147;border-radius:.75rem;padding:1rem;margin-top:.8rem;max-width:420px}.rr-prev .pt{font-weight:700;color:#a78bfa;margin-bottom:.5rem}.rr-prev .pb{color:#dbdee1;font-size:.9rem;line-height:1.45;white-space:pre-wrap}.rr-prev .re{margin-top:.75rem;display:flex;flex-wrap:wrap;gap:.4rem}.rr-prev .re span{background:#2b2d31;border-radius:1rem;padding:.25rem .55rem;font-size:.85rem}.rr-prev .ft{margin-top:.6rem;font-size:.7rem;color:#949ba4}</style></head><body>
 <aside class="side"><div style="font-weight:800;margin-bottom:.8rem">✨ Aeternus</div>
 <button class="nb on" data-p="servers">🏠 Servidores</button>
 <button class="nb" data-p="me">❄️ Conta</button>
@@ -9,29 +9,38 @@
 </aside>
 <main class="main">
 <section class="panel on" id="servers"><div class="card"><h3>Servidores</h3><div id="gList" class="grid"></div></div></section>
-<section class="panel" id="me"><div class="card"><h3>Conta</h3><div id="uchip" class="hint"></div><div class="stats" id="meStats"></div><p class="f" id="meXpLabel"></p></div></section>
+<section class="panel" id="me"><div class="card"><h3>Conta</h3><div id="uchip" class="hint"></div><div class="stats" id="meStats"></div></div></section>
 <section class="panel" id="overview"><div class="card"><h3>Visão geral</h3><div class="stats" id="ovStats"></div><div class="grid" id="ovHub" style="margin-top:1rem"></div></div></section>
 <section class="panel" id="sistemas"><div class="card"><h3>Sistemas</h3><div class="grid" id="sysHub"></div></div></section>
 <section class="panel" id="prefixo"><div class="card"><h3>Prefixo</h3><input id="prefixInput" placeholder="O."/><button class="btn" onclick="savePrefix()">Salvar</button></div></section>
 <section class="panel" id="reactionRoles">
 <div class="card">
 <h3>💎 Cargos VIP por reação</h3>
-<p class="hint">Configure os VIPs, emojis e o canal. Os membros reagem na mensagem e recebem o cargo automaticamente.</p>
-<div class="tg"><span>Ativo</span><input type="checkbox" id="rrEnabled" checked/></div>
+<p class="hint">Configure tudo aqui. A prévia abaixo mostra como ficará no Discord.</p>
+<div class="tg"><span>Ativo</span><input type="checkbox" id="rrEnabled" checked onchange="rrPreview()"/></div>
 <label class="f">Canal do painel</label>
 <select id="rrChannel"></select>
-<div class="tg"><span>Permitir vários VIPs ao mesmo tempo</span><input type="checkbox" id="rrMulti"/></div>
+<div class="tg"><span>Permitir vários VIPs ao mesmo tempo</span><input type="checkbox" id="rrMulti" onchange="rrPreview()"/></div>
+<label class="f">Mensagem do painel</label>
+<textarea id="rrMsg" rows="3" placeholder="Texto que aparece no embed…" oninput="rrPreview()"></textarea>
 <label class="f">VIPs configurados</label>
 <div id="rrList" class="hint">Nenhum ainda</div>
 <hr style="border:none;border-top:1px solid var(--line);margin:1rem 0"/>
 <label class="f">Adicionar VIP</label>
 <select id="rrRole"></select>
-<input id="rrEmoji" placeholder="Emoji (ex: ⭐ ou <:nome:id>)" />
+<input id="rrEmoji" placeholder="Emoji (ex: ⭐ ou &lt;:nome:id&gt;)" />
 <input id="rrLabel" placeholder="Nome (ex: VIP+)" />
 <button class="btn" type="button" onclick="rrAdd()">Adicionar à lista</button>
 <button class="btn ok" type="button" onclick="rrSave()">Salvar</button>
-<button class="btn" type="button" onclick="rrPublish()">Publicar / atualizar painel</button>
+<button class="btn" type="button" onclick="rrPublish()">Publicar / atualizar no Discord</button>
 <p class="hint" id="rrHint"></p>
+<label class="f" style="margin-top:1rem;display:block">Prévia (como fica no Discord)</label>
+<div class="rr-prev" id="rrPreview">
+  <div class="pt">Cargos VIP · reação</div>
+  <div class="pb" id="rrPrevBody">Configure e veja aqui.</div>
+  <div class="re" id="rrPrevEmojis"></div>
+  <div class="ft">Aeternus · reaja para receber o cargo</div>
+</div>
 </div>
 </section>
 <div class="toast" id="toast"></div>
