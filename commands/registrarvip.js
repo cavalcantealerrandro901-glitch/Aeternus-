@@ -15,6 +15,28 @@ function isMod(member) {
     );
 }
 
+async function notifyUserVip(client, user, rec, days) {
+    try {
+        const label = vip.vipLabel(rec);
+        const emb = new EmbedBuilder()
+            .setColor(COLOR)
+            .setTitle('VIP ativado')
+            .setDescription(
+                [
+                    `Seu **${label}** foi registrado com sucesso.`,
+                    '',
+                    rec.expiresAt
+                        ? `Válido até <t:${Math.floor(rec.expiresAt / 1000)}:D> (**${days}** dia(s)).`
+                        : 'Plano **permanente**.',
+                    '',
+                    'Confira a qualquer momento com **`O.vervip`** ou **`/ver-vip`**.'
+                ].join('\n')
+            )
+            .addFields({ name: 'VIP', value: `**${label}**`, inline: true });
+        await user.send({ embeds: [emb] });
+    } catch (_) {}
+}
+
 module.exports = {
     name: 'registrarvip',
     aliases: ['regvip', 'addvip', 'setvip'],
@@ -116,6 +138,7 @@ module.exports = {
         if (rec.note) emb.addFields({ name: 'Nota', value: rec.note });
 
         await message.reply({ embeds: [emb] });
+        await notifyUserVip(message.client, user, rec, dias);
     },
 
     async executeSlash(i) {
@@ -164,5 +187,6 @@ module.exports = {
         if (rec.note) emb.addFields({ name: 'Nota', value: rec.note });
 
         await i.reply({ embeds: [emb] });
+        await notifyUserVip(i.client, user, rec, dias);
     }
 };
