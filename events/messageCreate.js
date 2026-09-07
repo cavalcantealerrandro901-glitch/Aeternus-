@@ -4,6 +4,7 @@ const xp = require('../utils/xp');
 const afk = require('../utils/afk');
 const msgStats = require('../utils/msgStats');
 const antispam = require('../utils/antispam');
+const cmdLock = require('../utils/cmdLock');
 const pending = require('../utils/converterPending');
 const { rerollDrop } = require('../systems/drops');
 const autoRepair = require('../utils/autoRepair');
@@ -22,6 +23,26 @@ module.exports = {
             if (spam.block) {
                 await antispam.apply(message, spam);
                 return;
+            }
+
+            if (cmdLock.isLocked(message.guild.id, message.channel.id)) {
+                const prefix = getPrefix(message.guild.id);
+                if (cmdLock.looksLikeCommand(message.content, prefix)) {
+                    if (
+                        !message.member?.permissions?.has?.(
+                            PermissionFlagsBits.ManageChannels
+                        )
+                    ) {
+                        await message.delete().catch(() => {});
+                        const w = await message.channel
+                            .send(
+                                `🔒 ${message.author}, comandos estão bloqueados neste canal.`
+                            )
+                            .catch(() => null);
+                        if (w) setTimeout(() => w.delete().catch(() => {}), 5000);
+                        return;
+                    }
+                }
             }
         } catch (_) {}
 
@@ -61,26 +82,22 @@ module.exports = {
             }
         } catch (_) {}
 
-        // Resposta a @bot: só menção direta, NUNCA na "linha de resposta" (reply)
         try {
             const botMentioned =
                 message.mentions.users.has(client.user.id) && !message.mentions.everyone;
 
             if (botMentioned) {
-                // Discord coloca menção automática ao responder uma msg do bot
                 const isReply = Boolean(message.reference?.messageId);
                 const prefix = getPrefix(message.guild.id);
                 const startsWithPrefix = message.content
                     .toLowerCase()
                     .startsWith(prefix.toLowerCase());
 
-                // se é reply OU já é comando com prefixo → não manda o embed de "Olá"
                 if (!isReply && !startsWithPrefix) {
                     const stripped = message.content
                         .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
                         .trim();
 
-                    // só se a mensagem for só a menção (ou oi/ola/help)
                     const onlyMention =
                         stripped.length === 0 ||
                         /^(ol[aá]|oi|hey|help|ajuda|bot)\s*$/i.test(stripped);
