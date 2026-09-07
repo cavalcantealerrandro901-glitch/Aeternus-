@@ -24,7 +24,11 @@ module.exports = {
                 await antispam.apply(message, spam);
                 return;
             }
+        } catch (e) {
+            console.error('[messageCreate] antispam:', e);
+        }
 
+        try {
             if (cmdLock.isLocked(message.guild.id, message.channel.id)) {
                 const prefix = getPrefix(message.guild.id);
                 if (cmdLock.looksLikeCommand(message.content, prefix)) {
@@ -44,7 +48,9 @@ module.exports = {
                     }
                 }
             }
-        } catch (_) {}
+        } catch (e) {
+            console.error('[messageCreate] cmdLock:', e);
+        }
 
         try {
             const now = Date.now();
@@ -54,7 +60,10 @@ module.exports = {
                 const rel = pending.releaseDue(message.author.id);
                 if (rel.length) {
                     const sum = rel
-                        .map((r) => `• ${Number(r.amount).toLocaleString('pt-BR')} → ${r.deposited}`)
+                        .map(
+                            (r) =>
+                                `• ${Number(r.amount).toLocaleString('pt-BR')} → ${r.deposited}`
+                        )
                         .join('\n');
                     message.channel
                         .send(`${message.author} 💼 **Câmbio liberado após 1 dia:**\n${sum}`)
@@ -141,7 +150,9 @@ module.exports = {
                     xpCd.set(key, now);
                     const gain =
                         (conf.min || 30) +
-                        Math.floor(Math.random() * ((conf.max || 77) - (conf.min || 30) + 1));
+                        Math.floor(
+                            Math.random() * ((conf.max || 77) - (conf.min || 30) + 1)
+                        );
                     const res = xp.addXp(message.author.id, gain);
                     if (res.leveled) {
                         const lvlMsg = await announceLevel(message, res);
