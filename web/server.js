@@ -28,8 +28,16 @@ function setup(client) {
     app.use(express.urlencoded({ extended: true }));
     app.use(express.static(path.join(__dirname, '..', 'public')));
 
+    const publicBase =
+        (process.env.REDIRECT_URI &&
+            process.env.REDIRECT_URI.replace(/\/auth\/discord\/callback\/?$/, '')) ||
+        process.env.RENDER_EXTERNAL_URL ||
+        process.env.PUBLIC_URL ||
+        `http://localhost:${PORT}`;
     const REDIRECT_URI =
-        process.env.REDIRECT_URI || `http://localhost:${PORT}/auth/discord/callback`;
+        process.env.REDIRECT_URI ||
+        `${String(publicBase).replace(/\/$/, '')}/auth/discord/callback`;
+    console.log('[web] OAuth redirect:', REDIRECT_URI);
 
     function sessionUser(req) {
         try {
@@ -46,13 +54,19 @@ function setup(client) {
             ok: true,
             bot: client.user?.tag || null,
             guilds: client.guilds.cache.size,
-            support: process.env.SUPPORT_SERVER_URL || process.env.DISCORD_SUPPORT || ''
+            support: process.env.SUPPORT_SERVER_URL || process.env.DISCORD_SUPPORT || '',
+            redirect: REDIRECT_URI
         });
     });
 
     app.get('/login', (_req, res) => {
         const cid = CLIENT_ID();
         if (!cid) return res.status(500).send('CLIENT_ID não configurado');
+        if (!CLIENT_SECRET()) {
+            return res
+                .status(500)
+                .send('CLIENT_SECRET não configurado no Render (Environment)');
+        }
         const url =
             `https://discord.com/api/oauth2/authorize?client_id=${cid}` +
             `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
@@ -62,7 +76,14 @@ function setup(client) {
 
     app.get('/auth/discord/callback', async (req, res) => {
         const code = req.query.code;
-        if (!code) return res.status(400).send('code missing');
+        if (!code) {
+            return res
+                .status(400)
+                .send(
+                    'Login cancelado ou code ausente. Tente de novo em /login. Redirect esperado: ' +
+                        REDIRECT_URI
+                );
+        }
         try {
             const body = new URLSearchParams({
                 client_id: CLIENT_ID(),
@@ -96,12 +117,23 @@ function setup(client) {
             res.cookie('aeternus_user', JSON.stringify(user), {
                 signed: true,
                 httpOnly: true,
-                maxAge: 7 * 864e5
+                maxAge: 7 * 864e5,
+                sameSite: 'lax',
+                secure: true
             });
             res.redirect('/dashboard');
         } catch (e) {
-            console.error('[web auth]', e.message);
-            res.status(500).send('Auth falhou');
+            console.error('[web auth]', e.response?.data || e.message);
+            const detail =
+                e.response?.data?.error_description ||
+                e.response?.data?.error ||
+                e.message;
+            res.status(500).send(
+                'Auth falhou: ' +
+                    detail +
+                    '. Confira CLIENT_SECRET e Redirect no Developer Portal: ' +
+                    REDIRECT_URI
+            );
         }
     });
 
@@ -175,6 +207,7 @@ function setup(client) {
     const tryListen = (port, attempts = 0) => {
         const server = app.listen(port, () => {
             console.log(`🌐 Painel na porta ${port}`);
+            console.log('[web] OAuth redirect:', REDIRECT_URI);
         });
         server.on('error', (err) => {
             if (err.code === 'EADDRINUSE' && attempts < 15) {
