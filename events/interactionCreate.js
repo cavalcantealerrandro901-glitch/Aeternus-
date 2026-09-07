@@ -1,5 +1,6 @@
+const cmdLock = require('../utils/cmdLock');
 const autoRepair = require('../utils/autoRepair');
-const { Collection } = require('discord.js');
+const { Collection, PermissionFlagsBits } = require('discord.js');
 
 async function bridgeSlashToPrefix(interaction, cmd, client) {
     const raw = interaction.options?.getString?.('args') || '';
@@ -24,12 +25,11 @@ async function bridgeSlashToPrefix(interaction, cmd, client) {
         content: raw,
         mentions: {
             users: mentionUsers,
-            members: interaction.guild?.members?.cache || new Collection(),
-            has: () => false,
-            first: () => mentionUsers.first() || null
+            members: interaction.guild?.members?.cache || new Collection()
         },
-        async reply(payload) {
-            if (!replied && !interaction.replied && !interaction.deferred) {
+        reply: async (payload) => {
+            if (typeof payload === 'string') payload = { content: payload };
+            if (!interaction.replied && !interaction.deferred) {
                 replied = true;
                 return interaction.reply(payload);
             }
@@ -44,7 +44,7 @@ async function bridgeSlashToPrefix(interaction, cmd, client) {
     await cmd.execute(fakeMessage, args, client);
 
     if (!replied && !interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: '✅', ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: '✅', flags: 64 }).catch(() => {});
     }
 }
 
@@ -62,6 +62,24 @@ module.exports = {
             }
 
             if (interaction.isChatInputCommand()) {
+                if (
+                    interaction.guild &&
+                    cmdLock.isLocked(interaction.guild.id, interaction.channelId)
+                ) {
+                    if (
+                        !interaction.member?.permissions?.has?.(
+                            PermissionFlagsBits.ManageChannels
+                        )
+                    ) {
+                        return interaction
+                            .reply({
+                                content: '🔒 Comandos estão bloqueados neste canal.',
+                                flags: 64
+                            })
+                            .catch(() => {});
+                    }
+                }
+
                 const name = interaction.commandName;
                 const cmd = client.slash.get(name) || client.commands.get(name);
 
@@ -70,7 +88,7 @@ module.exports = {
                         .reply({
                             content:
                                 '❌ Este slash não existe mais. Aguarde a sincronização.',
-                            ephemeral: true
+                            flags: 64
                         })
                         .catch(() => {});
                 }
@@ -86,7 +104,7 @@ module.exports = {
                 }
 
                 return interaction
-                    .reply({ content: 'Indisponível.', ephemeral: true })
+                    .reply({ content: 'Indisponível.', flags: 64 })
                     .catch(() => {});
             }
 
@@ -98,27 +116,16 @@ module.exports = {
                 if (!cmd && (parts[0] === 'bj' || parts[0] === 'blackjack')) {
                     cmd = client.commands.get('blackjack') || client.commands.get('bj');
                 }
-                if (!cmd && parts[0] === 'pvp') cmd = client.commands.get('pvp');
-                if (!cmd && parts[0] === 'j') cmd = client.commands.get('j');
-                if (!cmd && parts[0] === 'rank') cmd = client.commands.get('rank');
-                if (!cmd && parts[0] === 'quiz') cmd = client.commands.get('quiz');
-                if (!cmd && id.startsWith('loja:')) cmd = client.commands.get('loja');
-                if (parts[0] === 'act' && parts[1] === 'devolver' && parts[2]) {
-                    cmd = client.commands.get(parts[2]);
-                }
 
                 if (cmd?.handleComponent) {
                     await cmd.handleComponent(interaction, client);
-                    return;
                 }
             }
         } catch (e) {
-            const id = interaction.customId || interaction.commandName || '?';
-            const cmdHint = String(id).split(':')[0];
             await autoRepair.handleCommandError({
-                cmdName: cmdHint,
+                cmdName: interaction.commandName || interaction.customId || 'interaction',
                 error: e,
-                context: `interaction · ${interaction.guild?.name || 'DM'} · ${interaction.type}`,
+                context: `slash · ${interaction.guild?.name || '?'}`,
                 interaction
             });
         }
