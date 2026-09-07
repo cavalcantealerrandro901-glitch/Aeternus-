@@ -43,14 +43,16 @@ async function buildUserEmbed(guild, user) {
         .setThumbnail(user.displayAvatarURL({ size: 128 }));
 
     if (!rec || rec.expired) {
-        emb.setDescription(`${user} **n\u00e3o possui VIP ativo** neste servidor.`);
+        emb.setDescription(`${user} **não possui VIP ativo** neste servidor.`);
         return emb;
     }
 
-    emb.setDescription(`${user} \u00b7 **${rec.tier}**`);
+    const label = vip.vipLabel(rec);
+    emb.setDescription(`${user}`);
     emb.addFields(
+        { name: 'VIP', value: `**${label}**`, inline: true },
         {
-            name: 'H\u00e1 quanto tempo',
+            name: 'Há quanto tempo',
             value: vip.timeHeld(rec.registeredAt),
             inline: true
         },
@@ -63,7 +65,7 @@ async function buildUserEmbed(guild, user) {
             name: 'Desde',
             value: rec.registeredAt
                 ? `<t:${Math.floor(rec.registeredAt / 1000)}:D>`
-                : '\u2014',
+                : '—',
             inline: true
         }
     );
@@ -96,13 +98,14 @@ async function buildListEmbed(guild) {
 
     const lines = [];
     for (const v of list.slice(0, 20)) {
+        const label = vip.vipLabel(v);
         const held = vip.timeHeld(v.registeredAt);
         const left = vip.timeLeft(v.expiresAt);
         lines.push(
-            `<@${v.userId}> \u00b7 **${v.tier}** \u00b7 h\u00e1 **${held}** \u00b7 resta **${left}**`
+            `<@${v.userId}> · **${label}** · há **${held}** · resta **${left}**`
         );
     }
-    if (list.length > 20) lines.push(`_\u2026e mais ${list.length - 20}_`);
+    if (list.length > 20) lines.push(`_…e mais ${list.length - 20}_`);
 
     emb.setDescription(lines.join('\n'));
     emb.setFooter({ text: `${list.length} VIP(s) ativo(s)` });

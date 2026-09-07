@@ -1,5 +1,8 @@
 const store = require('./store');
 
+/** Planos padrão (podem ser usados livres também) */
+const PLANOS = ['VIP', 'VIP+', 'VIP Gold', 'VIP Platinum', 'MVP', 'Booster'];
+
 function loadAll() {
     return store.load('vips.json', {});
 }
@@ -33,13 +36,15 @@ function listActive(guildId) {
         .sort((a, b) => Number(b.registeredAt || 0) - Number(a.registeredAt || 0));
 }
 
-function register({ guildId, userId, tier, registeredBy, days, note }) {
+function register({ guildId, userId, vipName, registeredBy, days, note }) {
     const { all, map } = guildMap(guildId);
     const now = Date.now();
     const d = days == null || Number(days) <= 0 ? null : Number(days);
     const expiresAt = d ? now + d * 24 * 60 * 60 * 1000 : null;
+    const name = String(vipName || 'VIP').trim().slice(0, 40);
     map[userId] = {
-        tier: String(tier || 'VIP').slice(0, 40),
+        vip: name,
+        tier: name,
         registeredBy: String(registeredBy),
         registeredAt: now,
         expiresAt,
@@ -57,6 +62,11 @@ function remove(guildId, userId) {
     return true;
 }
 
+function vipLabel(rec) {
+    if (!rec) return null;
+    return rec.vip || rec.tier || 'VIP';
+}
+
 function formatDuration(ms) {
     if (ms == null || ms <= 0) return 'permanente';
     const s = Math.floor(ms / 1000);
@@ -69,7 +79,7 @@ function formatDuration(ms) {
 }
 
 function timeHeld(registeredAt) {
-    if (!registeredAt) return '\u2014';
+    if (!registeredAt) return '—';
     return formatDuration(Date.now() - Number(registeredAt));
 }
 
@@ -81,10 +91,12 @@ function timeLeft(expiresAt) {
 }
 
 module.exports = {
+    PLANOS,
     get,
     listActive,
     register,
     remove,
+    vipLabel,
     timeHeld,
     timeLeft,
     formatDuration
