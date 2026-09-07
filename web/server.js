@@ -194,17 +194,59 @@ function setup(client) {
         res.json(u);
     });
 
-    app.get('/api/guilds', (req, res) => {
+    app.get('/api/guilds', async (req, res) => {
         const u = sessionUser(req);
         if (!u) return res.status(401).json({ error: 'auth' });
+
         const botGuilds = new Set(client.guilds.cache.keys());
-        res.json(
-            (u.guilds || []).map((g) => ({
-                ...g,
+        let list = Array.isArray(u.guilds) ? u.guilds.slice() : [];
+
+        try {
+            const sid =
+                req.signedCookies?.aeternus_sid || req.cookies?.aeternus_sid;
+            const sess = sid ? sessions.get(String(sid)) : null;
+            if (sess?.access) {
+                const gr = await axios.get('https://discord.com/api/users/@me/guilds', {
+                    headers: { Authorization: `Bearer ${sess.access}` }
+                });
+                list = (gr.data || []).map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                    icon: g.icon,
+                    owner: !!g.owner,
+                    permissions: g.permissions
+                }));
+                sess.user.guilds = list;
+            }
+        } catch (e) {
+            console.warn('[api/guilds] refresh:', e.response?.status || e.message);
+        }
+
+        const mapped = list
+            .map((g) => ({
+                id: g.id,
+                name: g.name,
+                icon: g.icon,
                 botIn: botGuilds.has(g.id),
                 memberCount: client.guilds.cache.get(g.id)?.memberCount || 0
             }))
-        );
+            .filter((g) => g.botIn);
+
+        const out =
+            mapped.length > 0
+                ? mapped
+                : [...botGuilds].map((id) => {
+                      const g = client.guilds.cache.get(id);
+                      return {
+                          id,
+                          name: g?.name || id,
+                          icon: g?.icon || null,
+                          botIn: true,
+                          memberCount: g?.memberCount || 0
+                      };
+                  });
+
+        res.json({ ok: true, guilds: out });
     });
 
     app.get('/api/guild/:id/settings', (req, res) => {
