@@ -112,9 +112,18 @@ function check(message) {
     b.lastStrikeAt = now;
     b.repeats = 0;
 
-    if (b.strikes === 1) return { block: true, reason, punish: 'warn' };
-    if (b.strikes === 2) return { block: true, reason, punish: 'mute' };
-    return { block: true, reason, punish: 'ban' };
+    // 3 avisos antes das penalidades pesadas
+    if (b.strikes <= 3) {
+        return {
+            block: true,
+            reason,
+            punish: 'warn',
+            strike: b.strikes,
+            maxWarns: 3
+        };
+    }
+    if (b.strikes === 4) return { block: true, reason, punish: 'mute', strike: b.strikes };
+    return { block: true, reason, punish: 'ban', strike: b.strikes };
 }
 
 async function apply(message, result) {
@@ -130,11 +139,18 @@ async function apply(message, result) {
 
     try {
         if (punish === 'warn') {
+            const n = result.strike || 1;
+            const maxW = result.maxWarns || 3;
+            const left = Math.max(0, maxW - n);
+            const next =
+                left > 0
+                    ? `Aviso **${n}/${maxW}**. Restam **${left}** antes do mute de 1 hora.`
+                    : `Aviso **${n}/${maxW}**. **Próxima infração: mute de 1 hora.** Depois: ban.`;
             const w = await message.channel
                 .send(
                     `⚠️ ${user}, pare de repetir mensagens/letras/números.\n` +
                         `Motivo: **${result.reason}**\n` +
-                        `Próxima vez: **mute de 1 hora**. Depois: **ban**.`
+                        next
                 )
                 .catch(() => null);
             if (w) setTimeout(() => w.delete().catch(() => {}), 12_000);
@@ -158,7 +174,7 @@ async function apply(message, result) {
         if (punish === 'ban' && member?.bannable) {
             await member
                 .ban({
-                    reason: `Anti-spam (3ª infração): ${result.reason}`,
+                    reason: `Anti-spam (após avisos): ${result.reason}`,
                     deleteMessageSeconds: 0
                 })
                 .catch(() => {});
