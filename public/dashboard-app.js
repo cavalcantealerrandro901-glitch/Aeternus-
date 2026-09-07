@@ -76,14 +76,22 @@ async function loadMe() {
 
 async function loadGuilds() {
   const r = await fetch('/api/guilds');
+  if (r.status === 401) return (location.href = '/login');
   const j = await r.json();
-  $('gList').innerHTML =
-    (j.guilds || [])
-      .map(
-        (g) =>
-          `<div class="sys" onclick="sel('${g.id}')"><b>${g.name}</b><div class="hint">${g.memberCount || ''} membros</div></div>`
-      )
-      .join('') || '<p class="hint">Nenhum servidor</p>';
+  const list = Array.isArray(j) ? j : j.guilds || [];
+  if (!list.length) {
+    $('gList').innerHTML =
+      '<p class="hint">Nenhum servidor com o bot. Convide o Aeternus e recarregue.</p>';
+    return;
+  }
+  $('gList').innerHTML = list
+    .map(
+      (g) =>
+        `<div class="sys" onclick="sel('${g.id}')"><b>${g.name}</b><div class="hint">${
+          g.memberCount ? g.memberCount + ' membros' : 'Bot online'
+        }</div></div>`
+    )
+    .join('');
 }
 
 async function sel(id) {
