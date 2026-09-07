@@ -16,8 +16,12 @@ function get(guildId) {
             channelId: null,
             messageId: null,
             allowMultiple: false,
+            message: 'Reaja com o emoji do VIP que deseja receber.',
             roles: []
         };
+    }
+    if (!all[guildId].message) {
+        all[guildId].message = 'Reaja com o emoji do VIP que deseja receber.';
     }
     return all[guildId];
 }
