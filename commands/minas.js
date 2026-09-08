@@ -3,14 +3,14 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    AttachmentBuilder,
-    StringSelectMenuBuilder,
-    StringSelectMenuOptionBuilder
+    AttachmentBuilder
 } = require('discord.js');
 const path = require('path');
 const fs = require('fs');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
+const minesCash = require('../utils/minesCashButton');
+const { fullComponents } = require('../utils/minesBoard');
 let WIN_IMG_FROM_UTIL = null;
 try {
     const mw = require('../utils/minesWinImage');
@@ -51,9 +51,9 @@ function minesResultThumb(kind) {
 function minesResultFiles(game) {
     const files = [];
     if (game.cashed && !game.fun && fs.existsSync(WIN_IMG_PATH)) {
-        files.push(new AttachmentBuilder(WIN_IMG_PATH, { name: 'mines-win.jpg' }));
+        files.push(new (require('discord.js').AttachmentBuilder)(WIN_IMG_PATH, { name: 'mines-win.jpg' }));
     } else if (game.dead && fs.existsSync(LOSE_IMG_PATH)) {
-        files.push(new AttachmentBuilder(LOSE_IMG_PATH, { name: 'mines-lose.jpg' }));
+        files.push(new (require('discord.js').AttachmentBuilder)(LOSE_IMG_PATH, { name: 'mines-lose.jpg' }));
     }
     return files;
 }
@@ -97,7 +97,10 @@ function touch(game, client) {
             client.channels
                 .fetch(game.channelId)
                 .then((ch) => ch.messages.fetch(game.messageId))
-                .then((m) => m.edit(endPayload(game, '_Partida expirada por inatividade._')))
+                .then(async (m) => {
+                    await m.edit(endPayload(game, '_Partida expirada por inatividade._'));
+                    await minesCash.syncCashMessage(client, game, potentialAt);
+                })
                 .catch(() => {});
         }
     }, IDLE_MS);
@@ -128,33 +131,19 @@ function eterRankFooter(userId) {
     const idx = entries.findIndex((e) => e.id === String(userId));
     const total = entries.length || 1;
     if (idx < 0) {
-        return (
-            '_🏆 Rank · sem posição global · saldo ✨ ' +
-            fmt(bal) +
-            ' · O.rank_'
-        );
+        return '_🏆 Rank · sem posição global · saldo ✨ ' + fmt(bal) + ' · O.rank_';
     }
     const pos = idx + 1;
     let medal = '#' + pos;
     if (pos === 1) medal = '🥇 #1';
     else if (pos === 2) medal = '🥈 #2';
     else if (pos === 3) medal = '🥉 #3';
-    return (
-        '_🏆 Rank global ' +
-        medal +
-        ' de ' +
-        total +
-        ' · ✨ ' +
-        fmt(bal) +
-        ' · O.rank_'
-    );
+    return '_🏆 Rank global ' + medal + ' de ' + total + ' · ✨ ' + fmt(bal) + ' · O.rank_';
 }
 
 function resultBanner(game) {
     if (!game.dead && !game.cashed) return null;
-    if (game.cashed && game.fun) {
-        return '🏁 **Partida encerrada** (modo diversão · sem éter).';
-    }
+    if (game.cashed && game.fun) return '🏁 **Partida encerrada** (modo diversão · sem éter).';
     if (game.cashed && !game.fun) {
         const win = game._lastWin || potentialAt(game.amount, game.opened.size, game.bombCount);
         const profit = Math.max(0, win - game.amount);
@@ -210,20 +199,12 @@ function panelEmbed(game, extra) {
             : '**Aposta** · ✨ **' + fmt(game.amount) + '**'
     );
     lines.push(
-        '**Casas** · 💣 **' +
-            bombs +
-            '** bombas · abertas **' +
-            opened +
-            '** / restam **' +
-            freeLeft +
-            '** gemas'
+        '**Casas** · 💣 **' + bombs + '** bombas · abertas **' + opened + '** / restam **' + freeLeft + '** gemas'
     );
     lines.push('**Multiplicador** · **×' + curM.toFixed(2) + '**');
     if (!game.dead && !game.cashed && opened < safeTotal) {
         lines.push(
-            '**Próximo multiplicador** · **×' +
-                nextM.toFixed(2) +
-                '**' +
+            '**Próximo multiplicador** · **×' + nextM.toFixed(2) + '**' +
                 (game.fun ? '' : ' · próximo ganho ✨ **' + fmt(nextPay) + '**')
         );
     } else if (!game.fun && opened > 0) {
@@ -240,7 +221,6 @@ function panelEmbed(game, extra) {
         lines.push(extra);
     }
 
-    // Frase + rank no final (itálico = visual mais “transparente”)
     const tip = tipPhrase(game);
     if (tip) {
         lines.push('');
@@ -264,94 +244,6 @@ function panelEmbed(game, extra) {
     return emb;
 }
 
-function boardRows(game, reveal = false) {
-    const ended = game.dead || game.cashed || reveal;
-    const rows = [];
-    for (let y = 0; y < ROWS; y++) {
-        const row = new ActionRowBuilder();
-        for (let x = 0; x < COLS; x++) {
-            const i = y * COLS + x;
-            const num = String(i + 1);
-            const opened = game.opened.has(i);
-            const bomb = game.bombs.has(i);
-            let label = '·';
-            let style = ButtonStyle.Secondary;
-            if (ended) {
-                if (bomb) {
-                    label = '💣';
-                    style = ButtonStyle.Danger;
-                } else if (opened) {
-                    label = '💎';
-                    style = ButtonStyle.Success;
-                } else {
-                    label = num;
-                    style = ButtonStyle.Secondary;
-                }
-            } else if (opened) {
-                label = '💎';
-                style = ButtonStyle.Success;
-            } else {
-                label = num;
-                style = ButtonStyle.Primary;
-            }
-            row.addComponents(
-                new ButtonBuilder()
-                    .setCustomId('minas:cell:' + game.id + ':' + i)
-                    .setLabel(label.slice(0, 80))
-                    .setStyle(style)
-                    .setDisabled(ended || opened)
-            );
-        }
-        rows.push(row);
-    }
-    return rows;
-}
-
-function controlsRow(game) {
-    const ended = game.dead || game.cashed;
-    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
-    const canCash = game.opened.size > 0 && !ended;
-    const cashLabel = game.fun ? 'Encerrar' : 'Sacar · ✨ ' + fmt(pot);
-
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('minas:random:' + game.id)
-            .setLabel('Aleatório')
-            .setEmoji('🎲')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(ended),
-        new ButtonBuilder()
-            .setCustomId('minas:refresh:' + game.id)
-            .setLabel('Atualizar')
-            .setEmoji('🔄')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId('minas:cash:' + game.id)
-            .setLabel(cashLabel.slice(0, 80))
-            .setEmoji(game.fun ? '🏁' : '💵')
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(ended || (!game.fun && !canCash))
-    );
-}
-
-function againRow(game) {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('minas:again:' + game.id)
-            .setLabel('Tentar novamente')
-            .setEmoji('🔁')
-            .setStyle(ButtonStyle.Primary)
-    );
-}
-
-function fullComponents(game, reveal = false) {
-    const ended = game.dead || game.cashed || reveal;
-    if (ended) {
-        return [...boardRows(game, true).slice(0, 4), againRow(game)];
-    }
-    return [...boardRows(game, false), controlsRow(game)];
-}
-
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
     const id = userId + '_' + Date.now();
     const bombs = new Set();
@@ -369,6 +261,7 @@ function makeGame(userId, amount, bombCount, fun, meta = {}) {
         fun: !!fun,
         channelId: meta.channelId || null,
         messageId: null,
+        cashMessageId: null,
         _lastWin: 0,
         _timer: null,
         _last: Date.now()
@@ -454,6 +347,7 @@ module.exports = {
         const msg = await message.reply(panelPayload(game));
         game.messageId = msg.id;
         game.channelId = message.channel.id;
+        await minesCash.syncCashMessage(client, game, potentialAt);
         touch(game, client);
     },
 
@@ -489,12 +383,14 @@ module.exports = {
             }
             games.delete(gameId);
             clearTimer(game);
+            await minesCash.deleteCashMessage(client, game);
             const ng = makeGame(game.userId, amount, bombCount, fun, {
                 channelId: interaction.channelId
             });
             await interaction.update(panelPayload(ng));
             ng.messageId = interaction.message.id;
             ng.channelId = interaction.channelId;
+            await minesCash.syncCashMessage(client, ng, potentialAt);
             touch(ng, client);
             return;
         }
@@ -507,7 +403,9 @@ module.exports = {
 
         if (action === 'refresh') {
             const ended = game.dead || game.cashed;
-            return interaction.update(panelPayload(game, ended ? null : '_Atualizado._', ended));
+            await interaction.update(panelPayload(game, ended ? null : '_Atualizado._', ended));
+            await minesCash.syncCashMessage(client, game, potentialAt);
+            return;
         }
 
         if (action === 'random') {
@@ -516,13 +414,19 @@ module.exports = {
                 return interaction.reply({ content: 'Nenhuma casa.', flags: 64 });
             }
             const res = openCell(game, idx);
-            if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
-            return interaction.update(
+            if (res.bomb || res.autoWin) {
+                await interaction.update(endPayload(game));
+                await minesCash.syncCashMessage(client, game, potentialAt);
+                return;
+            }
+            await interaction.update(
                 panelPayload(
                     game,
                     '🎲 Abriu **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
                 )
             );
+            await minesCash.syncCashMessage(client, game, potentialAt);
+            return;
         }
 
         if (action === 'cell') {
@@ -534,31 +438,52 @@ module.exports = {
             if (!res.ok) {
                 return interaction.reply({ content: 'Casa já aberta.', flags: 64 });
             }
-            if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
-            return interaction.update(
+            if (res.bomb || res.autoWin) {
+                await interaction.update(endPayload(game));
+                await minesCash.syncCashMessage(client, game, potentialAt);
+                return;
+            }
+            await interaction.update(
                 panelPayload(
                     game,
                     '💎 Casa **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
                 )
             );
+            await minesCash.syncCashMessage(client, game, potentialAt);
+            return;
         }
 
         if (action === 'cash') {
             if (game.fun) {
                 game.cashed = true;
-                return interaction.update(endPayload(game));
-            }
-            if (!game.opened.size) {
+            } else if (!game.opened.size) {
                 return interaction.reply({
                     content: 'Abra pelo menos uma casa antes de sacar.',
                     flags: 64
                 });
+            } else {
+                game.cashed = true;
+                const win = potentialAt(game.amount, game.opened.size, game.bombCount);
+                game._lastWin = win;
+                eter.add(game.userId, win, { reason: 'mines cash' });
             }
-            game.cashed = true;
-            const win = potentialAt(game.amount, game.opened.size, game.bombCount);
-            game._lastWin = win;
-            eter.add(game.userId, win, { reason: 'mines cash' });
-            return interaction.update(endPayload(game));
+
+            const end = endPayload(game);
+            const onCashMsg =
+                game.cashMessageId && interaction.message?.id === game.cashMessageId;
+
+            if (onCashMsg) {
+                await interaction.update(minesCash.cashPayload(game, potentialAt));
+                try {
+                    const ch = interaction.channel;
+                    const main = await ch.messages.fetch(game.messageId);
+                    await main.edit(end);
+                } catch (_) {}
+            } else {
+                await interaction.update(end);
+                await minesCash.syncCashMessage(client, game, potentialAt);
+            }
+            return;
         }
     }
 };
