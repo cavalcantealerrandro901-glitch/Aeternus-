@@ -1,10 +1,4 @@
-const {
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    SlashCommandBuilder
-} = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const workUtil = require('../utils/work');
 const eter = require('../utils/eter');
 
@@ -78,30 +72,29 @@ function cooldownEmbed(user, leftText, st) {
                 '',
                 `⏰ Disponível em **${leftText}**`,
                 '',
-                `${st.rank.emoji} Cargo atual: **${st.rank.name}**`,
+                `${st.rank.emoji} **Cargo atual:** ${st.rank.name}`,
                 `📦 Turnos: **${fmt(st.jobs)}**`,
-                `✨ Saldo: **${fmt(st.balance)}**`,
                 st.next
-                    ? `⏳ Próximo cargo: **${st.next.name}** (${st.jobsToNext} turnos)`
+                    ? `Próximo: ${st.next.emoji} **${st.next.name}** · faltam **${st.jobsToNext}** turnos`
                     : '🌌 Cargo máximo alcançado.'
             ].join('\n')
-        );
+        )
+        .setThumbnail(user.displayAvatarURL({ size: 128 }));
 }
 
 function statusEmbed(user, st) {
     const ranksList = workUtil.RANKS.map((rk) => {
-        const mark = rk.id === st.rank.id ? '▸' : '·';
-        const range = `✨ ${fmt(rk.min)}–${fmt(rk.max)}`;
-        return `${mark} ${rk.emoji} **${rk.name}** — ${range} · ${rk.minJobs}+ turnos`;
+        const mark = rk.id === st.rank.id ? ' ◀' : '';
+        return `${rk.emoji} **${rk.name}** · ${fmt(rk.minJobs)}+ turnos · ~✨ ${fmt(rk.payMin)}–${fmt(rk.payMax)}${mark}`;
     }).join('\n');
 
     return new EmbedBuilder()
-        .setColor(0x8b5cf6)
+        .setColor(0x38bdf8)
         .setAuthor({
             name: `${user.username} · Carreira`,
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle('💼  Central de Trabalho')
+        .setTitle('Perfil de trabalho')
         .setDescription(
             [
                 `${st.rank.emoji} **Cargo:** ${st.rank.name}`,
@@ -121,41 +114,16 @@ function statusEmbed(user, st) {
         .setThumbnail(user.displayAvatarURL({ size: 128 }));
 }
 
-function rows(canWork) {
-    return [
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('work:go')
-                .setLabel('Trabalhar')
-                .setEmoji('💼')
-                .setStyle(ButtonStyle.Success)
-                .setDisabled(!canWork),
-            new ButtonBuilder()
-                .setCustomId('work:status')
-                .setLabel('Carreira')
-                .setEmoji('📊')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId('work:ranks')
-                .setLabel('Cargos')
-                .setEmoji('🏆')
-                .setStyle(ButtonStyle.Secondary)
-        )
-    ];
-}
-
 async function doWork(user) {
     const r = workUtil.work(user.id);
     if (!r.ok) {
         const st = workUtil.status(user.id);
         return {
-            embeds: [cooldownEmbed(user, r.leftText, st)],
-            components: rows(false)
+            embeds: [cooldownEmbed(user, r.leftText, st)]
         };
     }
     return {
-        embeds: [resultEmbed(user, r)],
-        components: rows(false)
+        embeds: [resultEmbed(user, r)]
     };
 }
 
@@ -187,16 +155,14 @@ module.exports = {
         if (['status', 'perfil', 'carreira', 'info', 'stats'].includes(sub)) {
             const st = workUtil.status(message.author.id);
             return message.reply({
-                embeds: [statusEmbed(message.author, st)],
-                components: rows(st.cooldownLeft <= 0)
+                embeds: [statusEmbed(message.author, st)]
             });
         }
 
         if (['cargos', 'ranks', 'rank', 'niveis', 'nivel'].includes(sub)) {
             const st = workUtil.status(message.author.id);
             return message.reply({
-                embeds: [statusEmbed(message.author, st)],
-                components: rows(st.cooldownLeft <= 0)
+                embeds: [statusEmbed(message.author, st)]
             });
         }
 
@@ -209,29 +175,10 @@ module.exports = {
         if (acao === 'status' || acao === 'ranks') {
             const st = workUtil.status(interaction.user.id);
             return interaction.reply({
-                embeds: [statusEmbed(interaction.user, st)],
-                components: rows(st.cooldownLeft <= 0)
+                embeds: [statusEmbed(interaction.user, st)]
             });
         }
         const payload = await doWork(interaction.user);
         return interaction.reply(payload);
-    },
-
-    async handleComponent(interaction) {
-        const id = interaction.customId;
-        if (!id.startsWith('work:')) return;
-
-        if (id === 'work:status' || id === 'work:ranks') {
-            const st = workUtil.status(interaction.user.id);
-            return interaction.update({
-                embeds: [statusEmbed(interaction.user, st)],
-                components: rows(st.cooldownLeft <= 0)
-            });
-        }
-
-        if (id === 'work:go') {
-            const payload = await doWork(interaction.user);
-            return interaction.update(payload);
-        }
     }
 };
