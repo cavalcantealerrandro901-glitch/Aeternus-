@@ -129,10 +129,9 @@ function eterRankFooter(userId) {
     const total = entries.length || 1;
     if (idx < 0) {
         return (
-            '🏆 **Rank do sistema** · ainda sem posição no ranking global\n' +
-            'Saldo atual: ✨ **' +
+            '_🏆 Rank · sem posição global · saldo ✨ ' +
             fmt(bal) +
-            '** · veja com `O.rank`'
+            ' · O.rank_'
         );
     }
     const pos = idx + 1;
@@ -141,14 +140,13 @@ function eterRankFooter(userId) {
     else if (pos === 2) medal = '🥈 #2';
     else if (pos === 3) medal = '🥉 #3';
     return (
-        '🏆 **Rank do sistema** · global ' +
+        '_🏆 Rank global ' +
         medal +
-        ' de **' +
+        ' de ' +
         total +
-        '**\n' +
-        'Saldo: ✨ **' +
+        ' · ✨ ' +
         fmt(bal) +
-        '** · `O.rank` · `O.rank local` · `O.rank xp`'
+        ' · O.rank_'
     );
 }
 
@@ -175,35 +173,11 @@ function resultBanner(game) {
     ].join('\n');
 }
 
-function boardText(game, reveal = false) {
-    const ended = game.dead || game.cashed || reveal;
-    const lines = [];
-    for (let y = 0; y < ROWS; y++) {
-        const cells = [];
-        for (let x = 0; x < COLS; x++) {
-            const i = y * COLS + x;
-            const opened = game.opened.has(i);
-            const bomb = game.bombs.has(i);
-            if (ended) {
-                if (bomb) cells.push('💣');
-                else if (opened) cells.push('💎');
-                else cells.push('⬜');
-            } else if (opened) {
-                cells.push('💎');
-            } else {
-                cells.push('`' + String(i + 1).padStart(2, ' ') + '`');
-            }
-        }
-        lines.push(cells.join('  '));
-    }
-    return lines.join('\n');
-}
-
 function tipPhrase(game) {
     if (game.dead || game.cashed) return null;
     return (
-        'Clique nas casas do tabuleiro para ganhar mais e aumentar seu multiplicador, ' +
-        'mas lembre-se: quanto mais você abre, mais chances de você perder.'
+        '_Clique nas casas do tabuleiro para ganhar mais e aumentar seu multiplicador, ' +
+        'mas lembre-se: quanto mais você abre, mais chances de você perder._'
     );
 }
 
@@ -256,18 +230,6 @@ function panelEmbed(game, extra) {
         lines.push('**Valor atual** · ✨ **' + fmt(curPay) + '**');
     }
 
-    lines.push('');
-    lines.push('────────────────────────');
-    lines.push('**Tabuleiro**');
-    lines.push(boardText(game, game.dead || game.cashed));
-    lines.push('────────────────────────');
-
-    const tip = tipPhrase(game);
-    if (tip) {
-        lines.push('');
-        lines.push(tip);
-    }
-
     const banner = resultBanner(game);
     if (banner) {
         lines.push('');
@@ -278,8 +240,12 @@ function panelEmbed(game, extra) {
         lines.push(extra);
     }
 
-    lines.push('');
-    lines.push('────────────────────────');
+    // Frase + rank no final (itálico = visual mais “transparente”)
+    const tip = tipPhrase(game);
+    if (tip) {
+        lines.push('');
+        lines.push(tip);
+    }
     lines.push(eterRankFooter(game.userId));
 
     const emb = new EmbedBuilder()
@@ -298,36 +264,55 @@ function panelEmbed(game, extra) {
     return emb;
 }
 
-function pickMenuRow(game) {
-    const ended = game.dead || game.cashed;
-    const options = [];
-    for (let i = 0; i < TOTAL; i++) {
-        if (game.opened.has(i)) continue;
-        options.push(
-            new StringSelectMenuOptionBuilder()
-                .setLabel('Casa ' + (i + 1))
-                .setValue(String(i))
-                .setDescription('Abrir a casa ' + (i + 1))
-        );
+function boardRows(game, reveal = false) {
+    const ended = game.dead || game.cashed || reveal;
+    const rows = [];
+    for (let y = 0; y < ROWS; y++) {
+        const row = new ActionRowBuilder();
+        for (let x = 0; x < COLS; x++) {
+            const i = y * COLS + x;
+            const num = String(i + 1);
+            const opened = game.opened.has(i);
+            const bomb = game.bombs.has(i);
+            let label = '·';
+            let style = ButtonStyle.Secondary;
+            if (ended) {
+                if (bomb) {
+                    label = '💣';
+                    style = ButtonStyle.Danger;
+                } else if (opened) {
+                    label = '💎';
+                    style = ButtonStyle.Success;
+                } else {
+                    label = num;
+                    style = ButtonStyle.Secondary;
+                }
+            } else if (opened) {
+                label = '💎';
+                style = ButtonStyle.Success;
+            } else {
+                label = num;
+                style = ButtonStyle.Primary;
+            }
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId('minas:cell:' + game.id + ':' + i)
+                    .setLabel(label.slice(0, 80))
+                    .setStyle(style)
+                    .setDisabled(ended || opened)
+            );
+        }
+        rows.push(row);
     }
-    if (!options.length) {
-        options.push(
-            new StringSelectMenuOptionBuilder()
-                .setLabel('Sem casas')
-                .setValue('none')
-                .setDescription('Nenhuma casa livre')
-        );
-    }
-    const menu = new StringSelectMenuBuilder()
-        .setCustomId('minas:pick:' + game.id)
-        .setPlaceholder('Escolher casa do tabuleiro…')
-        .setDisabled(ended || options[0].data.value === 'none')
-        .addOptions(options.slice(0, 25));
-    return new ActionRowBuilder().addComponents(menu);
+    return rows;
 }
 
-function topControlsRow(game) {
+function controlsRow(game) {
     const ended = game.dead || game.cashed;
+    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
+    const canCash = game.opened.size > 0 && !ended;
+    const cashLabel = game.fun ? 'Encerrar' : 'Sacar · ✨ ' + fmt(pot);
+
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:random:' + game.id)
@@ -339,17 +324,7 @@ function topControlsRow(game) {
             .setCustomId('minas:refresh:' + game.id)
             .setLabel('Atualizar')
             .setEmoji('🔄')
-            .setStyle(ButtonStyle.Secondary)
-    );
-}
-
-function cashRow(game) {
-    const ended = game.dead || game.cashed;
-    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
-    const canCash = game.opened.size > 0 && !ended;
-    const cashLabel = game.fun ? 'Encerrar' : 'Sacar · ✨ ' + fmt(pot);
-
-    return new ActionRowBuilder().addComponents(
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId('minas:cash:' + game.id)
             .setLabel(cashLabel.slice(0, 80))
@@ -371,8 +346,10 @@ function againRow(game) {
 
 function fullComponents(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
-    if (ended) return [againRow(game)];
-    return [pickMenuRow(game), topControlsRow(game), cashRow(game)];
+    if (ended) {
+        return [...boardRows(game, true).slice(0, 4), againRow(game)];
+    }
+    return [...boardRows(game, false), controlsRow(game)];
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
@@ -544,25 +521,6 @@ module.exports = {
                 panelPayload(
                     game,
                     '🎲 Abriu **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
-                )
-            );
-        }
-
-        if (action === 'pick') {
-            const raw = interaction.values?.[0];
-            const idx = Number(raw);
-            if (!Number.isInteger(idx) || idx < 0 || idx >= TOTAL) {
-                return interaction.reply({ content: 'Casa inválida.', flags: 64 });
-            }
-            const res = openCell(game, idx);
-            if (!res.ok) {
-                return interaction.reply({ content: 'Casa já aberta.', flags: 64 });
-            }
-            if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
-            return interaction.update(
-                panelPayload(
-                    game,
-                    '💎 Casa **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
                 )
             );
         }
