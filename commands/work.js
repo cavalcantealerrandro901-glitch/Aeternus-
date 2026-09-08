@@ -1,6 +1,6 @@
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const workUtil = require('../utils/work');
-const eter = require('../utils/eter');
+const workRoles = require('../utils/workRoles');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -31,7 +31,8 @@ function resultEmbed(user, r) {
     if (r.promoted) {
         lines.push(
             '',
-            `🎉 **Promoção!** ${r.rankBefore.emoji} ${r.rankBefore.name} → ${r.rank.emoji} **${r.rank.name}**`
+            `🎉 **Promoção!** ${r.rankBefore.emoji} ${r.rankBefore.name} → ${r.rank.emoji} **${r.rank.name}**`,
+            '_Cargo antigo removido · novo cargo atribuído no servidor._'
         );
     }
 
@@ -85,7 +86,9 @@ function cooldownEmbed(user, leftText, st) {
 function statusEmbed(user, st) {
     const ranksList = workUtil.RANKS.map((rk) => {
         const mark = rk.id === st.rank.id ? ' ◀' : '';
-        return `${rk.emoji} **${rk.name}** · ${fmt(rk.minJobs)}+ turnos · ~✨ ${fmt(rk.payMin)}–${fmt(rk.payMax)}${mark}`;
+        const min = rk.min ?? rk.payMin ?? 0;
+        const max = rk.max ?? rk.payMax ?? 0;
+        return `${rk.emoji} **${rk.name}** · ${fmt(rk.minJobs)}+ turnos · ~✨ ${fmt(min)}–${fmt(max)}${mark}`;
     }).join('\n');
 
     return new EmbedBuilder()
@@ -114,7 +117,7 @@ function statusEmbed(user, st) {
         .setThumbnail(user.displayAvatarURL({ size: 128 }));
 }
 
-async function doWork(user) {
+async function doWork(user, member) {
     const r = workUtil.work(user.id);
     if (!r.ok) {
         const st = workUtil.status(user.id);
@@ -122,6 +125,15 @@ async function doWork(user) {
             embeds: [cooldownEmbed(user, r.leftText, st)]
         };
     }
+
+    if (member?.guild) {
+        try {
+            await workRoles.syncMember(member, r.rank.id);
+        } catch (e) {
+            console.error('[work] roles', e.message);
+        }
+    }
+
     return {
         embeds: [resultEmbed(user, r)]
     };
@@ -166,7 +178,7 @@ module.exports = {
             });
         }
 
-        const payload = await doWork(message.author);
+        const payload = await doWork(message.author, message.member);
         return message.reply(payload);
     },
 
@@ -178,7 +190,7 @@ module.exports = {
                 embeds: [statusEmbed(interaction.user, st)]
             });
         }
-        const payload = await doWork(interaction.user);
+        const payload = await doWork(interaction.user, interaction.member);
         return interaction.reply(payload);
     }
 };
