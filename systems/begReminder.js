@@ -30,7 +30,7 @@ function saveNotified(data) {
 }
 
 function buildEmbed(user) {
-    const name = user?.username || 'amigo';
+    const name = user?.globalName || user?.username || 'amigo';
     const avatar = user.displayAvatarURL?.({ size: 256 }) || null;
 
     return new EmbedBuilder()
@@ -39,23 +39,28 @@ function buildEmbed(user) {
             name: 'Aeternus · Pedir',
             iconURL: avatar || undefined
         })
-        .setTitle('✦ Você já pode pedir de novo')
+        .setTitle('🙏 A generosidade voltou a sorrir')
         .setDescription(
             [
-                `Olá, **${name}**.`,
+                `**${name}**, o tempo de espera terminou.`,
                 '',
-                'O intervalo de 1 hora acabou. Um novo pedido está **disponível**.',
+                'Alguém no servidor pode te ajudar de novo —',
+                'um novo pedido está **liberado agora**.',
                 '',
-                '━━━━━━━━━━━━━━━━━━━━',
-                '💰 **Ganho:** ✨ 100.000 – 600.000',
-                '⏱ **Cooldown:** 1 hora',
-                '━━━━━━━━━━━━━━━━━━━━',
+                '┌─────────────────────────┐',
+                '│  ✨ **100.000 – 600.000** éter',
+                '│  ⏱ Próximo pedido em **1 hora**',
+                '└─────────────────────────┘',
                 '',
-                '**Como pedir**',
-                '• Prefixo: **`O.beg`** ou **`O.pedir`**',
-                '• Slash: **`/pedir`**'
+                'Use **`O.pedir`** ou **`/pedir`** no servidor',
+                'e receba sua parte de éter.',
+                '',
+                '_Boa sorte — e não demore demais._'
             ].join('\n')
-        );
+        )
+        .setThumbnail(avatar || null)
+        .setFooter({ text: 'Aeternus · economia · pedido liberado' })
+        .setTimestamp();
 }
 
 async function sendReady(client, userId, lastBeg) {
