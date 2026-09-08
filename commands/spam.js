@@ -1,8 +1,7 @@
 const {
     PermissionFlagsBits,
     SlashCommandBuilder,
-    ChannelType,
-    EmbedBuilder
+    ChannelType
 } = require('discord.js');
 const spamAllow = require('../utils/spamAllow');
 
@@ -17,37 +16,34 @@ function isMod(member) {
 
 module.exports = {
     name: 'spam',
-    aliases: ['permitirspam', 'spamallow', 'antispam-canal'],
-    description: 'Permite ou bloqueia spam em um canal',
+    aliases: ['permitirspam'],
+    description: 'Ativar ou desativar canal livre de anti-spam',
     data: new SlashCommandBuilder()
         .setName('spam')
-        .setDescription('Gerenciar canais onde o spam é permitido')
+        .setDescription('Ativar ou desativar canal livre (sem anti-spam)')
         .addSubcommand((s) =>
             s
-                .setName('permitir')
-                .setDescription('Permite spam neste canal (anti-spam desligado aqui)')
+                .setName('ativar')
+                .setDescription('Ativa canal livre — anti-spam desligado neste canal')
                 .addChannelOption((o) =>
                     o
                         .setName('canal')
-                        .setDescription('Canal (padrão: canal atual)')
+                        .setDescription('Canal (opcional: usa o atual)')
                         .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                         .setRequired(false)
                 )
         )
         .addSubcommand((s) =>
             s
-                .setName('bloquear')
-                .setDescription('Volta a aplicar anti-spam neste canal')
+                .setName('desativar')
+                .setDescription('Desativa canal livre — anti-spam volta a valer')
                 .addChannelOption((o) =>
                     o
                         .setName('canal')
-                        .setDescription('Canal (padrão: canal atual)')
+                        .setDescription('Canal (opcional: usa o atual)')
                         .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                         .setRequired(false)
                 )
-        )
-        .addSubcommand((s) =>
-            s.setName('lista').setDescription('Lista canais com spam permitido')
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
@@ -55,39 +51,27 @@ module.exports = {
         if (!isMod(message.member)) {
             return message.reply('Sem permissão (**Gerenciar Servidor**).');
         }
-        const sub = (args[0] || 'lista').toLowerCase();
+        const sub = (args[0] || '').toLowerCase();
         const ch =
             message.mentions.channels.first() ||
             message.guild.channels.cache.get(args[1]) ||
             message.channel;
 
-        if (sub === 'permitir' || sub === 'on' || sub === 'allow') {
+        if (sub === 'ativar' || sub === 'on' || sub === 'ligar') {
             spamAllow.add(message.guild.id, ch.id);
             return message.reply(
-                `✅ Spam **permitido** em ${ch}.\nO anti-spam **não** age neste canal.`
+                `✅ Canal livre **ativado** em ${ch}.\nAnti-spam **desligado** neste chat.`
             );
         }
-        if (sub === 'bloquear' || sub === 'off' || sub === 'negar') {
+        if (sub === 'desativar' || sub === 'off' || sub === 'desligar') {
             spamAllow.remove(message.guild.id, ch.id);
             return message.reply(
-                `🛡️ Anti-spam **reativado** em ${ch}.\nSpam volta a ser punido aqui.`
+                `🛡️ Canal livre **desativado** em ${ch}.\nAnti-spam **ligado** de novo.`
             );
         }
-
-        const list = spamAllow.list(message.guild.id);
-        if (!list.length) {
-            return message.reply(
-                'Nenhum canal com spam liberado. Use `O.spam permitir #canal`.'
-            );
-        }
-        return message.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0xf59e0b)
-                    .setTitle('Canais com spam permitido')
-                    .setDescription(list.map((id) => `• <#${id}>`).join('\n'))
-            ]
-        });
+        return message.reply(
+            'Uso: `O.spam ativar [#canal]` · `O.spam desativar [#canal]`'
+        );
     },
 
     async executeSlash(i) {
@@ -100,40 +84,24 @@ module.exports = {
         const sub = i.options.getSubcommand();
         const ch = i.options.getChannel('canal') || i.channel;
 
-        if (sub === 'permitir') {
+        if (sub === 'ativar') {
             spamAllow.add(i.guild.id, ch.id);
             return i.reply({
                 content:
-                    `✅ Spam **permitido** em ${ch}.\n` +
-                    `O anti-spam **não** age neste canal.`,
+                    `✅ Canal livre **ativado** em ${ch}.\n` +
+                    `Anti-spam **desligado** neste chat.`,
                 flags: 64
             });
         }
-        if (sub === 'bloquear') {
+        if (sub === 'desativar') {
             spamAllow.remove(i.guild.id, ch.id);
             return i.reply({
                 content:
-                    `🛡️ Anti-spam **reativado** em ${ch}.\n` +
-                    `Spam volta a ser punido aqui.`,
+                    `🛡️ Canal livre **desativado** em ${ch}.\n` +
+                    `Anti-spam **ligado** de novo.`,
                 flags: 64
             });
         }
-
-        const list = spamAllow.list(i.guild.id);
-        if (!list.length) {
-            return i.reply({
-                content: 'Nenhum canal com spam liberado.',
-                flags: 64
-            });
-        }
-        return i.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0xf59e0b)
-                    .setTitle('Canais com spam permitido')
-                    .setDescription(list.map((id) => `• <#${id}>`).join('\n'))
-            ],
-            flags: 64
-        });
+        return i.reply({ content: 'Subcomando inválido.', flags: 64 });
     }
 };
