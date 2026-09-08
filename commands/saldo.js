@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const bank = require('../utils/bank');
 
@@ -6,7 +6,6 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-/** Ranking por fortuna (carteira + banco). Se guild for passada, só membros do servidor. */
 function rankPosition(userId, guild) {
     const wallets = eter.all?.() || {};
     const banks = bank.all?.() || {};
@@ -33,28 +32,38 @@ function rankPosition(userId, guild) {
     return idx + 1;
 }
 
-function buildCard(user, guild) {
+function buildEmbed(user, guild) {
     const wallet = eter.get(user.id);
     const bankBal = bank.get(user.id);
     const total = wallet + bankBal;
-    const tag = user.username ? `@${user.username}` : `<@${user.id}>`;
     const pos = rankPosition(user.id, guild);
     const rankLine =
         pos != null
-            ? `🏆 Posição no Ranking: #${pos}${guild ? ' no servidor' : ''}`
+            ? `🏆 Posição no Ranking: **#${pos}**${guild ? ' no servidor' : ''}`
             : '🏆 Posição no Ranking: —';
 
-    return [
-        `✨ **AETERNUS SALDO** • ${tag}`,
-        `👛 Em Mãos: **${fmt(wallet)}** Éter`,
-        `🏦 No Banco: **${fmt(bankBal)}** Éter`,
-        `💎 Fortuna: **${fmt(total)}** Éter`,
-        rankLine
-    ].join('\n');
+    return new EmbedBuilder()
+        .setColor(0xa78bfa)
+        .setAuthor({
+            name: `AETERNUS SALDO • @${user.username}`,
+            iconURL: user.displayAvatarURL({ size: 64 })
+        })
+        .setDescription(
+            [
+                `👛 **Em Mãos:** ${fmt(wallet)} Éter`,
+                `🏦 **No Banco:** ${fmt(bankBal)} Éter`,
+                `💎 **Fortuna:** ${fmt(total)} Éter`,
+                '',
+                rankLine
+            ].join('\n')
+        )
+        .setThumbnail(user.displayAvatarURL({ size: 128 }))
+        .setFooter({ text: 'Aeternus · economia' })
+        .setTimestamp();
 }
 
 async function run(user, guild, reply) {
-    return reply({ content: buildCard(user, guild) });
+    return reply({ embeds: [buildEmbed(user, guild)] });
 }
 
 module.exports = {

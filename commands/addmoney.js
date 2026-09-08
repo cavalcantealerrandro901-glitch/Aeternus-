@@ -1,4 +1,4 @@
-const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
@@ -21,34 +21,29 @@ function nowBr() {
     return `${get('day')}/${get('month')}/${get('year')} às ${get('hour')}:${get('minute')}`;
 }
 
-/** Recibo visual no estilo caixa (mensagem fora de embed) */
-function receiptBox(targetTag, amount, balance, modTag) {
-    const q = fmt(amount);
-    const b = fmt(balance);
-    const when = nowBr();
-    const pad = (s, n = 48) => {
-        const t = String(s);
-        if (t.length >= n) return t.slice(0, n);
-        return t + ' '.repeat(n - t.length);
-    };
+function receiptEmbed(target, amount, balance, modUser) {
+    const targetTag = target.username ? `@${target.username}` : `<@${target.id}>`;
+    const modTag = modUser?.username ? `@${modUser.username}` : '@Staff';
 
-    const lines = [
-        '┌──────────────────────────────────────────────────',
-        `│ ${pad('🔮 AETERNUS ECONOMIA', 48)} │`,
-        '├─────────────────────────────────────────────────┤',
-        `│ ${pad('', 48)} │`,
-        `│ ${pad('✨ Éter Adicionado com Sucesso!', 48)} │`,
-        `│ ${pad('', 48)} │`,
-        `│ ${pad(`👤 Usuário: ${targetTag}`, 48)} │`,
-        `│ ${pad(`💰 Quantia: + ${q} Éter`, 48)} │`,
-        `│ ${pad(`👮 Autorizado por: ${modTag}`, 48)} │`,
-        `│ ${pad('', 48)} │`,
-        `│ ${pad(`🏦 Novo Saldo Total: ${b} Éter`, 48)} │`,
-        `│ ${pad('', 48)} │`,
-        `│ ${pad(`───────────── ${when} ──────────────`, 48)} │`,
-        '└─────────────────────────────────────────────────┘'
-    ];
-    return '```\n' + lines.join('\n') + '\n```';
+    return new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setAuthor({
+            name: '🔮 AETERNUS ECONOMIA',
+            iconURL: modUser?.displayAvatarURL?.({ size: 64 }) || undefined
+        })
+        .setTitle('✨ Éter Adicionado com Sucesso!')
+        .setDescription(
+            [
+                `👤 **Usuário:** ${targetTag}`,
+                `💰 **Quantia:** + ${fmt(amount)} Éter`,
+                `👮 **Autorizado por:** ${modTag}`,
+                '',
+                `🏦 **Novo Saldo Total:** ${fmt(balance)} Éter`
+            ].join('\n')
+        )
+        .setThumbnail(target.displayAvatarURL({ size: 128 }))
+        .setFooter({ text: nowBr() })
+        .setTimestamp();
 }
 
 async function run(modMember, modUser, targets, amountRaw, reply) {
@@ -71,8 +66,7 @@ async function run(modMember, modUser, targets, amountRaw, reply) {
     const bet = resolveBet(amountRaw, Number.MAX_SAFE_INTEGER, { label: '✨' });
     if (!bet.ok) return reply({ content: `❌ ${bet.error}`, flags: 64 });
 
-    const modTag = modUser?.username ? `@${modUser.username}` : '@Staff';
-    const blocks = [];
+    const embeds = [];
     const skipped = [];
 
     for (const u of targets) {
@@ -82,29 +76,27 @@ async function run(modMember, modUser, targets, amountRaw, reply) {
         }
         eter.add(u.id, bet.amount, { reason: 'addmoney', by: modUser?.id });
         const bal = eter.get(u.id);
-        const tag = u.username ? `@${u.username}` : `<@${u.id}>`;
-        blocks.push(receiptBox(tag, bet.amount, bal, modTag));
+        embeds.push(receiptEmbed(u, bet.amount, bal, modUser));
     }
 
-    if (!blocks.length) {
+    if (!embeds.length) {
         return reply({
             content: '❌ Nenhum usuário válido (bots são ignorados).',
             flags: 64
         });
     }
 
-    let content = blocks.join('\n');
+    const payload = { embeds: embeds.slice(0, 10) };
     if (skipped.length) {
-        content += `\n_Ignorados (bots): ${skipped.join(', ')}_`;
+        payload.content = `_Ignorados (bots): ${skipped.join(', ')}_`;
+    }
+    if (embeds.length > 10) {
+        payload.content =
+            (payload.content ? payload.content + '\n' : '') +
+            `_… e mais ${embeds.length - 10} usuário(s)._`;
     }
 
-    if (content.length > 1900) {
-        content =
-            blocks.slice(0, 2).join('\n') +
-            `\n_… e mais ${blocks.length - 2} usuário(s) receberam ✨ **${fmt(bet.amount)}**._`;
-    }
-
-    return reply({ content });
+    return reply(payload);
 }
 
 module.exports = {
@@ -141,10 +133,7 @@ module.exports = {
             i.options.getString('valor', true),
             (p) => {
                 if (typeof p === 'string') return i.reply({ content: p, flags: 64 });
-                if (p.content && !p.embeds) {
-                    const flags = p.flags;
-                    return i.reply(flags != null ? p : { ...p });
-                }
+                if (p.content && !p.embeds) return i.reply({ ...p, flags: p.flags ?? 64 });
                 return i.reply(p);
             }
         );
