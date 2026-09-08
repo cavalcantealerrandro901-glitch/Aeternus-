@@ -51,9 +51,9 @@ function minesResultThumb(kind) {
 function minesResultFiles(game) {
     const files = [];
     if (game.cashed && !game.fun && fs.existsSync(WIN_IMG_PATH)) {
-        files.push(new (require('discord.js').AttachmentBuilder)(WIN_IMG_PATH, { name: 'mines-win.jpg' }));
+        files.push(new AttachmentBuilder(WIN_IMG_PATH, { name: 'mines-win.jpg' }));
     } else if (game.dead && fs.existsSync(LOSE_IMG_PATH)) {
-        files.push(new (require('discord.js').AttachmentBuilder)(LOSE_IMG_PATH, { name: 'mines-lose.jpg' }));
+        files.push(new AttachmentBuilder(LOSE_IMG_PATH, { name: 'mines-lose.jpg' }));
     }
     return files;
 }
@@ -131,14 +131,14 @@ function eterRankFooter(userId) {
     const idx = entries.findIndex((e) => e.id === String(userId));
     const total = entries.length || 1;
     if (idx < 0) {
-        return '_🏆 Rank · sem posição global · saldo ✨ ' + fmt(bal) + ' · O.rank_';
+        return '_🏆 rank · sem posição · ✨ ' + fmt(bal) + ' · O.rank_';
     }
     const pos = idx + 1;
     let medal = '#' + pos;
-    if (pos === 1) medal = '🥇 #1';
-    else if (pos === 2) medal = '🥈 #2';
-    else if (pos === 3) medal = '🥉 #3';
-    return '_🏆 Rank global ' + medal + ' de ' + total + ' · ✨ ' + fmt(bal) + ' · O.rank_';
+    if (pos === 1) medal = '🥇#1';
+    else if (pos === 2) medal = '🥈#2';
+    else if (pos === 3) medal = '🥉#3';
+    return '_🏆 rank global ' + medal + ' / ' + total + ' · ✨ ' + fmt(bal) + ' · O.rank_';
 }
 
 function resultBanner(game) {
@@ -221,11 +221,11 @@ function panelEmbed(game, extra) {
         lines.push(extra);
     }
 
+    lines.push('');
+    lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
+    lines.push('_tabuleiro abaixo · botões maiores · clique nas casas_');
     const tip = tipPhrase(game);
-    if (tip) {
-        lines.push('');
-        lines.push(tip);
-    }
+    if (tip) lines.push(tip);
     lines.push(eterRankFooter(game.userId));
 
     const emb = new EmbedBuilder()
