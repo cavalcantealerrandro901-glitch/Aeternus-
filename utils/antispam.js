@@ -1,4 +1,5 @@
 const { getSettings } = require('./settings');
+const spamAllow = require('./spamAllow');
 
 /** guild:user -> state */
 const buckets = new Map();
@@ -48,6 +49,10 @@ function getBucket(guildId, userId) {
 
 function check(message) {
     if (!message.guild || message.author.bot) return { block: false };
+
+    if (spamAllow.isAllowed(message.guild.id, message.channel.id)) {
+        return { block: false };
+    }
 
     const conf = getSettings(message.guild.id).automod || {};
     if (conf.enabled === false) return { block: false };
