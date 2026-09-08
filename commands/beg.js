@@ -5,6 +5,15 @@ const store = require('../utils/store');
 const CD_MS = 60 * 60 * 1000;
 const REWARD_MIN = 100_000;
 const REWARD_MAX = 600_000;
+const WIN_CHANCE = 0.65;
+
+const FAIL_LINES = [
+    'Ninguém parou para te ajudar desta vez.',
+    'As pessoas passaram direto, sem olhar.',
+    'Você estendeu a mão… e ficou no vazio.',
+    'Hoje a sorte não esteve do seu lado.',
+    'Tente de novo daqui a pouco — a rua muda.'
+];
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -53,6 +62,27 @@ function successEmbed(user, amount, balance) {
         );
 }
 
+function failEmbed(user, balance) {
+    const line = FAIL_LINES[Math.floor(Math.random() * FAIL_LINES.length)];
+    return new EmbedBuilder()
+        .setColor(0x94a3b8)
+        .setAuthor({
+            name: user.username,
+            iconURL: user.displayAvatarURL({ size: 64 })
+        })
+        .setTitle('💨 Ninguém ajudou')
+        .setDescription(
+            [
+                line,
+                '',
+                'Você **não recebeu** éter desta vez.',
+                `**Saldo:** ✨ **${fmt(balance)}**`,
+                '',
+                '_Cooldown: 1 hora · você será avisado no PV quando liberar._'
+            ].join('\n')
+        );
+}
+
 function waitEmbed(user, left) {
     return new EmbedBuilder()
         .setColor(0xf59e0b)
@@ -78,6 +108,12 @@ async function run(user, reply) {
     }
 
     setCd(user.id);
+
+    const win = Math.random() < WIN_CHANCE;
+    if (!win) {
+        return reply({ embeds: [failEmbed(user, eter.get(user.id))] });
+    }
+
     const amount = REWARD_MIN + Math.floor(Math.random() * (REWARD_MAX - REWARD_MIN + 1));
     eter.add(user.id, amount, { reason: 'beg' });
     const balance = eter.get(user.id);
@@ -91,7 +127,7 @@ module.exports = {
     CD_MS,
     data: new SlashCommandBuilder()
         .setName('pedir')
-        .setDescription('Pedir éter (100k–600k · cooldown 1h)'),
+        .setDescription('Pedir éter (100k–600k · chance de falhar · 1h)'),
 
     async execute(message) {
         await run(message.author, (p) => message.reply(p));
