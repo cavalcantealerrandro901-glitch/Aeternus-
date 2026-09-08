@@ -5,7 +5,8 @@ const store = require('../utils/store');
 const CD_MS = 60 * 60 * 1000;
 const REWARD_MIN = 100_000;
 const REWARD_MAX = 600_000;
-const WIN_CHANCE = 0.65;
+/** 50% ganha · 50% não ganha nada */
+const WIN_CHANCE = 0.5;
 
 const FAIL_LINES = [
     'Ninguém parou para te ajudar desta vez.',
@@ -14,6 +15,23 @@ const FAIL_LINES = [
     'Hoje a sorte não esteve do seu lado.',
     'Tente de novo daqui a pouco — a rua muda.'
 ];
+
+/**
+ * Distribuição do prêmio (só quando ganha):
+ *  50% → 100k–200k
+ *  35% → 200k–400k
+ *  15% → 400k–600k
+ */
+function rollReward() {
+    const r = Math.random();
+    if (r < 0.5) {
+        return 100_000 + Math.floor(Math.random() * 100_001);
+    }
+    if (r < 0.85) {
+        return 200_000 + Math.floor(Math.random() * 200_001);
+    }
+    return 400_000 + Math.floor(Math.random() * 200_001);
+}
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -114,7 +132,7 @@ async function run(user, reply) {
         return reply({ embeds: [failEmbed(user, eter.get(user.id))] });
     }
 
-    const amount = REWARD_MIN + Math.floor(Math.random() * (REWARD_MAX - REWARD_MIN + 1));
+    const amount = rollReward();
     eter.add(user.id, amount, { reason: 'beg' });
     const balance = eter.get(user.id);
     return reply({ embeds: [successEmbed(user, amount, balance)] });
