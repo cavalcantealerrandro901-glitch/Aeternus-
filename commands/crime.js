@@ -2,7 +2,11 @@ const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const store = require('../utils/store');
 
-const CD_MS = 10 * 60 * 1000;
+const CD_MS = 20 * 60 * 1000;
+const REWARD_MIN = 30_000;
+const REWARD_MAX = 400_000;
+const FINE_MIN = 20_000;
+const FINE_MAX = 100_000;
 
 const CRIMES = [
     { name: 'Assalto ao caixa', emoji: '🏦' },
@@ -47,11 +51,11 @@ function pickCrime() {
 }
 
 function rollReward() {
-    return 100 + Math.floor(Math.random() * 900);
+    return REWARD_MIN + Math.floor(Math.random() * (REWARD_MAX - REWARD_MIN + 1));
 }
 
 function rollFine(balance) {
-    const raw = 50 + Math.floor(Math.random() * 450);
+    const raw = FINE_MIN + Math.floor(Math.random() * (FINE_MAX - FINE_MIN + 1));
     return Math.min(Math.max(0, balance), raw);
 }
 
@@ -70,7 +74,7 @@ function successEmbed(user, crime, amount, balance) {
                 `Você levou **✨ ${fmt(amount)}**.`,
                 `**Saldo:** ✨ **${fmt(balance)}**`,
                 '',
-                `_Próximo crime em ${formatCd(CD_MS).replace(/\*\*/g, '')}._`
+                '_Cooldown: 20 minutos · você será avisado no PV quando liberar._'
             ].join('\n')
         );
 }
@@ -84,7 +88,7 @@ function failEmbed(user, crime, fine, balance) {
             : 'A polícia te pegou, mas você não tinha éter para pagar a multa.',
         `**Saldo:** ✨ **${fmt(balance)}**`,
         '',
-        `_Próximo crime em ${formatCd(CD_MS).replace(/\*\*/g, '')}._`
+        '_Cooldown: 20 minutos · você será avisado no PV quando liberar._'
     ];
     return new EmbedBuilder()
         .setColor(0xef4444)
@@ -107,7 +111,9 @@ function waitEmbed(user, left) {
         .setDescription(
             [
                 'Você ainda está se escondendo da última tentativa.',
-                `Aguarde ${formatCd(left)} para cometer outro crime.`
+                `Aguarde ${formatCd(left)} para cometer outro crime.`,
+                '',
+                '_Quando o tempo acabar, você recebe um aviso no PV._'
             ].join('\n')
         );
 }
@@ -139,6 +145,7 @@ module.exports = {
     name: 'crime',
     aliases: ['cometer-crime', 'assaltar'],
     description: 'Tentar um crime por éter',
+    CD_MS,
     data: new SlashCommandBuilder()
         .setName('cometer-crime')
         .setDescription('Tentar um crime para ganhar ou perder éter'),
