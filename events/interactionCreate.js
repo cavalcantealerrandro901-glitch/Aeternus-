@@ -113,16 +113,28 @@ module.exports = {
 
             if (interaction.isButton() || interaction.isStringSelectMenu()) {
                 const id = interaction.customId || '';
+                // Só processa componentes nossos (prefixo conhecido). Não mexe em outros bots.
                 const parts = id.split(':');
-                let cmd = client.commands.get(parts[0]);
+                const root = parts[0] || '';
+                let cmd = client.commands.get(root);
 
-                if (!cmd && (parts[0] === 'bj' || parts[0] === 'blackjack')) {
+                if (!cmd && (root === 'bj' || root === 'blackjack')) {
                     cmd = client.commands.get('blackjack') || client.commands.get('bj');
                 }
 
-                if (cmd?.handleComponent) {
-                    await cmd.handleComponent(interaction, client);
+                // IDs de outros bots / sistemas externos → ignorar em silêncio
+                if (!cmd?.handleComponent) return;
+
+                // Só edita mensagens do próprio Aeternus
+                if (
+                    interaction.message?.author?.id &&
+                    client.user?.id &&
+                    interaction.message.author.id !== client.user.id
+                ) {
+                    return;
                 }
+
+                await cmd.handleComponent(interaction, client);
             }
         } catch (e) {
             await autoRepair.handleCommandError({
