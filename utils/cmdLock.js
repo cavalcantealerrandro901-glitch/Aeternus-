@@ -36,21 +36,20 @@ function isLocked(guildId, channelId) {
     return getGuild(guildId).locked.includes(String(channelId));
 }
 
-function toggle(guildId, channelId) {
+function setLocked(guildId, channelId, locked) {
     const cfg = getGuild(guildId);
     const id = String(channelId);
     const set = new Set(cfg.locked);
-    let locked;
-    if (set.has(id)) {
-        set.delete(id);
-        locked = false;
-    } else {
-        set.add(id);
-        locked = true;
-    }
+    if (locked) set.add(id);
+    else set.delete(id);
     cfg.locked = [...set];
     saveGuild(guildId, cfg);
     return locked;
+}
+
+function toggle(guildId, channelId) {
+    const next = !isLocked(guildId, channelId);
+    return setLocked(guildId, channelId, next);
 }
 
 function setCommandsChannel(guildId, channelId) {
@@ -100,6 +99,7 @@ function redirectHint(guildId) {
 
 module.exports = {
     isLocked,
+    setLocked,
     toggle,
     setCommandsChannel,
     getCommandsChannel,

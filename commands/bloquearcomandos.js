@@ -13,24 +13,29 @@ function isMod(member) {
 module.exports = {
     name: 'bloquearcomandos',
     aliases: ['cmdlock', 'lockcmds', 'bloquearcmds', 'blockcmds'],
-    description: 'Bloqueia comandos de bots neste canal',
+    description: 'Bloqueia ou libera comandos em um canal',
     data: new SlashCommandBuilder()
         .setName('bloquear-comandos')
-        .setDescription('Bloqueia ou libera comandos neste canal')
-        .addSubcommand((s) =>
-            s.setName('toggle').setDescription('Liga/desliga o bloqueio neste canal')
+        .setDescription('true = bloqueia comandos · false = libera · canal opcional')
+        .addBooleanOption((o) =>
+            o
+                .setName('bloquear')
+                .setDescription('true = bloquear comandos · false = liberar')
+                .setRequired(true)
         )
-        .addSubcommand((s) =>
-            s
-                .setName('canal-comandos')
-                .setDescription('Define o canal #comandos para redirecionar')
-                .addChannelOption((o) =>
-                    o
-                        .setName('canal')
-                        .setDescription('Canal permitido para comandos')
-                        .addChannelTypes(ChannelType.GuildText)
-                        .setRequired(true)
-                )
+        .addChannelOption((o) =>
+            o
+                .setName('canal')
+                .setDescription('Canal (opcional: usa o atual)')
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                .setRequired(false)
+        )
+        .addChannelOption((o) =>
+            o
+                .setName('canal_comandos')
+                .setDescription('Opcional: define o #comandos para redirecionar')
+                .addChannelTypes(ChannelType.GuildText)
+                .setRequired(false)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
@@ -38,32 +43,45 @@ module.exports = {
         if (!isMod(message.member)) {
             return message.reply('Sem permissão (**Gerenciar Canais**).');
         }
-        const sub = (args[0] || 'toggle').toLowerCase();
 
-        if (sub === 'canal' || sub === 'comandos' || sub === 'canal-comandos') {
+        if (['canal', 'comandos', 'canal-comandos'].includes((args[0] || '').toLowerCase())) {
             const ch =
                 message.mentions.channels.first() ||
                 message.guild.channels.cache.get(args[1]);
-            if (!ch) {
-                return message.reply('Uso: `O.bloquearcomandos canal #comandos`');
-            }
+            if (!ch) return message.reply('Uso: `O.bloquearcomandos canal #comandos`');
             cmdLock.setCommandsChannel(message.guild.id, ch.id);
+            return message.reply(`📌 Canal de comandos definido: ${ch}`);
+        }
+
+        const raw = (args[0] || '').toLowerCase();
+        const trueVals = ['true', '1', 'on', 'sim', 'bloquear', 'yes', 's'];
+        const falseVals = ['false', '0', 'off', 'nao', 'não', 'liberar', 'no', 'n'];
+
+        if (!trueVals.includes(raw) && !falseVals.includes(raw)) {
             return message.reply(
-                `📌 Canal de comandos definido: ${ch}\n` +
-                    `Quem tentar comando em canal bloqueado será mandado para lá.`
+                'Uso: `O.bloquearcomandos true [#canal]` · `O.bloquearcomandos false [#canal]`\n' +
+                    '**true** = bloqueia comandos · **false** = libera\n' +
+                    'Canal de redirecionamento: `O.bloquearcomandos canal #comandos`'
             );
         }
 
-        const locked = cmdLock.toggle(message.guild.id, message.channel.id);
+        const lock = trueVals.includes(raw);
+        const ch =
+            message.mentions.channels.first() ||
+            message.guild.channels.cache.get(args[1]) ||
+            message.channel;
+
+        cmdLock.setLocked(message.guild.id, ch.id, lock);
         const hint = cmdLock.redirectHint(message.guild.id);
-        if (locked) {
+
+        if (lock) {
             return message.reply(
-                `🔒 Comandos **bloqueados** em ${message.channel}.\n` +
-                    `Mensagens de usuários e respostas de **qualquer bot** serão apagadas.\n` +
+                `🔒 Comandos **bloqueados** em ${ch} (\`true\`).\n` +
+                    `Mensagens de usuários e de **qualquer bot** serão apagadas.\n` +
                     hint
             );
         }
-        return message.reply(`🔓 Comandos **liberados** em ${message.channel}.`);
+        return message.reply(`🔓 Comandos **liberados** em ${ch} (\`false\`).`);
     },
 
     async executeSlash(i) {
@@ -73,30 +91,32 @@ module.exports = {
                 flags: 64
             });
         }
-        const sub = i.options.getSubcommand(false) || 'toggle';
 
-        if (sub === 'canal-comandos') {
-            const ch = i.options.getChannel('canal', true);
-            cmdLock.setCommandsChannel(i.guild.id, ch.id);
-            return i.reply({
-                content: `📌 Canal de comandos definido: ${ch}`,
-                flags: 64
-            });
+        const lock = i.options.getBoolean('bloquear', true);
+        const ch = i.options.getChannel('canal') || i.channel;
+        const redirect = i.options.getChannel('canal_comandos');
+
+        if (redirect) {
+            cmdLock.setCommandsChannel(i.guild.id, redirect.id);
         }
 
-        const locked = cmdLock.toggle(i.guild.id, i.channel.id);
+        cmdLock.setLocked(i.guild.id, ch.id, lock);
         const hint = cmdLock.redirectHint(i.guild.id);
-        if (locked) {
+
+        if (lock) {
             return i.reply({
                 content:
-                    `🔒 Comandos **bloqueados** em ${i.channel}.\n` +
+                    `🔒 Comandos **bloqueados** em ${ch} (\`true\`).\n` +
                     `Mensagens de usuários e de **qualquer bot** serão apagadas.\n` +
-                    hint,
+                    hint +
+                    (redirect ? `\n📌 Redirecionamento: ${redirect}` : ''),
                 flags: 64
             });
         }
         return i.reply({
-            content: `🔓 Comandos **liberados** em ${i.channel}.`,
+            content:
+                `🔓 Comandos **liberados** em ${ch} (\`false\`).` +
+                (redirect ? `\n📌 Redirecionamento: ${redirect}` : ''),
             flags: 64
         });
     }
