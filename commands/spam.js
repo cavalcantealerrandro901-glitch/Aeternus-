@@ -14,36 +14,70 @@ function isMod(member) {
     );
 }
 
+function resolveChannel(message, args) {
+    return (
+        message.mentions.channels.first() ||
+        message.guild.channels.cache.get(args.find((a) => /^\d{15,25}$/.test(a))) ||
+        message.channel
+    );
+}
+
+async function apply(guildId, channel, action, reply) {
+    const act = String(action || '').toLowerCase();
+
+    if (act === 'ativar' || act === 'on' || act === 'ligar' || act === 'enable') {
+        spamAllow.add(guildId, channel.id);
+        return reply(
+            `✅ Canal livre **ativado** em ${channel}.\nAnti-spam **desligado** neste chat.`
+        );
+    }
+
+    if (
+        act === 'desativar' ||
+        act === 'off' ||
+        act === 'desligar' ||
+        act === 'disable'
+    ) {
+        spamAllow.remove(guildId, channel.id);
+        return reply(
+            `🛡️ Canal livre **desativado** em ${channel}.\nAnti-spam **ligado** de novo.`
+        );
+    }
+
+    const on = spamAllow.toggle(guildId, channel.id);
+    if (on) {
+        return reply(
+            `✅ Canal livre **ativado** em ${channel}.\nAnti-spam **desligado** neste chat.`
+        );
+    }
+    return reply(
+        `🛡️ Canal livre **desativado** em ${channel}.\nAnti-spam **ligado** de novo.`
+    );
+}
+
 module.exports = {
     name: 'spam',
-    aliases: ['permitirspam'],
+    aliases: ['permitirspam', 'canallivre'],
     description: 'Ativar ou desativar canal livre de anti-spam',
     data: new SlashCommandBuilder()
         .setName('spam')
         .setDescription('Ativar ou desativar canal livre (sem anti-spam)')
-        .addSubcommand((s) =>
-            s
-                .setName('ativar')
-                .setDescription('Ativa canal livre — anti-spam desligado neste canal')
-                .addChannelOption((o) =>
-                    o
-                        .setName('canal')
-                        .setDescription('Canal (opcional: usa o atual)')
-                        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-                        .setRequired(false)
+        .addStringOption((o) =>
+            o
+                .setName('acao')
+                .setDescription('Ativar ou desativar')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Ativar (canal livre)', value: 'ativar' },
+                    { name: 'Desativar (anti-spam de volta)', value: 'desativar' }
                 )
         )
-        .addSubcommand((s) =>
-            s
-                .setName('desativar')
-                .setDescription('Desativa canal livre — anti-spam volta a valer')
-                .addChannelOption((o) =>
-                    o
-                        .setName('canal')
-                        .setDescription('Canal (opcional: usa o atual)')
-                        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-                        .setRequired(false)
-                )
+        .addChannelOption((o) =>
+            o
+                .setName('canal')
+                .setDescription('Canal (opcional: usa o atual)')
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                .setRequired(false)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
@@ -51,27 +85,13 @@ module.exports = {
         if (!isMod(message.member)) {
             return message.reply('Sem permissão (**Gerenciar Servidor**).');
         }
-        const sub = (args[0] || '').toLowerCase();
-        const ch =
-            message.mentions.channels.first() ||
-            message.guild.channels.cache.get(args[1]) ||
-            message.channel;
 
-        if (sub === 'ativar' || sub === 'on' || sub === 'ligar') {
-            spamAllow.add(message.guild.id, ch.id);
-            return message.reply(
-                `✅ Canal livre **ativado** em ${ch}.\nAnti-spam **desligado** neste chat.`
-            );
-        }
-        if (sub === 'desativar' || sub === 'off' || sub === 'desligar') {
-            spamAllow.remove(message.guild.id, ch.id);
-            return message.reply(
-                `🛡️ Canal livre **desativado** em ${ch}.\nAnti-spam **ligado** de novo.`
-            );
-        }
-        return message.reply(
-            'Uso: `O.spam ativar [#canal]` · `O.spam desativar [#canal]`'
-        );
+        const actionArg = (args[0] || '').toLowerCase();
+        const known = ['ativar', 'desativar', 'on', 'off', 'ligar', 'desligar'];
+        const action = known.includes(actionArg) ? actionArg : null;
+        const ch = resolveChannel(message, args);
+
+        await apply(message.guild.id, ch, action, (t) => message.reply(t));
     },
 
     async executeSlash(i) {
@@ -81,27 +101,12 @@ module.exports = {
                 flags: 64
             });
         }
-        const sub = i.options.getSubcommand();
+
+        const action = i.options.getString('acao', true);
         const ch = i.options.getChannel('canal') || i.channel;
 
-        if (sub === 'ativar') {
-            spamAllow.add(i.guild.id, ch.id);
-            return i.reply({
-                content:
-                    `✅ Canal livre **ativado** em ${ch}.\n` +
-                    `Anti-spam **desligado** neste chat.`,
-                flags: 64
-            });
-        }
-        if (sub === 'desativar') {
-            spamAllow.remove(i.guild.id, ch.id);
-            return i.reply({
-                content:
-                    `🛡️ Canal livre **desativado** em ${ch}.\n` +
-                    `Anti-spam **ligado** de novo.`,
-                flags: 64
-            });
-        }
-        return i.reply({ content: 'Subcomando inválido.', flags: 64 });
+        await apply(i.guild.id, ch, action, (t) =>
+            i.reply({ content: t, flags: 64 })
+        );
     }
 };
