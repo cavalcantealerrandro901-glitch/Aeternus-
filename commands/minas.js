@@ -119,6 +119,39 @@ function potentialAt(amount, opened, bombs) {
     return Math.floor(Number(amount || 0) * multAt(opened, bombs));
 }
 
+function eterRankFooter(userId) {
+    const bal = eter.get(userId);
+    const entries = Object.entries(eter.all() || {})
+        .map(([id, v]) => ({ id, value: Number(v || 0) }))
+        .filter((e) => e.value > 0)
+        .sort((a, b) => b.value - a.value);
+    const idx = entries.findIndex((e) => e.id === String(userId));
+    const total = entries.length || 1;
+    if (idx < 0) {
+        return (
+            '🏆 **Rank do sistema** · ainda sem posição no ranking global\n' +
+            'Saldo atual: ✨ **' +
+            fmt(bal) +
+            '** · veja com `O.rank`'
+        );
+    }
+    const pos = idx + 1;
+    let medal = '#' + pos;
+    if (pos === 1) medal = '🥇 #1';
+    else if (pos === 2) medal = '🥈 #2';
+    else if (pos === 3) medal = '🥉 #3';
+    return (
+        '🏆 **Rank do sistema** · global ' +
+        medal +
+        ' de **' +
+        total +
+        '**\n' +
+        'Saldo: ✨ **' +
+        fmt(bal) +
+        '** · `O.rank` · `O.rank local` · `O.rank xp`'
+    );
+}
+
 function resultBanner(game) {
     if (!game.dead && !game.cashed) return null;
     if (game.cashed && game.fun) {
@@ -244,6 +277,10 @@ function panelEmbed(game, extra) {
         lines.push('');
         lines.push(extra);
     }
+
+    lines.push('');
+    lines.push('────────────────────────');
+    lines.push(eterRankFooter(game.userId));
 
     const emb = new EmbedBuilder()
         .setColor(color)
