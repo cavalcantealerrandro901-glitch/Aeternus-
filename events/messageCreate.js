@@ -16,7 +16,30 @@ const pendingPing = new Map();
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
-        if (!message.guild || message.author.bot) return;
+        if (!message.guild) return;
+
+        try {
+            if (
+                message.author.bot &&
+                cmdLock.isLocked(message.guild.id, message.channel.id)
+            ) {
+                const c = message.content || '';
+                const isSystemNotice =
+                    message.author.id === client.user.id &&
+                    (c.startsWith('🔒') ||
+                        c.startsWith('⚠️') ||
+                        c.startsWith('🔇') ||
+                        c.startsWith('🔨'));
+                if (!isSystemNotice) {
+                    await message.delete().catch(() => {});
+                }
+                return;
+            }
+        } catch (e) {
+            console.error('[messageCreate] cmdLock bot:', e);
+        }
+
+        if (message.author.bot) return;
 
         try {
             const spam = antispam.check(message);
@@ -37,13 +60,18 @@ module.exports = {
                             PermissionFlagsBits.ManageChannels
                         )
                     ) {
+                        const isOurs = cmdLock.isAeternusCommand(
+                            message.content,
+                            prefix,
+                            client.user.id
+                        );
                         await message.delete().catch(() => {});
-                        const w = await message.channel
-                            .send(
-                                `🔒 ${message.author}, comandos estão bloqueados neste canal.`
-                            )
-                            .catch(() => null);
-                        if (w) setTimeout(() => w.delete().catch(() => {}), 5000);
+                        const hint = cmdLock.redirectHint(message.guild.id);
+                        const text = isOurs
+                            ? `🔒 ${message.author}, os **meus comandos** estão bloqueados neste chat.\n${hint}`
+                            : `🔒 ${message.author}, comandos de bots estão bloqueados neste chat.\n${hint}`;
+                        const w = await message.channel.send(text).catch(() => null);
+                        if (w) setTimeout(() => w.delete().catch(() => {}), 8000);
                         return;
                     }
                 }
@@ -124,7 +152,7 @@ module.exports = {
                                     `Eu sou o **${client.user.username}** — economia, jogos e utilidades.`,
                                     '',
                                     `**Prefixo:** \`${prefix}\``,
-                                    `**Exemplos:** \`${prefix}ajuda\` · \`${prefix}saldo\` · \`${prefix}daily\` · \`${prefix}bj\``,
+                                    `**Exemplos:** \`${prefix}ajuda\` · \`${prefix}saldo\` · \`${prefix}daily\``,
                                     '',
                                     `Digite \`${prefix}ajuda\` para a central completa.`
                                 ].join('\n')
