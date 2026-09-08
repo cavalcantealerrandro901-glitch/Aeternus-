@@ -1,9 +1,54 @@
-const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
+}
+
+function nowBr() {
+    const d = new Date();
+    const parts = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }).formatToParts(d);
+    const get = (t) => parts.find((p) => p.type === t)?.value || '';
+    return `${get('day')}/${get('month')}/${get('year')} às ${get('hour')}:${get('minute')}`;
+}
+
+/** Recibo visual no estilo caixa (mensagem fora de embed) */
+function receiptBox(targetTag, amount, balance, modTag) {
+    const q = fmt(amount);
+    const b = fmt(balance);
+    const when = nowBr();
+    const pad = (s, n = 48) => {
+        const t = String(s);
+        if (t.length >= n) return t.slice(0, n);
+        return t + ' '.repeat(n - t.length);
+    };
+
+    const lines = [
+        '┌──────────────────────────────────────────────────',
+        `│ ${pad('🔮 AETERNUS ECONOMIA', 48)} │`,
+        '├─────────────────────────────────────────────────┤',
+        `│ ${pad('', 48)} │`,
+        `│ ${pad('✨ Éter Adicionado com Sucesso!', 48)} │`,
+        `│ ${pad('', 48)} │`,
+        `│ ${pad(`👤 Usuário: ${targetTag}`, 48)} │`,
+        `│ ${pad(`💰 Quantia: + ${q} Éter`, 48)} │`,
+        `│ ${pad(`👮 Autorizado por: ${modTag}`, 48)} │`,
+        `│ ${pad('', 48)} │`,
+        `│ ${pad(`🏦 Novo Saldo Total: ${b} Éter`, 48)} │`,
+        `│ ${pad('', 48)} │`,
+        `│ ${pad(`───────────── ${when} ──────────────`, 48)} │`,
+        '└─────────────────────────────────────────────────┘'
+    ];
+    return '```\n' + lines.join('\n') + '\n```';
 }
 
 async function run(modMember, modUser, targets, amountRaw, reply) {
@@ -26,8 +71,10 @@ async function run(modMember, modUser, targets, amountRaw, reply) {
     const bet = resolveBet(amountRaw, Number.MAX_SAFE_INTEGER, { label: '✨' });
     if (!bet.ok) return reply({ content: `❌ ${bet.error}`, flags: 64 });
 
-    const lines = [];
+    const modTag = modUser?.username ? `@${modUser.username}` : '@Staff';
+    const blocks = [];
     const skipped = [];
+
     for (const u of targets) {
         if (!u || u.bot) {
             if (u?.bot) skipped.push(u.username);
@@ -35,36 +82,29 @@ async function run(modMember, modUser, targets, amountRaw, reply) {
         }
         eter.add(u.id, bet.amount, { reason: 'addmoney', by: modUser?.id });
         const bal = eter.get(u.id);
-        lines.push(
-            `• **${u.username}** → +✨ **${fmt(bet.amount)}** · saldo **${fmt(bal)}**`
-        );
+        const tag = u.username ? `@${u.username}` : `<@${u.id}>`;
+        blocks.push(receiptBox(tag, bet.amount, bal, modTag));
     }
 
-    if (!lines.length) {
+    if (!blocks.length) {
         return reply({
             content: '❌ Nenhum usuário válido (bots são ignorados).',
             flags: 64
         });
     }
 
-    const emb = new EmbedBuilder()
-        .setColor(0x22c55e)
-        .setTitle('✨ Éter adicionado')
-        .setDescription(lines.join('\n'))
-        .setFooter({
-            text: `Por ${modUser?.tag || modUser?.username || 'admin'} · Aeternus`
-        })
-        .setTimestamp();
-
+    let content = blocks.join('\n');
     if (skipped.length) {
-        emb.addFields({
-            name: 'Ignorados',
-            value: skipped.map((n) => `• ${n}`).join('\n'),
-            inline: false
-        });
+        content += `\n_Ignorados (bots): ${skipped.join(', ')}_`;
     }
 
-    return reply({ embeds: [emb] });
+    if (content.length > 1900) {
+        content =
+            blocks.slice(0, 2).join('\n') +
+            `\n_… e mais ${blocks.length - 2} usuário(s) receberam ✨ **${fmt(bet.amount)}**._`;
+    }
+
+    return reply({ content });
 }
 
 module.exports = {
@@ -101,7 +141,10 @@ module.exports = {
             i.options.getString('valor', true),
             (p) => {
                 if (typeof p === 'string') return i.reply({ content: p, flags: 64 });
-                if (p.content && !p.embeds) return i.reply({ ...p, flags: p.flags ?? 64 });
+                if (p.content && !p.embeds) {
+                    const flags = p.flags;
+                    return i.reply(flags != null ? p : { ...p });
+                }
                 return i.reply(p);
             }
         );
