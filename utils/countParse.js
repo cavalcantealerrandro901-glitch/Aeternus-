@@ -1,5 +1,6 @@
 /**
- * Parser da contagem: dígitos, palavras, romano, bases e expressões.
+ * Parser da contagem: dígitos, palavras, romano, bases, expressões (π, e…)
+ * e texto misto (ex.: "11 oi" → 11).
  */
 const DIGIT_MAP = {
     '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
@@ -30,6 +31,17 @@ const WORD_NUMBERS = {
     '零': 0
 };
 
+const MATH_CONST = {
+    pi: Math.PI,
+    π: Math.PI,
+    e: Math.E,
+    tau: Math.PI * 2,
+    τ: Math.PI * 2,
+    phi: (1 + Math.sqrt(5)) / 2,
+    φ: (1 + Math.sqrt(5)) / 2,
+    ϕ: (1 + Math.sqrt(5)) / 2
+};
+
 const ROMAN = { m: 1000, d: 500, c: 100, l: 50, x: 10, v: 5, i: 1 };
 
 function digitsToInt(str) {
@@ -58,81 +70,96 @@ function parseRoman(str) {
             prev = v;
         }
     }
-    if (!Number.isSafeInteger(total) || total < 0) return null;
+    if (!Number.isSafeInteger(total) || total < 1) return null;
     return total;
 }
 
-function parsePrefixed(str) {
-    const s = String(str || '').trim().toLowerCase().replace(/_/g, '');
+function parsePrefixed(raw) {
+    const s = String(raw || '').trim().toLowerCase();
+    const m = s.match(/^(0x|0b|0o)([0-9a-f]+)$/i);
+    if (!m) return null;
     try {
-        if (/^0b[01]+$/.test(s)) {
-            const n = parseInt(s.slice(2), 2);
-            return Number.isSafeInteger(n) && n >= 0 ? n : null;
-        }
-        if (/^0o[0-7]+$/.test(s)) {
-            const n = parseInt(s.slice(2), 8);
-            return Number.isSafeInteger(n) && n >= 0 ? n : null;
-        }
-        if (/^0x[0-9a-f]+$/.test(s)) {
-            const n = parseInt(s.slice(2), 16);
-            return Number.isSafeInteger(n) && n >= 0 ? n : null;
-        }
+        const n = m[1] === '0x' ? parseInt(m[2], 16) : m[1] === '0b' ? parseInt(m[2], 2) : parseInt(m[2], 8);
+        if (!Number.isSafeInteger(n) || n < 0) return null;
+        return n;
     } catch (_) {
         return null;
     }
-    return null;
+}
+
+function toIntegerResult(val) {
+    if (!Number.isFinite(val)) return null;
+    const rounded = Math.round(val);
+    if (!Number.isSafeInteger(rounded) || rounded < 0) return null;
+    return rounded;
 }
 
 function evalExpression(input) {
     let s = String(input || '').trim();
-    if (!s) return null;
+    if (!s || s.length > 120) return null;
+
     s = s
         .replace(/×/g, '*')
         .replace(/÷/g, '/')
         .replace(/−/g, '-')
-        .replace(/\^/g, '**')
-        .replace(/\s+/g, '');
+        .replace(/\^/g, '**');
 
-    if (/[a-zA-Z_]/.test(s)) return null;
-    if (s.length > 80) return null;
-    const cleaned = s.replace(/\*\*/g, '');
-    if (!/^[0-9+\-*/%().]+$/.test(cleaned)) return null;
+    s = s.replace(/π/g, 'pi').replace(/τ/g, 'tau').replace(/φ|ϕ/g, 'phi');
 
     let i = 0;
     const peek = () => s[i];
     const eat = () => s[i++];
 
+    function skipSpace() {
+        while (peek() === ' ' || peek() === '\t') eat();
+    }
+
     function parseExpr() {
+        skipSpace();
         let left = parseTerm();
+        skipSpace();
         while (peek() === '+' || peek() === '-') {
             const op = eat();
+            skipSpace();
             const right = parseTerm();
             left = op === '+' ? left + right : left - right;
+            skipSpace();
         }
         return left;
     }
+
     function parseTerm() {
+        skipSpace();
         let left = parsePower();
+        skipSpace();
         while (peek() === '*' || peek() === '/' || peek() === '%') {
             const op = eat();
+            skipSpace();
             const right = parsePower();
             if (op === '*') left *= right;
             else if (op === '/') left /= right;
             else left %= right;
+            skipSpace();
         }
         return left;
     }
+
     function parsePower() {
+        skipSpace();
         let base = parseUnary();
+        skipSpace();
         if (s.slice(i, i + 2) === '**') {
             i += 2;
+            skipSpace();
             const exp = parseUnary();
             if (exp > 12 || exp < 0) throw new Error('pow');
             base = Math.pow(base, exp);
         }
         return base;
     }
+
     function parseUnary() {
+        skipSpace();
         if (peek() === '+') {
             eat();
             return parseUnary();
@@ -143,14 +170,26 @@ function evalExpression(input) {
         }
         return parsePrimary();
     }
+
     function parsePrimary() {
+        skipSpace();
         if (peek() === '(') {
             eat();
             const v = parseExpr();
+            skipSpace();
             if (peek() !== ')') throw new Error('paren');
             eat();
             return v;
         }
+
+        if (/[a-zA-Z]/.test(peek() || '')) {
+            const start = i;
+            while (/[a-zA-Z]/.test(peek() || '')) eat();
+            const name = s.slice(start, i).toLowerCase();
+            if (MATH_CONST[name] !== undefined) return MATH_CONST[name];
+            throw new Error('id');
+        }
+
         const start = i;
         if (!/[0-9.]/.test(peek() || '')) throw new Error('num');
         while (/[0-9.]/.test(peek() || '')) eat();
@@ -161,12 +200,9 @@ function evalExpression(input) {
 
     try {
         const val = parseExpr();
+        skipSpace();
         if (i !== s.length) return null;
-        if (!Number.isFinite(val)) return null;
-        const rounded = Math.round(val);
-        if (Math.abs(val - rounded) > 1e-9) return null;
-        if (!Number.isSafeInteger(rounded) || rounded < 0) return null;
-        return rounded;
+        return toIntegerResult(val);
     } catch (_) {
         return null;
     }
@@ -208,6 +244,62 @@ function parseWordPhrase(raw) {
     return total;
 }
 
+function extractNumberFromMixed(raw) {
+    const s = String(raw || '');
+    let best = null;
+    let buf = '';
+    const flush = () => {
+        if (!buf) return;
+        const n = digitsToInt(buf);
+        if (n !== null && best === null) best = n;
+        buf = '';
+    };
+    for (const ch of s) {
+        if (DIGIT_MAP[ch] !== undefined) {
+            buf += ch;
+        } else if (/[0-9]/.test(ch)) {
+            buf += ch;
+        } else {
+            flush();
+            if (best !== null) break;
+        }
+    }
+    flush();
+    return best;
+}
+
+function evalExpressionLoose(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return null;
+    let v = evalExpression(s);
+    if (v !== null) return v;
+
+    const tokens = s.split(/\s+/);
+    for (let len = tokens.length; len >= 1; len--) {
+        const part = tokens.slice(0, len).join(' ');
+        v = evalExpression(part);
+        if (v !== null) return v;
+    }
+
+    const m = s.match(/^([\d.+\-*/%()^\s\u00d7\u00f7\u2212\u03c0]|pi|tau|phi|e)+/i);
+    if (m) {
+        v = evalExpression(m[0].trim());
+        if (v !== null) return v;
+    }
+    return null;
+}
+
+function parseMathConstantAlone(raw) {
+    const key = String(raw || '')
+        .trim()
+        .toLowerCase()
+        .replace(/π/g, 'pi')
+        .replace(/τ/g, 'tau')
+        .replace(/φ|ϕ/g, 'phi');
+    if (MATH_CONST[key] === undefined) return null;
+    return toIntegerResult(MATH_CONST[key]);
+}
+
 function parseCountMessage(content) {
     const raw = String(content || '').trim();
     if (!raw) return null;
@@ -224,6 +316,9 @@ function parseCountMessage(content) {
     const roman = parseRoman(raw);
     if (roman !== null) return roman;
 
+    const alone = parseMathConstantAlone(raw);
+    if (alone !== null) return alone;
+
     const key = raw
         .toLowerCase()
         .normalize('NFD')
@@ -235,8 +330,12 @@ function parseCountMessage(content) {
     const phrase = parseWordPhrase(raw);
     if (phrase !== null) return phrase;
 
-    if (/[+\-*/%^\u00d7\u00f7()]/.test(raw) || /\*\*/.test(raw)) {
-        const expr = evalExpression(raw);
+    if (
+        /[+\-*/%^\u00d7\u00f7()]/.test(raw) ||
+        /\*\*/.test(raw) ||
+        /π|pi\b|tau\b|phi\b|\be\b/i.test(raw)
+    ) {
+        const expr = evalExpressionLoose(raw);
         if (expr !== null) return expr;
     }
 
@@ -246,7 +345,15 @@ function parseCountMessage(content) {
         if (Number.isSafeInteger(n) && n >= 0) return n;
     }
 
+    const looksMath =
+        /[+\-*/%^=()]/.test(raw) ||
+        /π|\bpi\b|\btau\b|\bphi\b/i.test(raw);
+    if (!looksMath) {
+        const mixed = extractNumberFromMixed(raw);
+        if (mixed !== null) return mixed;
+    }
+
     return null;
 }
 
-module.exports = { parseCountMessage };
+module.exports = { parseCountMessage, evalExpression, extractNumberFromMixed };
