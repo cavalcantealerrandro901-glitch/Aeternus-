@@ -71,9 +71,12 @@ module.exports = {
                             PermissionFlagsBits.ManageChannels
                         )
                     ) {
+                        const hint = cmdLock.redirectHint(interaction.guild.id);
                         return interaction
                             .reply({
-                                content: '🔒 Comandos estão bloqueados neste canal.',
+                                content:
+                                    `🔒 ${interaction.user}, os **meus comandos** estão bloqueados neste chat.\n` +
+                                    hint,
                                 flags: 64
                             })
                             .catch(() => {});
