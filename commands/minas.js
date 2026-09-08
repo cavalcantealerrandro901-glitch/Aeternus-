@@ -1,8 +1,5 @@
 const {
     EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
     AttachmentBuilder
 } = require('discord.js');
 const path = require('path');
@@ -98,7 +95,7 @@ function touch(game, client) {
                 .fetch(game.channelId)
                 .then((ch) => ch.messages.fetch(game.messageId))
                 .then(async (m) => {
-                    await m.edit(endPayload(game, '_Partida expirada por inatividade._'));
+                    await m.edit(endPayload(game));
                     await minesCash.syncCashMessage(client, game, potentialAt);
                 })
                 .catch(() => {});
@@ -122,25 +119,6 @@ function potentialAt(amount, opened, bombs) {
     return Math.floor(Number(amount || 0) * multAt(opened, bombs));
 }
 
-function eterRankFooter(userId) {
-    const bal = eter.get(userId);
-    const entries = Object.entries(eter.all() || {})
-        .map(([id, v]) => ({ id, value: Number(v || 0) }))
-        .filter((e) => e.value > 0)
-        .sort((a, b) => b.value - a.value);
-    const idx = entries.findIndex((e) => e.id === String(userId));
-    const total = entries.length || 1;
-    if (idx < 0) {
-        return '_🏆 rank · sem posição · ✨ ' + fmt(bal) + ' · O.rank_';
-    }
-    const pos = idx + 1;
-    let medal = '#' + pos;
-    if (pos === 1) medal = '🥇#1';
-    else if (pos === 2) medal = '🥈#2';
-    else if (pos === 3) medal = '🥉#3';
-    return '_🏆 rank global ' + medal + ' / ' + total + ' · ✨ ' + fmt(bal) + ' · O.rank_';
-}
-
 function resultBanner(game) {
     if (!game.dead && !game.cashed) return null;
     if (game.cashed && game.fun) return '🏁 **Partida encerrada** (modo diversão · sem éter).';
@@ -160,14 +138,6 @@ function resultBanner(game) {
         'Você perdeu a aposta de **' + fmt(game.amount) + '** ✨.',
         'Casas seguras antes da bomba: **' + game.opened.size + '**'
     ].join('\n');
-}
-
-function tipPhrase(game) {
-    if (game.dead || game.cashed) return null;
-    return (
-        '_Clique nas casas do tabuleiro para ganhar mais e aumentar seu multiplicador, ' +
-        'mas lembre-se: quanto mais você abre, mais chances de você perder._'
-    );
 }
 
 function panelEmbed(game, extra) {
@@ -216,17 +186,6 @@ function panelEmbed(game, extra) {
         lines.push('');
         lines.push(banner);
     }
-    if (extra) {
-        lines.push('');
-        lines.push(extra);
-    }
-
-    lines.push('');
-    lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
-    lines.push('_tabuleiro abaixo · botões maiores · clique nas casas_');
-    const tip = tipPhrase(game);
-    if (tip) lines.push(tip);
-    lines.push(eterRankFooter(game.userId));
 
     const emb = new EmbedBuilder()
         .setColor(color)
@@ -301,7 +260,7 @@ function openCell(game, idx) {
 }
 
 function endPayload(game, note) {
-    return panelPayload(game, note || null, true);
+    return panelPayload(game, null, true);
 }
 
 module.exports = {
@@ -403,7 +362,7 @@ module.exports = {
 
         if (action === 'refresh') {
             const ended = game.dead || game.cashed;
-            await interaction.update(panelPayload(game, ended ? null : '_Atualizado._', ended));
+            await interaction.update(panelPayload(game, null, ended));
             await minesCash.syncCashMessage(client, game, potentialAt);
             return;
         }
@@ -414,17 +373,7 @@ module.exports = {
                 return interaction.reply({ content: 'Nenhuma casa.', flags: 64 });
             }
             const res = openCell(game, idx);
-            if (res.bomb || res.autoWin) {
-                await interaction.update(endPayload(game));
-                await minesCash.syncCashMessage(client, game, potentialAt);
-                return;
-            }
-            await interaction.update(
-                panelPayload(
-                    game,
-                    '🎲 Abriu **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
-                )
-            );
+            await interaction.update(res.bomb || res.autoWin ? endPayload(game) : panelPayload(game));
             await minesCash.syncCashMessage(client, game, potentialAt);
             return;
         }
@@ -438,17 +387,7 @@ module.exports = {
             if (!res.ok) {
                 return interaction.reply({ content: 'Casa já aberta.', flags: 64 });
             }
-            if (res.bomb || res.autoWin) {
-                await interaction.update(endPayload(game));
-                await minesCash.syncCashMessage(client, game, potentialAt);
-                return;
-            }
-            await interaction.update(
-                panelPayload(
-                    game,
-                    '💎 Casa **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
-                )
-            );
+            await interaction.update(res.bomb || res.autoWin ? endPayload(game) : panelPayload(game));
             await minesCash.syncCashMessage(client, game, potentialAt);
             return;
         }
