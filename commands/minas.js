@@ -3,7 +3,9 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    AttachmentBuilder
+    AttachmentBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder
 } = require('discord.js');
 const path = require('path');
 const fs = require('fs');
@@ -259,55 +261,36 @@ function panelEmbed(game, extra) {
     return emb;
 }
 
-function boardRows(game, reveal = false) {
-    const ended = game.dead || game.cashed || reveal;
-    const rows = [];
-    for (let y = 0; y < ROWS; y++) {
-        const row = new ActionRowBuilder();
-        for (let x = 0; x < COLS; x++) {
-            const i = y * COLS + x;
-            const num = String(i + 1);
-            const opened = game.opened.has(i);
-            const bomb = game.bombs.has(i);
-            let label = '·';
-            let style = ButtonStyle.Secondary;
-            if (ended) {
-                if (bomb) {
-                    label = '💣';
-                    style = ButtonStyle.Danger;
-                } else if (opened) {
-                    label = '💎';
-                    style = ButtonStyle.Success;
-                } else {
-                    label = num;
-                    style = ButtonStyle.Secondary;
-                }
-            } else if (opened) {
-                label = '💎';
-                style = ButtonStyle.Success;
-            } else {
-                label = num;
-                style = ButtonStyle.Primary;
-            }
-            row.addComponents(
-                new ButtonBuilder()
-                    .setCustomId('minas:cell:' + game.id + ':' + i)
-                    .setLabel(label.slice(0, 80))
-                    .setStyle(style)
-                    .setDisabled(ended || opened)
-            );
-        }
-        rows.push(row);
+function pickMenuRow(game) {
+    const ended = game.dead || game.cashed;
+    const options = [];
+    for (let i = 0; i < TOTAL; i++) {
+        if (game.opened.has(i)) continue;
+        options.push(
+            new StringSelectMenuOptionBuilder()
+                .setLabel('Casa ' + (i + 1))
+                .setValue(String(i))
+                .setDescription('Abrir a casa ' + (i + 1))
+        );
     }
-    return rows;
+    if (!options.length) {
+        options.push(
+            new StringSelectMenuOptionBuilder()
+                .setLabel('Sem casas')
+                .setValue('none')
+                .setDescription('Nenhuma casa livre')
+        );
+    }
+    const menu = new StringSelectMenuBuilder()
+        .setCustomId('minas:pick:' + game.id)
+        .setPlaceholder('Escolher casa do tabuleiro…')
+        .setDisabled(ended || options[0].data.value === 'none')
+        .addOptions(options.slice(0, 25));
+    return new ActionRowBuilder().addComponents(menu);
 }
 
-function controlsRow(game) {
+function topControlsRow(game) {
     const ended = game.dead || game.cashed;
-    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
-    const canCash = game.opened.size > 0 && !ended;
-    const cashLabel = game.fun ? 'Encerrar' : 'Sacar · ✨ ' + fmt(pot);
-
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:random:' + game.id)
@@ -319,7 +302,17 @@ function controlsRow(game) {
             .setCustomId('minas:refresh:' + game.id)
             .setLabel('Atualizar')
             .setEmoji('🔄')
-            .setStyle(ButtonStyle.Secondary),
+            .setStyle(ButtonStyle.Secondary)
+    );
+}
+
+function cashRow(game) {
+    const ended = game.dead || game.cashed;
+    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
+    const canCash = game.opened.size > 0 && !ended;
+    const cashLabel = game.fun ? 'Encerrar' : 'Sacar · ✨ ' + fmt(pot);
+
+    return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:cash:' + game.id)
             .setLabel(cashLabel.slice(0, 80))
@@ -341,8 +334,8 @@ function againRow(game) {
 
 function fullComponents(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
-    if (ended) return [...boardRows(game, true), againRow(game)].slice(0, 5);
-    return [...boardRows(game, false), controlsRow(game)];
+    if (ended) return [againRow(game)];
+    return [pickMenuRow(game), topControlsRow(game), cashRow(game)];
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
@@ -514,6 +507,25 @@ module.exports = {
                 panelPayload(
                     game,
                     '🎲 Abriu **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
+                )
+            );
+        }
+
+        if (action === 'pick') {
+            const raw = interaction.values?.[0];
+            const idx = Number(raw);
+            if (!Number.isInteger(idx) || idx < 0 || idx >= TOTAL) {
+                return interaction.reply({ content: 'Casa inválida.', flags: 64 });
+            }
+            const res = openCell(game, idx);
+            if (!res.ok) {
+                return interaction.reply({ content: 'Casa já aberta.', flags: 64 });
+            }
+            if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
+            return interaction.update(
+                panelPayload(
+                    game,
+                    '💎 Casa **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
                 )
             );
         }
