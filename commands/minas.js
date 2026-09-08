@@ -166,25 +166,10 @@ function boardText(game, reveal = false) {
 
 function tipPhrase(game) {
     if (game.dead || game.cashed) return null;
-    const opened = game.opened.size;
-    const bombs = game.bombCount;
-    const safeTotal = TOTAL - bombs;
-    const freeLeft = Math.max(0, safeTotal - opened);
-    const curM = multAt(opened, bombs);
-    const nextM = opened < safeTotal ? multAt(opened + 1, bombs) : curM;
-    const pot = potentialAt(game.amount, opened, bombs);
-
-    return [
-        'Cada casa segura sobe o multiplicador. Uma bomba encerra tudo.',
-        'Use **Aleatório** para abrir uma casa livre ou **Sacar** e garantir o valor atual.',
-        opened === 0
-            ? 'Ainda não há saque — abra pelo menos **1** gema para poder sacar.'
-            : 'Com **' + opened + '** gemas, o saque agora vale **✨ ' + fmt(pot) + '** (×' + curM.toFixed(2) + ').',
-        freeLeft > 0
-            ? 'Restam **' + freeLeft + '** gemas · próxima casa mira **×' + nextM.toFixed(2) + '**.'
-            : 'Todas as gemas foram abertas — partida concluída.',
-        '**Atualizar** só redesenha o painel; não abre casa nem gasta jogada.'
-    ].join('\n');
+    return (
+        'Clique nas casas do tabuleiro para ganhar mais e aumentar seu multiplicador, ' +
+        'mas lembre-se: quanto mais você abre, mais chances de você perder.'
+    );
 }
 
 function panelEmbed(game, extra) {
@@ -274,12 +259,56 @@ function panelEmbed(game, extra) {
     return emb;
 }
 
-function actionRows(game) {
+function boardRows(game, reveal = false) {
+    const ended = game.dead || game.cashed || reveal;
+    const rows = [];
+    for (let y = 0; y < ROWS; y++) {
+        const row = new ActionRowBuilder();
+        for (let x = 0; x < COLS; x++) {
+            const i = y * COLS + x;
+            const num = String(i + 1);
+            const opened = game.opened.has(i);
+            const bomb = game.bombs.has(i);
+            let label = '·';
+            let style = ButtonStyle.Secondary;
+            if (ended) {
+                if (bomb) {
+                    label = '💣';
+                    style = ButtonStyle.Danger;
+                } else if (opened) {
+                    label = '💎';
+                    style = ButtonStyle.Success;
+                } else {
+                    label = num;
+                    style = ButtonStyle.Secondary;
+                }
+            } else if (opened) {
+                label = '💎';
+                style = ButtonStyle.Success;
+            } else {
+                label = num;
+                style = ButtonStyle.Primary;
+            }
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId('minas:cell:' + game.id + ':' + i)
+                    .setLabel(label.slice(0, 80))
+                    .setStyle(style)
+                    .setDisabled(ended || opened)
+            );
+        }
+        rows.push(row);
+    }
+    return rows;
+}
+
+function controlsRow(game) {
     const ended = game.dead || game.cashed;
     const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
     const canCash = game.opened.size > 0 && !ended;
+    const cashLabel = game.fun ? 'Encerrar' : 'Sacar · ✨ ' + fmt(pot);
 
-    const row1 = new ActionRowBuilder().addComponents(
+    return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:random:' + game.id)
             .setLabel('Aleatório')
@@ -290,13 +319,7 @@ function actionRows(game) {
             .setCustomId('minas:refresh:' + game.id)
             .setLabel('Atualizar')
             .setEmoji('🔄')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(false)
-    );
-
-    const cashLabel = game.fun ? 'Encerrar' : 'Sacar · ✨ ' + fmt(pot);
-
-    const row2 = new ActionRowBuilder().addComponents(
+            .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
             .setCustomId('minas:cash:' + game.id)
             .setLabel(cashLabel.slice(0, 80))
@@ -304,8 +327,6 @@ function actionRows(game) {
             .setStyle(ButtonStyle.Success)
             .setDisabled(ended || (!game.fun && !canCash))
     );
-
-    return [row1, row2];
 }
 
 function againRow(game) {
@@ -320,8 +341,8 @@ function againRow(game) {
 
 function fullComponents(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
-    if (ended) return [againRow(game)];
-    return actionRows(game);
+    if (ended) return [...boardRows(game, true), againRow(game)].slice(0, 5);
+    return [...boardRows(game, false), controlsRow(game)];
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
@@ -493,6 +514,24 @@ module.exports = {
                 panelPayload(
                     game,
                     '🎲 Abriu **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
+                )
+            );
+        }
+
+        if (action === 'cell') {
+            const idx = Number(parts[3]);
+            if (!Number.isInteger(idx) || idx < 0 || idx >= TOTAL) {
+                return interaction.reply({ content: 'Casa inválida.', flags: 64 });
+            }
+            const res = openCell(game, idx);
+            if (!res.ok) {
+                return interaction.reply({ content: 'Casa já aberta.', flags: 64 });
+            }
+            if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
+            return interaction.update(
+                panelPayload(
+                    game,
+                    '💎 Casa **#' + (idx + 1) + '** · multi ×**' + multAt(game.opened.size, game.bombCount) + '**'
                 )
             );
         }
