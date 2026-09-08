@@ -1,7 +1,5 @@
 /**
- * Botão de saque do Mines — arquivo separado.
- * A mensagem de saque fica fora do painel do tabuleiro;
- * o jogo (commands/minas.js) só "traz junto" via syncCashMessage.
+ * Botão de saque do Mines — mensagem separada (só o botão).
  */
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
@@ -29,17 +27,8 @@ function cashRow(game, potentialFn) {
 }
 
 function cashPayload(game, potentialFn) {
-    const ended = game.dead || game.cashed;
-    let content = '💵 **Saque** — valor se parar agora';
-    if (ended) {
-        content = game.dead
-            ? '💥 Partida encerrada · bomba'
-            : game.fun
-              ? '🏁 Partida encerrada'
-              : '✅ Saque realizado';
-    }
     return {
-        content,
+        content: '​',
         components: [cashRow(game, potentialFn)]
     };
 }
