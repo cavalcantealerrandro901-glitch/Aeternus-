@@ -14,63 +14,18 @@ function isMod(member) {
     );
 }
 
-function resolveChannel(message, args) {
-    return (
-        message.mentions.channels.first() ||
-        message.guild.channels.cache.get(args.find((a) => /^\d{15,25}$/.test(a))) ||
-        message.channel
-    );
-}
-
-async function apply(guildId, channel, action, reply) {
-    const act = String(action || '').toLowerCase();
-
-    if (act === 'ativar' || act === 'on' || act === 'ligar' || act === 'enable') {
-        spamAllow.add(guildId, channel.id);
-        return reply(
-            `✅ Canal livre **ativado** em ${channel}.\nAnti-spam **desligado** neste chat.`
-        );
-    }
-
-    if (
-        act === 'desativar' ||
-        act === 'off' ||
-        act === 'desligar' ||
-        act === 'disable'
-    ) {
-        spamAllow.remove(guildId, channel.id);
-        return reply(
-            `🛡️ Canal livre **desativado** em ${channel}.\nAnti-spam **ligado** de novo.`
-        );
-    }
-
-    const on = spamAllow.toggle(guildId, channel.id);
-    if (on) {
-        return reply(
-            `✅ Canal livre **ativado** em ${channel}.\nAnti-spam **desligado** neste chat.`
-        );
-    }
-    return reply(
-        `🛡️ Canal livre **desativado** em ${channel}.\nAnti-spam **ligado** de novo.`
-    );
-}
-
 module.exports = {
     name: 'spam',
     aliases: ['permitirspam', 'canallivre'],
-    description: 'Ativar ou desativar canal livre de anti-spam',
+    description: 'Permitir ou bloquear spam em um canal',
     data: new SlashCommandBuilder()
         .setName('spam')
-        .setDescription('Ativar ou desativar canal livre (sem anti-spam)')
-        .addStringOption((o) =>
+        .setDescription('true = canal livre (spam ok) · false = anti-spam ligado')
+        .addBooleanOption((o) =>
             o
-                .setName('acao')
-                .setDescription('Ativar ou desativar')
+                .setName('permitir')
+                .setDescription('true = spam permitido · false = spam bloqueado')
                 .setRequired(true)
-                .addChoices(
-                    { name: 'Ativar (canal livre)', value: 'ativar' },
-                    { name: 'Desativar (anti-spam de volta)', value: 'desativar' }
-                )
         )
         .addChannelOption((o) =>
             o
@@ -86,12 +41,33 @@ module.exports = {
             return message.reply('Sem permissão (**Gerenciar Servidor**).');
         }
 
-        const actionArg = (args[0] || '').toLowerCase();
-        const known = ['ativar', 'desativar', 'on', 'off', 'ligar', 'desligar'];
-        const action = known.includes(actionArg) ? actionArg : null;
-        const ch = resolveChannel(message, args);
+        const raw = (args[0] || '').toLowerCase();
+        const trueVals = ['true', '1', 'on', 'sim', 'ativar', 'yes', 's'];
+        const falseVals = ['false', '0', 'off', 'nao', 'não', 'desativar', 'no', 'n'];
 
-        await apply(message.guild.id, ch, action, (t) => message.reply(t));
+        if (!trueVals.includes(raw) && !falseVals.includes(raw)) {
+            return message.reply(
+                'Uso: `O.spam true [#canal]` · `O.spam false [#canal]`\n' +
+                    '**true** = spam permitido · **false** = anti-spam ligado'
+            );
+        }
+
+        const allow = trueVals.includes(raw);
+        const ch =
+            message.mentions.channels.first() ||
+            message.guild.channels.cache.get(args[1]) ||
+            message.channel;
+
+        if (allow) {
+            spamAllow.add(message.guild.id, ch.id);
+            return message.reply(
+                `✅ Spam **permitido** em ${ch} (\`true\`).\nAnti-spam **desligado** neste chat.`
+            );
+        }
+        spamAllow.remove(message.guild.id, ch.id);
+        return message.reply(
+            `🛡️ Spam **bloqueado** em ${ch} (\`false\`).\nAnti-spam **ligado** de novo.`
+        );
     },
 
     async executeSlash(i) {
@@ -102,11 +78,25 @@ module.exports = {
             });
         }
 
-        const action = i.options.getString('acao', true);
+        const allow = i.options.getBoolean('permitir', true);
         const ch = i.options.getChannel('canal') || i.channel;
 
-        await apply(i.guild.id, ch, action, (t) =>
-            i.reply({ content: t, flags: 64 })
-        );
+        if (allow) {
+            spamAllow.add(i.guild.id, ch.id);
+            return i.reply({
+                content:
+                    `✅ Spam **permitido** em ${ch} (\`true\`).\n` +
+                    `Anti-spam **desligado** neste chat.`,
+                flags: 64
+            });
+        }
+
+        spamAllow.remove(i.guild.id, ch.id);
+        return i.reply({
+            content:
+                `🛡️ Spam **bloqueado** em ${ch} (\`false\`).\n` +
+                `Anti-spam **ligado** de novo.`,
+            flags: 64
+        });
     }
 };
