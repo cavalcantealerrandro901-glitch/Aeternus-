@@ -3,18 +3,25 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const COLS = 4;
 const ROWS = 4;
 
-/** Rótulo compacto e alinhado (01–16) */
-function cellLabel(index, { opened, bomb, ended }) {
-    if (ended) {
-        if (bomb) return '💣';
-        if (opened) return '💎';
-        return String(index + 1).padStart(2, '0');
-    }
-    if (opened) return '💎';
-    return String(index + 1).padStart(2, '0');
+/**
+ * Labels largos e do mesmo tamanho → botões ocupam mais espaço na linha.
+ * Discord não permite mudar a altura; a largura vem do texto do rótulo.
+ */
+function padCell(text) {
+    const t = String(text);
+    return ('  ' + t + '  ').slice(0, 12);
 }
 
-/** Tabuleiro em texto (dentro do embed) */
+function cellLabel(index, { opened, bomb, ended }) {
+    if (ended) {
+        if (bomb) return padCell('💣');
+        if (opened) return padCell('💎');
+        return padCell(String(index + 1).padStart(2, '0'));
+    }
+    if (opened) return padCell('💎');
+    return padCell(String(index + 1).padStart(2, '0'));
+}
+
 function boardText(game, reveal = false) {
     const ended = !!(game.dead || game.cashed || reveal);
     const lines = [];
@@ -64,7 +71,7 @@ function boardRows(game, reveal = false) {
             row.addComponents(
                 new ButtonBuilder()
                     .setCustomId('minas:cell:' + game.id + ':' + i)
-                    .setLabel(cellLabel(i, { opened, bomb, ended }))
+                    .setLabel(cellLabel(i, { opened, bomb, ended }).slice(0, 80))
                     .setStyle(style)
                     .setDisabled(ended || opened)
             );
@@ -79,13 +86,13 @@ function controlsRow(game) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:random:' + game.id)
-            .setLabel('Aleatório')
+            .setLabel('  Aleatório  ')
             .setEmoji('🎲')
             .setStyle(ButtonStyle.Primary)
             .setDisabled(ended),
         new ButtonBuilder()
             .setCustomId('minas:refresh:' + game.id)
-            .setLabel('Atualizar')
+            .setLabel('  Atualizar  ')
             .setEmoji('🔄')
             .setStyle(ButtonStyle.Secondary)
     );
@@ -95,16 +102,12 @@ function againRow(game) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:again:' + game.id)
-            .setLabel('Tentar novamente')
+            .setLabel('  Tentar novamente  ')
             .setEmoji('🔁')
             .setStyle(ButtonStyle.Primary)
     );
 }
 
-/**
- * Em jogo: 4 linhas de células + controles
- * Encerrado: tabuleiro revelado (botão "de novo" na mensagem externa)
- */
 function fullComponents(game, reveal = false) {
     const ended = !!(game.dead || game.cashed || reveal);
     if (ended) {
