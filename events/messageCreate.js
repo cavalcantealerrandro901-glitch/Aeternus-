@@ -36,8 +36,9 @@ function resolvePrefixMatch(message, client) {
         }
     }
 
-    if (client?.user?.id) {
-        const m = content.match(new RegExp(`^<@!?${client.user.id}>\\s*`));
+    if (client && client.user && client.user.id) {
+        const re = new RegExp('^<@!?' + client.user.id + '>\\s*');
+        const m = content.match(re);
         if (m) {
             return { prefix: m[0], rest: content.slice(m[0].length) };
         }
@@ -167,7 +168,7 @@ module.exports = {
 
                 if (!isReply && !startsWithPrefix) {
                     const stripped = message.content
-                        .replace(new RegExp(`<@!?${client.user.id}>`, 'g'), '')
+                        .replace(new RegExp('<@!?' + client.user.id + '>', 'g'), '')
                         .trim();
 
                     const onlyMention =
@@ -249,12 +250,12 @@ module.exports = {
         if (!name) return;
 
         let cmd = client.commands.get(name);
-        if (!cmd?.execute) {
-            cmd =
-                client.commands.get(name.replace(/[-_]/g, '')) ||
-                client.commands.get(name.replace(/-/g, ''));
+        if (!cmd || !cmd.execute) {
+            const alt1 = client.commands.get(name.replace(/[-_]/g, ''));
+            const alt2 = client.commands.get(name.replace(/-/g, ''));
+            cmd = alt1 || alt2 || null;
         }
-        if (!cmd?.execute) return;
+        if (!cmd || !cmd.execute) return;
 
         try {
             await cmd.execute(message, args, client);
@@ -262,7 +263,13 @@ module.exports = {
             await autoRepair.handleCommandError({
                 cmdName: cmd.name || name,
                 error: e,
-                context: `prefix · ${message.guild?.name || '?'} · #${message.channel?.name || message.channelId}`,
+                context:
+                    'prefix · ' +
+                    (message.guild && message.guild.name ? message.guild.name : '?') +
+                    ' · #' +
+                    (message.channel && message.channel.name
+                        ? message.channel.name
+                        : message.channelId),
                 message
             });
         }
