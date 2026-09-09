@@ -13,6 +13,38 @@ const { announceLevel } = require('../systems/guildModules');
 const xpCd = new Map();
 const pendingPing = new Map();
 
+/** Detecta prefixo do servidor ou menção do bot no início da mensagem */
+function resolvePrefixMatch(message, client) {
+    const content = String(message.content || '');
+    if (!content) return null;
+
+    const configured = getPrefix(message.guild.id);
+    const candidates = [configured, 'O.', 'o.'].filter(Boolean);
+    const seen = new Set();
+    const list = [];
+    for (const c of candidates) {
+        const k = String(c).toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        list.push(String(c));
+    }
+
+    const lower = content.toLowerCase();
+    for (const p of list) {
+        if (lower.startsWith(p.toLowerCase())) {
+            return { prefix: p, rest: content.slice(p.length) };
+        }
+    }
+
+    if (client?.user?.id) {
+        const m = content.match(new RegExp(`^<@!?${client.user.id}>\\s*`));
+        if (m) {
+            return { prefix: m[0], rest: content.slice(m[0].length) };
+        }
+    }
+    return null;
+}
+
 module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
@@ -42,10 +74,13 @@ module.exports = {
         if (message.author.bot) return;
 
         try {
-            const spam = antispam.check(message);
-            if (spam.block) {
-                await antispam.apply(message, spam);
-                return;
+            const pre = resolvePrefixMatch(message, client);
+            if (!pre) {
+                const spam = antispam.check(message);
+                if (spam.block) {
+                    await antispam.apply(message, spam);
+                    return;
+                }
             }
         } catch (e) {
             console.error('[messageCreate] antispam:', e);
@@ -185,7 +220,6 @@ module.exports = {
                     if (res.leveled) {
                         const lvlRes = await announceLevel(message, res);
                         const lvlMsg = lvlRes?.message || lvlRes;
-                        // No canal configurado de nível a mensagem permanece (não some)
                         if (lvlMsg && !lvlRes?.sticky) {
                             setTimeout(() => lvlMsg.delete().catch(() => {}), 7000);
                         }
@@ -207,14 +241,19 @@ module.exports = {
             return;
         }
 
-        const prefix = getPrefix(message.guild.id);
-        if (!message.content.toLowerCase().startsWith(prefix.toLowerCase())) return;
+        const matched = resolvePrefixMatch(message, client);
+        if (!matched) return;
 
-        const args = message.content.slice(prefix.length).trim().split(/\s+/);
+        const args = matched.rest.trim().split(/\s+/).filter(Boolean);
         const name = (args.shift() || '').toLowerCase();
         if (!name) return;
 
-        const cmd = client.commands.get(name);
+        let cmd = client.commands.get(name);
+        if (!cmd?.execute) {
+            cmd =
+                client.commands.get(name.replace(/[-_]/g, '')) ||
+                client.commands.get(name.replace(/-/g, ''));
+        }
         if (!cmd?.execute) return;
 
         try {
