@@ -349,6 +349,41 @@ async function finishExternal(client, game) {
     await minesCash.syncCashMessage(client, game, potentialAt, text);
 }
 
+async function closePreviousGames(userId, client) {
+    const toClose = [];
+    for (const [id, g] of games) {
+        if (g.userId === userId && !g.dead && !g.cashed) {
+            toClose.push([id, g]);
+        }
+    }
+    for (const [id, g] of toClose) {
+        clearTimer(g);
+        g.cashed = true;
+        g._idleAuto = false;
+        g._lastWin = 0;
+        try {
+            if (client && g.channelId && g.messageId) {
+                const ch = await client.channels.fetch(g.channelId).catch(() => null);
+                if (ch?.isTextBased?.()) {
+                    const main = await ch.messages.fetch(g.messageId).catch(() => null);
+                    if (main) {
+                        await main
+                            .edit({
+                                content: '⏹️ Partida anterior encerrada.',
+                                embeds: main.embeds?.length ? main.embeds : [],
+                                components: []
+                            })
+                            .catch(() => {});
+                    }
+                }
+            }
+            await minesCash.deleteCashMessage(client, g).catch(() => {});
+        } catch (_) {}
+        games.delete(id);
+    }
+    return toClose.length;
+}
+
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'mina'],
@@ -376,6 +411,8 @@ module.exports = {
             eter.remove(message.author.id, amount, { reason: 'mines start' });
         }
 
+        await closePreviousGames(message.author.id, client);
+
         const game = makeGame(message.author.id, amount, bombCount, fun, {
             channelId: message.channel.id
         });
@@ -383,7 +420,9 @@ module.exports = {
         const msg = await message.reply({
             content: '<@' + message.author.id + '>',
             allowedMentions: { users: [message.author.id] },
-            ...payload
+            embeds: payload.embeds,
+            components: payload.components,
+            files: payload.files || []
         });
         game.messageId = msg.id;
         game.channelId = message.channel.id;
@@ -454,7 +493,7 @@ module.exports = {
 
             try {
                 await interaction.update({
-                    content: '🔁 Nova partida iniciada.',
+                    content: '⏹️ Partida anterior encerrada · nova em andamento.',
                     embeds: [],
                     components: []
                 });
@@ -463,16 +502,20 @@ module.exports = {
             }
 
             await minesCash.deleteCashMessage(client, game).catch(() => {});
+            await closePreviousGames(game.userId, client);
 
             const ng = makeGame(game.userId, amount, bombCount, fun, {
                 channelId: interaction.channelId
             });
 
+            const payload = panelPayload(ng);
             const sent = await interaction.channel
                 .send({
                     content: '<@' + game.userId + '>',
                     allowedMentions: { users: [game.userId] },
-                    ...panelPayload(ng)
+                    embeds: payload.embeds,
+                    components: payload.components,
+                    files: payload.files || []
                 })
                 .catch(() => null);
 
