@@ -23,7 +23,6 @@ const DEFAULT = {
         logChannelId: null,
         maxOpen: 3
     },
-    music: { enabled: true, categoryId: null },
     economy: { dailyMin: 5000, dailyMax: 50000, robEnabled: true, workEnabled: true },
     xp: { enabled: true, min: 30, max: 77, cooldownSec: 45 },
     suggestions: { enabled: false, channelId: null, upvoteEmoji: '👍', downvoteEmoji: '👎' },
@@ -132,7 +131,7 @@ function deepMerge(a, b) {
 }
 
 const MERGE_KEYS = [
-    'logs', 'welcome', 'leave', 'automod', 'tickets', 'music', 'economy', 'xp',
+    'logs', 'welcome', 'leave', 'automod', 'tickets', 'economy', 'xp',
     'suggestions', 'reports', 'levels', 'starboard', 'autorole', 'verification',
     'antinuke', 'shop', 'birthday', 'counting', 'sticky', 'autoPublish',
     'memberCounter', 'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub', 'drops', 'partnership'
