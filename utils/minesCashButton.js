@@ -1,6 +1,6 @@
 /**
- * Mensagem externa do Mines (fora do embed principal):
- * em jogo: dica + Sacar + nº partida
+ * Mensagem externa do Mines:
+ * em jogo: embed (dica + nº partida + valor atual) + botão Sacar
  * fim: embed de saque/perda + Tentar novamente
  */
 const {
@@ -39,7 +39,7 @@ function againRow(game) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:again:' + game.id)
-            .setLabel('Tentar novamente')
+            .setLabel('  Tentar novamente  ')
             .setEmoji('🔁')
             .setStyle(ButtonStyle.Primary)
     );
@@ -52,6 +52,18 @@ function tipLine() {
 function partidaLine(game) {
     const n = game.number != null ? game.number : '—';
     return '🎮 Partida nº **#' + n + '**';
+}
+
+/** Embed em jogo (acima do botão Sacar) */
+function playingEmbed(game, pot) {
+    const lines = [tipLine(), '', partidaLine(game)];
+    if (!game.fun && game.opened.size > 0) {
+        lines.splice(1, 0, '', 'Valor atual se sacar agora: **✨ ' + fmt(pot) + '**');
+    }
+    return new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle('💣 Mines')
+        .setDescription(lines.join('\n'));
 }
 
 /** Embed de resultado (saque / perda / inatividade) */
@@ -97,14 +109,10 @@ function cashPayload(game, potentialFn, resultText) {
         typeof potentialFn === 'function'
             ? potentialFn(game.amount, game.opened.size, game.bombCount)
             : 0;
-    const lines = [tipLine(), partidaLine(game)];
-    if (!game.fun && game.opened.size > 0) {
-        lines.splice(1, 0, 'Valor atual se sacar agora: **✨ ' + fmt(pot) + '**');
-    }
 
     return {
-        content: lines.join('\n'),
-        embeds: [],
+        content: null,
+        embeds: [playingEmbed(game, pot)],
         components: [cashRow(game, potentialFn)]
     };
 }
@@ -149,6 +157,7 @@ module.exports = {
     syncCashMessage,
     deleteCashMessage,
     resultEmbed,
+    playingEmbed,
     tipLine,
     partidaLine
 };
