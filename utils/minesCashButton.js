@@ -1,9 +1,14 @@
 /**
- * Mensagem externa do Mines (fora do embed):
- * dica + botão Sacar + número da partida
- * No fim: texto de resultado + botão Tentar novamente
+ * Mensagem externa do Mines (fora do embed principal):
+ * em jogo: dica + Sacar + nº partida
+ * fim: embed de saque/perda + Tentar novamente
  */
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    EmbedBuilder
+} = require('discord.js');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -49,17 +54,42 @@ function partidaLine(game) {
     return '🎮 Partida nº **#' + n + '**';
 }
 
+/** Embed de resultado (saque / perda / inatividade) */
+function resultEmbed(game, resultText) {
+    const dead = !!game.dead;
+    const idle = !!game._idleAuto;
+
+    let color = 0x57f287;
+    let title = '💰 Saque seguro';
+    if (dead) {
+        color = 0xed4245;
+        title = '💥 Explodiu';
+    } else if (idle) {
+        color = 0xf59e0b;
+        title = '⏱️ Saque automático';
+    } else if (game.fun) {
+        color = 0x5865f2;
+        title = '🏁 Partida encerrada';
+    }
+
+    const desc = [String(resultText || '').trim(), '', partidaLine(game)]
+        .filter((x, i, a) => x || a[i - 1])
+        .join('\n');
+
+    return new EmbedBuilder()
+        .setColor(color)
+        .setTitle(title)
+        .setDescription(desc || 'Partida encerrada.');
+}
+
 function cashPayload(game, potentialFn, resultText) {
     const ended = !!(game.dead || game.cashed);
 
     if (ended) {
-        const lines = [];
-        if (resultText) lines.push(String(resultText));
-        lines.push(partidaLine(game));
         return {
-            content: lines.join('\n'),
-            components: [againRow(game)],
-            embeds: []
+            content: null,
+            embeds: [resultEmbed(game, resultText)],
+            components: [againRow(game)]
         };
     }
 
@@ -74,8 +104,8 @@ function cashPayload(game, potentialFn, resultText) {
 
     return {
         content: lines.join('\n'),
-        components: [cashRow(game, potentialFn)],
-        embeds: []
+        embeds: [],
+        components: [cashRow(game, potentialFn)]
     };
 }
 
@@ -118,6 +148,7 @@ module.exports = {
     cashPayload,
     syncCashMessage,
     deleteCashMessage,
+    resultEmbed,
     tipLine,
     partidaLine
 };
