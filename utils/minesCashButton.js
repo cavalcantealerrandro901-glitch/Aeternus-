@@ -2,6 +2,7 @@
  * Mensagem externa do Mines:
  * em jogo: embed (dica + nº partida) + botão Sacar (uma só)
  * fim: embed de resultado + Tentar novamente
+ * Menção do usuário sempre fora do embed.
  */
 const {
     ActionRowBuilder,
@@ -10,7 +11,6 @@ const {
     EmbedBuilder
 } = require('discord.js');
 
-/** Evita race: duas syncs ao mesmo tempo criando 2 mensagens */
 const syncLocks = new Map();
 
 function fmt(n) {
@@ -97,10 +97,13 @@ function resultEmbed(game, resultText) {
 
 function cashPayload(game, potentialFn, resultText) {
     const ended = !!(game.dead || game.cashed);
+    const mention = game.userId ? '<@' + game.userId + '>' : null;
+    const am = game.userId ? { users: [String(game.userId)] } : undefined;
 
     if (ended) {
         return {
-            content: null,
+            content: mention,
+            allowedMentions: am,
             embeds: [resultEmbed(game, resultText)],
             components: [againRow(game)]
         };
@@ -112,7 +115,8 @@ function cashPayload(game, potentialFn, resultText) {
             : 0;
 
     return {
-        content: null,
+        content: mention,
+        allowedMentions: am,
         embeds: [playingEmbed(game, pot)],
         components: [cashRow(game, potentialFn)]
     };
