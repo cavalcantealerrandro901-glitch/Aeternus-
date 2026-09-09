@@ -188,8 +188,20 @@ async function run(ctx, { repUser, member, inviteRaw, client, isSlash }) {
         serverName: name,
         messageId: msg.id,
         channelId: ch.id,
+        roleId: conf.roleId || null,
         createdBy: (ctx.user || ctx.author).id
     });
+
+    let roleGiven = false;
+    if (conf.roleId) {
+        try {
+            const role = await guild.roles.fetch(conf.roleId).catch(() => null);
+            if (role && member) {
+                await member.roles.add(role, 'Parceria registrada').catch(() => null);
+                roleGiven = member.roles.cache.has(role.id) || true;
+            }
+        } catch (_) {}
+    }
 
     try {
         await repUser.send(
@@ -209,7 +221,12 @@ async function run(ctx, { repUser, member, inviteRaw, client, isSlash }) {
                 `**Servidor confirmado:** **${name}**\n` +
                 `**Convite:** ${inviteMd}\n` +
                 `**Canal:** ${ch}\n` +
-                `**ID:** \`${entry.id}\`\n\n` +
+                `**ID:** \`${entry.id}\`\n` +
+                (roleGiven && conf.roleId
+                    ? `**Cargo:** <@&${conf.roleId}>\n\n`
+                    : conf.roleId
+                      ? `**Cargo:** configurado, mas não foi possível aplicar.\n\n`
+                      : `\n`) +
                 `_Se o representante sair do servidor, a parceria e o anúncio são removidos._`
         );
 
