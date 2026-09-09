@@ -69,30 +69,22 @@ function pick(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
-/**
- * Monta embed personalizado com base no perfil do usuário.
- */
 function buildEmbed(user, st) {
     const name = user?.username || 'viajante';
     const streak = Number(st.nextStreak || st.streak || 0);
     const level = Number(st.level || 0);
     const bal = Number(st.balance || 0);
     const min = st.dailyMin ?? 5000;
-    const max = st.dailyMax ?? 50000;
+    const max = st.dailyMax ?? 15000;
     const mult = Number(st.multiplier || 1);
 
     let color = 0xa78bfa;
-    let title;
-    let body;
+    let title = '✦ Daily disponível';
+    let body = '';
 
-    // --- variantes por situação ---
     if (streak >= 30) {
         color = 0xfbbf24;
-        title = pick([
-            '👑 Lenda da sequência',
-            '✦ Trinta dias e além',
-            '🌟 Constância rara'
-        ]);
+        title = pick(['👑 Lenda da sequência', '✦ Trinta dias e além', '🌟 Constância rara']);
         body = pick([
             [
                 `**${name}**, sua marca é difícil de ignorar.`,
@@ -103,24 +95,20 @@ function buildEmbed(user, st) {
                     (mult > 1 ? ` · bônus ×${mult.toFixed(2)}` : '') +
                     '.',
                 '',
-                'Resgate agora: **`O.daily`** ou **`/diario`**'
+                'Resgate agora: **O.daily** ou **/diario**'
             ].join('\n'),
             [
                 `A madrugada reconhece **${name}**.`,
-                `**${streak} dias** de caminho — continue.',
+                `**${streak} dias** de caminho — continue.`,
                 '',
                 'Um único resgate mantém tudo o que você construiu.',
                 '',
-                '→ **`O.daily`**  ·  **`/diario`**'
+                '→ **O.daily**  ·  **/diario**'
             ].join('\n')
         ]);
     } else if (streak >= 7) {
         color = 0x34d399;
-        title = pick([
-            '🔥 Semana em chamas',
-            '✦ Sequência firme',
-            '💪 Ritmo conquistado'
-        ]);
+        title = pick(['🔥 Semana em chamas', '✦ Sequência firme', '💪 Ritmo conquistado']);
         body = pick([
             [
                 `**${name}**, você já segura **${Math.max(streak - 1, 1)}+ dias** seguidos.`,
@@ -129,7 +117,7 @@ function buildEmbed(user, st) {
                 'Não deixe a meia-noite passar em branco.',
                 `Recompensa na faixa ✨ **${fmt(min)} – ${fmt(max)}**.`,
                 '',
-                '**`O.daily`** ou **`/diario`** — e a sequência segue.'
+                '**O.daily** ou **/diario** — e a sequência segue.'
             ].join('\n'),
             [
                 `Bom recomeço de ciclo, **${name}**.`,
@@ -137,7 +125,7 @@ function buildEmbed(user, st) {
                 '',
                 'Resgate em segundos e siga o dia mais leve.',
                 '',
-                '→ **`/diario`**'
+                '→ **/diario**'
             ].join('\n')
         ]);
     } else if (streak <= 1 && !st.last) {
@@ -152,19 +140,18 @@ function buildEmbed(user, st) {
                 '',
                 'É rápido — e abre a sua sequência.',
                 '',
-                'Use **`O.daily`** ou **`/diario`** no servidor.'
+                'Use **O.daily** ou **/diario** no servidor.'
             ].join('\n'),
             [
-                `**${name}**, a porta do daily acabou de abrir.`,
+                `**${name}**, bem-vindo ao ciclo diário.`,
                 '',
-                'Sem compromisso com o passado — só o primeiro resgate.',
+                'Um resgate por dia. Sem mistério.',
                 'Depois, cada dia conta.',
                 '',
-                '→ **`O.daily`**'
+                '→ **O.daily**'
             ].join('\n')
         ]);
     } else if (streak <= 1) {
-        // quebrou sequência ou voltando
         color = 0xf472b6;
         title = pick(['🔄 De volta ao ciclo', '✦ Recomeço', '🌓 Outra chance']);
         body = pick([
@@ -174,25 +161,20 @@ function buildEmbed(user, st) {
                 'Resgatar hoje é recomeçar a sequência do zero, com éter na conta.',
                 `Faixa: ✨ **${fmt(min)} – ${fmt(max)}**.`,
                 '',
-                '**`O.daily`** · **`/diario`**'
+                '**O.daily** · **/diario**'
             ].join('\n'),
             [
                 `A meia-noite não pergunta o que ficou para trás, **${name}**.`,
-                'Só oferecee o que você faz agora.',
+                'Só oferece o que você faz agora.',
                 '',
                 'Colete o daily e comece de novo.',
                 '',
-                '→ **`/diario`**'
+                '→ **/diario**'
             ].join('\n')
         ]);
     } else {
-        // 2–6 dias
         color = 0xa78bfa;
-        title = pick([
-            '✦ Um novo ciclo começou',
-            '🌑 Daily à espera',
-            '✨ Éter da madrugada'
-        ]);
+        title = pick(['✦ Um novo ciclo começou', '🌑 Daily à espera', '✨ Éter da madrugada']);
         body = pick([
             [
                 `Olá, **${name}**.`,
@@ -204,90 +186,66 @@ function buildEmbed(user, st) {
                     (mult > 1 ? ` (bônus ×${mult.toFixed(2)})` : '') +
                     '.',
                 '',
-                '**`O.daily`** ou **`/diario`**'
+                '**O.daily** ou **/diario**'
             ].join('\n'),
             [
                 `**${name}**, a recompensa diária abriu com a meia-noite.`,
                 '',
-                level > 0 ? `Nível **${level}** · saldo **✨ ${fmt(bal)}**.` : `Saldo atual: **✨ ${fmt(bal)}**.`,
+                level > 0
+                    ? `Nível **${level}** · saldo **✨ ${fmt(bal)}**.`
+                    : `Saldo atual: **✨ ${fmt(bal)}**.`,
                 'Um comando é o bastante para garantir o dia.',
                 '',
-                '→ **`O.daily`**  ·  **`/diario`**'
+                '→ **O.daily**  ·  **/diario**'
             ].join('\n'),
             [
                 `Madrugada quieta, **${name}** — e o daily já é seu se quiser.`,
                 '',
                 `Sequência à vista: **${streak}**. Não quebre o fio.`,
                 '',
-                'Resgate: **`/diario`**'
+                'Resgate: **/diario**'
             ].join('\n')
         ]);
     }
 
-    return new EmbedBuilder()
-        .setColor(color)
-        .setTitle(title)
-        .setDescription(body)
-        .setFooter({ text: 'Aeternus · aviso único à meia-noite' });
+    return new EmbedBuilder().setColor(color).setTitle(title).setDescription(body);
 }
 
-async function sendOne(client, userId, today) {
-    const st = daily.status(userId, null);
-    if (st.claimed) return { ok: false, reason: 'claimed' };
-
-    const map = reminders();
-    if (map[userId] === today) return { ok: false, reason: 'already' };
-
-    try {
-        const user = await client.users.fetch(userId).catch(() => null);
-        if (!user || user.bot) return { ok: false, reason: 'invalid' };
-
-        await user.send({ embeds: [buildEmbed(user, st)] });
-
-        map[userId] = today;
-        const cut = new Date(today + 'T12:00:00');
-        cut.setDate(cut.getDate() - 4);
-        const cutoff = cut.toLocaleDateString('en-CA');
-        for (const [uid, day] of Object.entries(map)) {
-            if (String(day) < cutoff) delete map[uid];
-        }
-        saveReminders(map);
-        return { ok: true };
-    } catch (e) {
-        const code = e?.code || e?.rawError?.code;
-        if (code === 50007 || code === 50001) {
-            map[userId] = today;
-            saveReminders(map);
-            return { ok: false, reason: 'dm_closed' };
-        }
-        return { ok: false, reason: e.message || 'error' };
-    }
-}
-
-async function runMidnightPass(client) {
+async function tick(client) {
     if (!isEnabled()) return;
-    if (!client?.user) return;
-
     const { day, hour, minute } = nowBRT();
-    if (hour !== 0 || minute > 4) return;
+    if (hour !== 0 || minute > 8) return;
     if (lastRunDay === day) return;
-
     lastRunDay = day;
-    console.log(`[dailyReminder] meia-noite BRT · ${day} · DMs personalizadas…`);
 
+    const data = reminders();
     const ids = candidateIds();
     let sent = 0;
-    let skipped = 0;
 
     for (const id of ids) {
-        const r = await sendOne(client, id, day);
-        if (r.ok) {
-            sent++;
-            await new Promise((res) => setTimeout(res, BATCH_DELAY_MS));
-        } else skipped++;
-    }
+        try {
+            if (data[id] === day) continue;
+            let st = { nextStreak: 1, streak: 0, last: null, balance: 0, level: 0 };
+            try {
+                if (typeof daily.status === 'function') st = { ...st, ...daily.status(id) };
+            } catch (_) {}
+            try {
+                st.balance = typeof eter.get === 'function' ? eter.get(id) : 0;
+            } catch (_) {}
 
-    console.log(`[dailyReminder] ok · ${sent} enviada(s) · ${skipped} ignorado(s)`);
+            const user = await client.users.fetch(id).catch(() => null);
+            if (!user) continue;
+            const emb = buildEmbed(user, st);
+            await user.send({ embeds: [emb] }).catch(() => null);
+            data[id] = day;
+            sent += 1;
+            await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+        } catch (e) {
+            console.warn('[dailyReminder]', id, e.message);
+        }
+    }
+    saveReminders(data);
+    if (sent) console.log(`[dailyReminder] ${sent} DM(s) em ${day}`);
 }
 
 function setup(client) {
@@ -295,23 +253,9 @@ function setup(client) {
         console.log('[dailyReminder] desligado (DAILY_REMINDER=off)');
         return;
     }
-
-    const tick = () => {
-        runMidnightPass(client).catch((e) => console.error('[dailyReminder]', e.message));
-    };
-
-    const start = () => {
-        tick();
-        setInterval(tick, CHECK_MS);
-    };
-
-    if (client.user) setTimeout(start, 15_000);
-    else {
-        client.once('clientReady', () => setTimeout(start, 15_000));
-        client.once('ready', () => setTimeout(start, 15_000));
-    }
-
-    console.log('[dailyReminder] ativo · meia-noite BRT · mensagens personalizadas');
+    console.log('[dailyReminder] ativo · meia-noite BRT');
+    setTimeout(() => tick(client).catch(() => {}), 8000);
+    setInterval(() => tick(client).catch(() => {}), CHECK_MS);
 }
 
-module.exports = { setup, runMidnightPass };
+module.exports = { setup, tick, buildEmbed };
