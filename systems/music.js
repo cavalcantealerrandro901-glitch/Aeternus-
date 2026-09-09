@@ -1,14 +1,10 @@
 /**
  * Música — Node.js + Lavalink v4 (Lavaplayer no servidor)
  *
- * Arquitetura:
- *  - Este módulo = cliente (HTTP + WebSocket)
- *  - Servidor Lavalink (Java) usa Lavaplayer DefaultAudioPlayerManager.loadItem
- *  - REST /v4/loadtracks  ≈  loadItem(identifier)
- *
  * ENV:
  *   LAVALINK_NODES=host:port:password:secure[,host2:...]
- *   ou LAVALINK_HOST + LAVALINK_PORT + LAVALINK_PASSWORD + LAVALINK_SECURE=true
+ *   ou host|port|password|secure  (melhor se a senha tiver ":")
+ *   LAVALINK_NO_PUBLIC=1  → não usa nodes públicos embutidos
  *   LAVALINK_SEARCH_PREFIX=ytsearch:
  */
 
@@ -40,38 +36,98 @@ function formatMs(ms) {
     return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
 }
 
+/** Nodes públicos de vários provedores (fallback + complementares) */
+const DEFAULT_PUBLIC_NODES = [
+    { host: 'lavalinkv4.serenetia.com', port: 443, password: 'BatuManaBisa', secure: true },
+    { host: 'lavalinkv4-id.serenetia.com', port: 443, password: 'BatuManaBisa', secure: true },
+    { host: 'lavalink.hewkawar.xyz', port: 443, password: 'HewkawArrPass', secure: true },
+    { host: 'lava-v4.ajieblogs.eu.org', port: 443, password: 'https://dsc.gg/ajidevserver', secure: true },
+    { host: 'free-lava.heavencloud.in', port: 4000, password: 'heavencloud.in', secure: false },
+    { host: 'lava-v4.ajieblogs.eu.org', port: 80, password: 'https://dsc.gg/ajidevserver', secure: false },
+    { host: 'lava4.horizxon.studio', port: 80, password: 'horizxon.studio', secure: false },
+    { host: 'lava1.horizxon.studio', port: 80, password: 'horizxon.studio', secure: false }
+];
+
+function parseOneNode(part) {
+    const s = String(part || '').trim();
+    if (!s) return null;
+    if (s.includes('|')) {
+        const bits = s.split('|').map((x) => x.trim());
+        if (bits.length < 3) return null;
+        const host = bits[0];
+        const port = Number(bits[1]);
+        const secureRaw = bits[bits.length - 1].toLowerCase();
+        const secure =
+            secureRaw === 'true' || secureRaw === '1' || secureRaw === 'secure';
+        const password = secure
+            ? bits.slice(2, -1).join('|')
+            : bits.slice(2).join('|');
+        if (!host || !port) return null;
+        return { host, port, password: password || 'youshallnotpass', secure };
+    }
+    const bits = s.split(':');
+    if (bits.length < 3) return null;
+    const last = bits[bits.length - 1].toLowerCase();
+    const secure = last === 'true' || last === '1' || last === 'secure';
+    if (secure) {
+        if (bits.length < 4) return null;
+        const port = Number(bits[bits.length - 3]);
+        const password = bits[bits.length - 2];
+        const host = bits.slice(0, -3).join(':');
+        if (!host || !port) return null;
+        return { host, port, password: password || 'youshallnotpass', secure: true };
+    }
+    const port = Number(bits[bits.length - 2]);
+    const password = bits[bits.length - 1];
+    const host = bits.slice(0, -2).join(':');
+    if (!host || !port) return null;
+    return {
+        host,
+        port,
+        password: password || 'youshallnotpass',
+        secure: port === 443
+    };
+}
+
 function parseNodes() {
     const raw = String(process.env.LAVALINK_NODES || '').trim();
     const list = [];
+    const seen = new Set();
+
+    const push = (n) => {
+        if (!n?.host || !n?.port) return;
+        const key = `${n.host}:${n.port}:${n.secure ? 1 : 0}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        list.push({
+            host: n.host,
+            port: Number(n.port),
+            password: n.password || 'youshallnotpass',
+            secure: !!n.secure
+        });
+    };
+
     if (raw) {
-        for (const part of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
-            const bits = part.split(':');
-            if (bits.length < 3) continue;
-            const secure =
-                bits[bits.length - 1] === 'true' ||
-                bits[bits.length - 1] === '1' ||
-                bits[bits.length - 1] === 'secure';
-            const password = secure ? bits[bits.length - 2] : bits[bits.length - 1];
-            const port = Number(secure ? bits[bits.length - 3] : bits[bits.length - 2]);
-            const host = (secure ? bits.slice(0, -3) : bits.slice(0, -2)).join(':');
-            if (host && port)
-                list.push({
-                    host,
-                    port,
-                    password: password || 'youshallnotpass',
-                    secure: !!secure
-                });
+        for (const part of raw.split(',').map((x) => x.trim()).filter(Boolean)) {
+            push(parseOneNode(part));
         }
     }
-    if (!list.length) {
-        const host = String(process.env.LAVALINK_HOST || '').trim();
+
+    const host = String(process.env.LAVALINK_HOST || '').trim();
+    if (host) {
         const port = Number(process.env.LAVALINK_PORT || 2333);
         const password = String(process.env.LAVALINK_PASSWORD || 'youshallnotpass');
         const secure =
             String(process.env.LAVALINK_SECURE || '').toLowerCase() === 'true' ||
             port === 443;
-        if (host) list.push({ host, port, password, secure });
+        push({ host, port, password, secure });
     }
+
+    const noPublic = String(process.env.LAVALINK_NO_PUBLIC || '').toLowerCase();
+    if (noPublic !== '1' && noPublic !== 'true') {
+        for (const n of DEFAULT_PUBLIC_NODES) push(n);
+    }
+
     return list;
 }
 
@@ -102,7 +158,7 @@ function wsUrl(node) {
 
 async function rest(method, path, body) {
     if (!activeNode || !sessionId)
-        throw new Error('Lavalink ainda não conectou. Configure LAVALINK_NODES.');
+        throw new Error('Lavalink ainda não conectou.');
     const url = restBase(activeNode) + path;
     const res = await axios({
         method,
@@ -124,7 +180,6 @@ async function rest(method, path, body) {
     return res.data;
 }
 
-/** Equivalente ao Lavaplayer loadItem(identifier) */
 async function loadItem(identifier) {
     if (!activeNode) throw new Error('Nenhum node Lavalink ativo.');
     const url =
@@ -220,7 +275,7 @@ async function resolveQuery(query, requester) {
 
 function connectNode(index = 0) {
     if (!nodesConfig.length) {
-        console.warn('[lavalink] nenhum node em LAVALINK_NODES / LAVALINK_HOST');
+        console.warn('[lavalink] nenhum node configurado');
         return;
     }
     if (connecting) return;
@@ -280,8 +335,13 @@ function connectNode(index = 0) {
         sessionId = null;
         connecting = false;
         const next = (index + 1) % nodesConfig.length;
+        const nextNode = nodesConfig[next];
+        console.log(
+            `[lavalink] failover → ${nextNode.host}:${nextNode.port} (${next + 1}/${nodesConfig.length})`
+        );
         if (reconnectTimer) clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(() => connectNode(next), 4000);
+        const delay = next === 0 ? 8000 : 2500;
+        reconnectTimer = setTimeout(() => connectNode(next), delay);
     });
 }
 
@@ -344,7 +404,6 @@ async function joinVoice(guild, voiceChannelId) {
     } catch (e) {
         console.warn('[lavalink] voice op4:', e.message);
     }
-
     return waitForVoice(guild.id);
 }
 
@@ -391,10 +450,8 @@ async function playTrack(guildId, track) {
     const st = getState(guildId);
     st.current = track;
     st.paused = false;
-
     const voice = pendingVoice.get(guildId);
     if (!voice) throw new Error('Sem dados de voz. Entre em um canal primeiro.');
-
     await updatePlayer(guildId, {
         track: { encoded: track.encoded },
         voice: {
@@ -432,7 +489,7 @@ function resolveCtx(ctx) {
 async function play(ctx, query) {
     if (!sessionId) {
         throw new Error(
-            'Lavalink ainda não conectou. Configure `LAVALINK_NODES` e aguarde o log de sessão.'
+            'Lavalink ainda não conectou. Aguarde o log de sessão ou configure LAVALINK_NODES.'
         );
     }
     const { guild, user, channel, voiceId } = resolveCtx(ctx);
@@ -521,6 +578,7 @@ function status() {
     return {
         lavalink: !!sessionId,
         node: activeNode ? `${activeNode.host}:${activeNode.port}` : null,
+        nodes: nodesConfig.length,
         guilds: guilds.size
     };
 }
@@ -573,9 +631,7 @@ function load(client) {
     const start = () => {
         if (!client.user?.id) return;
         if (!nodesConfig.length) {
-            console.warn(
-                '[lavalink] Configure LAVALINK_NODES=host:port:password:secure'
-            );
+            console.warn('[lavalink] nenhum node disponível');
             return;
         }
         console.log(
@@ -589,7 +645,7 @@ function load(client) {
     else client.once('clientReady', start);
     client.once('ready', start);
 
-    console.log('[music] cliente Lavalink v4 (Lavaplayer loadItem via /v4/loadtracks)');
+    console.log('[music] cliente Lavalink v4 · multi-node + failover');
 }
 
 module.exports = {
