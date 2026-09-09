@@ -112,6 +112,12 @@ const DEFAULT = {
         enabled: false,
         channelId: null,
         createTemp: false
+    },
+    partnership: {
+        enabled: true,
+        channelId: null,
+        phrase: '🤝 **Nova parceria!**\nRepresentante: {rep}\nServidor: **{server}**\nConvite: {invite}',
+        image: null
     }
 };
 
@@ -128,7 +134,7 @@ const MERGE_KEYS = [
     'logs', 'welcome', 'leave', 'automod', 'tickets', 'music', 'economy', 'xp',
     'suggestions', 'reports', 'levels', 'starboard', 'autorole', 'verification',
     'antinuke', 'shop', 'birthday', 'counting', 'sticky', 'autoPublish',
-    'memberCounter', 'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub', 'drops'
+    'memberCounter', 'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub', 'drops', 'partnership'
 ];
 
 function getSettings(guildId) {
