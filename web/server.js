@@ -218,11 +218,13 @@ function setup(client) {
         if (!guild) return res.status(404).json({ error: 'not found' });
         const body = req.body || {};
         const extraEntries = Array.isArray(body.extraEntries)
-            ? body.extraEntries.filter((e) => e && e.roleId).map((e) => ({
-                  roleId: String(e.roleId),
-                  entries: Math.max(0, Math.floor(Number(e.entries) || 0)),
-                  label: String(e.label || e.name || '').slice(0, 64)
-              }))
+            ? body.extraEntries
+                  .filter((e) => e && e.roleId)
+                  .map((e) => ({
+                      roleId: String(e.roleId),
+                      entries: Math.max(0, Math.floor(Number(e.entries) || 0)),
+                      label: String(e.label || e.name || '').slice(0, 64)
+                  }))
             : [];
         const requirements = {
             minLevel: Math.max(0, Math.floor(Number(body.minLevel) || 0)),
@@ -252,6 +254,7 @@ function setup(client) {
         const partnership = {
             enabled: body.enabled !== false,
             channelId: body.channelId || null,
+            roleId: body.roleId ? String(body.roleId) : null,
             phrase: String(body.phrase || '').slice(0, 2000),
             image:
                 body.image && String(body.image).startsWith('http')
