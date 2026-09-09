@@ -66,16 +66,18 @@
 <section class="panel" id="partnership">
 <div class="card">
 <h3>🤝 Parcerias</h3>
-<p class="hint">Frase e imagem do anúncio público. A mensagem no DM do representante é fixa e não muda aqui.</p>
+<p class="hint">Frase e imagem do anúncio público. O cargo abaixo é dado ao representante ao registrar a parceria. A DM continua fixa.</p>
 <div class="tg"><span>Sistema ativo</span><input type="checkbox" id="partEnabled" checked/></div>
 <label class="f">Canal dos anúncios</label>
 <select id="partChannel"></select>
+<label class="f">Cargo do representante</label>
+<select id="partRole"></select>
 <label class="f">Frase do anúncio ({rep} {server} {invite} {host})</label>
 <textarea id="partPhrase" rows="4" placeholder="Texto da parceria…"></textarea>
 <label class="f">URL da imagem (opcional)</label>
 <input id="partImage" placeholder="https://…"/>
 <button class="btn ok" type="button" onclick="partSave()">Salvar parcerias</button>
-<p class="hint" id="partHint">Comando: /fazer-parceria ou O.fazer-parceria @rep link [nome]</p>
+<p class="hint" id="partHint">Comando: /fazer-parceria ou O.fazer-parceria @rep link</p>
 </div>
 </section>
 <div class="toast" id="toast"></div>
