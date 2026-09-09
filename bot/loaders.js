@@ -99,9 +99,14 @@ function loadCommands(client) {
 
             ensureSlashData(cmd);
 
-            client.commands.set(cmd.name, cmd);
+            const mainName = String(cmd.name).toLowerCase().trim();
+            cmd.name = mainName;
+            client.commands.set(mainName, cmd);
             if (Array.isArray(cmd.aliases)) {
-                for (const a of cmd.aliases) client.commands.set(String(a).toLowerCase(), cmd);
+                for (const a of cmd.aliases) {
+                    const al = String(a).toLowerCase().trim();
+                    if (al) client.commands.set(al, cmd);
+                }
             }
 
             if (cmd.data?.name) {
