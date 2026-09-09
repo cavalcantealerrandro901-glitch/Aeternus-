@@ -17,7 +17,6 @@ function normalizeInviteUrl(code) {
     return `https://discord.gg/${code}`;
 }
 
-/** Valida o convite e puxa o nome real do servidor */
 async function resolveInvite(client, raw) {
     const code = extractInviteCode(raw);
     if (!code) return { ok: false, error: 'Convite inválido. Use um link `discord.gg/...`.' };
@@ -193,13 +192,13 @@ async function run(ctx, { repUser, member, inviteRaw, client, isSlash }) {
     });
 
     try {
-        await repUser.send({
-            content: partnerships.fixedDmText({
+        await repUser.send(
+            partnerships.fixedDmPayload({
                 host: guild.name,
                 server: name,
                 invite: inviteMd
             })
-        });
+        );
     } catch (_) {}
 
     const ok = new EmbedBuilder()

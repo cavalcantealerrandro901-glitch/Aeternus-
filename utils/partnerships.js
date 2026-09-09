@@ -12,11 +12,16 @@ const DEFAULT_PHRASE =
 
 /** Mensagem fixa no DM — não configurável no painel */
 const FIXED_DM =
-    'Olá! Você foi registrado como **representante de parceria** no servidor **{host}**.\n\n' +
-    '📦 Parceria: **{server}**\n' +
-    '🔗 Convite salvo pela staff.\n\n' +
-    '⚠️ Se você **sair** do servidor **{host}**, a parceria será **cancelada automaticamente** e o convite/anúncio será removido.\n\n' +
-    'Obrigado pela parceria!';
+    '✨ **Obrigado por caminhar conosco.**\n\n' +
+    'Você foi escolhido como **representante oficial** da parceria entre **{host}** e **{server}**.\n\n' +
+    '🤝 Sua presença une duas comunidades — e isso significa muito.\n' +
+    '🔗 Convite da parceria: {invite}\n\n' +
+    '⚠️ Lembrete importante: se você **sair** de **{host}**, a parceria será **encerrada automaticamente** e o anúncio será removido.\n\n' +
+    'Com gratidão,\n**Equipe {host}**';
+
+/** GIF de anime (parceria / cumprimento) — fixa, não vem do painel */
+const DM_GIF =
+    'https://media.tenor.com/S3sG0fD1y0IAAAAC/anime-handshake.gif';
 
 function all() {
     return store.load(KEY, {});
@@ -107,6 +112,19 @@ function fixedDmText(vars) {
     return fill(FIXED_DM, vars);
 }
 
+/** Payload pronto para user.send — embed elegante + GIF de parceria */
+function fixedDmPayload(vars) {
+    const { EmbedBuilder } = require('discord.js');
+    const emb = new EmbedBuilder()
+        .setColor(0xa78bfa)
+        .setTitle('🤝 Parceria confirmada')
+        .setDescription(fixedDmText(vars))
+        .setImage(DM_GIF)
+        .setFooter({ text: 'Aeternus · obrigado pela confiança' })
+        .setTimestamp();
+    return { embeds: [emb] };
+}
+
 module.exports = {
     list,
     get,
@@ -118,6 +136,8 @@ module.exports = {
     getConfig,
     fill,
     fixedDmText,
+    fixedDmPayload,
     DEFAULT_PHRASE,
-    FIXED_DM
+    FIXED_DM,
+    DM_GIF
 };
