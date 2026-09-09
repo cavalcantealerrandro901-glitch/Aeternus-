@@ -106,7 +106,7 @@ async function sel(id) {
     roles = data.roles || [],
     cats = data.categories || [];
   document.querySelectorAll('select').forEach((sel) => {
-    if (/Role|arRole|vfRole|tkRole|rrRole/.test(sel.id)) fill(sel, roles, 'Cargo');
+    if (/Role|arRole|vfRole|tkRole|rrRole|partRole/.test(sel.id)) fill(sel, roles, 'Cargo');
     else if (sel.id === 'tkCat') fill(sel, cats, 'Categoria');
     else fill(sel, ch, 'Canal');
   });
@@ -131,6 +131,7 @@ async function sel(id) {
   dropLoadFromSettings(s);
 
   if ($('partChannel')) fill($('partChannel'), ch, 'Canal de parcerias');
+  if ($('partRole')) fill($('partRole'), roles, 'Cargo do representante');
   partLoadFromSettings(s);
 
   if ($('prefixInput')) $('prefixInput').value = s.prefix || 'O.';
@@ -331,6 +332,7 @@ function partLoadFromSettings(s) {
   const p = s?.partnership || {};
   if ($('partEnabled')) $('partEnabled').checked = p.enabled !== false;
   if ($('partChannel')) $('partChannel').value = p.channelId || '';
+  if ($('partRole')) $('partRole').value = p.roleId || '';
   if ($('partPhrase'))
     $('partPhrase').value =
       p.phrase ||
@@ -343,6 +345,7 @@ async function partSave() {
   const body = {
     enabled: $('partEnabled')?.checked !== false,
     channelId: val('partChannel') || null,
+    roleId: val('partRole') || null,
     phrase: val('partPhrase') || '',
     image: val('partImage') || null
   };
@@ -356,7 +359,7 @@ async function partSave() {
   toast('Parcerias salvas');
   if ($('partHint'))
     $('partHint').textContent =
-      'Salvo. DM do representante continua fixa. Use /fazer-parceria';
+      'Salvo. Cargo do representante aplicado em novas parcerias.';
 }
 
 loadMe();
