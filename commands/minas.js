@@ -4,7 +4,7 @@ const fs = require('fs');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const minesCash = require('../utils/minesCashButton');
-const { fullComponents, boardText } = require('../utils/minesBoard');
+const { fullComponents } = require('../utils/minesBoard');
 let WIN_IMG_FROM_UTIL = null;
 try {
     const mw = require('../utils/minesWinImage');
@@ -247,15 +247,11 @@ function panelEmbed(game, extra, reveal) {
             ' Éter**)'
           : '⚡ Multi final: **' + curM.toFixed(2) + 'x** (✨ **' + fmt(curPay) + '**)';
 
-    const board = '```\n' + boardText(game, !!(reveal || game.dead || game.cashed)) + '\n```';
-
     const lines = [
         left1 + '       ' + right1,
         left2 + '       ' + right2,
         '',
         '─────────────────────────────────',
-        '',
-        board,
         '',
         '───────── ' + fmtWhen(game._last || Date.now()) + ' ─────────'
     ];
@@ -445,9 +441,8 @@ module.exports = {
 
             try {
                 await interaction.update({
-                    content:
-                        (interaction.message.content || '') +
-                        '\n\n🔁 Nova partida iniciada.',
+                    content: '🔁 Nova partida iniciada.',
+                    embeds: [],
                     components: []
                 });
             } catch (_) {
