@@ -21,7 +21,7 @@ const CLIENT_SECRET = () => process.env.CLIENT_SECRET || process.env.DISCORD_CLI
 const SESSION_SECRET = () => process.env.SESSION_SECRET || process.env.TOKEN || 'aeternus-dev';
 
 const SETTINGS_KEYS = [
-    'welcomeChannel', 'goodbyeChannel', 'logChannel', 'autorole', 'prefix', 'shop', 'modules', 'drops'
+    'welcomeChannel', 'goodbyeChannel', 'logChannel', 'autorole', 'prefix', 'shop', 'modules', 'drops', 'partnership'
 ];
 
 function setup(client) {
@@ -86,26 +86,19 @@ function setup(client) {
     }
 
     app.get('/api/health', (_req, res) => {
-        res.json({
-            ok: true,
-            bot: client.user?.tag || null,
-            guilds: client.guilds.cache.size,
-            redirect: REDIRECT_URI
-        });
+        res.json({ ok: true, bot: client.user?.tag || null, guilds: client.guilds.cache.size, redirect: REDIRECT_URI });
     });
 
     app.get('/login', (req, res) => {
         if (sessionUser(req)) return res.redirect('/dashboard');
         const cid = CLIENT_ID();
         if (!cid) return res.status(500).send('CLIENT_ID não configurado');
-        if (!CLIENT_SECRET()) {
-            return res.status(500).send('CLIENT_SECRET não configurado');
-        }
-        const urlConsent =
+        if (!CLIENT_SECRET()) return res.status(500).send('CLIENT_SECRET não configurado');
+        const url =
             `https://discord.com/api/oauth2/authorize?client_id=${cid}` +
             `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
             `&response_type=code&scope=identify%20guilds`;
-        res.redirect(urlConsent);
+        res.redirect(url);
     });
 
     app.get('/auth/discord/callback', async (req, res) => {
@@ -119,11 +112,9 @@ function setup(client) {
                 code: String(code),
                 redirect_uri: REDIRECT_URI
             });
-            const tokenRes = await axios.post(
-                'https://discord.com/api/oauth2/token',
-                body.toString(),
-                { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-            );
+            const tokenRes = await axios.post('https://discord.com/api/oauth2/token', body.toString(), {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            });
             const access = tokenRes.data.access_token;
             const me = await axios.get('https://discord.com/api/users/@me', {
                 headers: { Authorization: `Bearer ${access}` }
@@ -135,11 +126,7 @@ function setup(client) {
                 id: me.data.id,
                 username: me.data.username,
                 avatar: me.data.avatar,
-                guilds: (guilds.data || []).map((g) => ({
-                    id: g.id,
-                    name: g.name,
-                    icon: g.icon
-                }))
+                guilds: (guilds.data || []).map((g) => ({ id: g.id, name: g.name, icon: g.icon }))
             };
             const sid = createSession(user, access);
             setSessionCookie(res, sid);
@@ -177,11 +164,7 @@ function setup(client) {
                 const gr = await axios.get('https://discord.com/api/users/@me/guilds', {
                     headers: { Authorization: `Bearer ${sess.access}` }
                 });
-                list = (gr.data || []).map((g) => ({
-                    id: g.id,
-                    name: g.name,
-                    icon: g.icon
-                }));
+                list = (gr.data || []).map((g) => ({ id: g.id, name: g.name, icon: g.icon }));
                 sess.user.guilds = list;
             }
         } catch (_) {}
@@ -199,13 +182,7 @@ function setup(client) {
                 ? mapped
                 : [...botGuilds].map((id) => {
                       const g = client.guilds.cache.get(id);
-                      return {
-                          id,
-                          name: g?.name || id,
-                          icon: g?.icon || null,
-                          botIn: true,
-                          memberCount: g?.memberCount || 0
-                      };
+                      return { id, name: g?.name || id, icon: g?.icon || null, botIn: true, memberCount: g?.memberCount || 0 };
                   });
         res.json({ ok: true, guilds: out });
     });
@@ -241,25 +218,16 @@ function setup(client) {
         if (!guild) return res.status(404).json({ error: 'not found' });
         const body = req.body || {};
         const extraEntries = Array.isArray(body.extraEntries)
-            ? body.extraEntries
-                  .filter((e) => e && e.roleId)
-                  .map((e) => ({
-                      roleId: String(e.roleId),
-                      entries: Math.max(0, Math.floor(Number(e.entries) || 0)),
-                      label: String(e.label || e.name || '').slice(0, 64)
-                  }))
+            ? body.extraEntries.filter((e) => e && e.roleId).map((e) => ({
+                  roleId: String(e.roleId),
+                  entries: Math.max(0, Math.floor(Number(e.entries) || 0)),
+                  label: String(e.label || e.name || '').slice(0, 64)
+              }))
             : [];
         const requirements = {
             minLevel: Math.max(0, Math.floor(Number(body.minLevel) || 0)),
-            minMessagesDay: Math.max(0, Math.floor(Number(body.minMessagesDay) || 0)),
-            minMessagesWeek: Math.max(0, Math.floor(Number(body.minMessagesWeek) || 0)),
-            minMessagesMonth: Math.max(0, Math.floor(Number(body.minMessagesMonth) || 0)),
-            requiredRoleIds: Array.isArray(body.requiredRoleIds)
-                ? body.requiredRoleIds.map(String)
-                : [],
-            blockedRoleIds: Array.isArray(body.blockedRoleIds)
-                ? body.blockedRoleIds.map(String)
-                : []
+            blockedRoleIds: Array.isArray(body.blockedRoleIds) ? body.blockedRoleIds.map(String) : [],
+            requiredRoleIds: Array.isArray(body.requiredRoleIds) ? body.requiredRoleIds.map(String) : []
         };
         const drops = {
             enabled: body.enabled !== false,
@@ -276,6 +244,30 @@ function setup(client) {
         }
     });
 
+    app.post('/api/guild/:id/partnership', (req, res) => {
+        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
+        const guild = client.guilds.cache.get(req.params.id);
+        if (!guild) return res.status(404).json({ error: 'not found' });
+        const body = req.body || {};
+        const partnership = {
+            enabled: body.enabled !== false,
+            channelId: body.channelId || null,
+            phrase: String(body.phrase || '').slice(0, 2000),
+            image:
+                body.image && String(body.image).startsWith('http')
+                    ? String(body.image).slice(0, 300)
+                    : null
+        };
+        try {
+            const us = require('../utils/settings');
+            const s = us.setSettings(guild.id, { partnership });
+            return res.json({ ok: true, partnership: s.partnership });
+        } catch (e) {
+            setSettings(guild.id, { partnership });
+            return res.json({ ok: true, partnership });
+        }
+    });
+
     app.post('/api/guild/:id/shop/vips', (req, res) => {
         if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
         const guild = client.guilds.cache.get(req.params.id);
@@ -286,11 +278,8 @@ function setup(client) {
             .map((v, i) => ({
                 id: String(v.id || `vip_${Date.now()}_${i}`),
                 name: String(v.name).slice(0, 64),
-                desc: String(v.desc || 'Cargo VIP').slice(0, 120),
-                price: Math.max(0, Math.floor(Number(v.price) || 0)),
-                currency: 'eter',
                 roleId: String(v.roleId),
-                durationDays: Math.max(0, Math.floor(Number(v.durationDays) || 0)),
+                price: Math.max(0, Math.floor(Number(v.price) || 0)),
                 dropEntries: Math.max(0, Math.floor(Number(v.dropEntries || 0) || 0))
             }));
         try {
@@ -312,15 +301,11 @@ function setup(client) {
 
     const tryListen = (port, attempts = 0) => {
         const server = app.listen(port, () => {
-            console.log(`\ud83c\udf10 Painel na porta ${port}`);
-            console.log('[web] OAuth redirect:', REDIRECT_URI);
+            console.log('Painel na porta', port);
         });
         server.on('error', (err) => {
-            if (err.code === 'EADDRINUSE' && attempts < 15) {
-                tryListen(port + 1, attempts + 1);
-            } else {
-                console.error('Painel web não iniciou:', err.message);
-            }
+            if (err.code === 'EADDRINUSE' && attempts < 15) tryListen(port + 1, attempts + 1);
+            else console.error('Painel não iniciou:', err.message);
         });
     };
     tryListen(Number(PORT) || 10000);
