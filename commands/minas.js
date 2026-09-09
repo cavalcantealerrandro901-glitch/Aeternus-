@@ -145,16 +145,25 @@ function multAt(opened, bombs) {
     opened = Math.max(0, Number(opened) || 0);
     bombs = Math.min(MAX_BOMBS, Math.max(1, Number(bombs) || 1));
     if (opened <= 0) return 1;
+
     let m = 1;
     const safe = TOTAL - bombs;
+    const density = bombs / TOTAL;
+
     for (let i = 0; i < opened; i++) {
         const cellsLeft = TOTAL - i;
         const safeLeft = safe - i;
         if (safeLeft <= 0 || cellsLeft <= 0) break;
-        m *= cellsLeft / safeLeft;
+        const fair = cellsLeft / safeLeft;
+        const stepBoost = 1 + density * 0.42 + (bombs / MAX_BOMBS) * 0.12;
+        m *= fair * stepBoost;
     }
-    const riskBonus = 1 + (bombs / TOTAL) * 0.08;
-    m = m * HOUSE * riskBonus;
+
+    const bombPower = 1 + Math.pow(bombs / MAX_BOMBS, 1.15) * 1.15;
+    m = m * HOUSE * bombPower;
+    m = Math.max(1 + opened * (0.08 + density * 0.12), m);
+    if (m > 500) m = 500;
+
     return Math.max(1, Math.round(m * 100) / 100);
 }
 
