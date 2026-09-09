@@ -80,7 +80,6 @@ function panelPayload(game, extra, reveal) {
         emb.setThumbnail('attachment://mines-lose.jpg');
     }
     return {
-        content: null,
         embeds: [emb],
         components: fullComponents(game, reveal),
         files: files.length ? files : []
@@ -371,7 +370,12 @@ module.exports = {
         const game = makeGame(message.author.id, amount, bombCount, fun, {
             channelId: message.channel.id
         });
-        const msg = await message.reply(panelPayload(game));
+        const payload = panelPayload(game);
+        const msg = await message.reply({
+            content: '<@' + message.author.id + '>',
+            allowedMentions: { users: [message.author.id] },
+            ...payload
+        });
         game.messageId = msg.id;
         game.channelId = message.channel.id;
         await minesCash.syncCashMessage(client, game, potentialAt);
@@ -458,6 +462,7 @@ module.exports = {
             const sent = await interaction.channel
                 .send({
                     content: '<@' + game.userId + '>',
+                    allowedMentions: { users: [game.userId] },
                     ...panelPayload(ng)
                 })
                 .catch(() => null);
