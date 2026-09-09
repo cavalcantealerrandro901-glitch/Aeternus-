@@ -57,6 +57,7 @@ function create(guildId, entry) {
         serverName: entry.serverName || 'Servidor parceiro',
         messageId: entry.messageId || null,
         channelId: entry.channelId || null,
+        roleId: entry.roleId || null,
         createdAt: Date.now(),
         createdBy: entry.createdBy || null,
         cancelled: false
@@ -95,6 +96,7 @@ function getConfig(guildId) {
     return {
         enabled: s.enabled !== false,
         channelId: s.channelId || null,
+        roleId: s.roleId || null,
         phrase: s.phrase || DEFAULT_PHRASE,
         image: s.image || null
     };
@@ -112,7 +114,6 @@ function fixedDmText(vars) {
     return fill(FIXED_DM, vars);
 }
 
-/** Payload pronto para user.send — embed elegante + GIF de parceria */
 function fixedDmPayload(vars) {
     const { EmbedBuilder } = require('discord.js');
     const emb = new EmbedBuilder()
