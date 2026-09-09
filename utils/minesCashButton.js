@@ -1,7 +1,7 @@
 /**
  * Mensagem externa do Mines:
- * em jogo: embed (dica + nº partida + valor atual) + botão Sacar
- * fim: embed de saque/perda + Tentar novamente
+ * em jogo: embed (dica + nº partida) + botão Sacar (uma só)
+ * fim: embed de resultado + Tentar novamente
  */
 const {
     ActionRowBuilder,
@@ -9,6 +9,9 @@ const {
     ButtonStyle,
     EmbedBuilder
 } = require('discord.js');
+
+/** Evita race: duas syncs ao mesmo tempo criando 2 mensagens */
+const syncLocks = new Map();
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -54,7 +57,6 @@ function partidaLine(game) {
     return '🎮 Partida nº **#' + n + '**';
 }
 
-/** Embed em jogo (acima do botão Sacar) */
 function playingEmbed(game, pot) {
     const lines = [tipLine(), '', partidaLine(game)];
     if (!game.fun && game.opened.size > 0) {
@@ -66,7 +68,6 @@ function playingEmbed(game, pot) {
         .setDescription(lines.join('\n'));
 }
 
-/** Embed de resultado (saque / perda / inatividade) */
 function resultEmbed(game, resultText) {
     const dead = !!game.dead;
     const idle = !!game._idleAuto;
@@ -117,8 +118,55 @@ function cashPayload(game, potentialFn, resultText) {
     };
 }
 
+function isMinesCashMessage(msg, gameId) {
+    if (!msg?.components?.length) return false;
+    try {
+        for (const row of msg.components) {
+            for (const c of row.components || []) {
+                const id = c.customId || c.data?.custom_id || '';
+                if (
+                    id === 'minas:cash:' + gameId ||
+                    id === 'minas:again:' + gameId ||
+                    (typeof id === 'string' && id.startsWith('minas:cash:' + gameId))
+                ) {
+                    return true;
+                }
+            }
+        }
+    } catch (_) {}
+    return false;
+}
+
+async function purgeDuplicateCashMessages(ch, game, keepId) {
+    if (!ch?.messages?.fetch) return;
+    try {
+        const fetched = await ch.messages.fetch({ limit: 30 }).catch(() => null);
+        if (!fetched) return;
+        const botId = ch.client?.user?.id;
+        for (const m of fetched.values()) {
+            if (keepId && m.id === keepId) continue;
+            if (botId && m.author?.id !== botId) continue;
+            if (isMinesCashMessage(m, game.id)) {
+                await m.delete().catch(() => {});
+            }
+        }
+    } catch (_) {}
+}
+
 async function syncCashMessage(client, game, potentialFn, resultText) {
     if (!client || !game?.channelId) return;
+
+    const prev = syncLocks.get(game.id) || Promise.resolve();
+    let release;
+    const gate = new Promise((r) => {
+        release = r;
+    });
+    syncLocks.set(
+        game.id,
+        prev.then(() => gate).catch(() => gate)
+    );
+    await prev.catch(() => {});
+
     try {
         const ch = await client.channels.fetch(game.channelId).catch(() => null);
         if (!ch || !ch.isTextBased?.()) return;
@@ -129,23 +177,53 @@ async function syncCashMessage(client, game, potentialFn, resultText) {
             const m = await ch.messages.fetch(game.cashMessageId).catch(() => null);
             if (m) {
                 await m.edit(payload).catch(() => {});
+                await purgeDuplicateCashMessages(ch, game, m.id);
                 return;
             }
+            game.cashMessageId = null;
         }
 
+        try {
+            const fetched = await ch.messages.fetch({ limit: 20 }).catch(() => null);
+            if (fetched) {
+                const botId = client.user?.id;
+                for (const m of fetched.values()) {
+                    if (botId && m.author?.id !== botId) continue;
+                    if (isMinesCashMessage(m, game.id)) {
+                        game.cashMessageId = m.id;
+                        await m.edit(payload).catch(() => {});
+                        await purgeDuplicateCashMessages(ch, game, m.id);
+                        return;
+                    }
+                }
+            }
+        } catch (_) {}
+
         const sent = await ch.send(payload).catch(() => null);
-        if (sent) game.cashMessageId = sent.id;
+        if (sent) {
+            game.cashMessageId = sent.id;
+            await purgeDuplicateCashMessages(ch, game, sent.id);
+        }
     } catch (e) {
         console.warn('[minesCash] sync:', e.message);
+    } finally {
+        release();
     }
 }
 
 async function deleteCashMessage(client, game) {
-    if (!client || !game?.channelId || !game.cashMessageId) return;
+    if (!client || !game?.channelId) return;
     try {
         const ch = await client.channels.fetch(game.channelId).catch(() => null);
-        const m = await ch?.messages?.fetch(game.cashMessageId).catch(() => null);
-        if (m) await m.delete().catch(() => {});
+        if (!ch) {
+            game.cashMessageId = null;
+            return;
+        }
+        if (game.cashMessageId) {
+            const m = await ch.messages.fetch(game.cashMessageId).catch(() => null);
+            if (m) await m.delete().catch(() => {});
+        }
+        await purgeDuplicateCashMessages(ch, game, null);
     } catch (_) {}
     game.cashMessageId = null;
 }
