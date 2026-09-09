@@ -59,8 +59,7 @@ function fmt(n) {
 
 function renderHub() {
   const html = SYS_HUB.map(
-    ([id, ic, nm]) =>
-      `<div class="sys" onclick="show('${id}')">${ic} <b>${nm}</b></div>`
+    ([id, ic, nm]) => `<div class="sys" onclick="show('${id}')">${ic} <b>${nm}</b></div>`
   ).join('');
   if ($('sysHub')) $('sysHub').innerHTML = html;
   if ($('ovHub')) $('ovHub').innerHTML = html;
@@ -122,8 +121,7 @@ async function sel(id) {
   if ($('rrRole')) fill($('rrRole'), roles, 'Cargo VIP');
   if ($('rrMsg'))
     $('rrMsg').value =
-      data.reactionRoles?.message ||
-      'Reaja com o emoji do VIP que deseja receber.';
+      data.reactionRoles?.message || 'Reaja com o emoji do VIP que deseja receber.';
   rrRenderList();
   rrPreview();
 
@@ -131,6 +129,9 @@ async function sel(id) {
   if ($('dropVipRole')) fill($('dropVipRole'), roles, 'Cargo VIP');
   if ($('dropBlockedRole')) fill($('dropBlockedRole'), roles, 'Cargo bloqueado');
   dropLoadFromSettings(s);
+
+  if ($('partChannel')) fill($('partChannel'), ch, 'Canal de parcerias');
+  partLoadFromSettings(s);
 
   if ($('prefixInput')) $('prefixInput').value = s.prefix || 'O.';
   if ($('ovStats'))
@@ -198,8 +199,7 @@ function rrPreview() {
   const body = $('rrPrevBody');
   const em = $('rrPrevEmojis');
   if (body) body.textContent = val('rrMsg') || 'Reaja para receber o VIP.';
-  if (em)
-    em.innerHTML = rrRoles.map((r) => `<span>${r.emoji} ${r.label || ''}</span>`).join('');
+  if (em) em.innerHTML = rrRoles.map((r) => `<span>${r.emoji} ${r.label || ''}</span>`).join('');
 }
 
 async function rrSave() {
@@ -233,7 +233,6 @@ async function rrPublish() {
   toast(j.ok ? 'Publicado!' : j.error || 'Erro');
 }
 
-/* ===== Drops (painel) ===== */
 let dropExtra = [];
 let dropBlocked = [];
 
@@ -326,7 +325,38 @@ async function dropSave() {
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error) return toast(j.error || 'Erro ao salvar');
   toast('Drops salvos');
-  if ($('dropHint')) $('dropHint').textContent = 'Configuração aplicada aos próximos drops.';
+}
+
+function partLoadFromSettings(s) {
+  const p = s?.partnership || {};
+  if ($('partEnabled')) $('partEnabled').checked = p.enabled !== false;
+  if ($('partChannel')) $('partChannel').value = p.channelId || '';
+  if ($('partPhrase'))
+    $('partPhrase').value =
+      p.phrase ||
+      '🤝 **Nova parceria!**\nRepresentante: {rep}\nServidor: **{server}**\nConvite: {invite}';
+  if ($('partImage')) $('partImage').value = p.image || '';
+}
+
+async function partSave() {
+  if (!gid) return toast('Selecione um servidor');
+  const body = {
+    enabled: $('partEnabled')?.checked !== false,
+    channelId: val('partChannel') || null,
+    phrase: val('partPhrase') || '',
+    image: val('partImage') || null
+  };
+  const r = await fetch('/api/guild/' + gid + '/partnership', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) return toast(j.error || 'Erro ao salvar');
+  toast('Parcerias salvas');
+  if ($('partHint'))
+    $('partHint').textContent =
+      'Salvo. DM do representante continua fixa. Use /fazer-parceria';
 }
 
 loadMe();
