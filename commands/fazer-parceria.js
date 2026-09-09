@@ -1,25 +1,36 @@
 const {
     SlashCommandBuilder,
     PermissionFlagsBits,
-    EmbedBuilder
+    EmbedBuilder,
+    ChannelType
 } = require('discord.js');
 const partnerships = require('../utils/partnerships');
 
 function extractInviteCode(raw) {
-    const s = String(raw || '').trim();
+    const s = String(raw || '');
     const m =
         s.match(/(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)([a-zA-Z0-9-]+)/i) ||
-        s.match(/^([a-zA-Z0-9-]{2,32})$/);
-    return m ? m[1] : null;
+        s.match(/\((https?:\/\/discord\.gg\/[a-zA-Z0-9-]+)\)/i);
+    if (!m) return null;
+    if (m[1] && m[1].includes('discord')) {
+        const m2 = m[1].match(/discord\.gg\/([a-zA-Z0-9-]+)/i);
+        return m2 ? m2[1] : null;
+    }
+    return m[1] || null;
 }
 
 function normalizeInviteUrl(code) {
     return `https://discord.gg/${code}`;
 }
 
-async function resolveInvite(client, raw) {
-    const code = extractInviteCode(raw);
-    if (!code) return { ok: false, error: 'Convite inválido. Use um link `discord.gg/...`.' };
+async function resolveInvite(client, textOrUrl) {
+    const code = extractInviteCode(textOrUrl);
+    if (!code) {
+        return {
+            ok: false,
+            error: 'Não achei um convite `discord.gg/...` dentro do texto. Coloque o link na mensagem da parceria.'
+        };
+    }
     try {
         const inv = await client.fetchInvite(code);
         const name = inv.guild?.name || inv.channel?.name || null;
@@ -35,26 +46,41 @@ async function resolveInvite(client, raw) {
             code: inv.code || code,
             url,
             serverName: name || `Servidor (${code})`,
-            memberCount: inv.memberCount ?? null,
-            presenceCount: inv.presenceCount ?? null
+            memberCount: inv.memberCount ?? null
         };
-    } catch (e) {
+    } catch (_) {
         return {
             ok: false,
-            error: 'Convite **não encontrado** ou expirado. Confira o link e tente de novo.'
+            error: 'Convite **não encontrado** ou expirado. Confira o link no texto.'
         };
     }
+}
+
+function canPost(channel) {
+    if (!channel) return false;
+    if (typeof channel.isTextBased === 'function' && channel.isTextBased()) return true;
+    const okTypes = new Set([
+        ChannelType.GuildText,
+        ChannelType.GuildAnnouncement,
+        ChannelType.GuildVoice,
+        ChannelType.GuildStageVoice,
+        ChannelType.PublicThread,
+        ChannelType.PrivateThread,
+        ChannelType.AnnouncementThread,
+        ChannelType.GuildForum
+    ]);
+    return okTypes.has(channel.type);
 }
 
 module.exports = {
     name: 'fazer-parceria',
     aliases: ['parceria', 'addparceria', 'novaparceria'],
-    description: 'Registra uma parceria com um representante',
+    description: 'Registra parceria com texto personalizado (link dentro do texto)',
     category: 'moderacao',
 
     data: new SlashCommandBuilder()
         .setName('fazer-parceria')
-        .setDescription('Registra parceria (representante + convite do servidor parceiro)')
+        .setDescription('Registra parceria: cole o texto (com o link dentro) + representante')
         .addUserOption((o) =>
             o
                 .setName('representante')
@@ -63,10 +89,10 @@ module.exports = {
         )
         .addStringOption((o) =>
             o
-                .setName('convite')
-                .setDescription('Link de convite (o bot confirma o nome do servidor)')
+                .setName('texto')
+                .setDescription('Texto da parceria (formatação + link discord.gg dentro)')
                 .setRequired(true)
-                .setMaxLength(200)
+                .setMaxLength(4000)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
@@ -78,20 +104,34 @@ module.exports = {
         const rep =
             message.mentions.members.first() ||
             (args[0] && (await message.guild.members.fetch(args[0]).catch(() => null)));
-        const invite =
-            args.find((a) => /discord\.gg\/|discord\.com\/invite\//i.test(a)) ||
-            args.find((a) => /^[a-zA-Z0-9-]{2,32}$/.test(a) && !/^\d{17,20}$/.test(a)) ||
-            args[1];
-        if (!rep || !invite) {
+
+        let texto = message.content
+            .replace(
+                /^(?:<@!?\d+>\s*)?(?:O\.)?(?:fazer-parceria|parceria|addparceria|novaparceria)\s*/i,
+                ''
+            )
+            .replace(/<@!?\d+>/g, '')
+            .trim();
+
+        if ((!texto || texto.length < 10) && message.reference?.messageId) {
+            const ref = await message.channel.messages
+                .fetch(message.reference.messageId)
+                .catch(() => null);
+            if (ref?.content) texto = ref.content.trim();
+        }
+
+        if (!rep || !texto) {
             return message.reply(
-                'Uso: `O.fazer-parceria @representante <link-convite>`\n' +
-                    '_O bot confirma o nome do servidor pelo convite._'
+                'Uso:\n' +
+                    '`O.fazer-parceria @representante` + cole o **texto da parceria** (com o link dentro)\n' +
+                    'Ou responda à mensagem do texto com `O.fazer-parceria @representante`\n' +
+                    '_O bot tira o convite do texto e confirma o servidor._'
             );
         }
         return run(message, {
             repUser: rep.user,
             member: rep,
-            inviteRaw: String(invite).trim(),
+            texto,
             client: message.client
         });
     },
@@ -105,7 +145,7 @@ module.exports = {
         }
         await i.deferReply();
         const user = i.options.getUser('representante', true);
-        const inviteRaw = i.options.getString('convite', true).trim();
+        const texto = i.options.getString('texto', true).trim();
         const member = await i.guild.members.fetch(user.id).catch(() => null);
         if (!member) {
             return i.editReply({ content: '❌ Representante não está neste servidor.' });
@@ -113,72 +153,60 @@ module.exports = {
         return run(i, {
             repUser: user,
             member,
-            inviteRaw,
+            texto,
             client: i.client,
             isSlash: true
         });
     }
 };
 
-async function run(ctx, { repUser, member, inviteRaw, client, isSlash }) {
+async function run(ctx, { repUser, member, texto, client, isSlash }) {
     const guild = ctx.guild;
     const conf = partnerships.getConfig(guild.id);
     if (conf.enabled === false) {
         return reply(ctx, isSlash, '❌ Sistema de parcerias desativado no painel.');
     }
 
-    const resolved = await resolveInvite(client, inviteRaw);
+    const resolved = await resolveInvite(client, texto);
     if (!resolved.ok) {
         return reply(ctx, isSlash, `❌ ${resolved.error}`);
     }
 
-    const channelId = conf.channelId || ctx.channel?.id;
-    const ch = await guild.channels.fetch(channelId).catch(() => null);
-    if (!ch?.isTextBased()) {
+    const ch = ctx.channel;
+    if (!canPost(ch)) {
         return reply(
             ctx,
             isSlash,
-            '❌ Canal de parcerias inválido. Configure no painel (Parcerias).'
+            '❌ Não consigo enviar mensagem neste canal. Use em texto, anúncio ou call com chat.'
         );
     }
 
     const name = resolved.serverName;
     const inviteMd = `[Entrar em ${name}](${resolved.url})`;
 
-    const text = partnerships.fill(conf.phrase || partnerships.DEFAULT_PHRASE, {
-        rep: `${repUser}`,
-        server: name,
-        invite: inviteMd,
-        host: guild.name
-    });
-
-    const emb = new EmbedBuilder()
-        .setColor(0xa78bfa)
-        .setTitle('🤝 Parceria')
-        .setDescription(text)
-        .addFields(
-            { name: 'Representante', value: `${repUser}`, inline: true },
-            { name: 'Servidor', value: name, inline: true },
-            { name: 'Convite', value: inviteMd, inline: false }
-        )
-        .setFooter({ text: `Por ${ctx.user?.tag || ctx.author?.tag || 'staff'}` })
-        .setTimestamp();
-
-    if (resolved.memberCount != null) {
-        emb.addFields({
-            name: 'Membros (convite)',
-            value: String(resolved.memberCount),
-            inline: true
-        });
-    }
+    const payload = { content: texto.slice(0, 2000) };
 
     if (conf.image && /^https?:\/\//i.test(conf.image)) {
-        emb.setImage(conf.image);
+        payload.embeds = [
+            new EmbedBuilder()
+                .setColor(0xa78bfa)
+                .setImage(conf.image)
+                .setFooter({
+                    text: `Parceria · ${name} · por ${ctx.user?.tag || ctx.author?.tag || 'staff'}`
+                })
+        ];
     }
 
-    const msg = await ch.send({ embeds: [emb] }).catch(() => null);
+    const msg = await ch.send(payload).catch((e) => {
+        console.warn('[parceria] send:', e.message);
+        return null;
+    });
     if (!msg) {
-        return reply(ctx, isSlash, '❌ Não consegui enviar no canal de parcerias.');
+        return reply(
+            ctx,
+            isSlash,
+            '❌ Não consegui enviar neste canal (permissão ou tipo de canal).'
+        );
     }
 
     const entry = partnerships.create(guild.id, {
@@ -198,7 +226,7 @@ async function run(ctx, { repUser, member, inviteRaw, client, isSlash }) {
             const role = await guild.roles.fetch(conf.roleId).catch(() => null);
             if (role && member) {
                 await member.roles.add(role, 'Parceria registrada').catch(() => null);
-                roleGiven = member.roles.cache.has(role.id) || true;
+                roleGiven = true;
             }
         } catch (_) {}
     }
@@ -219,7 +247,7 @@ async function run(ctx, { repUser, member, inviteRaw, client, isSlash }) {
         .setDescription(
             `**Representante:** ${repUser}\n` +
                 `**Servidor confirmado:** **${name}**\n` +
-                `**Convite:** ${inviteMd}\n` +
+                `**Convite (do texto):** ${inviteMd}\n` +
                 `**Canal:** ${ch}\n` +
                 `**ID:** \`${entry.id}\`\n` +
                 (roleGiven && conf.roleId
@@ -227,7 +255,7 @@ async function run(ctx, { repUser, member, inviteRaw, client, isSlash }) {
                     : conf.roleId
                       ? `**Cargo:** configurado, mas não foi possível aplicar.\n\n`
                       : `\n`) +
-                `_Se o representante sair do servidor, a parceria e o anúncio são removidos._`
+                `_Se o representante sair, a parceria e a mensagem são removidas._`
         );
 
     return reply(ctx, isSlash, { embeds: [ok] });
