@@ -56,7 +56,6 @@ async function resolveInvite(client, textOrUrl) {
     }
 }
 
-/** Envia em texto, anúncio, call, stage, thread ou fórum (cria post). */
 async function postAnywhere(channel, payload, serverName) {
     if (!channel) return { ok: false, error: 'Canal inválido.' };
 
@@ -66,7 +65,8 @@ async function postAnywhere(channel, payload, serverName) {
                 name: `Parceria · ${(serverName || 'Parceiro').slice(0, 80)}`,
                 message: {
                     content: payload.content,
-                    embeds: payload.embeds
+                    embeds: payload.embeds,
+                    allowedMentions: payload.allowedMentions
                 },
                 reason: 'Parceria Aeternus'
             });
@@ -223,7 +223,25 @@ async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash
     const name = resolved.serverName;
     const inviteMd = `[Entrar em ${name}](${resolved.url})`;
 
-    const payload = { content: texto.slice(0, 2000) };
+    // Pings no final: representante + cargo de notificação do painel
+    const footerPings = [];
+    footerPings.push(`**Rep:** <@${repUser.id}>`);
+    if (conf.roleId) {
+        footerPings.push(`**Notificação:** <@&${conf.roleId}>`);
+    }
+    const pingBlock = '\n\n' + footerPings.join(' · ');
+    const body = String(texto).trim();
+    const maxBody = Math.max(0, 2000 - pingBlock.length);
+    const finalContent = body.slice(0, maxBody) + pingBlock;
+
+    const payload = {
+        content: finalContent,
+        allowedMentions: {
+            users: [repUser.id],
+            roles: conf.roleId ? [String(conf.roleId)] : [],
+            parse: []
+        }
+    };
 
     if (conf.image && /^https?:\/\//i.test(conf.image)) {
         payload.embeds = [
