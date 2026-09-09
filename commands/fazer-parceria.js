@@ -56,20 +56,48 @@ async function resolveInvite(client, textOrUrl) {
     }
 }
 
-function canPost(channel) {
-    if (!channel) return false;
-    if (typeof channel.isTextBased === 'function' && channel.isTextBased()) return true;
-    const okTypes = new Set([
-        ChannelType.GuildText,
-        ChannelType.GuildAnnouncement,
-        ChannelType.GuildVoice,
-        ChannelType.GuildStageVoice,
-        ChannelType.PublicThread,
-        ChannelType.PrivateThread,
-        ChannelType.AnnouncementThread,
-        ChannelType.GuildForum
-    ]);
-    return okTypes.has(channel.type);
+/** Envia em texto, anúncio, call, stage, thread ou fórum (cria post). */
+async function postAnywhere(channel, payload, serverName) {
+    if (!channel) return { ok: false, error: 'Canal inválido.' };
+
+    if (channel.type === ChannelType.GuildForum) {
+        try {
+            const thread = await channel.threads.create({
+                name: `Parceria · ${(serverName || 'Parceiro').slice(0, 80)}`,
+                message: {
+                    content: payload.content,
+                    embeds: payload.embeds
+                },
+                reason: 'Parceria Aeternus'
+            });
+            let msg = null;
+            try {
+                const fetched = await thread.messages.fetch({ limit: 1 });
+                msg = fetched.first() || null;
+            } catch (_) {}
+            return {
+                ok: true,
+                msg: msg || { id: thread.id, channel: thread },
+                channel: thread
+            };
+        } catch (e) {
+            return { ok: false, error: `Fórum: ${e.message}` };
+        }
+    }
+
+    if (typeof channel.send === 'function') {
+        try {
+            const msg = await channel.send(payload);
+            return { ok: true, msg, channel };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+
+    return {
+        ok: false,
+        error: 'Este tipo de canal não aceita mensagens de texto.'
+    };
 }
 
 module.exports = {
@@ -80,7 +108,7 @@ module.exports = {
 
     data: new SlashCommandBuilder()
         .setName('fazer-parceria')
-        .setDescription('Registra parceria: cole o texto (com o link dentro) + representante')
+        .setDescription('Registra parceria: texto + representante, em qualquer canal')
         .addUserOption((o) =>
             o
                 .setName('representante')
@@ -94,6 +122,12 @@ module.exports = {
                 .setRequired(true)
                 .setMaxLength(4000)
         )
+        .addChannelOption((o) =>
+            o
+                .setName('canal')
+                .setDescription('Destino: texto, anúncio, call, fórum… (padrão: canal atual)')
+                .setRequired(false)
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
 
@@ -105,12 +139,15 @@ module.exports = {
             message.mentions.members.first() ||
             (args[0] && (await message.guild.members.fetch(args[0]).catch(() => null)));
 
+        const channelMention = message.mentions.channels.first() || null;
+
         let texto = message.content
             .replace(
                 /^(?:<@!?\d+>\s*)?(?:O\.)?(?:fazer-parceria|parceria|addparceria|novaparceria)\s*/i,
                 ''
             )
             .replace(/<@!?\d+>/g, '')
+            .replace(/<#\d+>/g, '')
             .trim();
 
         if ((!texto || texto.length < 10) && message.reference?.messageId) {
@@ -123,15 +160,16 @@ module.exports = {
         if (!rep || !texto) {
             return message.reply(
                 'Uso:\n' +
-                    '`O.fazer-parceria @representante` + cole o **texto da parceria** (com o link dentro)\n' +
-                    'Ou responda à mensagem do texto com `O.fazer-parceria @representante`\n' +
-                    '_O bot tira o convite do texto e confirma o servidor._'
+                    '`O.fazer-parceria @representante [#canal]` + texto da parceria\n' +
+                    'Ou responda à mensagem do texto com `O.fazer-parceria @representante [#canal]`\n' +
+                    '_Canal pode ser texto, call, anúncio ou fórum._'
             );
         }
         return run(message, {
             repUser: rep.user,
             member: rep,
             texto,
+            targetChannel: channelMention || message.channel,
             client: message.client
         });
     },
@@ -146,6 +184,7 @@ module.exports = {
         await i.deferReply();
         const user = i.options.getUser('representante', true);
         const texto = i.options.getString('texto', true).trim();
+        const targetChannel = i.options.getChannel('canal') || i.channel;
         const member = await i.guild.members.fetch(user.id).catch(() => null);
         if (!member) {
             return i.editReply({ content: '❌ Representante não está neste servidor.' });
@@ -154,13 +193,14 @@ module.exports = {
             repUser: user,
             member,
             texto,
+            targetChannel,
             client: i.client,
             isSlash: true
         });
     }
 };
 
-async function run(ctx, { repUser, member, texto, client, isSlash }) {
+async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash }) {
     const guild = ctx.guild;
     const conf = partnerships.getConfig(guild.id);
     if (conf.enabled === false) {
@@ -172,13 +212,12 @@ async function run(ctx, { repUser, member, texto, client, isSlash }) {
         return reply(ctx, isSlash, `❌ ${resolved.error}`);
     }
 
-    const ch = ctx.channel;
-    if (!canPost(ch)) {
-        return reply(
-            ctx,
-            isSlash,
-            '❌ Não consigo enviar mensagem neste canal. Use em texto, anúncio ou call com chat.'
-        );
+    let ch = targetChannel;
+    if (ch && !ch.send && ch.id) {
+        ch = await guild.channels.fetch(ch.id).catch(() => ch);
+    }
+    if (!ch) {
+        return reply(ctx, isSlash, '❌ Canal de destino inválido.');
     }
 
     const name = resolved.serverName;
@@ -197,25 +236,25 @@ async function run(ctx, { repUser, member, texto, client, isSlash }) {
         ];
     }
 
-    const msg = await ch.send(payload).catch((e) => {
-        console.warn('[parceria] send:', e.message);
-        return null;
-    });
-    if (!msg) {
+    const posted = await postAnywhere(ch, payload, name);
+    if (!posted.ok) {
         return reply(
             ctx,
             isSlash,
-            '❌ Não consegui enviar neste canal (permissão ou tipo de canal).'
+            `❌ Não consegui enviar em ${ch}: ${posted.error || 'erro desconhecido'}`
         );
     }
+
+    const msg = posted.msg;
+    const dest = posted.channel || ch;
 
     const entry = partnerships.create(guild.id, {
         repId: repUser.id,
         repTag: repUser.tag,
         inviteUrl: resolved.url,
         serverName: name,
-        messageId: msg.id,
-        channelId: ch.id,
+        messageId: msg?.id || null,
+        channelId: dest.id,
         roleId: conf.roleId || null,
         createdBy: (ctx.user || ctx.author).id
     });
@@ -248,7 +287,7 @@ async function run(ctx, { repUser, member, texto, client, isSlash }) {
             `**Representante:** ${repUser}\n` +
                 `**Servidor confirmado:** **${name}**\n` +
                 `**Convite (do texto):** ${inviteMd}\n` +
-                `**Canal:** ${ch}\n` +
+                `**Canal:** ${dest}\n` +
                 `**ID:** \`${entry.id}\`\n` +
                 (roleGiven && conf.roleId
                     ? `**Cargo:** <@&${conf.roleId}>\n\n`
