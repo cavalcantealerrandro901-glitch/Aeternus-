@@ -3,18 +3,40 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const COLS = 4;
 const ROWS = 4;
 
-/**
- * Rótulos curtos e do mesmo "peso" visual para o tabuleiro ficar reto.
- * Discord não tem largura fixa real — emojis iguais alinham melhor que espaços.
- */
+/** Rótulo compacto e alinhado (01–16) */
 function cellLabel(index, { opened, bomb, ended }) {
     if (ended) {
         if (bomb) return '💣';
         if (opened) return '💎';
-        return String(index + 1);
+        return String(index + 1).padStart(2, '0');
     }
     if (opened) return '💎';
-    return String(index + 1);
+    return String(index + 1).padStart(2, '0');
+}
+
+/** Tabuleiro em texto (dentro do embed) */
+function boardText(game, reveal = false) {
+    const ended = !!(game.dead || game.cashed || reveal);
+    const lines = [];
+    for (let y = 0; y < ROWS; y++) {
+        const cells = [];
+        for (let x = 0; x < COLS; x++) {
+            const i = y * COLS + x;
+            const opened = game.opened.has(i);
+            const bomb = game.bombs.has(i);
+            if (ended) {
+                if (bomb) cells.push('💣');
+                else if (opened) cells.push('💎');
+                else cells.push(String(i + 1).padStart(2, '0'));
+            } else if (opened) {
+                cells.push('💎');
+            } else {
+                cells.push(String(i + 1).padStart(2, '0'));
+            }
+        }
+        lines.push(cells.join('  '));
+    }
+    return lines.join('\n');
 }
 
 function boardRows(game, reveal = false) {
@@ -79,11 +101,23 @@ function againRow(game) {
     );
 }
 
+/**
+ * Em jogo: 4 linhas de células + controles
+ * Encerrado: tabuleiro revelado (botão "de novo" na mensagem externa)
+ */
 function fullComponents(game, reveal = false) {
-    if (game.dead || game.cashed || reveal) {
-        return [...boardRows(game, true).slice(0, 4), againRow(game)];
+    const ended = !!(game.dead || game.cashed || reveal);
+    if (ended) {
+        return boardRows(game, true);
     }
     return [...boardRows(game, false), controlsRow(game)];
 }
 
-module.exports = { boardRows, controlsRow, againRow, fullComponents, cellLabel };
+module.exports = {
+    boardRows,
+    controlsRow,
+    againRow,
+    fullComponents,
+    cellLabel,
+    boardText
+};
