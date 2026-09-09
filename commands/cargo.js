@@ -3,20 +3,34 @@ const {
     PermissionFlagsBits,
     EmbedBuilder
 } = require('discord.js');
+const tempRoles = require('../utils/tempRoles');
 
 module.exports = {
     name: 'cargo',
     aliases: ['role', 'setcargo', 'togglecargo'],
-    description: 'Dar ou remover cargo de um membro',
+    description: 'Dar ou remover cargo de um membro (opcional: temporário)',
 
     data: new SlashCommandBuilder()
         .setName('cargo-membro')
-        .setDescription('Dar ou remover cargo de um membro')
+        .setDescription('Dar ou remover cargo de um membro (pode ser temporário)')
         .addUserOption((o) =>
             o.setName('membro').setDescription('Membro alvo').setRequired(true)
         )
         .addRoleOption((o) =>
             o.setName('cargo').setDescription('Cargo a alternar').setRequired(true)
+        )
+        .addStringOption((o) =>
+            o
+                .setName('duracao')
+                .setDescription('Tempo do cargo (ex: 30m, 2h, 1d). Vazio = permanente/toggle')
+                .setRequired(false)
+                .setMaxLength(20)
+        )
+        .addBooleanOption((o) =>
+            o
+                .setName('notificar')
+                .setDescription('Avisar o usuário no PV antes do cargo acabar')
+                .setRequired(false)
         )
         .addStringOption((o) =>
             o
@@ -32,7 +46,7 @@ module.exports = {
         if (!interaction.inGuild()) {
             return interaction.reply({
                 content: 'Este comando só funciona em servidores.',
-                ephemeral: true
+                flags: 64
             });
         }
 
@@ -40,6 +54,8 @@ module.exports = {
 
         const targetUser = interaction.options.getUser('membro', true);
         const role = interaction.options.getRole('cargo', true);
+        const durRaw = interaction.options.getString('duracao');
+        const notificar = interaction.options.getBoolean('notificar') ?? true;
         const reason =
             interaction.options.getString('motivo') || 'Alternância de cargo via /cargo-membro';
 
@@ -72,11 +88,7 @@ module.exports = {
 
         if (role.position >= me.roles.highest.position) {
             return interaction.editReply({
-                embeds: [
-                    fail(
-                        `O cargo ${role} está **acima ou igual** ao meu cargo mais alto.\nSuba o cargo do bot na lista de cargos.`
-                    )
-                ]
+                embeds: [fail('Esse cargo está **acima ou igual** ao meu na hierarquia.')]
             });
         }
 
@@ -85,101 +97,115 @@ module.exports = {
             role.position >= author.roles.highest.position
         ) {
             return interaction.editReply({
-                embeds: [
-                    fail(`O cargo ${role} está **acima ou igual** ao seu cargo mais alto.`)
-                ]
+                embeds: [fail('Esse cargo está **acima ou igual** ao seu na hierarquia.')]
             });
         }
 
-        let member;
-        try {
-            member = await interaction.guild.members.fetch(targetUser.id);
-        } catch (_) {
-            return interaction.editReply({
-                embeds: [fail('Membro não encontrado neste servidor.')]
-            });
+        const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+        if (!member) {
+            return interaction.editReply({ embeds: [fail('Membro não encontrado no servidor.')] });
         }
 
-        if (member.id === me.id) {
-            return interaction.editReply({
-                embeds: [fail('Não posso alterar cargos em mim mesmo por este comando.')]
-            });
-        }
-
-        if (
-            interaction.guild.ownerId !== author.id &&
-            member.roles.highest.position >= author.roles.highest.position &&
-            member.id !== author.id
-        ) {
+        const durationMs = durRaw ? tempRoles.parseDuration(durRaw) : null;
+        if (durRaw && !durationMs) {
             return interaction.editReply({
                 embeds: [
                     fail(
-                        'Você não pode gerenciar cargos de alguém com **cargo igual ou superior** ao seu.'
+                        'Duração inválida. Exemplos: `30m`, `2h`, `1d`, `1w` (mín. 1 min · máx. 90 dias).'
                     )
                 ]
             });
+        }
+
+        if (durationMs) {
+            try {
+                if (!member.roles.cache.has(role.id)) {
+                    await member.roles.add(role, `${interaction.user.tag}: ${reason} (temp)`);
+                }
+            } catch (e) {
+                return interaction.editReply({
+                    embeds: [fail(`Falha ao atribuir: ${e.message}`)]
+                });
+            }
+
+            const entry = tempRoles.setTempRole(interaction.guild.id, {
+                userId: member.id,
+                roleId: role.id,
+                durationMs,
+                notify: !!notificar,
+                by: interaction.user.id,
+                reason
+            });
+
+            const emb = new EmbedBuilder()
+                .setColor(0x22c55e)
+                .setTitle('⏱️ Cargo TEMPORÁRIO concedido')
+                .setDescription(
+                    `**Membro:** ${member}\n` +
+                        `**Cargo:** ${role}\n` +
+                        `**Duração:** ${tempRoles.formatDuration(durationMs)}\n` +
+                        `**Termina:** <t:${Math.floor(entry.endsAt / 1000)}:R>\n` +
+                        `**Notificar:** ${notificar ? 'sim' : 'não'}\n` +
+                        `**Staff:** ${interaction.user}`
+                )
+                .setFooter({
+                    text: 'Mensagens: /configurar-mensagem-cargo'
+                });
+
+            return interaction.editReply({ embeds: [emb] });
         }
 
         const has = member.roles.cache.has(role.id);
-        const audit = `${interaction.user.tag}: ${reason}`.slice(0, 512);
-
         try {
-            if (has) await member.roles.remove(role, audit);
-            else await member.roles.add(role, audit);
+            if (has) {
+                await member.roles.remove(role, `${interaction.user.tag}: ${reason}`);
+                tempRoles.clearTempRole(interaction.guild.id, member.id, role.id);
+            } else {
+                await member.roles.add(role, `${interaction.user.tag}: ${reason}`);
+            }
         } catch (e) {
-            console.error('[cargo]', e);
-            return interaction.editReply({
-                embeds: [
-                    fail(
-                        `Falha ao ${has ? 'remover' : 'adicionar'} o cargo.\nVerifique hierarquia e permissões.`
-                    )
-                ]
-            });
+            return interaction.editReply({ embeds: [fail(`Falha: ${e.message}`)] });
         }
 
-        const color = has ? 0xf43f5e : 0x22c55e;
-        const emoji = has ? '➖' : '➕';
-        const verb = has ? 'RETIRADO' : 'CONCEDIDO';
-
-        const embed = new EmbedBuilder()
-            .setColor(color)
-            .setTitle(`${emoji}  Cargo ${verb}`)
-            .setDescription(
-                [
-                    `**Membro:** ${member}`,
-                    `**Cargo:** ${role}`,
-                    `**Staff:** ${interaction.user}`,
-                    reason !== 'Alternância de cargo via /cargo-membro'
-                        ? `**Motivo:** ${reason}`
-                        : null
-                ]
-                    .filter(Boolean)
-                    .join('\n')
-            )
-            .setThumbnail(member.user.displayAvatarURL({ size: 128 }));
-
-        await interaction.editReply({ embeds: [embed] });
+        return interaction.editReply({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(has ? 0xf43f5e : 0x22c55e)
+                    .setTitle(has ? '➖ Cargo RETIRADO' : '➕ Cargo CONCEDIDO')
+                    .setDescription(
+                        `**Membro:** ${member}\n**Cargo:** ${role}\n**Staff:** ${interaction.user}` +
+                            (reason ? `\n**Motivo:** ${reason}` : '')
+                    )
+            ]
+        });
     },
 
     async execute(message, args) {
+        if (!message.guild) return;
         if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
-            return message.reply('❌ Sem permissão **Gerenciar Cargos**.');
+            return message.reply('❌ Você precisa da permissão **Gerenciar Cargos**.');
         }
-        const member = message.mentions.members.first();
+
+        const member =
+            message.mentions.members.first() ||
+            (args[0] && (await message.guild.members.fetch(args[0]).catch(() => null)));
         const role =
             message.mentions.roles.first() ||
-            message.guild.roles.cache.get(args.find((a) => /^\d{17,20}$/.test(a)) || '');
+            (args[1] && message.guild.roles.cache.get(args[1]));
 
         if (!member || !role) {
-            return message.reply('Uso: `O.cargo @membro @cargo`');
+            return message.reply(
+                'Uso: `O.cargo @membro @cargo [duração] [motivo]`\n' +
+                    'Ex.: `O.cargo @user @VIP 2h` · `O.cargo @user @VIP 1d boas-vindas`'
+            );
         }
 
         const me = message.guild.members.me;
         if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) {
-            return message.reply('❌ Eu preciso de **Gerenciar Cargos**.');
+            return message.reply('❌ Eu preciso da permissão **Gerenciar Cargos**.');
         }
         if (role.managed || role.id === message.guild.id) {
-            return message.reply('❌ Cargo inválido (integração ou @everyone).');
+            return message.reply('❌ Cargo inválido.');
         }
         if (role.position >= me.roles.highest.position) {
             return message.reply('❌ Cargo acima do meu na hierarquia.');
@@ -191,14 +217,54 @@ module.exports = {
             return message.reply('❌ Cargo acima do seu na hierarquia.');
         }
 
-        const has = member.roles.cache.has(role.id);
-        const reason =
-            args.filter((a) => !a.startsWith('<@') && !/^\d{17,20}$/.test(a)).join(' ') ||
-            'Toggle via prefixo';
+        const rest = args.filter((a) => !a.startsWith('<@') && !/^\d{17,20}$/.test(a));
+        let durationMs = null;
+        let reasonParts = rest.slice();
+        if (rest[0] && tempRoles.parseDuration(rest[0])) {
+            durationMs = tempRoles.parseDuration(rest[0]);
+            reasonParts = rest.slice(1);
+        }
+        const reason = reasonParts.join(' ') || 'Toggle via prefixo';
 
+        if (durationMs) {
+            try {
+                if (!member.roles.cache.has(role.id)) {
+                    await member.roles.add(role, `${message.author.tag}: ${reason} (temp)`);
+                }
+            } catch (e) {
+                return message.reply(`❌ Falha: ${e.message}`);
+            }
+            const entry = tempRoles.setTempRole(message.guild.id, {
+                userId: member.id,
+                roleId: role.id,
+                durationMs,
+                notify: true,
+                by: message.author.id,
+                reason
+            });
+            return message.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0x22c55e)
+                        .setTitle('⏱️ Cargo TEMPORÁRIO concedido')
+                        .setDescription(
+                            `**Membro:** ${member}\n**Cargo:** ${role}\n` +
+                                `**Duração:** ${tempRoles.formatDuration(durationMs)}\n` +
+                                `**Termina:** <t:${Math.floor(entry.endsAt / 1000)}:R>\n` +
+                                `**Staff:** ${message.author}`
+                        )
+                ]
+            });
+        }
+
+        const has = member.roles.cache.has(role.id);
         try {
-            if (has) await member.roles.remove(role, `${message.author.tag}: ${reason}`);
-            else await member.roles.add(role, `${message.author.tag}: ${reason}`);
+            if (has) {
+                await member.roles.remove(role, `${message.author.tag}: ${reason}`);
+                tempRoles.clearTempRole(message.guild.id, member.id, role.id);
+            } else {
+                await member.roles.add(role, `${message.author.tag}: ${reason}`);
+            }
         } catch (e) {
             return message.reply(`❌ Falha: ${e.message}`);
         }
@@ -207,7 +273,7 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(has ? 0xf43f5e : 0x22c55e)
-                    .setTitle(has ? '➖  Cargo RETIRADO' : '➕  Cargo CONCEDIDO')
+                    .setTitle(has ? '➖ Cargo RETIRADO' : '➕ Cargo CONCEDIDO')
                     .setDescription(
                         `**Membro:** ${member}\n**Cargo:** ${role}\n**Staff:** ${message.author}`
                     )
