@@ -262,7 +262,7 @@ function formatDropPanelInfo(guild, guildId) {
     const blocked = [];
     for (const rid of req.blockedRoleIds || []) {
         const role = guild?.roles?.cache?.get(String(rid));
-        blocked.push(role ? `${role}` : ``${rid}``);
+        blocked.push(role ? `${role}` : String(rid));
     }
     return { vipLines, blocked };
 }
