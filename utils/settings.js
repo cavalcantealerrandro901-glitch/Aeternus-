@@ -86,6 +86,7 @@ const DEFAULT = {
         enabled: true,
         channelId: null,
         roleId: null,
+        notifyRoleId: null,
         phrase: '🤝 **Nova parceria!**\nRepresentante: {rep}\nServidor: **{server}**\nConvite: {invite}',
         image: null
     }
