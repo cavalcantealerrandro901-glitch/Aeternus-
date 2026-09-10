@@ -1,45 +1,25 @@
 /**
  * Parser da contagem: dígitos, palavras, romano, bases, expressões (π, e…)
- * e texto misto (ex.: "11 oi" → 11).
+ * e texto misto (ex.: "11 oi" → 11). Emojis são ignorados.
  */
 const DIGIT_MAP = {
     '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-    '０': 0, '１': 1, '２': 2, '３': 3, '４': 4, '５': 5, '６': 6, '７': 7, '８': 8, '９': 9,
-    '٠': 0, '١': 1, '٢': 2, '٣': 3, '٤': 4, '٥': 5, '٦': 6, '٧': 7, '٨': 8, '٩': 9,
-    '۰': 0, '۱': 1, '۲': 2, '۳': 3, '۴': 4, '۵': 5, '۶': 6, '۷': 7, '۸': 8, '۹': 9,
-    '०': 0, '१': 1, '२': 2, '३': 3, '४': 4, '५': 5, '६': 6, '७': 7, '८': 8, '९': 9,
-    '০': 0, '১': 1, '২': 2, '৩': 3, '৪': 4, '৫': 5, '৬': 6, '৭': 7, '৮': 8, '৯': 9,
-    '๐': 0, '๑': 1, '๒': 2, '๓': 3, '๔': 4, '๕': 5, '๖': 6, '๗': 7, '๘': 8, '๙': 9,
-    '၀': 0, '၁': 1, '၂': 2, '၃': 3, '၄': 4, '၅': 5, '၆': 6, '၇': 7, '၈': 8, '၉': 9
+    '０': 0, '１': 1, '２': 2, '３': 3, '４': 4, '５': 5, '６': 6, '７': 7, '８': 8, '９': 9
 };
 
 const WORD_NUMBERS = {
     zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, três: 3, quatro: 4, cinco: 5,
     seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13,
-    quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezasseis: 16, dezessete: 17,
+    quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezessete: 17,
     dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50,
     sessenta: 60, setenta: 70, oitenta: 80, noventa: 90, cem: 100, cento: 100,
-    duzentos: 200, trezentos: 300, quatrocentos: 400, quinhentos: 500,
-    seiscentos: 600, setecentos: 700, oitocentos: 800, novecentos: 900,
-    mil: 1000, milhao: 1000000, milhão: 1000000,
-    one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-    eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
-    seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40,
-    fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100, thousand: 1000,
-    uno: 1, dos: 2, cuatro: 4, siete: 7, ocho: 8, nueve: 9, diez: 10,
-    '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
-    '零': 0
+    mil: 1000, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+    eight: 8, nine: 9, ten: 10, twenty: 20, hundred: 100, thousand: 1000
 };
 
 const MATH_CONST = {
-    pi: Math.PI,
-    π: Math.PI,
-    e: Math.E,
-    tau: Math.PI * 2,
-    τ: Math.PI * 2,
-    phi: (1 + Math.sqrt(5)) / 2,
-    φ: (1 + Math.sqrt(5)) / 2,
-    ϕ: (1 + Math.sqrt(5)) / 2
+    pi: Math.PI, 'π': Math.PI, e: Math.E, tau: Math.PI * 2, 'τ': Math.PI * 2,
+    phi: (1 + Math.sqrt(5)) / 2, 'φ': (1 + Math.sqrt(5)) / 2
 };
 
 const ROMAN = { m: 1000, d: 500, c: 100, l: 50, x: 10, v: 5, i: 1 };
@@ -79,7 +59,12 @@ function parsePrefixed(raw) {
     const m = s.match(/^(0x|0b|0o)([0-9a-f]+)$/i);
     if (!m) return null;
     try {
-        const n = m[1] === '0x' ? parseInt(m[2], 16) : m[1] === '0b' ? parseInt(m[2], 2) : parseInt(m[2], 8);
+        const n =
+            m[1] === '0x'
+                ? parseInt(m[2], 16)
+                : m[1] === '0b'
+                  ? parseInt(m[2], 2)
+                  : parseInt(m[2], 8);
         if (!Number.isSafeInteger(n) || n < 0) return null;
         return n;
     } catch (_) {
@@ -97,23 +82,14 @@ function toIntegerResult(val) {
 function evalExpression(input) {
     let s = String(input || '').trim();
     if (!s || s.length > 120) return null;
-
-    s = s
-        .replace(/×/g, '*')
-        .replace(/÷/g, '/')
-        .replace(/−/g, '-')
-        .replace(/\^/g, '**');
-
+    s = s.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/\^/g, '**');
     s = s.replace(/π/g, 'pi').replace(/τ/g, 'tau').replace(/φ|ϕ/g, 'phi');
-
     let i = 0;
     const peek = () => s[i];
     const eat = () => s[i++];
-
     function skipSpace() {
         while (peek() === ' ' || peek() === '\t') eat();
     }
-
     function parseExpr() {
         skipSpace();
         let left = parseTerm();
@@ -127,7 +103,6 @@ function evalExpression(input) {
         }
         return left;
     }
-
     function parseTerm() {
         skipSpace();
         let left = parsePower();
@@ -143,7 +118,6 @@ function evalExpression(input) {
         }
         return left;
     }
-
     function parsePower() {
         skipSpace();
         let base = parseUnary();
@@ -157,7 +131,6 @@ function evalExpression(input) {
         }
         return base;
     }
-
     function parseUnary() {
         skipSpace();
         if (peek() === '+') {
@@ -170,7 +143,6 @@ function evalExpression(input) {
         }
         return parsePrimary();
     }
-
     function parsePrimary() {
         skipSpace();
         if (peek() === '(') {
@@ -181,7 +153,6 @@ function evalExpression(input) {
             eat();
             return v;
         }
-
         if (/[a-zA-Z]/.test(peek() || '')) {
             const start = i;
             while (/[a-zA-Z]/.test(peek() || '')) eat();
@@ -189,7 +160,6 @@ function evalExpression(input) {
             if (MATH_CONST[name] !== undefined) return MATH_CONST[name];
             throw new Error('id');
         }
-
         const start = i;
         if (!/[0-9.]/.test(peek() || '')) throw new Error('num');
         while (/[0-9.]/.test(peek() || '')) eat();
@@ -197,7 +167,6 @@ function evalExpression(input) {
         if (!Number.isFinite(n)) throw new Error('num');
         return n;
     }
-
     try {
         const val = parseExpr();
         skipSpace();
@@ -219,7 +188,6 @@ function parseWordPhrase(raw) {
         .trim();
     if (!key) return null;
     if (WORD_NUMBERS[key] !== undefined) return WORD_NUMBERS[key];
-
     const parts = key.split(' ').filter((p) => p && p !== 'e' && p !== 'and');
     if (parts.length < 2 || parts.length > 6) return null;
     let total = 0;
@@ -255,11 +223,8 @@ function extractNumberFromMixed(raw) {
         buf = '';
     };
     for (const ch of s) {
-        if (DIGIT_MAP[ch] !== undefined) {
-            buf += ch;
-        } else if (/[0-9]/.test(ch)) {
-            buf += ch;
-        } else {
+        if (DIGIT_MAP[ch] !== undefined || /[0-9]/.test(ch)) buf += ch;
+        else {
             flush();
             if (best !== null) break;
         }
@@ -273,17 +238,10 @@ function evalExpressionLoose(raw) {
     if (!s) return null;
     let v = evalExpression(s);
     if (v !== null) return v;
-
     const tokens = s.split(/\s+/);
     for (let len = tokens.length; len >= 1; len--) {
         const part = tokens.slice(0, len).join(' ');
         v = evalExpression(part);
-        if (v !== null) return v;
-    }
-
-    const m = s.match(/^([\d.+\-*/%()^\s\u00d7\u00f7\u2212\u03c0]|pi|tau|phi|e)+/i);
-    if (m) {
-        v = evalExpression(m[0].trim());
         if (v !== null) return v;
     }
     return null;
@@ -300,8 +258,25 @@ function parseMathConstantAlone(raw) {
     return toIntegerResult(MATH_CONST[key]);
 }
 
+/** Remove emojis Unicode e custom do Discord (<:nome:id> / <a:nome:id>). */
+function stripEmojis(str) {
+    return String(str || '')
+        .replace(/<a?:[\w~]+:\d+>/g, ' ')
+        .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+        .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+        .replace(/[\u{2600}-\u{27BF}]/gu, '')
+        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+        .replace(/[\u{200D}]/gu, '')
+        .replace(/[\u{20E3}]/gu, '')
+        .replace(/[\u{E0020}-\u{E007F}]/gu, '')
+        .replace(/\u{FE0F}/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function parseCountMessage(content) {
-    const raw = String(content || '').trim();
+    // Emojis (qualquer tipo) são ignorados — não contam e não quebram a sequência
+    const raw = stripEmojis(content);
     if (!raw) return null;
 
     const pureDigits = raw.replace(/[\s_,.]/g, '');
@@ -356,4 +331,4 @@ function parseCountMessage(content) {
     return null;
 }
 
-module.exports = { parseCountMessage, evalExpression, extractNumberFromMixed };
+module.exports = { parseCountMessage, evalExpression, extractNumberFromMixed, stripEmojis };
