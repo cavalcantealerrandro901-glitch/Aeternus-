@@ -2,7 +2,8 @@ const {
     SlashCommandBuilder,
     PermissionFlagsBits,
     EmbedBuilder,
-    ChannelType
+    ChannelType,
+    MessageFlags
 } = require('discord.js');
 const partnerships = require('../utils/partnerships');
 
@@ -20,7 +21,7 @@ function extractInviteCode(raw) {
 }
 
 function normalizeInviteUrl(code) {
-    return `https://discord.gg/${code}`;
+    return 'https://discord.gg/' + code;
 }
 
 async function resolveInvite(client, textOrUrl) {
@@ -44,9 +45,9 @@ async function resolveInvite(client, textOrUrl) {
         return {
             ok: true,
             code: inv.code || code,
-            url,
-            serverName: name || `Servidor (${code})`,
-            memberCount: inv.memberCount ?? null
+            url: url,
+            serverName: name || 'Servidor (' + code + ')',
+            memberCount: inv.memberCount != null ? inv.memberCount : null
         };
     } catch (_) {
         return {
@@ -62,7 +63,7 @@ async function postAnywhere(channel, payload, serverName) {
     if (channel.type === ChannelType.GuildForum) {
         try {
             const thread = await channel.threads.create({
-                name: `Parceria · ${(serverName || 'Parceiro').slice(0, 80)}`,
+                name: 'Parceria · ' + String(serverName || 'Parceiro').slice(0, 80),
                 message: {
                     content: payload.content,
                     embeds: payload.embeds,
@@ -75,29 +76,22 @@ async function postAnywhere(channel, payload, serverName) {
                 const fetched = await thread.messages.fetch({ limit: 1 });
                 msg = fetched.first() || null;
             } catch (_) {}
-            return {
-                ok: true,
-                msg: msg || { id: thread.id, channel: thread },
-                channel: thread
-            };
-        } catch (e) {
-            return { ok: false, error: `Fórum: ${e.message}` };
-        }
-    }
-
-    if (typeof channel.send === 'function') {
-        try {
-            const msg = await channel.send(payload);
-            return { ok: true, msg, channel };
+            return { ok: true, msg: msg, channel: thread };
         } catch (e) {
             return { ok: false, error: e.message };
         }
     }
 
-    return {
-        ok: false,
-        error: 'Este tipo de canal não aceita mensagens de texto.'
-    };
+    if (typeof channel.send !== 'function') {
+        return { ok: false, error: 'Este canal não aceita mensagens de texto.' };
+    }
+
+    try {
+        const msg = await channel.send(payload);
+        return { ok: true, msg: msg, channel: channel };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
 }
 
 module.exports = {
@@ -109,37 +103,44 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('fazer-parceria')
         .setDescription('Registra parceria: texto + representante, em qualquer canal')
-        .addUserOption((o) =>
-            o
+        .addUserOption(function (o) {
+            return o
                 .setName('representante')
                 .setDescription('Membro que representa a parceria neste servidor')
-                .setRequired(true)
-        )
-        .addStringOption((o) =>
-            o
+                .setRequired(true);
+        })
+        .addStringOption(function (o) {
+            return o
                 .setName('texto')
                 .setDescription('Texto da parceria (formatação + link discord.gg dentro)')
                 .setRequired(true)
-                .setMaxLength(4000)
-        )
-        .addChannelOption((o) =>
-            o
+                .setMaxLength(4000);
+        })
+        .addChannelOption(function (o) {
+            return o
                 .setName('canal')
                 .setDescription('Destino: texto, anúncio, call, fórum… (padrão: canal atual)')
-                .setRequired(false)
-        )
+                .setRequired(false);
+        })
+        .addRoleOption(function (o) {
+            return o
+                .setName('notificar')
+                .setDescription('Cargo para notificar no anúncio (opcional)')
+                .setRequired(false);
+        })
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
 
     async execute(message, args) {
-        if (!message.member?.permissions?.has(PermissionFlagsBits.ManageGuild)) {
+        if (!message.member || !message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
             return message.reply('❌ Precisa de **Gerenciar Servidor**.');
         }
         const rep =
             message.mentions.members.first() ||
-            (args[0] && (await message.guild.members.fetch(args[0]).catch(() => null)));
+            (args[0] && (await message.guild.members.fetch(args[0]).catch(function () { return null; })));
 
         const channelMention = message.mentions.channels.first() || null;
+        const roleMention = message.mentions.roles.first() || null;
 
         let texto = message.content
             .replace(
@@ -148,59 +149,71 @@ module.exports = {
             )
             .replace(/<@!?\d+>/g, '')
             .replace(/<#\d+>/g, '')
+            .replace(/<@&\d+>/g, '')
             .trim();
 
-        if ((!texto || texto.length < 10) && message.reference?.messageId) {
+        if ((!texto || texto.length < 10) && message.reference && message.reference.messageId) {
             const ref = await message.channel.messages
                 .fetch(message.reference.messageId)
-                .catch(() => null);
-            if (ref?.content) texto = ref.content.trim();
+                .catch(function () { return null; });
+            if (ref && ref.content) texto = ref.content.trim();
         }
 
         if (!rep || !texto) {
             return message.reply(
                 'Uso:\n' +
-                    '`O.fazer-parceria @representante [#canal]` + texto da parceria\n' +
-                    'Ou responda à mensagem do texto com `O.fazer-parceria @representante [#canal]`\n' +
-                    '_Canal pode ser texto, call, anúncio ou fórum._'
+                    '`O.fazer-parceria @representante [#canal] [@cargo-notificar]` + texto\n' +
+                    'Ou responda à mensagem do texto com o comando.\n' +
+                    '_Canal e cargo de notificação são opcionais._'
             );
         }
+
         return run(message, {
             repUser: rep.user,
             member: rep,
-            texto,
+            texto: texto,
             targetChannel: channelMention || message.channel,
-            client: message.client
+            client: message.client,
+            isSlash: false,
+            notifyRoleId: roleMention ? roleMention.id : null
         });
     },
 
     async executeSlash(i) {
-        if (!i.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+        if (!i.memberPermissions || !i.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
             return i.reply({
                 content: '❌ Precisa de **Gerenciar Servidor**.',
-                flags: 64
+                flags: MessageFlags.Ephemeral
             });
         }
-        await i.deferReply();
+        await i.deferReply({ flags: MessageFlags.Ephemeral });
         const user = i.options.getUser('representante', true);
         const texto = i.options.getString('texto', true).trim();
         const targetChannel = i.options.getChannel('canal') || i.channel;
-        const member = await i.guild.members.fetch(user.id).catch(() => null);
-        if (!member) {
-            return i.editReply({ content: '❌ Representante não está neste servidor.' });
-        }
+        const notifyRole = i.options.getRole('notificar');
+        const member = await i.guild.members.fetch(user.id).catch(function () { return null; });
+
         return run(i, {
             repUser: user,
-            member,
-            texto,
-            targetChannel,
+            member: member,
+            texto: texto,
+            targetChannel: targetChannel,
             client: i.client,
-            isSlash: true
+            isSlash: true,
+            notifyRoleId: notifyRole ? notifyRole.id : null
         });
     }
 };
 
-async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash }) {
+async function run(ctx, opts) {
+    const repUser = opts.repUser;
+    const member = opts.member;
+    const texto = opts.texto;
+    const targetChannel = opts.targetChannel;
+    const client = opts.client;
+    const isSlash = opts.isSlash;
+    const notifyRoleId = opts.notifyRoleId;
+
     const guild = ctx.guild;
     const conf = partnerships.getConfig(guild.id);
     if (conf.enabled === false) {
@@ -209,25 +222,27 @@ async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash
 
     const resolved = await resolveInvite(client, texto);
     if (!resolved.ok) {
-        return reply(ctx, isSlash, `❌ ${resolved.error}`);
+        return reply(ctx, isSlash, '❌ ' + resolved.error);
     }
 
     let ch = targetChannel;
     if (ch && !ch.send && ch.id) {
-        ch = await guild.channels.fetch(ch.id).catch(() => ch);
+        ch = await guild.channels.fetch(ch.id).catch(function () { return ch; });
     }
     if (!ch) {
         return reply(ctx, isSlash, '❌ Canal de destino inválido.');
     }
 
     const name = resolved.serverName;
-    const inviteMd = `[Entrar em ${name}](${resolved.url})`;
+    const inviteMd = '[Entrar em ' + name + '](' + resolved.url + ')';
 
-    // Pings no final: representante + cargo de notificação do painel
+    const repRoleId = conf.roleId || null;
+    const pingRoleId = notifyRoleId || conf.notifyRoleId || null;
+
     const footerPings = [];
-    footerPings.push(`**Rep:** <@${repUser.id}>`);
-    if (conf.roleId) {
-        footerPings.push(`**Notificação:** <@&${conf.roleId}>`);
+    footerPings.push('**Rep:** <@' + repUser.id + '>');
+    if (pingRoleId) {
+        footerPings.push('**Notificação:** <@&' + pingRoleId + '>');
     }
     const pingBlock = '\n\n' + footerPings.join(' · ');
     const body = String(texto).trim();
@@ -238,7 +253,7 @@ async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash
         content: finalContent,
         allowedMentions: {
             users: [repUser.id],
-            roles: conf.roleId ? [String(conf.roleId)] : [],
+            roles: pingRoleId ? [String(pingRoleId)] : [],
             parse: []
         }
     };
@@ -249,7 +264,11 @@ async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash
                 .setColor(0xa78bfa)
                 .setImage(conf.image)
                 .setFooter({
-                    text: `Parceria · ${name} · por ${ctx.user?.tag || ctx.author?.tag || 'staff'}`
+                    text:
+                        'Parceria · ' +
+                        name +
+                        ' · por ' +
+                        ((ctx.user && ctx.user.tag) || (ctx.author && ctx.author.tag) || 'staff')
                 })
         ];
     }
@@ -259,7 +278,7 @@ async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash
         return reply(
             ctx,
             isSlash,
-            `❌ Não consegui enviar em ${ch}: ${posted.error || 'erro desconhecido'}`
+            '❌ Não consegui enviar em ' + ch + ': ' + (posted.error || 'erro desconhecido')
         );
     }
 
@@ -271,19 +290,22 @@ async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash
         repTag: repUser.tag,
         inviteUrl: resolved.url,
         serverName: name,
-        messageId: msg?.id || null,
+        messageId: msg && msg.id ? msg.id : null,
         channelId: dest.id,
-        roleId: conf.roleId || null,
+        roleId: repRoleId,
+        notifyRoleId: pingRoleId,
         createdBy: (ctx.user || ctx.author).id
     });
 
     let roleGiven = false;
-    if (conf.roleId) {
+    if (repRoleId && member) {
         try {
-            const role = await guild.roles.fetch(conf.roleId).catch(() => null);
-            if (role && member) {
-                await member.roles.add(role, 'Parceria registrada').catch(() => null);
-                roleGiven = true;
+            const role = await guild.roles.fetch(repRoleId).catch(function () { return null; });
+            if (role) {
+                await member.roles
+                    .add(role, 'Parceria registrada — cargo do representante')
+                    .catch(function () { return null; });
+                roleGiven = member.roles.cache.has(role.id);
             }
         } catch (_) {}
     }
@@ -302,24 +324,35 @@ async function run(ctx, { repUser, member, texto, targetChannel, client, isSlash
         .setColor(0x22c55e)
         .setTitle('✅ Parceria registrada')
         .setDescription(
-            `**Representante:** ${repUser}\n` +
-                `**Servidor confirmado:** **${name}**\n` +
-                `**Convite (do texto):** ${inviteMd}\n` +
-                `**Canal:** ${dest}\n` +
-                `**ID:** \`${entry.id}\`\n` +
-                (roleGiven && conf.roleId
-                    ? `**Cargo:** <@&${conf.roleId}>\n\n`
-                    : conf.roleId
-                      ? `**Cargo:** configurado, mas não foi possível aplicar.\n\n`
-                      : `\n`) +
-                `_Se o representante sair, a parceria e a mensagem são removidas._`
+            '**Representante:** ' +
+                repUser +
+                '\n' +
+                '**Servidor confirmado:** **' +
+                name +
+                '**\n' +
+                '**Convite (do texto):** ' +
+                inviteMd +
+                '\n' +
+                '**Canal:** ' +
+                dest +
+                '\n' +
+                '**ID:** `' +
+                entry.id +
+                '`\n' +
+                (roleGiven && repRoleId
+                    ? '**Cargo do representante:** <@&' + repRoleId + '>\n'
+                    : repRoleId
+                      ? '**Cargo do representante:** configurado, mas não foi possível aplicar.\n'
+                      : '') +
+                (pingRoleId ? '**Notificação:** <@&' + pingRoleId + '>\n' : '') +
+                '\n_Se o representante sair, a parceria e a mensagem são removidas._'
         );
 
     return reply(ctx, isSlash, { embeds: [ok] });
 }
 
 async function reply(ctx, isSlash, content) {
-    const payload = typeof content === 'string' ? { content } : content;
+    const payload = typeof content === 'string' ? { content: content } : content;
     if (isSlash) {
         if (ctx.deferred || ctx.replied) return ctx.editReply(payload);
         return ctx.reply(payload);
