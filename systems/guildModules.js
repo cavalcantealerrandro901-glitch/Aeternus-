@@ -14,7 +14,7 @@ const antinukeHits = new Map();
 function fmt(tpl, map) {
     let s = String(tpl || '');
     for (const [k, v] of Object.entries(map)) {
-        s = s.replace(new RegExp(`\\{${k}\\}`, 'gi'), String(v ?? ''));
+        s = s.replace(new RegExp('\\{' + k + '\\}', 'gi'), String(v ?? ''));
     }
     return s;
 }
@@ -34,7 +34,7 @@ async function updateMemberCounter(guild) {
 }
 
 function antinukeCheck(guildId, action, max, windowSec) {
-    const key = `${guildId}:${action}`;
+    const key = guildId + ':' + action;
     const now = Date.now();
     let st = antinukeHits.get(key) || { n: 0, at: now };
     if (now - st.at > (windowSec || 30) * 1000) st = { n: 0, at: now };
@@ -69,9 +69,7 @@ function persistCount(guildId, ct, state) {
 }
 
 async function failCounting(message, ct, state, expected, reason) {
-    state.current = 0;
-    state.lastUser = null;
-    persistCount(message.guild.id, ct, state);
+    // Não zera o contador — o valor atual permanece; basta acertar o próximo
     await message.react('❌').catch(() => {});
     await message.channel
         .send({
@@ -80,7 +78,17 @@ async function failCounting(message, ct, state, expected, reason) {
                     .setColor(0xf87171)
                     .setTitle('🔢 Contagem errada')
                     .setDescription(
-                        `${message.author} errou.\n${reason || ''}\nEsperado: **${expected}**. A contagem voltou para **1**.`
+                        message.author +
+                            ' errou.\n' +
+                            (reason || '') +
+                            '\nO número certo era **' +
+                            expected +
+                            '**.\n' +
+                            'O contador continua em **' +
+                            state.current +
+                            '** — próximo válido: **' +
+                            expected +
+                            '**.'
                     )
             ]
         })
@@ -104,7 +112,7 @@ function setup(client) {
                 const ch = await member.guild.channels.fetch(s.welcome.channelId).catch(() => null);
                 if (ch?.isTextBased()) {
                     const text = fmt(s.welcome.message || 'Bem-vindo {user}!', {
-                        user: `${member}`,
+                        user: String(member),
                         server: member.guild.name,
                         memberCount: member.guild.memberCount
                     });
@@ -183,6 +191,7 @@ function setup(client) {
         try {
             const ct = s.counting;
             if (ct?.enabled && String(ct.channelId) === String(message.channel.id)) {
+                // Mensagens só com emoji → parseCountMessage retorna null → ignora (não altera contador)
                 const num = parseCountMessage(message.content);
                 if (num !== null) {
                     const state = getCountState(message.channel.id, ct.current);
@@ -203,7 +212,7 @@ function setup(client) {
                             ct,
                             state,
                             expected,
-                            `Você enviou **${num}**.`
+                            'Você enviou **' + num + '**.'
                         );
                         return;
                     }
@@ -302,7 +311,7 @@ function setup(client) {
             if (already) {
                 await already
                     .edit({
-                        embeds: [EmbedBuilder.from(already.embeds[0]).setTitle(`${emoji} ${reaction.count}`)]
+                        embeds: [EmbedBuilder.from(already.embeds[0]).setTitle(emoji + ' ' + reaction.count)]
                     })
                     .catch(() => {});
                 return;
@@ -314,12 +323,12 @@ function setup(client) {
                     iconURL: message.author?.displayAvatarURL?.({ size: 64 })
                 })
                 .setDescription(message.content?.slice(0, 1500) || '_sem texto_')
-                .setTitle(`${emoji} ${reaction.count}`)
+                .setTitle(emoji + ' ' + reaction.count)
                 .addFields({
                     name: 'Origem',
-                    value: `[Ir](${message.url}) · <#${message.channel.id}>`
+                    value: '[Ir](' + message.url + ') · <#' + message.channel.id + '>'
                 })
-                .setFooter({ text: `ID ${message.id}` })
+                .setFooter({ text: 'ID ' + message.id })
                 .setTimestamp(message.createdAt);
             const img = message.attachments?.find((a) =>
                 /\.(png|jpe?g|gif|webp)$/i.test(a.name || a.url)
@@ -350,7 +359,7 @@ function setup(client) {
             if (newS.channelId === s.channelId) {
                 const ch = await guild.channels
                     .create({
-                        name: `🎧 ${newS.member?.displayName || 'Sala'}`.slice(0, 100),
+                        name: ('🎧 ' + (newS.member?.displayName || 'Sala')).slice(0, 100),
                         type: ChannelType.GuildVoice,
                         parent: newS.channel?.parentId || undefined,
                         reason: 'Voice hub temp'
@@ -414,16 +423,17 @@ async function announceLevel(message, res) {
         const gains = Array.isArray(res.attrGains) ? res.attrGains : [];
         const gainText = gains.length
             ? gains
-                  .map((g) => `+${g.amount} ${g.label || ATTR_LABEL[g.key] || g.key}`)
+                  .map((g) => '+' + g.amount + ' ' + (g.label || ATTR_LABEL[g.key] || g.key))
                   .join(' · ')
             : 'atributos reforçados';
 
         const items = Array.isArray(res.items) ? res.items : [];
         const itemText = items.length
-            ? '\n🎁 Item: ' + items.map((i) => `${i.emoji || ''} **${i.name}**`).join(', ')
+            ? '\n🎁 Item: ' + items.map((i) => (i.emoji || '') + ' **' + i.name + '**').join(', ')
             : '';
 
-        const text = `⭐ ${message.author} nível **${res.level}**!\n💪 ${gainText}${itemText}`;
+        const text =
+            '⭐ ' + message.author + ' nível **' + res.level + '**!\n💪 ' + gainText + itemText;
 
         if (s?.announceChannelId) {
             const ch = await message.guild.channels.fetch(s.announceChannelId).catch(() => null);
@@ -439,7 +449,8 @@ async function announceLevel(message, res) {
     }
 }
 
-function setCountingNumber(guildId, n, { resetLastUser = true } = {}) {
+function setCountingNumber(guildId, n, opts) {
+    const resetLastUser = !opts || opts.resetLastUser !== false;
     const s = getSettings(guildId);
     const ct = s.counting;
     if (!ct || ct.enabled === false) {
@@ -459,11 +470,11 @@ function setCountingNumber(guildId, n, { resetLastUser = true } = {}) {
     const state = getCountState(String(ct.channelId), current);
     state.current = current;
     if (resetLastUser) state.lastUser = null;
-    persistCount(guildId, { ...ct, enabled: true }, state);
+    persistCount(guildId, Object.assign({}, ct, { enabled: true }), state);
     return {
         ok: true,
         current: state.current,
-        next,
+        next: next,
         channelId: String(ct.channelId)
     };
 }
