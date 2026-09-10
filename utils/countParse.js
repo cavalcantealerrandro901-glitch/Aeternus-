@@ -1,6 +1,6 @@
 /**
  * Parser da contagem: dígitos, palavras, romano, bases, expressões (π, e…)
- * e texto misto (ex.: "11 oi" → 11). Emojis são ignorados.
+ * e texto misto (ex.: "11 oi" → 11).
  */
 const DIGIT_MAP = {
     '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
@@ -258,25 +258,8 @@ function parseMathConstantAlone(raw) {
     return toIntegerResult(MATH_CONST[key]);
 }
 
-/** Remove emojis Unicode e custom do Discord (<:nome:id> / <a:nome:id>). */
-function stripEmojis(str) {
-    return String(str || '')
-        .replace(/<a?:[\w~]+:\d+>/g, ' ')
-        .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
-        .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
-        .replace(/[\u{2600}-\u{27BF}]/gu, '')
-        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
-        .replace(/[\u{200D}]/gu, '')
-        .replace(/[\u{20E3}]/gu, '')
-        .replace(/[\u{E0020}-\u{E007F}]/gu, '')
-        .replace(/\u{FE0F}/gu, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
 function parseCountMessage(content) {
-    // Emojis (qualquer tipo) são ignorados — não contam e não quebram a sequência
-    const raw = stripEmojis(content);
+    const raw = String(content || '').trim();
     if (!raw) return null;
 
     const pureDigits = raw.replace(/[\s_,.]/g, '');
@@ -331,4 +314,4 @@ function parseCountMessage(content) {
     return null;
 }
 
-module.exports = { parseCountMessage, evalExpression, extractNumberFromMixed, stripEmojis };
+module.exports = { parseCountMessage, evalExpression, extractNumberFromMixed };
