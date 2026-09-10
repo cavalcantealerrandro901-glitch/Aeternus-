@@ -69,7 +69,9 @@ function persistCount(guildId, ct, state) {
 }
 
 async function failCounting(message, ct, state, expected, reason) {
-    // Não zera o contador — o valor atual permanece; basta acertar o próximo
+    state.current = 0;
+    state.lastUser = null;
+    persistCount(message.guild.id, ct, state);
     await message.react('❌').catch(() => {});
     await message.channel
         .send({
@@ -78,17 +80,7 @@ async function failCounting(message, ct, state, expected, reason) {
                     .setColor(0xf87171)
                     .setTitle('🔢 Contagem errada')
                     .setDescription(
-                        message.author +
-                            ' errou.\n' +
-                            (reason || '') +
-                            '\nO número certo era **' +
-                            expected +
-                            '**.\n' +
-                            'O contador continua em **' +
-                            state.current +
-                            '** — próximo válido: **' +
-                            expected +
-                            '**.'
+                        `${message.author} errou.\n${reason || ''}\nEsperado: **${expected}**. A contagem voltou para **1**.`
                     )
             ]
         })
@@ -191,7 +183,6 @@ function setup(client) {
         try {
             const ct = s.counting;
             if (ct?.enabled && String(ct.channelId) === String(message.channel.id)) {
-                // Mensagens só com emoji → parseCountMessage retorna null → ignora (não altera contador)
                 const num = parseCountMessage(message.content);
                 if (num !== null) {
                     const state = getCountState(message.channel.id, ct.current);
