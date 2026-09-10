@@ -1,0 +1,62 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Aeternus Painel</title><link rel="stylesheet" href="/dashboard.css"/></head><body>
+<aside class="side" id="sideNav">
+<div style="font-weight:800;margin-bottom:.8rem">✨ Aeternus</div>
+<button class="nb on" data-p="servers">🏠 Servidores</button>
+<button class="nb" data-p="me">❄️ Conta</button>
+<button class="nb" data-p="overview" disabled>📊 Visão geral</button>
+<button class="nb" data-p="drops" disabled>🎁 Drops</button>
+<button class="nb" data-p="partnership" disabled>🤝 Parcerias</button>
+</aside>
+<main class="main">
+<section class="panel on" id="servers"><div class="card"><h3>Servidores</h3><div id="guildList" class="grid"></div></div></section>
+<section class="panel" id="me"><div class="card"><h3>Conta</h3><p class="hint" id="meInfo">—</p><a class="btn" href="/logout">Sair</a></div></section>
+<section class="panel" id="overview"><div class="card"><h3>Visão geral</h3><div class="stats" id="ovStats"></div></div></section>
+<section class="panel" id="drops">
+<div class="card">
+<h3>🎁 Drops</h3>
+<div class="tg"><span>Drops ativos</span><input type="checkbox" id="dropEnabled" checked/></div>
+<label class="f">Canal padrão</label>
+<select id="dropChannel"></select>
+<label class="f">Nível mínimo</label>
+<input id="dropMinLevel" type="number" min="0" value="0"/>
+<label class="f">VIP · entradas extras</label>
+<div id="dropVipList" class="hint">Nenhum</div>
+<div style="display:flex;gap:.4rem;flex-wrap:wrap">
+<select id="dropVipRole" style="flex:1"></select>
+<input id="dropVipEntries" type="number" min="1" value="1" style="width:5rem"/>
+<input id="dropVipLabel" placeholder="Nome" style="flex:1"/>
+<button class="btn" type="button" onclick="dropVipAdd()">Adicionar</button>
+</div>
+<label class="f">Cargos bloqueados</label>
+<div id="dropBlockedList" class="hint">Nenhum</div>
+<div style="display:flex;gap:.4rem">
+<select id="dropBlockedRole" style="flex:1"></select>
+<button class="btn" type="button" onclick="dropBlockedAdd()">Bloquear</button>
+</div>
+<label class="f">Cargos que ignoram requisitos</label>
+<p class="hint">Quem tiver este cargo entra no drop sem cumprir nível/cargos exigidos. Cargo bloqueado ainda impede.</p>
+<div id="dropBypassList" class="hint">Nenhum</div>
+<div style="display:flex;gap:.4rem">
+<select id="dropBypassRole" style="flex:1"></select>
+<button class="btn" type="button" onclick="dropBypassAdd()">Adicionar</button>
+</div>
+<button class="btn ok" type="button" onclick="dropSave()">Salvar drops</button>
+<p class="hint" id="dropHint"></p>
+</div>
+</section>
+<section class="panel" id="partnership">
+<div class="card">
+<h3>🤝 Parcerias</h3>
+<div class="tg"><span>Sistema ativo</span><input type="checkbox" id="partEnabled" checked/></div>
+<label class="f">Canal</label><select id="partChannel"></select>
+<label class="f">Cargo do representante</label><select id="partRole"></select>
+<label class="f">Frase</label><textarea id="partPhrase" rows="4"></textarea>
+<label class="f">Imagem (URL)</label><input id="partImage"/>
+<button class="btn ok" type="button" onclick="partSave()">Salvar parcerias</button>
+<p class="hint" id="partHint"></p>
+</div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+<script src="/dashboard-app.js"></script>
+</body></html>
