@@ -92,7 +92,7 @@ async function selectGuild(id, name) {
   ['welChannel', 'leaveChannel', 'dropChannel', 'partChannel'].forEach(function (id) {
     fill($(id), ch, 'Canal');
   });
-  ['dropVipRole', 'dropBlockedRole', 'dropBypassRole', 'partRole'].forEach(function (id) {
+  ['dropVipRole', 'dropBlockedRole', 'dropBypassRole', 'partRole', 'partNotifyRole'].forEach(function (id) {
     fill($(id), roles, 'Cargo');
   });
 
@@ -231,6 +231,7 @@ function partLoadFromSettings(s) {
   if ($('partEnabled')) $('partEnabled').checked = p.enabled !== false;
   if ($('partChannel')) $('partChannel').value = p.channelId || '';
   if ($('partRole')) $('partRole').value = p.roleId || '';
+  if ($('partNotifyRole')) $('partNotifyRole').value = p.notifyRoleId || '';
   if ($('partPhrase'))
     $('partPhrase').value =
       p.phrase ||
@@ -244,6 +245,7 @@ async function partSave() {
     enabled: !$('partEnabled') || $('partEnabled').checked !== false,
     channelId: val('partChannel') || null,
     roleId: val('partRole') || null,
+    notifyRoleId: val('partNotifyRole') || null,
     phrase: val('partPhrase') || '',
     image: val('partImage') || null
   };
