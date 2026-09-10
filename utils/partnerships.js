@@ -10,7 +10,6 @@ const KEY = 'partnerships.json';
 const DEFAULT_PHRASE =
     '🤝 **Nova parceria!**\nRepresentante: {rep}\nServidor: **{server}**\nConvite: {invite}';
 
-/** Mensagem fixa no DM — não configurável no painel */
 const FIXED_DM =
     '✨ **Obrigado por caminhar conosco.**\n\n' +
     'Você foi escolhido como **representante oficial** da parceria entre **{host}** e **{server}**.\n\n' +
@@ -19,7 +18,6 @@ const FIXED_DM =
     '⚠️ Lembrete importante: se você **sair** de **{host}**, a parceria será **encerrada automaticamente** e o anúncio será removido.\n\n' +
     'Com gratidão,\n**Equipe {host}**';
 
-/** GIF de anime (parceria / cumprimento) — fixa, não vem do painel */
 const DM_GIF =
     'https://media.tenor.com/S3sG0fD1y0IAAAAC/anime-handshake.gif';
 
@@ -58,6 +56,7 @@ function create(guildId, entry) {
         messageId: entry.messageId || null,
         channelId: entry.channelId || null,
         roleId: entry.roleId || null,
+        notifyRoleId: entry.notifyRoleId || null,
         createdAt: Date.now(),
         createdBy: entry.createdBy || null,
         cancelled: false
@@ -97,6 +96,7 @@ function getConfig(guildId) {
         enabled: s.enabled !== false,
         channelId: s.channelId || null,
         roleId: s.roleId || null,
+        notifyRoleId: s.notifyRoleId || null,
         phrase: s.phrase || DEFAULT_PHRASE,
         image: s.image || null
     };
