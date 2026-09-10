@@ -166,6 +166,7 @@ function setup(client) {
             enabled: body.enabled !== false,
             channelId: body.channelId || null,
             roleId: body.roleId || null,
+            notifyRoleId: body.notifyRoleId || null,
             phrase: body.phrase || '',
             image: body.image || null
         };
