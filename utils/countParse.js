@@ -1,6 +1,6 @@
 /**
  * Parser da contagem: dígitos, palavras, romano, bases, expressões (π, e…)
- * e texto misto (ex.: "11 oi" → 11).
+ * Número só no início da frase; emojis à frente/depois são permitidos.
  */
 const DIGIT_MAP = {
     '0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
@@ -258,60 +258,91 @@ function parseMathConstantAlone(raw) {
     return toIntegerResult(MATH_CONST[key]);
 }
 
+/** Remove só emojis no início (Unicode + custom Discord). */
+function stripLeadingEmojis(str) {
+    let s = String(str || '');
+    let prev;
+    do {
+        prev = s;
+        s = s
+            .replace(/^\s+/u, '')
+            .replace(/^<a?:[\w~]+:\d+>/u, '')
+            .replace(/^[\u{1F1E0}-\u{1F1FF}]/u, '')
+            .replace(/^[\u{1F300}-\u{1FAFF}]/u, '')
+            .replace(/^[\u{2600}-\u{27BF}]/u, '')
+            .replace(/^[\u{FE00}-\u{FE0F}]/u, '')
+            .replace(/^[\u{200D}]/u, '')
+            .replace(/^[\u{20E3}]/u, '')
+            .replace(/^\u{FE0F}/u, '');
+    } while (s !== prev);
+    return s.trimStart();
+}
+
+/**
+ * Aceita número só no início da frase.
+ * Emojis à frente ou depois do número são permitidos.
+ * Números no meio/fim de texto (ex.: "oi 5") são ignorados.
+ */
 function parseCountMessage(content) {
-    const raw = String(content || '').trim();
+    let raw = String(content || '').trim();
     if (!raw) return null;
 
-    const pureDigits = raw.replace(/[\s_,.]/g, '');
-    if (pureDigits && [...pureDigits].every((ch) => DIGIT_MAP[ch] !== undefined)) {
-        const n = digitsToInt(pureDigits);
-        if (n !== null) return n;
+    raw = stripLeadingEmojis(raw);
+    if (!raw) return null;
+
+    const digMatch = raw.match(/^((?:[\d]|[_\s.])+)/u);
+    if (digMatch) {
+        const pure = digMatch[1].replace(/[\s_,.]/g, '');
+        if (pure && [...pure].every((ch) => DIGIT_MAP[ch] !== undefined)) {
+            const n = digitsToInt(pure);
+            if (n !== null) return n;
+        }
     }
 
-    const pref = parsePrefixed(raw.replace(/\s/g, ''));
+    const firstTok = raw.split(/\s+/)[0] || '';
+    const pref = parsePrefixed(firstTok);
     if (pref !== null) return pref;
 
-    const roman = parseRoman(raw);
-    if (roman !== null) return roman;
+    const romanTok = firstTok.replace(/[^mdclxviMDCLXVI]/g, '');
+    if (romanTok && romanTok === firstTok) {
+        const roman = parseRoman(firstTok);
+        if (roman !== null) return roman;
+    }
 
-    const alone = parseMathConstantAlone(raw);
+    const alone = parseMathConstantAlone(firstTok);
     if (alone !== null) return alone;
 
-    const key = raw
+    const wordKey = firstTok
         .toLowerCase()
         .normalize('NFD')
         .replace(/\p{M}/gu, '')
         .replace(/[^\p{L}\p{N}]/gu, '');
-    if (WORD_NUMBERS[raw] !== undefined) return WORD_NUMBERS[raw];
-    if (WORD_NUMBERS[key] !== undefined) return WORD_NUMBERS[key];
+    if (WORD_NUMBERS[firstTok.toLowerCase()] !== undefined) return WORD_NUMBERS[firstTok.toLowerCase()];
+    if (WORD_NUMBERS[wordKey] !== undefined) return WORD_NUMBERS[wordKey];
 
     const phrase = parseWordPhrase(raw);
-    if (phrase !== null) return phrase;
+    if (phrase !== null) {
+        const startWord = wordKey || firstTok.toLowerCase();
+        if (
+            WORD_NUMBERS[startWord] !== undefined ||
+            /^(um|uma|dois|duas|tres|três|zero|one|two)/i.test(firstTok)
+        ) {
+            return phrase;
+        }
+    }
 
-    if (
-        /[+\-*/%^\u00d7\u00f7()]/.test(raw) ||
-        /\*\*/.test(raw) ||
-        /π|pi\b|tau\b|phi\b|\be\b/i.test(raw)
-    ) {
+    if (/^[0-9(+\-]/.test(raw) || /^(pi|τ|π|phi|e)\b/i.test(raw)) {
         const expr = evalExpressionLoose(raw);
         if (expr !== null) return expr;
     }
 
-    const compact = raw.replace(/[_\s.]/g, '');
-    if (/^\d+$/.test(compact)) {
-        const n = Number(compact);
+    const m = raw.match(/^(\d+)/);
+    if (m) {
+        const n = Number(m[1]);
         if (Number.isSafeInteger(n) && n >= 0) return n;
-    }
-
-    const looksMath =
-        /[+\-*/%^=()]/.test(raw) ||
-        /π|\bpi\b|\btau\b|\bphi\b/i.test(raw);
-    if (!looksMath) {
-        const mixed = extractNumberFromMixed(raw);
-        if (mixed !== null) return mixed;
     }
 
     return null;
 }
 
-module.exports = { parseCountMessage, evalExpression, extractNumberFromMixed };
+module.exports = { parseCountMessage, evalExpression, extractNumberFromMixed, stripLeadingEmojis };
