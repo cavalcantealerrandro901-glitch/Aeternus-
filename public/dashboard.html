@@ -97,11 +97,16 @@
 
     <section class="panel" id="partnership">
       <h2>Parcerias</h2>
-      <p class="sub">Anúncio público e cargo do representante.</p>
+      <p class="sub">Anúncio público, cargo do representante e notificação.</p>
       <div class="card">
         <div class="tg"><span>Sistema ativo</span><label class="switch"><input type="checkbox" id="partEnabled" checked/><span class="slider"></span></label></div>
         <label class="f">Canal</label><select id="partChannel"></select>
-        <label class="f">Cargo do representante</label><select id="partRole"></select>
+        <label class="f">Cargo do representante</label>
+        <p class="hint">Aplicado automaticamente ao representante ao registrar a parceria.</p>
+        <select id="partRole"></select>
+        <label class="f">Cargo de notificação</label>
+        <p class="hint">Mencionado no anúncio. Pode ser sobrescrito no comando com a opção notificar.</p>
+        <select id="partNotifyRole"></select>
         <label class="f">Frase</label><textarea id="partPhrase" rows="4"></textarea>
         <label class="f">Imagem (URL)</label><input id="partImage"/>
         <button class="btn ok" type="button" onclick="partSave()">Salvar parcerias</button>
