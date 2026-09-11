@@ -82,7 +82,7 @@ function profileEmbed(user, profile) {
               .slice(-8)
               .map((i) => `${i.emoji || '🎁'} ${i.name}`)
               .join('\n')
-        : '_Nenhum item — 5% de drop ao subir de nível._';
+        : '_Nenhum item — 10% de drop ao subir de nível._';
 
     return new EmbedBuilder()
         .setColor(cls.color || 0xa78bfa)
@@ -101,7 +101,7 @@ function profileEmbed(user, profile) {
                 '',
                 `❤️ HP **${xp.maxHp(user.id)}** · 🔵 Mana **${maxMana}**`,
                 '',
-                '**Atributos** — use o **➕** do botão sob cada um'
+                `💠 **Pontos disponíveis:** **${Number(st.attrPoints || 0)}** — use **➕** abaixo`
             ].join('\n')
         )
         .addFields(
@@ -113,7 +113,7 @@ function profileEmbed(user, profile) {
             },
             {
                 name: '🎫  Inventário',
-                value: invLines,
+                value: invLines + '\n_Ver tudo: `O.inventario`_',
                 inline: false
             }
         )
@@ -121,11 +121,6 @@ function profileEmbed(user, profile) {
         .setImage(cls.banner);
 }
 
-/**
- * Botões + alinhados aos atributos (grade 2x2):
- * [Força] [Defesa]
- * [Agilidade] [Vida]
- */
 function attrButtons(ownerId) {
     const rows = [];
     for (let i = 0; i < ATTR_META.length; i += 2) {
@@ -247,9 +242,7 @@ async function startPhotoWait(user, draft) {
         }
 
         await dm
-            .send({
-                content: '📸 **Foto recebida!** Salvando no perfil…'
-            })
+            .send({ content: '📸 **Foto recebida!** Salvando no perfil…' })
             .catch(() => {});
 
         await finishProfile(
@@ -292,7 +285,8 @@ module.exports = {
                     '**Sistema de Jogador**',
                     '`O.j perfil` — sua ficha',
                     '`O.j perfil @user` — ficha de outro',
-                    '`O.j criar` — criar perfil (PV)'
+                    '`O.j criar` — criar perfil (PV)',
+                    '`O.inventario [categoria]` — itens'
                 ].join('\n')
             );
         }
@@ -348,18 +342,31 @@ module.exports = {
             const ownerId = parts[3];
             const meta = ATTR_META.find((a) => a.key === attrKey);
             if (!meta) {
-                return interaction.reply({ content: 'Atributo inválido.', ephemeral: true });
+                return interaction.reply({ content: 'Atributo inválido.', flags: 64 });
             }
             if (String(interaction.user.id) !== String(ownerId)) {
                 return interaction.reply({
                     content: 'Só o dono do perfil pode usar estes botões.',
-                    ephemeral: true
+                    flags: 64
                 });
             }
-            return interaction.reply({
-                content: `➕ **${meta.label}** — botão pronto. Aguardando a próxima instrução.`,
-                ephemeral: true
-            });
+            const spent = xp.spendAttrPoint(ownerId, attrKey);
+            if (!spent.ok) {
+                return interaction.reply({ content: spent.error, flags: 64 });
+            }
+            const profile = player.get(ownerId);
+            if (!profile) {
+                return interaction.reply({ content: 'Perfil não encontrado.', flags: 64 });
+            }
+            await interaction.update(
+                profilePayload(interaction.user, profile, interaction.user.id)
+            );
+            return interaction
+                .followUp({
+                    content: `➕ **${meta.label}** agora em **${spent.value}** · pontos restantes: **${spent.attrPoints}**`,
+                    flags: 64
+                })
+                .catch(() => {});
         }
 
         if (id === 'j:class' && interaction.isStringSelectMenu()) {
