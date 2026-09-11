@@ -411,29 +411,51 @@ async function announceLevel(message, res) {
         const s = getSettings(message.guild.id).levels;
         if (s?.enabled === false) return null;
 
-        const gains = Array.isArray(res.attrGains) ? res.attrGains : [];
-        const gainText = gains.length
-            ? gains
-                  .map((g) => '+' + g.amount + ' ' + (g.label || ATTR_LABEL[g.key] || g.key))
-                  .join(' · ')
-            : 'atributos reforçados';
-
+        const pts = Number(res.pointsGained || 0);
+        const totalPts = Number(res.attrPoints ?? res.progress?.attrPoints ?? 0);
         const items = Array.isArray(res.items) ? res.items : [];
-        const itemText = items.length
-            ? '\n🎁 Item: ' + items.map((i) => (i.emoji || '') + ' **' + i.name + '**').join(', ')
-            : '';
 
-        const text =
-            '⭐ ' + message.author + ' nível **' + res.level + '**!\n💪 ' + gainText + itemText;
+        const emb = new EmbedBuilder()
+            .setColor(0xfbbf24)
+            .setAuthor({
+                name: message.author.username,
+                iconURL: message.author.displayAvatarURL({ size: 64 })
+            })
+            .setTitle(`⭐ Nível ${res.level}!`)
+            .setDescription(
+                [
+                    `${message.author} subiu para o **nível ${res.level}**!`,
+                    '',
+                    pts > 0
+                        ? `💪 **+${pts}** ponto(s) de atributo`
+                        : '💪 Pontos de atributo atualizados',
+                    totalPts > 0 ? `📊 Disponíveis agora: **${totalPts}**` : '',
+                    '',
+                    '_Use `O.j perfil` e os botões **➕** para distribuir os pontos._'
+                ]
+                    .filter(Boolean)
+                    .join('\n')
+            )
+            .setThumbnail(message.author.displayAvatarURL({ size: 128 }))
+            .setTimestamp();
+
+        if (items.length) {
+            emb.addFields({
+                name: '🎁 Drop de nível (10%)',
+                value: items.map((i) => `${i.emoji || '🎁'} **${i.name}**`).join('\n')
+            });
+        }
+
+        const payload = { embeds: [emb] };
 
         if (s?.announceChannelId) {
             const ch = await message.guild.channels.fetch(s.announceChannelId).catch(() => null);
             if (ch?.isTextBased()) {
-                const msg = await ch.send(text).catch(() => null);
+                const msg = await ch.send(payload).catch(() => null);
                 return msg ? { message: msg, sticky: true } : null;
             }
         }
-        const msg = await message.channel.send(text).catch(() => null);
+        const msg = await message.channel.send(payload).catch(() => null);
         return msg ? { message: msg, sticky: false } : null;
     } catch {
         return null;
