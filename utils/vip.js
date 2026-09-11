@@ -3,7 +3,6 @@ const crypto = require('crypto');
 
 const PLANOS = ['VIP', 'VIP+', 'VIP++', 'MVP', 'Booster', 'Premium'];
 
-/** Categorias de anotação / registro */
 const CATEGORIES = [
     { value: 'compra_vip', name: 'Compra de VIP' },
     { value: 'patrimonio', name: 'Patrimônio' },
@@ -55,6 +54,7 @@ function guildData(guildId) {
     const list = [];
     for (const [userId, rec] of Object.entries(g)) {
         if (!rec || typeof rec !== 'object') continue;
+        const roleIds = rec.roleIds || (rec.roleId ? [rec.roleId] : []);
         list.push({
             id: newId(),
             userId: String(userId),
@@ -62,7 +62,8 @@ function guildData(guildId) {
             item: rec.vip || rec.tier || rec.roleName || 'VIP',
             vip: rec.vip || rec.tier || null,
             tier: rec.tier || null,
-            roleId: rec.roleId || null,
+            roleId: roleIds[0] || rec.roleId || null,
+            roleIds,
             roleName: rec.roleName || null,
             registeredBy: rec.registeredBy || null,
             registeredAt: rec.registeredAt || Date.now(),
@@ -119,6 +120,7 @@ function register({
     days,
     note,
     roleId,
+    roleIds,
     roleName,
     type,
     category
@@ -130,6 +132,10 @@ function register({
     const cat = String(category || type || 'compra_vip');
     const name = String(item || vipName || roleName || 'Item').trim().slice(0, 80);
 
+    let ids = Array.isArray(roleIds) ? roleIds.map(String).filter(Boolean) : [];
+    if (roleId) ids.unshift(String(roleId));
+    ids = [...new Set(ids)].slice(0, 10);
+
     const rec = {
         id: newId(),
         userId: String(userId),
@@ -137,7 +143,8 @@ function register({
         item: name,
         vip: name,
         tier: name,
-        roleId: roleId ? String(roleId) : null,
+        roleId: ids[0] || null,
+        roleIds: ids,
         roleName: roleName ? String(roleName).slice(0, 80) : null,
         registeredBy: String(registeredBy),
         registeredAt: now,
@@ -162,7 +169,6 @@ function remove(guildId, userId) {
     return true;
 }
 
-/** Remove anotações pelos números exibidos em /ver-anotacoes (1-based). */
 function removeByNumbers(guildId, numbers, category) {
     const { all, data } = guildData(guildId);
     const sorted = listAll(guildId, category || 'todas');
@@ -192,7 +198,6 @@ function removeByNumbers(guildId, numbers, category) {
     data.list = (data.list || []).filter((r) => !idsToRemove.has(String(r.id)));
     all[guildId] = data;
     saveAll(all);
-    // ordem crescente para mensagem
     removed.sort((a, b) => a.number - b.number);
     return { ok: true, removed };
 }
