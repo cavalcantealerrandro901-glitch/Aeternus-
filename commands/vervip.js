@@ -10,6 +10,17 @@ const vip = require('../utils/vip');
 const COLOR = 0xa78bfa;
 const PAGE_SIZE = 6;
 
+function rolesText(v) {
+    const ids =
+        Array.isArray(v.roleIds) && v.roleIds.length
+            ? v.roleIds
+            : v.roleId
+              ? [v.roleId]
+              : [];
+    if (!ids.length) return '_sem cargo_';
+    return ids.map((id) => `<@&${id}>`).join(' ');
+}
+
 module.exports = {
     name: 'veranotacoes',
     aliases: ['vervip', 'vip', 'meuvip', 'listavip', 'verregistros', 'registros', 'anotacoes'],
@@ -50,9 +61,8 @@ module.exports = {
             );
             if (known) category = known.value;
         }
-        const page = 0;
         const list = vip.listAll(message.guild.id, category);
-        return message.reply(buildPagePayload(list, category, page));
+        return message.reply(buildPagePayload(list, category, 0));
     },
 
     async executeSlash(i) {
@@ -61,9 +71,8 @@ module.exports = {
             return i.reply({ embeds: [buildUserEmbed(i.guild, target)] });
         }
         const category = i.options.getString('categoria') || 'todas';
-        const page = 0;
         const list = vip.listAll(i.guild.id, category);
-        return i.reply(buildPagePayload(list, category, page));
+        return i.reply(buildPagePayload(list, category, 0));
     },
 
     async handleComponent(interaction) {
@@ -105,7 +114,10 @@ function buildUserEmbed(guild, user) {
         const when = v.registeredAt
             ? `<t:${Math.floor(v.registeredAt / 1000)}:f>`
             : '—';
-        const cargo = v.roleId ? ` · <@&${v.roleId}>` : '';
+        const cargo =
+            (Array.isArray(v.roleIds) && v.roleIds.length) || v.roleId
+                ? ` · ${rolesText(v)}`
+                : '';
         return `**${idx + 1}.** [${cat}] **${label}** — ${when}${cargo}`;
     });
     emb.setDescription(`${user}\n\n` + lines.join('\n'));
@@ -118,8 +130,7 @@ function buildPagePayload(list, category, page) {
     page = Math.max(0, Math.min(page, totalPages - 1));
     const start = page * PAGE_SIZE;
     const slice = list.slice(start, start + PAGE_SIZE);
-    const catLabel =
-        category === 'todas' ? 'Todas' : vip.categoryLabel(category);
+    const catLabel = category === 'todas' ? 'Todas' : vip.categoryLabel(category);
 
     const emb = new EmbedBuilder()
         .setColor(COLOR)
@@ -132,7 +143,7 @@ function buildPagePayload(list, category, page) {
             const n = start + idx + 1;
             const label = vip.vipLabel(v);
             const cat = vip.categoryLabel(v.category);
-            const cargo = v.roleId ? `<@&${v.roleId}>` : '_sem cargo_';
+            const cargo = rolesText(v);
             const when = v.registeredAt
                 ? `<t:${Math.floor(v.registeredAt / 1000)}:f>`
                 : '—';
