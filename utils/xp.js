@@ -33,6 +33,7 @@ function get(userId) {
     return {
         xp: Number(raw.xp || 0),
         level: Number(raw.level || 0),
+        attrPoints: Math.max(0, Math.floor(Number(raw.attrPoints || 0))),
         attrs: ensureAttrs({ attrs: raw.attrs })
     };
 }
@@ -54,7 +55,7 @@ function levelFromXp(totalXp) {
 }
 
 function progress(userId) {
-    const { xp, level, attrs } = get(userId);
+    const { xp, level, attrs, attrPoints } = get(userId);
     let remain = Number(xp || 0);
     for (let lv = 0; lv < level; lv++) remain -= xpForLevel(lv);
     if (remain < 0) remain = 0;
@@ -68,12 +69,18 @@ function progress(userId) {
         pct,
         toNext: Math.max(0, need - Math.floor(remain)),
         mult: dailyMultiplier(level),
-        attrs
+        attrs,
+        attrPoints
     };
 }
 
 function dailyMultiplier(level) {
     return 1 + Math.min(2, Number(level || 0) * 0.04);
+}
+
+function pointsForLevel(level) {
+    const lv = Math.max(1, Number(level) || 1);
+    return 2 + Math.floor(lv / 10);
 }
 
 function rollAttrGain(double = false) {
@@ -95,6 +102,8 @@ function addXp(userId, amount) {
 
     const gains = [];
     const items = [];
+    let pointsGained = 0;
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
 
     if (after > before) {
         let playerUtil = null;
@@ -104,15 +113,12 @@ function addXp(userId, amount) {
 
         const levelsGained = after - before;
         for (let i = 0; i < levelsGained; i++) {
-            // dobro de atributos por nível (2 rolls)
-            for (let r = 0; r < 2; r++) {
-                const g = rollAttrGain(false);
-                cur.attrs[g.key] = (cur.attrs[g.key] || 0) + g.amount;
-                gains.push(g);
-            }
+            const lv = before + i + 1;
+            const pts = pointsForLevel(lv);
+            cur.attrPoints += pts;
+            pointsGained += pts;
 
-            // 5% item de classe
-            if (playerUtil && Math.random() < 0.05) {
+            if (playerUtil && Math.random() < 0.1) {
                 const profile = playerUtil.get(userId);
                 const classId = profile?.classId || 'guerreiro';
                 const item = playerUtil.rollClassItem(classId);
@@ -129,12 +135,37 @@ function addXp(userId, amount) {
         xp: cur.xp,
         level: cur.level,
         attrs: { ...cur.attrs },
+        attrPoints: cur.attrPoints,
         leveled: after > before,
         reward: 0,
         attrGains: gains,
+        pointsGained,
         items,
         oldLevel: before,
         progress: progress(userId)
+    };
+}
+
+function spendAttrPoint(userId, attrKey) {
+    if (!ATTR_KEYS.includes(attrKey)) return { ok: false, error: 'Atributo inválido.' };
+    const data = all();
+    const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR }, attrPoints: 0 };
+    ensureAttrs(cur);
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
+    if (cur.attrPoints < 1) {
+        return { ok: false, error: 'Você não tem pontos de atributo disponíveis.' };
+    }
+    cur.attrPoints -= 1;
+    cur.attrs[attrKey] = (cur.attrs[attrKey] || 0) + 1;
+    data[userId] = cur;
+    store.save('xp.json', data);
+    return {
+        ok: true,
+        attrKey,
+        label: ATTR_LABEL[attrKey],
+        value: cur.attrs[attrKey],
+        attrPoints: cur.attrPoints,
+        attrs: { ...cur.attrs }
     };
 }
 
@@ -174,27 +205,37 @@ function leaderboard(limit = 10) {
 function rankOf(userId) {
     const data = all();
     const list = Object.entries(data)
-        .map(([id, v]) => ({ userId: id, xp: Number(v.xp || 0) }))
-        .sort((a, b) => b.xp - a.xp);
-    const idx = list.findIndex((x) => x.userId === userId);
-    if (idx < 0) return { rank: list.length + 1, total: list.length || 1 };
-    return { rank: idx + 1, total: list.length };
+        .map(([id, v]) => ({
+            userId: id,
+            xp: Number(v.xp || 0),
+            level: Number(v.level || levelFromXp(v.xp || 0))
+        }))
+        .sort((a, b) => b.xp - a.xp || b.level - a.level);
+    const idx = list.findIndex((r) => String(r.userId) === String(userId));
+    return {
+        rank: idx >= 0 ? idx + 1 : list.length + 1,
+        total: list.length,
+        entry: idx >= 0 ? list[idx] : null
+    };
 }
 
 module.exports = {
-    get,
-    addXp,
-    levelFromXp,
-    xpForLevel,
-    dailyMultiplier,
-    progress,
-    leaderboard,
-    rankOf,
-    all,
-    getAttrs,
-    maxHp,
-    maxMana,
     ATTR_KEYS,
     ATTR_LABEL,
+    all,
+    get,
+    getAttrs,
+    xpForLevel,
+    levelFromXp,
+    progress,
+    dailyMultiplier,
+    addXp,
+    spendAttrPoint,
+    pointsForLevel,
+    maxHp,
+    maxMana,
+    leaderboard,
+    rankOf,
+    rollAttrGain,
     BASE_ATTR
 };
