@@ -2,7 +2,7 @@
  * Notificações automáticas de VIP
  * - DM para o usuário (avisos + expiração)
  * - DM para staff com o cargo VIP_ADMIN_ROLE_ID
- * - Ao expirar: remove o registro (some do O.vervip)
+ * - Ao expirar: remove o registro
  *
  * ENV:
  *   VIP_REMINDER=off          → desliga
@@ -50,8 +50,15 @@ function saveNotified(data) {
 function allVipEntries() {
     const all = store.load('vips.json', {});
     const out = [];
-    for (const [guildId, map] of Object.entries(all || {})) {
-        for (const [userId, rec] of Object.entries(map || {})) {
+    for (const [guildId, g] of Object.entries(all || {})) {
+        if (g && Array.isArray(g.list)) {
+            for (const rec of g.list) {
+                out.push({ guildId, userId: rec.userId, ...rec });
+            }
+            continue;
+        }
+        for (const [userId, rec] of Object.entries(g || {})) {
+            if (!rec || typeof rec !== 'object') continue;
             out.push({ guildId, userId, ...rec });
         }
     }
@@ -150,7 +157,7 @@ function buildStaffExpired(userTag, userId, rec, guildName) {
                 `O VIP de **${userTag}** (<@${userId}>) **expirou**.`,
                 '',
                 `**Plano:** ${label}`,
-                'O registro foi **removido** do sistema (não aparece mais em `O.vervip`).',
+                'O registro foi **removido** do sistema.',
                 guildName ? `**Servidor:** ${guildName}` : ''
             ]
                 .filter(Boolean)
