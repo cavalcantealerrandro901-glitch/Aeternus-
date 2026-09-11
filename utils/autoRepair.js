@@ -55,6 +55,23 @@ function canDm(key) {
     return true;
 }
 
+/** Ruído de rede / Lavalink público — não manda DM */
+function isIgnorableNoise(text) {
+    const t = String(text || '');
+    if (/DeprecationWarning|DEP0\d+|ExperimentalWarning/i.test(t)) return true;
+    if (/\[lavalink\]|\[music\]|shoukaku/i.test(t)) {
+        if (
+            /ETIMEDOUT|ECONNREFUSED|ENOTFOUND|ECONNRESET|socket hang up|1006|fechado|offline|instável|reconectado|disconnect|Opening handshake|WS erro|WS fechado|timeout/i.test(
+                t
+            )
+        ) {
+            return true;
+        }
+    }
+    if (/connect ETIMEDOUT|getaddrinfo|EHOSTUNREACH/i.test(t)) return true;
+    return false;
+}
+
 async function dmOwners(embed) {
     const ids = ownerIds();
     if (!ids.length || !clientRef) {
@@ -62,7 +79,6 @@ async function dmOwners(embed) {
         return false;
     }
 
-    // Bot ainda não pronto (client.user null) → não tenta DM
     if (!clientRef.user?.id) {
         console.warn('[autoRepair] client ainda não ready — DM adiado.');
         return false;
@@ -281,9 +297,9 @@ function errorEmbed({ cmdName, error, context, searchHits, status, extra }) {
 async function reportError({ source = 'system', error, context = '', tryReload = false } = {}) {
     const name = String(source || 'system').toLowerCase().slice(0, 40);
     const errMsg = error?.message || String(error || 'erro');
+    const full = String(error?.stack || errMsg);
 
-    // ignora warnings inofensivos
-    if (/DeprecationWarning|DEP0\d+|ExperimentalWarning/i.test(errMsg)) return { repaired: false };
+    if (isIgnorableNoise(full) || isIgnorableNoise(errMsg)) return { repaired: false };
 
     const key = `${name}:${errMsg.slice(0, 80)}`;
 
@@ -359,7 +375,7 @@ async function handleCommandError({ cmdName, error, context, message, interactio
         } else if (interaction) {
             const payload = {
                 content: '❌ Erro na interação. O dono foi avisado.',
-                ephemeral: true
+                flags: 64
             };
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp(payload).catch(() => {});
@@ -377,6 +393,8 @@ function installGlobalHooks() {
     hooksInstalled = true;
 
     process.on('unhandledRejection', (err) => {
+        const msg = err?.message || String(err || '');
+        if (isIgnorableNoise(msg)) return;
         reportError({
             source: 'unhandledRejection',
             error: err,
@@ -400,7 +418,7 @@ function installGlobalHooks() {
                 .map((a) => (a instanceof Error ? a.stack || a.message : String(a)))
                 .join(' ');
             if (text.includes('[autoRepair')) return;
-            if (/DeprecationWarning|DEP0\d+|ExperimentalWarning/i.test(text)) return;
+            if (isIgnorableNoise(text)) return;
             if (
                 /error|erro|cannot|failed|exception|undefined|null/i.test(text) &&
                 text.length > 15

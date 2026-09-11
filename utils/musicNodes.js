@@ -3,31 +3,52 @@
  * Vários nodes = menos sobrecarga e failover automático.
  */
 
-/** Nodes públicos de fallback (podem cair — prefira os seus em LAVALINK_NODES) */
+/**
+ * Nodes públicos de fallback (instáveis — use LAVALINK_NODES com nodes seus).
+ * Credenciais atualizadas conforme listas públicas conhecidas.
+ */
 const DEFAULT_PUBLIC_NODES = [
     {
-        name: 'serenetia-v4',
-        url: 'lavalinkv4.serenetia.com:443',
-        auth: 'https://discord.gg/Y93BRPNFYP',
-        secure: true
+        name: 'serenetia',
+        url: 'lavalinkv4.serenetia.com:80',
+        auth: 'https://dsc.gg/ajidevserver',
+        secure: false
     },
     {
-        name: 'lavalink-host',
-        url: 'lava-v4.ajieblogs.eu.org:443',
-        auth: 'https://discord.gg/Y93BRPNFYP',
-        secure: true
+        name: 'ajieblogs',
+        url: 'lava-v4.ajieblogs.eu.org:80',
+        auth: 'https://dsc.gg/ajidevserver',
+        secure: false
+    },
+    {
+        name: 'horizxon-ap',
+        url: 'lava4.horizxon.studio:80',
+        auth: 'horizxon.studio',
+        secure: false
+    },
+    {
+        name: 'horizxon-eu',
+        url: 'lava3.horizxon.studio:80',
+        auth: 'horizxon.studio',
+        secure: false
+    },
+    {
+        name: 'trinium',
+        url: 'lavalink.triniumhost.com:4333',
+        auth: 'free',
+        secure: false
+    },
+    {
+        name: 'jirayu',
+        url: 'lavalink.jirayu.net:13592',
+        auth: 'youshallnotpass',
+        secure: false
     },
     {
         name: 'heavencloud',
         url: 'free-lava.heavencloud.in:4000',
-        auth: 'heaven',
+        auth: 'heavencloud.in',
         secure: false
-    },
-    {
-        name: 'kakatxeira',
-        url: 'lavalink.jirayu.net:443',
-        auth: 'youshallnotpass',
-        secure: true
     }
 ];
 
@@ -76,14 +97,24 @@ function parseNodesFromEnv(raw) {
 
 function normalizeNode(n, i = 0) {
     if (!n) return null;
-    let url = String(n.url || n.host || '').replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    let url = String(n.url || n.host || '')
+        .replace(/^https?:\/\//i, '')
+        .replace(/\/$/, '');
     if (n.port && !url.includes(':')) url = `${url}:${n.port}`;
-    if (!url || !n.auth && n.auth !== '') return null;
+    if (!url) return null;
+    const auth = n.auth ?? n.password;
+    if (auth == null || auth === '') return null;
+
+    let secure = n.secure === true || n.secure === 'true';
+    // só força secure se a porta for 443 e o usuário não tiver definido secure=false
+    if (n.secure === false || n.secure === 'false') secure = false;
+    else if (!secure && /:443$/.test(url)) secure = true;
+
     return {
         name: String(n.name || `node-${i + 1}`).slice(0, 64),
         url,
-        auth: String(n.auth ?? n.password ?? 'youshallnotpass'),
-        secure: n.secure === true || n.secure === 'true' || Number(n.port) === 443
+        auth: String(auth),
+        secure
     };
 }
 
@@ -94,9 +125,9 @@ function getNodes() {
         return fromEnv;
     }
     console.log(
-        `[music] LAVALINK_NODES vazio — usando ${DEFAULT_PUBLIC_NODES.length} nodes públicos (instáveis). Configure os seus no Render.`
+        `[music] LAVALINK_NODES vazio — usando ${DEFAULT_PUBLIC_NODES.length} nodes públicos (podem cair). Configure nodes estáveis no Render.`
     );
-    return DEFAULT_PUBLIC_NODES.map((n, i) => normalizeNode(n, i));
+    return DEFAULT_PUBLIC_NODES.map((n, i) => normalizeNode(n, i)).filter(Boolean);
 }
 
 module.exports = { getNodes, parseNodesFromEnv, DEFAULT_PUBLIC_NODES };
