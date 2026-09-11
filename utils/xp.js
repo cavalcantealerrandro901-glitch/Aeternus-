@@ -102,13 +102,18 @@ function addXp(userId, amount) {
 
     const gains = [];
     const items = [];
+    const materialsGained = [];
     let pointsGained = 0;
     cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
 
     if (after > before) {
         let playerUtil = null;
+        let craftUtil = null;
         try {
             playerUtil = require('./player');
+        } catch (_) {}
+        try {
+            craftUtil = require('./craft');
         } catch (_) {}
 
         const levelsGained = after - before;
@@ -124,6 +129,12 @@ function addXp(userId, amount) {
                 const item = playerUtil.rollClassItem(classId);
                 playerUtil.addItem(userId, item);
                 items.push(item);
+            }
+
+            if (craftUtil && playerUtil) {
+                const profile = playerUtil.get(userId);
+                const mats = craftUtil.onLevelUp(userId, profile?.classId, lv);
+                if (mats && Object.keys(mats).length) materialsGained.push({ level: lv, mats });
             }
         }
     }
@@ -141,6 +152,7 @@ function addXp(userId, amount) {
         attrGains: gains,
         pointsGained,
         items,
+        materialsGained,
         oldLevel: before,
         progress: progress(userId)
     };

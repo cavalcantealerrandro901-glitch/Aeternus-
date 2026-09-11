@@ -1,4 +1,5 @@
 const store = require('./store');
+const itemsCatalog = require('./items');
 
 const CLASSES = {
     mago: {
@@ -9,8 +10,7 @@ const CLASSES = {
         bonus: { forca: 1, defesa: 0, agilidade: 1, vida: 0 },
         manaMult: 1.4,
         color: 0x7c3aed,
-        banner:
-            'https://placehold.co/600x200/4c1d95/e9d5ff/png?text=%F0%9F%A7%99+MAGO&font=roboto'
+        banner: 'https://placehold.co/600x200/4c1d95/e9d5ff/png?text=%F0%9F%A7%99+MAGO&font=roboto'
     },
     arqueiro: {
         id: 'arqueiro',
@@ -20,8 +20,7 @@ const CLASSES = {
         bonus: { forca: 1, defesa: 0, agilidade: 3, vida: 0 },
         manaMult: 1.0,
         color: 0x16a34a,
-        banner:
-            'https://placehold.co/600x200/14532d/bbf7d0/png?text=%F0%9F%8F%B9+ARQUEIRO&font=roboto'
+        banner: 'https://placehold.co/600x200/14532d/bbf7d0/png?text=%F0%9F%8F%B9+ARQUEIRO&font=roboto'
     },
     tanque: {
         id: 'tanque',
@@ -31,8 +30,7 @@ const CLASSES = {
         bonus: { forca: 0, defesa: 3, agilidade: 0, vida: 3 },
         manaMult: 0.85,
         color: 0x64748b,
-        banner:
-            'https://placehold.co/600x200/334155/e2e8f0/png?text=%F0%9F%9B%A1+TANQUE&font=roboto'
+        banner: 'https://placehold.co/600x200/334155/e2e8f0/png?text=%F0%9F%9B%A1+TANQUE&font=roboto'
     },
     healer: {
         id: 'healer',
@@ -42,8 +40,7 @@ const CLASSES = {
         bonus: { forca: 0, defesa: 1, agilidade: 1, vida: 2 },
         manaMult: 1.25,
         color: 0xec4899,
-        banner:
-            'https://placehold.co/600x200/9d174d/fce7f3/png?text=%F0%9F%92%8A+HEALER&font=roboto'
+        banner: 'https://placehold.co/600x200/9d174d/fce7f3/png?text=%F0%9F%92%8A+HEALER&font=roboto'
     },
     guerreiro: {
         id: 'guerreiro',
@@ -53,8 +50,7 @@ const CLASSES = {
         bonus: { forca: 3, defesa: 1, agilidade: 0, vida: 1 },
         manaMult: 0.95,
         color: 0xdc2626,
-        banner:
-            'https://placehold.co/600x200/7f1d1d/fecaca/png?text=%E2%9A%94+GUERREIRO&font=roboto'
+        banner: 'https://placehold.co/600x200/7f1d1d/fecaca/png?text=%E2%9A%94+GUERREIRO&font=roboto'
     },
     assassino: {
         id: 'assassino',
@@ -64,8 +60,7 @@ const CLASSES = {
         bonus: { forca: 2, defesa: 0, agilidade: 3, vida: 0 },
         manaMult: 0.9,
         color: 0x312e81,
-        banner:
-            'https://placehold.co/600x200/1e1b4b/c7d2fe/png?text=%F0%9F%97%A1+ASSASSINO&font=roboto'
+        banner: 'https://placehold.co/600x200/1e1b4b/c7d2fe/png?text=%F0%9F%97%A1+ASSASSINO&font=roboto'
     }
 };
 
@@ -78,37 +73,14 @@ const ITEM_CATEGORIES = [
     { value: 'todos', name: 'Todos' }
 ];
 
+// legado + catálogo
 const CLASS_ITEMS = {
-    mago: [
-        { id: 'cajado_arcano', name: 'Cajado Arcano', emoji: '🪄' },
-        { id: 'grimorio', name: 'Grimório Antigo', emoji: '📕' },
-        { id: 'orbe_mana', name: 'Orbe de Mana', emoji: '🔮' }
-    ],
-    arqueiro: [
-        { id: 'arco_longo', name: 'Arco Longo', emoji: '🏹' },
-        { id: 'aljava', name: 'Aljava Élfica', emoji: '🗡️' },
-        { id: 'botas_vento', name: 'Botas do Vento', emoji: '👟' }
-    ],
-    tanque: [
-        { id: 'escudo_ferro', name: 'Escudo de Ferro', emoji: '🛡️' },
-        { id: 'armadura_pesada', name: 'Armadura Pesada', emoji: '🧥' },
-        { id: 'elmo_guerra', name: 'Elmo de Guerra', emoji: '🎩' }
-    ],
-    healer: [
-        { id: 'cajado_luz', name: 'Cajado da Luz', emoji: '✨' },
-        { id: 'pocao_sagrada', name: 'Poção Sagrada', emoji: '💊' },
-        { id: 'amuleto_vida', name: 'Amuleto da Vida', emoji: '💚' }
-    ],
-    guerreiro: [
-        { id: 'espada_aco', name: 'Espada de Aço', emoji: '⚔️' },
-        { id: 'machado', name: 'Machado de Batalha', emoji: '🪓' },
-        { id: 'cinto_forca', name: 'Cinto da Força', emoji: '🦢' }
-    ],
-    assassino: [
-        { id: 'adagas', name: 'Adagas Gêmeas', emoji: '🗡️' },
-        { id: 'capa_sombra', name: 'Capa das Sombras', emoji: '🧣' },
-        { id: 'veneno', name: 'Frasco de Veneno', emoji: '☠️' }
-    ]
+    mago: ['cajado_arcano', 'grimorio', 'orbe_mana'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    arqueiro: ['arco_longo', 'aljava', 'botas_vento'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    tanque: ['escudo_ferro', 'armadura_pesada', 'elmo_guerra'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    healer: ['cajado_luz', 'pocao_sagrada', 'amuleto_vida'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    guerreiro: ['espada_aco', 'machado', 'cinto_forca'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    assassino: ['adagas', 'capa_sombra', 'veneno'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean)
 };
 
 function all() {
@@ -147,6 +119,7 @@ function create(userId, { name, classId, photoUrl }) {
         classId,
         photoUrl: photoUrl || null,
         inventory: [],
+        materials: {},
         createdAt: Date.now(),
         updatedAt: Date.now()
     };
@@ -167,7 +140,7 @@ function addItem(userId, item) {
     const data = all();
     if (!data[userId]) return null;
     if (!Array.isArray(data[userId].inventory)) data[userId].inventory = [];
-    data[userId].inventory.push({ ...item, gotAt: Date.now() });
+    data[userId].inventory.push({ ...item, gotAt: item.gotAt || Date.now() });
     data[userId].updatedAt = Date.now();
     save(data);
     return data[userId];
@@ -175,26 +148,29 @@ function addItem(userId, item) {
 
 function itemCategory(item) {
     if (item?.category) return item.category;
+    const def = item?.id ? itemsCatalog.getItemDef(item.id) : null;
+    if (def?.category) return def.category;
     const id = String(item?.id || item?.name || '').toLowerCase();
-    if (/espada|machado|arco|cajado|adaga|varinha|lança|bastao/.test(id)) return 'arma';
-    if (/armadura|elmo|escudo|capa|cinto|botas|peitoral/.test(id)) return 'armadura';
-    if (/anel|colar|amuleto|bracelete/.test(id)) return 'acessorio';
+    if (/espada|machado|arco|cajado|adaga|varinha|lanca|bastao/.test(id)) return 'arma';
+    if (/armadura|elmo|escudo|capa|cinto|botas|peitoral|manto|egide/.test(id)) return 'armadura';
+    if (/anel|colar|amuleto|bracelete|selo|orbe|rel[ií]quia/.test(id)) return 'acessorio';
     if (/pocao|frasco|comida|elixir|veneno/.test(id)) return 'consumivel';
     return 'especial';
 }
 
 function rollClassItem(classId) {
-    const pool = CLASS_ITEMS[classId] || CLASS_ITEMS.guerreiro;
-    const base = { ...pool[Math.floor(Math.random() * pool.length)] };
-    base.category = itemCategory(base);
-    return base;
+    return itemsCatalog.rollDropItem(classId || 'guerreiro');
 }
 
 function getInventory(userId, category) {
     const p = get(userId);
     if (!p) return [];
     let list = Array.isArray(p.inventory) ? [...p.inventory] : [];
-    list = list.map((it) => ({ ...it, category: it.category || itemCategory(it) }));
+    list = list.map((it) => ({
+        ...it,
+        category: it.category || itemCategory(it),
+        rarity: it.rarity || itemsCatalog.getItemDef(it.id)?.rarity || 'comum'
+    }));
     if (category && category !== 'todos') {
         list = list.filter((it) => String(it.category) === String(category));
     }
@@ -214,6 +190,7 @@ module.exports = {
     CLASS_ITEMS,
     ITEM_CATEGORIES,
     all,
+    save,
     has,
     get,
     getClass,
