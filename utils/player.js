@@ -69,6 +69,15 @@ const CLASSES = {
     }
 };
 
+const ITEM_CATEGORIES = [
+    { value: 'arma', name: 'Armas' },
+    { value: 'armadura', name: 'Armaduras' },
+    { value: 'acessorio', name: 'Acessórios' },
+    { value: 'consumivel', name: 'Consumíveis' },
+    { value: 'especial', name: 'Especiais' },
+    { value: 'todos', name: 'Todos' }
+];
+
 const CLASS_ITEMS = {
     mago: [
         { id: 'cajado_arcano', name: 'Cajado Arcano', emoji: '🪄' },
@@ -164,9 +173,32 @@ function addItem(userId, item) {
     return data[userId];
 }
 
+function itemCategory(item) {
+    if (item?.category) return item.category;
+    const id = String(item?.id || item?.name || '').toLowerCase();
+    if (/espada|machado|arco|cajado|adaga|varinha|lança|bastao/.test(id)) return 'arma';
+    if (/armadura|elmo|escudo|capa|cinto|botas|peitoral/.test(id)) return 'armadura';
+    if (/anel|colar|amuleto|bracelete/.test(id)) return 'acessorio';
+    if (/pocao|frasco|comida|elixir|veneno/.test(id)) return 'consumivel';
+    return 'especial';
+}
+
 function rollClassItem(classId) {
     const pool = CLASS_ITEMS[classId] || CLASS_ITEMS.guerreiro;
-    return { ...pool[Math.floor(Math.random() * pool.length)] };
+    const base = { ...pool[Math.floor(Math.random() * pool.length)] };
+    base.category = itemCategory(base);
+    return base;
+}
+
+function getInventory(userId, category) {
+    const p = get(userId);
+    if (!p) return [];
+    let list = Array.isArray(p.inventory) ? [...p.inventory] : [];
+    list = list.map((it) => ({ ...it, category: it.category || itemCategory(it) }));
+    if (category && category !== 'todos') {
+        list = list.filter((it) => String(it.category) === String(category));
+    }
+    return list;
 }
 
 function listMissing(userIds) {
@@ -180,6 +212,7 @@ function count() {
 module.exports = {
     CLASSES,
     CLASS_ITEMS,
+    ITEM_CATEGORIES,
     all,
     has,
     get,
@@ -188,6 +221,8 @@ module.exports = {
     update,
     addItem,
     rollClassItem,
+    getInventory,
+    itemCategory,
     maxManaFromLevel,
     listMissing,
     count
