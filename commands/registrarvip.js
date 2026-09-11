@@ -15,60 +15,98 @@ function isMod(member) {
     );
 }
 
-async function notifyUserVip(client, user, rec, days) {
+async function notifyUserPurchase(client, user, rec) {
     try {
         const label = vip.vipLabel(rec);
         const emb = new EmbedBuilder()
             .setColor(COLOR)
-            .setTitle('VIP ativado')
+            .setTitle('Compra registrada')
             .setDescription(
                 [
-                    `Seu **${label}** foi registrado com sucesso.`,
+                    `Sua compra de **${label}** foi registrada com sucesso.`,
+                    rec.roleId ? `Cargo: <@&${rec.roleId}>` : '',
                     '',
-                    rec.expiresAt
-                        ? `Válido até <t:${Math.floor(rec.expiresAt / 1000)}:D> (**${days}** dia(s)).`
-                        : 'Plano **permanente**.',
-                    '',
-                    'Confira a qualquer momento com **`O.vervip`** ou **`/ver-vip`**.'
-                ].join('\n')
-            )
-            .addFields({ name: 'VIP', value: `**${label}**`, inline: true });
+                    'Confira com **`O.vervip`** ou **`/ver-vip`**.'
+                ]
+                    .filter(Boolean)
+                    .join('\n')
+            );
         await user.send({ embeds: [emb] });
     } catch (_) {}
 }
 
+async function tryAssignRole(guild, userId, roleId) {
+    if (!roleId) return { ok: false, reason: 'sem cargo' };
+    try {
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (!member) return { ok: false, reason: 'membro não encontrado' };
+        const role =
+            guild.roles.cache.get(roleId) ||
+            (await guild.roles.fetch(roleId).catch(() => null));
+        if (!role) return { ok: false, reason: 'cargo não encontrado' };
+        await member.roles.add(role, 'Registro de compra VIP');
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, reason: e?.message || 'falha ao adicionar cargo' };
+    }
+}
+
+function buildConfirmEmbed({ user, rec, by, roleAssign }) {
+    const label = vip.vipLabel(rec);
+    const emb = new EmbedBuilder()
+        .setColor(COLOR)
+        .setTitle('Compra registrada')
+        .setDescription(`Registro de **compra** para ${user}`)
+        .addFields(
+            { name: 'Tipo', value: '**Compra**', inline: true },
+            { name: 'Nome', value: `**${label}**`, inline: true },
+            {
+                name: 'Cargo',
+                value: rec.roleId ? `<@&${rec.roleId}>` : rec.roleName || '—',
+                inline: true
+            },
+            {
+                name: 'Data / hora',
+                value: rec.registeredAt
+                    ? `<t:${Math.floor(rec.registeredAt / 1000)}:F>`
+                    : '—',
+                inline: true
+            },
+            { name: 'Registrado por', value: `${by}`, inline: true }
+        )
+        .setTimestamp();
+    if (rec.note) emb.addFields({ name: 'Nota', value: rec.note });
+    if (roleAssign) {
+        emb.addFields({
+            name: 'Cargo no membro',
+            value: roleAssign.ok
+                ? '✅ Cargo adicionado'
+                : `⚠️ Não foi possível adicionar: ${roleAssign.reason}`,
+            inline: false
+        });
+    }
+    return emb;
+}
+
 module.exports = {
     name: 'registrarvip',
-    aliases: ['regvip', 'addvip', 'setvip'],
-    description: 'Registrar VIP de um membro',
+    aliases: ['registrar', 'regvip', 'addvip', 'setvip'],
+    description: 'Registrar compra VIP de um membro',
     data: new SlashCommandBuilder()
-        .setName('registrar-vip')
-        .setDescription('Registrar qual VIP o membro comprou')
-        .addUserOption((o) =>
-            o.setName('usuario').setDescription('Membro').setRequired(true)
-        )
-        .addStringOption((o) => {
-            o.setName('vip')
-                .setDescription('Qual VIP ele comprou')
-                .setRequired(true);
-            for (const p of vip.PLANOS) {
-                o.addChoices({ name: p, value: p });
-            }
-            return o;
-        })
-        .addIntegerOption((o) =>
-            o
-                .setName('dias')
-                .setDescription('Duração em dias (0 = permanente)')
-                .setRequired(false)
-                .setMinValue(0)
-                .setMaxValue(3650)
-        )
+        .setName('registrar')
+        .setDescription('Registrar compra (VIP) de um membro')
         .addStringOption((o) =>
             o
-                .setName('outro')
-                .setDescription('Se o VIP não estiver na lista, escreva aqui o nome')
-                .setRequired(false)
+                .setName('tipo')
+                .setDescription('Tipo de registro')
+                .setRequired(true)
+                .addChoices({ name: 'Compra', value: 'compra' })
+        )
+        .addUserOption((o) =>
+            o.setName('usuario').setDescription('Quem comprou').setRequired(true)
+        )
+        .addRoleOption((o) =>
+            o.setName('cargo').setDescription('Cargo do VIP comprado').setRequired(true)
         )
         .addStringOption((o) =>
             o.setName('nota').setDescription('Observação opcional').setRequired(false)
@@ -79,66 +117,74 @@ module.exports = {
         if (!isMod(message.member)) {
             return message.reply('Sem permissão. Precisa de **Gerenciar Servidor**.');
         }
+
+        if (!args.length) {
+            return message.reply(
+                'Uso: `O.registrar compra @usuário @cargo [nota]`\n' +
+                    'Ex: `O.registrar compra @joao @VIP+ pagamento via pix`'
+            );
+        }
+
+        let tipo = 'compra';
+        let rest = [...args];
+        if (/^compra$/i.test(rest[0])) {
+            tipo = 'compra';
+            rest = rest.slice(1);
+        }
+
         const user =
             message.mentions.users.first() ||
-            (args[0] && (await message.client.users.fetch(args[0]).catch(() => null)));
+            (rest[0] && (await message.client.users.fetch(rest[0]).catch(() => null)));
+        const role =
+            message.mentions.roles.first() ||
+            message.guild.roles.cache.get(rest.find((a) => /^\d{17,20}$/.test(a))) ||
+            null;
+
         if (!user) {
             return message.reply(
-                'Uso: `O.registrarvip @usuário <VIP> [dias] [nota]`\n' +
-                    'Ex: `O.registrarvip @joao VIP+ 30`\n' +
-                    `Planos: ${vip.PLANOS.join(', ')} (ou qualquer nome)`
+                'Informe o **usuário** da compra. Ex: `O.registrar compra @user @cargo`'
             );
         }
-        const rest = args.filter((a) => !a.includes(user.id) && !a.startsWith('<'));
-        const vipName = rest[0];
-        if (!vipName) {
+        if (!role) {
             return message.reply(
-                `Informe qual VIP. Ex: ${vip.PLANOS.map((p) => '`' + p + '`').join(', ')}`
+                'Informe o **cargo** da compra. Ex: `O.registrar compra @user @cargo`'
             );
         }
-        let dias = 0;
-        let nota = '';
-        if (rest[1] != null && /^\d+$/.test(rest[1])) {
-            dias = parseInt(rest[1], 10);
-            nota = rest.slice(2).join(' ').trim();
-        } else {
-            nota = rest.slice(1).join(' ').trim();
-        }
+
+        const nota = rest
+            .filter(
+                (a) =>
+                    !a.includes(user.id) &&
+                    !a.includes(role.id) &&
+                    !a.startsWith('<@')
+            )
+            .join(' ')
+            .trim();
 
         const rec = vip.register({
             guildId: message.guild.id,
             userId: user.id,
-            vipName,
+            vipName: role.name,
+            roleId: role.id,
+            roleName: role.name,
+            type: tipo,
             registeredBy: message.author.id,
-            days: dias,
+            days: 0,
             note: nota
         });
 
-        const label = vip.vipLabel(rec);
-        const emb = new EmbedBuilder()
-            .setColor(COLOR)
-            .setTitle('VIP registrado')
-            .setDescription(`${user} agora está com **${label}**`)
-            .addFields(
-                { name: 'VIP', value: `**${label}**`, inline: true },
-                {
-                    name: 'Duração',
-                    value: rec.expiresAt ? `${dias} dia(s)` : 'Permanente',
-                    inline: true
-                },
-                {
-                    name: 'Expira',
-                    value: rec.expiresAt
-                        ? `<t:${Math.floor(rec.expiresAt / 1000)}:D>`
-                        : 'Não expira',
-                    inline: true
-                },
-                { name: 'Registrado por', value: `${message.author}`, inline: true }
-            );
-        if (rec.note) emb.addFields({ name: 'Nota', value: rec.note });
-
-        await message.reply({ embeds: [emb] });
-        await notifyUserVip(message.client, user, rec, dias);
+        const roleAssign = await tryAssignRole(message.guild, user.id, role.id);
+        await message.reply({
+            embeds: [
+                buildConfirmEmbed({
+                    user,
+                    rec,
+                    by: message.author,
+                    roleAssign
+                })
+            ]
+        });
+        await notifyUserPurchase(message.client, user, rec);
     },
 
     async executeSlash(i) {
@@ -148,45 +194,39 @@ module.exports = {
                 flags: 64
             });
         }
+
+        const tipo = i.options.getString('tipo', true);
         const user = i.options.getUser('usuario', true);
-        const outro = i.options.getString('outro');
-        const vipName = (outro && outro.trim()) || i.options.getString('vip', true);
-        const dias = i.options.getInteger('dias') ?? 0;
+        const role = i.options.getRole('cargo', true);
         const nota = i.options.getString('nota') || '';
+
+        if (tipo !== 'compra') {
+            return i.reply({ content: 'Tipo de registro inválido.', flags: 64 });
+        }
 
         const rec = vip.register({
             guildId: i.guild.id,
             userId: user.id,
-            vipName,
+            vipName: role.name,
+            roleId: role.id,
+            roleName: role.name,
+            type: tipo,
             registeredBy: i.user.id,
-            days: dias,
+            days: 0,
             note: nota
         });
 
-        const label = vip.vipLabel(rec);
-        const emb = new EmbedBuilder()
-            .setColor(COLOR)
-            .setTitle('VIP registrado')
-            .setDescription(`${user} agora está com **${label}**`)
-            .addFields(
-                { name: 'VIP', value: `**${label}**`, inline: true },
-                {
-                    name: 'Duração',
-                    value: rec.expiresAt ? `${dias} dia(s)` : 'Permanente',
-                    inline: true
-                },
-                {
-                    name: 'Expira',
-                    value: rec.expiresAt
-                        ? `<t:${Math.floor(rec.expiresAt / 1000)}:D>`
-                        : 'Não expira',
-                    inline: true
-                },
-                { name: 'Registrado por', value: `${i.user}`, inline: true }
-            );
-        if (rec.note) emb.addFields({ name: 'Nota', value: rec.note });
-
-        await i.reply({ embeds: [emb] });
-        await notifyUserVip(i.client, user, rec, dias);
+        const roleAssign = await tryAssignRole(i.guild, user.id, role.id);
+        await i.reply({
+            embeds: [
+                buildConfirmEmbed({
+                    user,
+                    rec,
+                    by: i.user,
+                    roleAssign
+                })
+            ]
+        });
+        await notifyUserPurchase(i.client, user, rec);
     }
 };

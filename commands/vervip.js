@@ -5,21 +5,17 @@ const COLOR = 0xa78bfa;
 
 module.exports = {
     name: 'vervip',
-    aliases: ['vip', 'meuvip', 'checkvip'],
-    description: 'Ver VIP de um membro ou lista do servidor',
+    aliases: ['vip', 'meuvip', 'listavip', 'verregistros', 'registros'],
+    description: 'Ver registros de VIP / compras',
     data: new SlashCommandBuilder()
         .setName('ver-vip')
-        .setDescription('Ver status de VIP')
+        .setDescription('Ver registros de compra VIP')
         .addUserOption((o) =>
-            o.setName('usuario').setDescription('Membro (opcional)').setRequired(false)
+            o.setName('usuario').setDescription('Ver só um membro (opcional)').setRequired(false)
         ),
 
-    async execute(message, args) {
-        const target =
-            message.mentions.users.first() ||
-            (args[0] && (await message.client.users.fetch(args[0]).catch(() => null))) ||
-            null;
-
+    async execute(message) {
+        const target = message.mentions.users.first();
         if (target) {
             return message.reply({ embeds: [await buildUserEmbed(message.guild, target)] });
         }
@@ -39,43 +35,36 @@ async function buildUserEmbed(guild, user) {
     const rec = vip.get(guild.id, user.id);
     const emb = new EmbedBuilder()
         .setColor(COLOR)
-        .setTitle('VIP')
+        .setTitle('Registro VIP')
         .setThumbnail(user.displayAvatarURL({ size: 128 }));
 
     if (!rec || rec.expired) {
-        emb.setDescription(`${user} **não possui VIP ativo** neste servidor.`);
+        emb.setDescription(`${user} **não possui registro ativo** neste servidor.`);
         return emb;
     }
 
     const label = vip.vipLabel(rec);
     emb.setDescription(`${user}`);
     emb.addFields(
-        { name: 'VIP', value: `**${label}**`, inline: true },
+        { name: 'Nome', value: `**${label}**`, inline: true },
+        {
+            name: 'Cargo',
+            value: rec.roleId ? `<@&${rec.roleId}>` : rec.roleName || '—',
+            inline: true
+        },
+        {
+            name: 'Data / hora',
+            value: rec.registeredAt
+                ? `<t:${Math.floor(rec.registeredAt / 1000)}:F>`
+                : '—',
+            inline: true
+        },
         {
             name: 'Há quanto tempo',
             value: vip.timeHeld(rec.registeredAt),
             inline: true
-        },
-        {
-            name: 'Tempo restante',
-            value: vip.timeLeft(rec.expiresAt),
-            inline: true
-        },
-        {
-            name: 'Desde',
-            value: rec.registeredAt
-                ? `<t:${Math.floor(rec.registeredAt / 1000)}:D>`
-                : '—',
-            inline: true
         }
     );
-    if (rec.expiresAt) {
-        emb.addFields({
-            name: 'Expira em',
-            value: `<t:${Math.floor(rec.expiresAt / 1000)}:D>`,
-            inline: true
-        });
-    }
     if (rec.registeredBy) {
         emb.addFields({
             name: 'Registrado por',
@@ -88,26 +77,32 @@ async function buildUserEmbed(guild, user) {
 }
 
 async function buildListEmbed(guild) {
-    const list = vip.listActive(guild.id);
-    const emb = new EmbedBuilder().setColor(COLOR).setTitle('VIPs do servidor');
+    const list = vip.listAll(guild.id);
+    const emb = new EmbedBuilder().setColor(COLOR).setTitle('Registros de compra VIP');
 
     if (!list.length) {
-        emb.setDescription('Nenhum VIP ativo no momento.');
+        emb.setDescription('Nenhum registro no momento.');
         return emb;
     }
 
     const lines = [];
-    for (const v of list.slice(0, 20)) {
+    const max = 25;
+    list.slice(0, max).forEach((v, idx) => {
+        const n = idx + 1;
         const label = vip.vipLabel(v);
-        const held = vip.timeHeld(v.registeredAt);
-        const left = vip.timeLeft(v.expiresAt);
+        const cargo = v.roleId ? `<@&${v.roleId}>` : v.roleName || '—';
+        const when = v.registeredAt
+            ? `<t:${Math.floor(v.registeredAt / 1000)}:f>`
+            : '—';
+        const status = v.expired ? ' · _expirado_' : '';
         lines.push(
-            `<@${v.userId}> · **${label}** · há **${held}** · resta **${left}**`
+            `**${n}.** **${label}** — <@${v.userId}>\n` +
+                `  📅 ${when} · 🎭 ${cargo}${status}`
         );
-    }
-    if (list.length > 20) lines.push(`_…e mais ${list.length - 20}_`);
+    });
+    if (list.length > max) lines.push(`_…e mais ${list.length - max}_`);
 
-    emb.setDescription(lines.join('\n'));
-    emb.setFooter({ text: `${list.length} VIP(s) ativo(s)` });
+    emb.setDescription(lines.join('\n\n'));
+    emb.setFooter({ text: `${list.length} registro(s)` });
     return emb;
 }

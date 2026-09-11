@@ -1,14 +1,17 @@
 const store = require('./store');
 
-/** Planos padrão (podem ser usados livres também) */
-const PLANOS = ['VIP', 'VIP+', 'VIP Gold', 'VIP Platinum', 'MVP', 'Booster'];
+const PLANOS = ['VIP', 'VIP+', 'VIP++', 'MVP', 'Booster', 'Premium'];
+
+const TIPOS = [
+    { name: 'Compra', value: 'compra' }
+];
 
 function loadAll() {
     return store.load('vips.json', {});
 }
 
-function saveAll(data) {
-    store.save('vips.json', data);
+function saveAll(all) {
+    store.save('vips.json', all);
 }
 
 function guildMap(guildId) {
@@ -27,6 +30,7 @@ function get(guildId, userId) {
     return { ...v, expired: false };
 }
 
+/** Lista registros ativos (não expirados), mais recentes primeiro. */
 function listActive(guildId) {
     const { map } = guildMap(guildId);
     const now = Date.now();
@@ -36,22 +40,47 @@ function listActive(guildId) {
         .sort((a, b) => Number(b.registeredAt || 0) - Number(a.registeredAt || 0));
 }
 
-function register({ guildId, userId, vipName, registeredBy, days, note }) {
+/** Todos os registros (ativos + expirados), mais recentes primeiro. */
+function listAll(guildId) {
+    const { map } = guildMap(guildId);
+    return Object.entries(map)
+        .map(([userId, v]) => {
+            const expired =
+                v.expiresAt && Number(v.expiresAt) > 0 && Date.now() > Number(v.expiresAt);
+            return { userId, ...v, expired: !!expired };
+        })
+        .sort((a, b) => Number(b.registeredAt || 0) - Number(a.registeredAt || 0));
+}
+
+function register({
+    guildId,
+    userId,
+    vipName,
+    registeredBy,
+    days,
+    note,
+    roleId,
+    roleName,
+    type
+}) {
     const { all, map } = guildMap(guildId);
     const now = Date.now();
     const d = days == null || Number(days) <= 0 ? null : Number(days);
     const expiresAt = d ? now + d * 24 * 60 * 60 * 1000 : null;
-    const name = String(vipName || 'VIP').trim().slice(0, 40);
+    const name = String(vipName || roleName || 'VIP').trim().slice(0, 40);
     map[userId] = {
+        type: String(type || 'compra'),
         vip: name,
         tier: name,
+        roleId: roleId ? String(roleId) : null,
+        roleName: roleName ? String(roleName).slice(0, 80) : name,
         registeredBy: String(registeredBy),
         registeredAt: now,
         expiresAt,
         note: note ? String(note).slice(0, 120) : ''
     };
     saveAll(all);
-    return map[userId];
+    return { userId, ...map[userId] };
 }
 
 function remove(guildId, userId) {
@@ -64,7 +93,7 @@ function remove(guildId, userId) {
 
 function vipLabel(rec) {
     if (!rec) return null;
-    return rec.vip || rec.tier || 'VIP';
+    return rec.vip || rec.tier || rec.roleName || 'VIP';
 }
 
 function formatDuration(ms) {
@@ -92,8 +121,10 @@ function timeLeft(expiresAt) {
 
 module.exports = {
     PLANOS,
+    TIPOS,
     get,
     listActive,
+    listAll,
     register,
     remove,
     vipLabel,
