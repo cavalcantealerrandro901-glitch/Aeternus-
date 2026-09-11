@@ -3,6 +3,7 @@ const {
     SlashCommandBuilder
 } = require('discord.js');
 const player = require('../utils/player');
+const items = require('../utils/items');
 
 const COLOR = 0x34d399;
 
@@ -59,6 +60,12 @@ module.exports = {
     }
 };
 
+function rarityTag(it) {
+    const r = it.rarity || items.getItemDef(it.id)?.rarity || 'comum';
+    const name = items.RARITY[r]?.name || r;
+    return name;
+}
+
 function buildEmbed(user, category) {
     const profile = player.get(user.id);
     const emb = new EmbedBuilder()
@@ -85,7 +92,7 @@ function buildEmbed(user, category) {
     if (!list.length) {
         emb.setDescription(
             category === 'todos'
-                ? '_Inventário vazio. Itens podem dropar ao subir de nível (10%)._'
+                ? '_Inventário vazio. Itens podem dropar ao subir de nível (10%)._\n_Materiais: `O.materiais` · Craft: `O.craft` · Troca: `O.troca`_'
                 : `_Nenhum item na categoria **${catName}**._`
         );
         return emb;
@@ -98,12 +105,11 @@ function buildEmbed(user, category) {
             if (!groups[c]) groups[c] = [];
             groups[c].push(it);
         }
-        for (const [c, items] of Object.entries(groups)) {
-            const lines = items.slice(0, 15).map((it, i) => {
-                const when = it.gotAt
-                    ? ` · <t:${Math.floor(it.gotAt / 1000)}:R>`
-                    : '';
-                return `**${i + 1}.** ${it.emoji || '🎁'} **${it.name}**${when}`;
+        for (const [c, arr] of Object.entries(groups)) {
+            const lines = arr.slice(0, 15).map((it, i) => {
+                const when = it.gotAt ? ` · <t:${Math.floor(it.gotAt / 1000)}:R>` : '';
+                const rr = rarityTag(it);
+                return `**${i + 1}.** ${it.emoji || '🎁'} **${it.name}** · _${rr}_${when}`;
             });
             emb.addFields({
                 name: CAT_LABEL[c] || c,
@@ -113,14 +119,14 @@ function buildEmbed(user, category) {
         }
     } else {
         const lines = list.map((it, i) => {
-            const when = it.gotAt
-                ? ` · <t:${Math.floor(it.gotAt / 1000)}:R>`
-                : '';
-            return `**${i + 1}.** ${it.emoji || '🎁'} **${it.name}**${when}`;
+            const when = it.gotAt ? ` · <t:${Math.floor(it.gotAt / 1000)}:R>` : '';
+            const rr = rarityTag(it);
+            const desc = it.desc ? `\n└ ${it.desc}` : '';
+            return `**${i + 1}.** ${it.emoji || '🎁'} **${it.name}** · _${rr}_${when}${desc}`;
         });
         emb.setDescription(lines.join('\n').slice(0, 4000));
     }
 
-    emb.setFooter({ text: `${list.length} item(ns)` });
+    emb.setFooter({ text: `${list.length} item(ns) · O.desmontar <n> · O.craft · O.troca` });
     return emb;
 }
