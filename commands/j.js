@@ -68,10 +68,14 @@ function profileEmbed(user, profile) {
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
     const attrs = st.attrs || { forca: 0, defesa: 0, agilidade: 0, vida: 0 };
 
-    const attrLines = ATTR_META.map((a) => {
+    const attrFields = ATTR_META.map((a) => {
         const v = Number(attrs[a.key] || 0);
-        return `${a.emoji} **${a.label}**\n┌${attrBar(v)}┐ **${v}**`;
-    }).join('\n\n');
+        return {
+            name: `${a.emoji} ${a.label}`,
+            value: `┌${attrBar(v)}┐\n**${v}**  ·  \`+\``,
+            inline: true
+        };
+    });
 
     const invLines = inv.length
         ? inv
@@ -95,14 +99,17 @@ function profileEmbed(user, profile) {
                 `🎯 **Nível ${st.level}** · XP ${prog.current}/${prog.need} (**${prog.pct}%**)`,
                 `┌${attrBar(prog.pct, 100)}┐`,
                 '',
-                `❤️ HP **${xp.maxHp(user.id)}** · 🔵 Mana **${maxMana}**`
+                `❤️ HP **${xp.maxHp(user.id)}** · 🔵 Mana **${maxMana}**`,
+                '',
+                '**Atributos** — use o **➕** do botão sob cada um'
             ].join('\n')
         )
         .addFields(
+            ...attrFields,
             {
-                name: '📈  Atributos',
-                value: attrLines,
-                inline: false
+                name: '\u200b',
+                value: '\u200b',
+                inline: true
             },
             {
                 name: '🎫  Inventário',
@@ -114,24 +121,35 @@ function profileEmbed(user, profile) {
         .setImage(cls.banner);
 }
 
-/** Botões + por atributo (só dono do perfil) */
+/**
+ * Botões + alinhados aos atributos (grade 2x2):
+ * [Força] [Defesa]
+ * [Agilidade] [Vida]
+ */
 function attrButtons(ownerId) {
-    return new ActionRowBuilder().addComponents(
-        ...ATTR_META.map((a) =>
-            new ButtonBuilder()
-                .setCustomId(`j:attrplus:${a.key}:${ownerId}`)
-                .setLabel(`${a.label}`)
-                .setEmoji('➕')
-                .setStyle(ButtonStyle.Secondary)
-        )
-    );
+    const rows = [];
+    for (let i = 0; i < ATTR_META.length; i += 2) {
+        const slice = ATTR_META.slice(i, i + 2);
+        rows.push(
+            new ActionRowBuilder().addComponents(
+                ...slice.map((a) =>
+                    new ButtonBuilder()
+                        .setCustomId(`j:attrplus:${a.key}:${ownerId}`)
+                        .setLabel(a.label)
+                        .setEmoji('➕')
+                        .setStyle(ButtonStyle.Secondary)
+                )
+            )
+        );
+    }
+    return rows;
 }
 
 function profilePayload(user, profile, viewerId) {
     const embeds = [profileEmbed(user, profile)];
     const components = [];
     if (viewerId && String(viewerId) === String(user.id)) {
-        components.push(attrButtons(user.id));
+        components.push(...attrButtons(user.id));
     }
     return { embeds, components };
 }
@@ -324,7 +342,6 @@ module.exports = {
 
         if (id === 'j:start') return beginCreate(interaction);
 
-        // Botões + atributo — só o dono; ação fica para a próxima etapa
         if (id.startsWith('j:attrplus:')) {
             const parts = id.split(':');
             const attrKey = parts[2];
@@ -339,7 +356,6 @@ module.exports = {
                     ephemeral: true
                 });
             }
-            // Placeholder até você definir a lógica
             return interaction.reply({
                 content: `➕ **${meta.label}** — botão pronto. Aguardando a próxima instrução.`,
                 ephemeral: true
@@ -491,14 +507,14 @@ async function finishProfile(user, data, channel, interaction, fromPhoto = false
             await interaction.update({
                 content: notice,
                 embeds: [emb],
-                components: attrButtons(user.id) ? [attrButtons(user.id)] : []
+                components: attrButtons(user.id)
             });
         } else {
             await channel
                 .send({
                     content: notice,
                     embeds: [emb],
-                    components: [attrButtons(user.id)]
+                    components: attrButtons(user.id)
                 })
                 .catch(() => {});
         }
