@@ -4,12 +4,12 @@ const vip = require('../utils/vip');
 const COLOR = 0xa78bfa;
 
 module.exports = {
-    name: 'vervip',
-    aliases: ['vip', 'meuvip', 'listavip', 'verregistros', 'registros'],
-    description: 'Ver registros de VIP / compras',
+    name: 'veranotacoes',
+    aliases: ['vervip', 'vip', 'meuvip', 'listavip', 'verregistros', 'registros', 'anotacoes'],
+    description: 'Ver anotações de compras VIP',
     data: new SlashCommandBuilder()
-        .setName('ver-vip')
-        .setDescription('Ver registros de compra VIP')
+        .setName('ver-anotacoes')
+        .setDescription('Ver anotações de compras VIP')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Ver só um membro (opcional)').setRequired(false)
         ),
@@ -35,7 +35,7 @@ async function buildUserEmbed(guild, user) {
     const rec = vip.get(guild.id, user.id);
     const emb = new EmbedBuilder()
         .setColor(COLOR)
-        .setTitle('Registro VIP')
+        .setTitle('Anotação')
         .setThumbnail(user.displayAvatarURL({ size: 128 }));
 
     if (!rec || rec.expired) {
@@ -78,10 +78,10 @@ async function buildUserEmbed(guild, user) {
 
 async function buildListEmbed(guild) {
     const list = vip.listAll(guild.id);
-    const emb = new EmbedBuilder().setColor(COLOR).setTitle('Registros de compra VIP');
+    const emb = new EmbedBuilder().setColor(COLOR).setTitle('Anotações de compra');
 
     if (!list.length) {
-        emb.setDescription('Nenhum registro no momento.');
+        emb.setDescription('Nenhuma anotação no momento.');
         return emb;
     }
 
@@ -103,6 +103,6 @@ async function buildListEmbed(guild) {
     if (list.length > max) lines.push(`_…e mais ${list.length - max}_`);
 
     emb.setDescription(lines.join('\n\n'));
-    emb.setFooter({ text: `${list.length} registro(s)` });
+    emb.setFooter({ text: `${list.length} anotação(ões)` });
     return emb;
 }

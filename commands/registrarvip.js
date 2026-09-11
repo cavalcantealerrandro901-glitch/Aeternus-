@@ -26,7 +26,7 @@ async function notifyUserPurchase(client, user, rec) {
                     `Sua compra de **${label}** foi registrada com sucesso.`,
                     rec.roleId ? `Cargo: <@&${rec.roleId}>` : '',
                     '',
-                    'Confira com **`O.vervip`** ou **`/ver-vip`**.'
+                    'Confira com **`O.veranotacoes`** ou **`/ver-anotacoes`**.'
                 ]
                     .filter(Boolean)
                     .join('\n')
