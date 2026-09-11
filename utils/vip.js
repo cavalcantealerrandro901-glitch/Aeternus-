@@ -162,6 +162,52 @@ function remove(guildId, userId) {
     return true;
 }
 
+/** Remove anotações pelos números exibidos em /ver-anotacoes (1-based). */
+function removeByNumbers(guildId, numbers, category) {
+    const { all, data } = guildData(guildId);
+    const sorted = listAll(guildId, category || 'todas');
+    const nums = [
+        ...new Set(
+            (Array.isArray(numbers) ? numbers : [numbers])
+                .map((n) => Math.floor(Number(n)))
+                .filter((n) => n >= 1)
+        )
+    ].sort((a, b) => b - a);
+
+    const removed = [];
+    const idsToRemove = new Set();
+
+    for (const n of nums) {
+        const rec = sorted[n - 1];
+        if (rec?.id) {
+            idsToRemove.add(String(rec.id));
+            removed.push({ number: n, ...rec });
+        }
+    }
+
+    if (!idsToRemove.size) {
+        return { ok: false, removed: [], error: 'Nenhum número válido encontrado na lista.' };
+    }
+
+    data.list = (data.list || []).filter((r) => !idsToRemove.has(String(r.id)));
+    all[guildId] = data;
+    saveAll(all);
+    // ordem crescente para mensagem
+    removed.sort((a, b) => a.number - b.number);
+    return { ok: true, removed };
+}
+
+function removeById(guildId, id) {
+    const { all, data } = guildData(guildId);
+    const before = (data.list || []).length;
+    const found = (data.list || []).find((r) => String(r.id) === String(id));
+    data.list = (data.list || []).filter((r) => String(r.id) !== String(id));
+    if (data.list.length === before) return { ok: false };
+    all[guildId] = data;
+    saveAll(all);
+    return { ok: true, removed: found };
+}
+
 function vipLabel(rec) {
     if (!rec) return null;
     return rec.item || rec.vip || rec.tier || rec.roleName || 'Item';
@@ -200,6 +246,8 @@ module.exports = {
     listAll,
     register,
     remove,
+    removeByNumbers,
+    removeById,
     vipLabel,
     timeHeld,
     timeLeft,
