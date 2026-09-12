@@ -1,2 +1,12 @@
 const { register } = require('../utils/interaction');
-module.exports = register({ name: 'beijo', aliases: ['kiss'], gif: 'kiss', target: '{author} beijou {target}!', botReply: '{bot} beijou {author} de volta!', returnLabel: 'Devolver beijo', returnEmoji: '😘', color: 0xf472b6 });
+module.exports = register({
+    name: 'beijo',
+    aliases: ['kiss', 'beijar', 'beijo'],
+    description: 'Beija alguém',
+    gif: 'kiss',
+    target: '{author} beijou {target}!',
+    botReply: '{bot} devolveu o beijo de {author}!',
+    returnLabel: 'Devolver beijo',
+    returnEmoji: '💋',
+    color: 0xfb7185
+});

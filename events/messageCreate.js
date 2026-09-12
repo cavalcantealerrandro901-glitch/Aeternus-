@@ -13,6 +13,13 @@ const { announceLevel } = require('../systems/guildModules');
 const xpCd = new Map();
 const pendingPing = new Map();
 
+function stripAccents(s) {
+    return String(s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
 /** Detecta prefixo do servidor ou menção do bot no início da mensagem */
 function resolvePrefixMatch(message, client) {
     const content = String(message.content || '');
@@ -42,6 +49,28 @@ function resolvePrefixMatch(message, client) {
         if (m) {
             return { prefix: m[0], rest: content.slice(m[0].length) };
         }
+    }
+    return null;
+}
+
+function resolveCommand(client, name) {
+    const raw = String(name || '').toLowerCase();
+    const norm = stripAccents(raw);
+
+    let cmd =
+        client.commands.get(raw) ||
+        client.commands.get(norm) ||
+        client.commands.get(raw.replace(/[-_]/g, '')) ||
+        client.commands.get(norm.replace(/[-_]/g, ''));
+
+    if (cmd?.execute) return cmd;
+
+    // aliases com acento (ex.: abraço → abraco)
+    for (const [, c] of client.commands) {
+        if (!c?.execute) continue;
+        const aliases = Array.isArray(c.aliases) ? c.aliases : [];
+        const names = [c.name, ...aliases].map(stripAccents);
+        if (names.includes(norm)) return c;
     }
     return null;
 }
@@ -249,12 +278,7 @@ module.exports = {
         const name = (args.shift() || '').toLowerCase();
         if (!name) return;
 
-        let cmd = client.commands.get(name);
-        if (!cmd || !cmd.execute) {
-            const alt1 = client.commands.get(name.replace(/[-_]/g, ''));
-            const alt2 = client.commands.get(name.replace(/-/g, ''));
-            cmd = alt1 || alt2 || null;
-        }
+        const cmd = resolveCommand(client, name);
         if (!cmd || !cmd.execute) return;
 
         try {
