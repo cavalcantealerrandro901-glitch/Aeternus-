@@ -18,8 +18,26 @@ const FIXED_DM =
     '⚠️ Lembrete importante: se você **sair** de **{host}**, a parceria será **encerrada automaticamente** e o anúncio será removido.\n\n' +
     'Com gratidão,\n**Equipe {host}**';
 
+const FIXED_CANCEL_DM =
+    '⚠️ **Parceria encerrada**\n\n' +
+    'A parceria entre **{host}** e **{server}** foi **cancelada automaticamente**.\n\n' +
+    '📌 Motivo: o representante saiu de **{host}**.\n' +
+    '🗑️ O anúncio/convite publicado no servidor foi removido.\n\n' +
+    'Se quiser renovar a parceria no futuro, fale com a staff de **{host}**.\n\n' +
+    '— **Equipe {host}**';
+
+const FIXED_CANCEL_CHANNEL =
+    '❌ **Parceria cancelada**\n\n' +
+    'A parceria com **{server}** foi encerrada.\n' +
+    '👤 Representante: {rep} (`{repTag}`)\n' +
+    '📌 Motivo: o representante **saiu do servidor**.\n' +
+    '🗑️ O anúncio/convite desta parceria foi **removido**.';
+
 const DM_GIF =
     'https://media.tenor.com/S3sG0fD1y0IAAAAC/anime-handshake.gif';
+
+const CANCEL_GIF =
+    'https://media.tenor.com/gYxqZqP7v6cAAAAC/anime-sad.gif';
 
 function all() {
     return store.load(KEY, {});
@@ -126,6 +144,29 @@ function fixedDmPayload(vars) {
     return { embeds: [emb] };
 }
 
+function cancelDmPayload(vars) {
+    const { EmbedBuilder } = require('discord.js');
+    const emb = new EmbedBuilder()
+        .setColor(0xf87171)
+        .setTitle('❌ Parceria cancelada')
+        .setDescription(fill(FIXED_CANCEL_DM, vars))
+        .setImage(CANCEL_GIF)
+        .setFooter({ text: 'Aeternus · parceria encerrada' })
+        .setTimestamp();
+    return { embeds: [emb] };
+}
+
+function cancelChannelPayload(vars) {
+    const { EmbedBuilder } = require('discord.js');
+    const emb = new EmbedBuilder()
+        .setColor(0xf87171)
+        .setTitle('❌ Parceria cancelada')
+        .setDescription(fill(FIXED_CANCEL_CHANNEL, vars))
+        .setFooter({ text: 'Cancelamento automático · representante saiu' })
+        .setTimestamp();
+    return { embeds: [emb] };
+}
+
 module.exports = {
     list,
     get,
@@ -138,7 +179,12 @@ module.exports = {
     fill,
     fixedDmText,
     fixedDmPayload,
+    cancelDmPayload,
+    cancelChannelPayload,
     DEFAULT_PHRASE,
     FIXED_DM,
-    DM_GIF
+    FIXED_CANCEL_DM,
+    FIXED_CANCEL_CHANNEL,
+    DM_GIF,
+    CANCEL_GIF
 };
