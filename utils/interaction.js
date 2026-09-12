@@ -1,4 +1,11 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    SlashCommandBuilder,
+    MessageFlags
+} = require('discord.js');
 const gifs = require('./gifs');
 
 const ACTIONS = {};
@@ -36,6 +43,7 @@ function register(def) {
         name: def.name,
         aliases: def.aliases || [],
         description: def.description || def.name,
+        category: 'interacao',
         data,
         async execute(message) {
             await run(message, def, {});
@@ -53,24 +61,64 @@ function register(def) {
             await run(fake, def, { forcedTarget: target || null });
         },
         async handleComponent(interaction) {
-            const parts = interaction.customId.split(':');
-            if (parts[1] !== 'devolver') return;
-            const actionName = parts[2];
-            const fromId = parts[3];
-            const toId = parts[4];
-            if (interaction.user.id !== fromId)
+            const parts = String(interaction.customId || '').split(':');
+
+            // Formatos:
+            //  nome:devolver:quemRecebeu:quemEnviou
+            //  act:devolver:nome:quemRecebeu:quemEnviou  (legado)
+            let actionName;
+            let fromId; // quem pode clicar (recebeu)
+            let toId; // quem recebe a devolução (autor original)
+
+            if (parts[0] === 'act' && parts[1] === 'devolver') {
+                actionName = parts[2];
+                fromId = parts[3];
+                toId = parts[4];
+            } else if (parts[1] === 'devolver') {
+                actionName = parts[0];
+                fromId = parts[2];
+                toId = parts[3];
+            } else {
+                return;
+            }
+
+            if (interaction.user.id !== fromId) {
                 return interaction.reply({
-                    content: 'Só quem recebeu pode devolver.',
-                    ephemeral: true
+                    content: 'Só quem **recebeu** pode devolver.',
+                    flags: MessageFlags.Ephemeral
                 });
+            }
+
             const actionDef = ACTIONS[actionName] || def;
             const fromUser = await interaction.client.users
                 .fetch(fromId)
                 .catch(() => interaction.user);
             const toUser = await interaction.client.users.fetch(toId).catch(() => null);
-            if (!toUser)
-                return interaction.reply({ content: 'Usuário inválido.', ephemeral: true });
-            await interaction.deferUpdate().catch(() => {});
+
+            if (!toUser) {
+                return interaction.reply({
+                    content: 'Usuário inválido.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            // Desativa o botão na mensagem original
+            try {
+                const disabled = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(interaction.customId)
+                        .setLabel(actionDef.returnLabel || 'Devolvido')
+                        .setEmoji(actionDef.returnEmoji || '✅')
+                        .setStyle(ButtonStyle.Success)
+                        .setDisabled(true)
+                );
+                await interaction.update({ components: [disabled] }).catch(async () => {
+                    await interaction.deferUpdate().catch(() => {});
+                });
+            } catch (_) {
+                await interaction.deferUpdate().catch(() => {});
+            }
+
             const fake = {
                 author: fromUser,
                 client: interaction.client,
@@ -79,7 +127,8 @@ function register(def) {
                 mentions: { users: { first: () => toUser } },
                 reply: (p) => interaction.followUp(p)
             };
-            await run(fake, actionDef, { forcedTarget: toUser });
+
+            await run(fake, actionDef, { forcedTarget: toUser, isReturn: true });
         }
     };
 }
@@ -149,11 +198,15 @@ async function run(message, def, opts) {
 
     const content = target ? `${author} ➜ ${target}` : `${author}`;
     const components = [];
+
+    // Botão devolver: só se houver alvo humano e não for uma devolução em cadeia infinita opcional
+    // (ainda permite devolver a devolução — o botão fica na nova mensagem)
     if (target && !target.bot) {
         components.push(
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`act:devolver:${def.name}:${target.id}:${author.id}`)
+                    // root = nome do comando → interactionCreate encontra handleComponent
+                    .setCustomId(`${def.name}:devolver:${target.id}:${author.id}`)
                     .setLabel(def.returnLabel || 'Devolver')
                     .setEmoji(def.returnEmoji || '🔁')
                     .setStyle(ButtonStyle.Secondary)
@@ -163,7 +216,8 @@ async function run(message, def, opts) {
 
     await message.reply({ content, embeds: [embed], components });
 
-    if (target?.bot) {
+    // Bots “devolvem” sozinhos
+    if (target?.bot && !opts.isReturn) {
         setTimeout(async () => {
             try {
                 const replyGif = await pickGif(def);
@@ -175,20 +229,22 @@ async function run(message, def, opts) {
                     .setDescription(botText)
                     .setTimestamp();
                 if (replyGif) botEmbed.setImage(replyGif);
+
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`act:devolver:${def.name}:${author.id}:${target.id}`)
+                        .setCustomId(`${def.name}:devolver:${author.id}:${target.id}`)
                         .setLabel(def.returnLabel || 'Devolver')
                         .setEmoji(def.returnEmoji || '🔁')
                         .setStyle(ButtonStyle.Secondary)
                 );
+
                 await message.channel.send({
                     content: `${target} ➜ ${author}`,
                     embeds: [botEmbed],
                     components: [row]
                 });
             } catch (e) {
-                console.error('[interaction]', e.message);
+                console.warn('[interaction]', e.message);
             }
         }, 900);
     }

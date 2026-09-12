@@ -113,10 +113,14 @@ module.exports = {
 
             if (interaction.isButton() || interaction.isStringSelectMenu()) {
                 const id = interaction.customId || '';
-                // Só processa componentes nossos (prefixo conhecido). Não mexe em outros bots.
                 const parts = id.split(':');
                 const root = parts[0] || '';
                 let cmd = client.commands.get(root);
+
+                // Legado: act:devolver:nomeComando:from:to
+                if (!cmd && root === 'act' && parts[1] === 'devolver' && parts[2]) {
+                    cmd = client.commands.get(parts[2]);
+                }
 
                 if (!cmd && (root === 'bj' || root === 'blackjack')) {
                     cmd = client.commands.get('blackjack') || client.commands.get('bj');
