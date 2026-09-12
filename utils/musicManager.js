@@ -10,6 +10,7 @@ const {
     ButtonStyle,
     MessageFlags
 } = require('discord.js');
+const { searchIdentifiers, isUrl } = require('./musicSearch');
 
 const MAX_PLAY_RETRIES = 4;
 const MAX_RESOLVE_TRIES = 2;
@@ -121,7 +122,7 @@ function trackEmbed(track, q, title = 'Tocando agora') {
                 inline: true
             }
         )
-        .setFooter({ text: 'SoundCloud prioritário · recuperação automática' })
+        .setFooter({ text: 'Busca internacional · SoundCloud prioritário' })
         .setTimestamp();
 
     const art = info.artworkUrl || info.thumbnail;
@@ -129,9 +130,6 @@ function trackEmbed(track, q, title = 'Tocando agora') {
     return embed;
 }
 
-function isUrl(q) {
-    return /^https?:\/\//i.test(String(q || '').trim());
-}
 function isYoutubeUrl(q) {
     return /youtube\.com|youtu\.be|music\.youtube\.com/i.test(String(q || ''));
 }
@@ -140,22 +138,6 @@ function isSpotifyUrl(q) {
 }
 function isDeezerUrl(q) {
     return /deezer\.com/i.test(String(q || ''));
-}
-
-function searchIdentifiers(raw) {
-    const q = String(raw || '').trim();
-    if (!q) return [];
-    if (isUrl(q)) return [q];
-    const clean = q.replace(/\s+/g, ' ').slice(0, 180);
-    return [
-        `scsearch:${clean}`,
-        `scsearch:${clean} official`,
-        `scsearch:${clean} audio`,
-        `dzsearch:${clean}`,
-        `spsearch:${clean}`,
-        `ytmsearch:${clean}`,
-        `ytsearch:${clean}`
-    ];
 }
 
 function parseResolveResult(result) {
@@ -229,7 +211,6 @@ async function resolveTracks(shoukaku, query) {
     const nodes = listNodes(shoukaku);
     if (!nodes.length) throw new Error('Nenhum node Lavalink conectado. Aguarde alguns segundos.');
 
-    // Passada 1: todos os identificadores no node ideal + outros
     for (let pass = 0; pass < MAX_RESOLVE_TRIES; pass++) {
         for (const node of nodes) {
             for (const identifier of identifiers) {
@@ -246,7 +227,6 @@ async function resolveTracks(shoukaku, query) {
         if (pass === 0) await sleep(400);
     }
 
-    // Passada 2: mirror de URL
     if (isUrl(query)) {
         for (const node of nodes) {
             const sc = await mirrorByTitle(node, query);
@@ -311,10 +291,7 @@ function sleep(ms) {
 
 async function ensurePlayer(shoukaku, guild, voiceChannelId) {
     let player = shoukaku.players.get(guild.id);
-    if (player) {
-        // já conectado — ok
-        return player;
-    }
+    if (player) return player;
 
     const shardId = guild.shardId ?? guild.shard?.id ?? 0;
     for (let i = 0; i < 3; i++) {
@@ -411,7 +388,6 @@ async function playNext(client, guildId) {
         const q = getQueue(guildId);
         let player = shoukaku.players.get(guildId);
 
-        // rejoin se player sumiu mas ainda há fila
         if (!player && q.voiceChannelId && (q.current || q.tracks.length)) {
             try {
                 const guild = await client.guilds.fetch(guildId).catch(() => null);
@@ -426,13 +402,11 @@ async function playNext(client, guildId) {
         }
         if (!player) return;
 
-        // anti double-fire
         const now = Date.now();
         if (now - (q.lastAdvance || 0) < 250 && q.playing && q.current) return;
         q.lastAdvance = now;
 
         if (q.loop === 1 && q.current && q.retries === 0) {
-            // keep current
         } else if (q.loop === 2 && q.current && q.retries === 0) {
             q.tracks.push(q.current);
             q.current = null;
@@ -480,7 +454,6 @@ async function handlePlayFailure(client, guildId, track, reason) {
     const q = getQueue(guildId);
     q.retries = (q.retries || 0) + 1;
 
-    // mirror SC
     if (!track.__scTried) {
         track.__scTried = true;
         try {
@@ -498,7 +471,6 @@ async function handlePlayFailure(client, guildId, track, reason) {
         return playNext(client, guildId);
     }
 
-    // esgotou — próxima (fica na call)
     q.current = null;
     q.retries = 0;
 
@@ -552,7 +524,6 @@ function bindPlayerEvents(client, player, guildId) {
     player.on('closed', () => {
         try {
             const q = getQueue(guildId);
-            // se ainda tem fila, tenta rejoin em vez de apagar tudo
             if (q.tracks.length || q.current) {
                 setTimeout(() => {
                     playNext(client, guildId).catch(() => {});
@@ -572,9 +543,7 @@ function bindPlayerEvents(client, player, guildId) {
         } catch (_) {}
     });
 
-    player.on('error', () => {
-        /* engole — tratado via exception/end */
-    });
+    player.on('error', () => {});
 }
 
 async function enqueue(client, { guild, voiceChannelId, textChannelId, query, requesterId }) {
@@ -585,7 +554,6 @@ async function enqueue(client, { guild, voiceChannelId, textChannelId, query, re
     try {
         resolved = await resolveTracks(shoukaku, query);
     } catch (e) {
-        // última chance: só SC com query limpa
         const nodes = listNodes(shoukaku);
         const q = String(query || '').replace(/https?:\/\/\S+/g, '').trim();
         if (q && nodes[0]) {
