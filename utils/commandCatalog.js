@@ -1,5 +1,14 @@
 /** Catálogo central de comandos por categoria */
 
+function strip(s) {
+    return String(s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/^\//, '')
+        .trim();
+}
+
 const CATEGORIES = {
     economia: {
         id: 'economia',
@@ -36,7 +45,8 @@ const CATEGORIES = {
             { name: 'minas', desc: 'Mines', usage: 'minas <valor>', example: 'O.minas 500', about: 'Jogo de minas: escolha casas e saque antes de explodir.' },
             { name: 'blackjack', desc: 'Blackjack 21', usage: 'blackjack <valor>', example: 'O.bj 1000', about: 'Clássico 21 contra o dealer.' },
             { name: 'quiz', desc: 'Quiz', usage: 'quiz [tema]', example: 'O.quiz matemática', about: 'Perguntas no canal até o tempo acabar; ranking de acertos.' },
-            { name: 'pvp', desc: 'Duelo PVP', usage: 'pvp @user', example: 'O.pvp @user', about: 'Duelo por turnos entre jogadores.' }
+            { name: 'pvp', desc: 'Duelo PVP', usage: 'pvp @user', example: 'O.pvp @user', about: 'Duelo por turnos entre jogadores.' },
+            { name: 'emojibet', desc: 'Batalha de emojis', usage: 'emojibet [max] [valor]', example: 'O.emojibet 10 500', about: 'Batalha de emojis com ou sem aposta.' }
         ]
     },
     moderacao: {
@@ -62,17 +72,28 @@ const CATEGORIES = {
         id: 'interacoes',
         label: 'Interações',
         emoji: '💞',
-        description: 'GIFs e ações entre membros',
+        description: 'GIFs e ações entre membros (anime)',
         commands: [
-            { name: 'abraco', desc: 'Abraçar', usage: 'abraco @user', example: 'O.abraco @user', about: 'Envia um GIF de abraço e botão para devolver.' },
-            { name: 'beijo', desc: 'Beijar', usage: 'beijo @user', example: 'O.beijo @user', about: 'Envia um GIF de beijo anime.' },
+            { name: 'abraco', desc: 'Abraçar', usage: 'abraco @user', example: 'O.abraco @user', about: 'Abraça alguém com GIF anime e botão devolver. Aceita: abraço, abraçar.' },
+            { name: 'beijo', desc: 'Beijar', usage: 'beijo @user', example: 'O.beijo @user', about: 'Beija alguém com GIF. Aceita: beijar.' },
             { name: 'tapa', desc: 'Tapa', usage: 'tapa @user', example: 'O.tapa @user', about: 'Dá um tapa (GIF) no membro.' },
-            { name: 'carinho', desc: 'Carinho', usage: 'carinho @user', example: 'O.carinho @user', about: 'Faz carinho com GIF anime.' },
+            { name: 'carinho', desc: 'Carinho', usage: 'carinho @user', example: 'O.carinho @user', about: 'Faz carinho (pat) com GIF anime.' },
+            { name: 'cafune', desc: 'Cafuné', usage: 'cafune @user', example: 'O.cafune @user', about: 'Faz cafuné / cuddle. Aceita: cafuné.' },
             { name: 'cutucar', desc: 'Cutucar', usage: 'cutucar @user', example: 'O.cutucar @user', about: 'Cutuca o membro.' },
             { name: 'bonk', desc: 'Bonk', usage: 'bonk @user', example: 'O.bonk @user', about: 'Bonk clássico.' },
             { name: 'morder', desc: 'Morder', usage: 'morder @user', example: 'O.morder @user', about: 'Morde o membro (GIF).' },
-            { name: 'dancar', desc: 'Dançar', usage: 'dancar [@user]', example: 'O.dancar', about: 'Dança solo ou com alguém.' },
-            { name: 'highfive', desc: 'High five', usage: 'highfive @user', example: 'O.highfive @user', about: 'Toca as mãos com o membro.' }
+            { name: 'lambida', desc: 'Lambida', usage: 'lambida @user', example: 'O.lambida @user', about: 'Dá uma lambida. Aceita: lamber.' },
+            { name: 'highfive', desc: 'High five', usage: 'highfive @user', example: 'O.highfive @user', about: 'Toca as mãos com o membro.' },
+            { name: 'maos', desc: 'Mãos dadas', usage: 'maos @user', example: 'O.maos @user', about: 'Segura a mão de alguém. Aceita: mãos.' },
+            { name: 'acenar', desc: 'Acenar', usage: 'acenar [@user]', example: 'O.acenar @user', about: 'Acena sozinho ou para alguém.' },
+            { name: 'corar', desc: 'Corar', usage: 'corar [@user]', example: 'O.corar', about: 'Fica corado(a).' },
+            { name: 'sorrir', desc: 'Sorrir', usage: 'sorrir [@user]', example: 'O.sorrir @user', about: 'Sorri sozinho ou para alguém.' },
+            { name: 'rir', desc: 'Rir', usage: 'rir [@user]', example: 'O.rir', about: 'Ri sozinho ou com alguém.' },
+            { name: 'piscadela', desc: 'Piscadela', usage: 'piscadela [@user]', example: 'O.piscadela @user', about: 'Pisca para alguém.' },
+            { name: 'dancar', desc: 'Dançar', usage: 'dancar [@user]', example: 'O.dancar', about: 'Dança solo ou com alguém. Aceita: dançar.' },
+            { name: 'chorar', desc: 'Chorar', usage: 'chorar [@user]', example: 'O.chorar', about: 'Chora (GIF).' },
+            { name: 'yeet', desc: 'Yeet', usage: 'yeet @user', example: 'O.yeet @user', about: 'Arremessa alguém (de brincadeira).' },
+            { name: 'matar', desc: 'Eliminar (play)', usage: 'matar @user', example: 'O.matar @user', about: '“Mata” alguém só de brincadeira (GIF).' }
         ]
     },
     utilidade: {
@@ -81,7 +102,7 @@ const CATEGORIES = {
         emoji: '🛠️',
         description: 'Ferramentas do dia a dia',
         commands: [
-            { name: 'help', desc: 'Central de ajuda', usage: 'help [categoria|comando]', example: 'O.ajuda saldo', about: 'Lista categorias ou detalhes de um comando.' },
+            { name: 'help', desc: 'Central de ajuda', usage: 'help [categoria|comando]', example: 'O.ajuda saldo', about: 'Lista categorias ou detalhes de um comando. Aceita acentos (ex: abraço, interações).' },
             { name: 'ping', desc: 'Latência', usage: 'ping', example: 'O.ping', about: 'Mostra latência da API e do round-trip.' },
             { name: 'afk', desc: 'Modo AFK', usage: 'afk [motivo]', example: 'O.afk almoço', about: 'Marca você como AFK; remove ao falar de novo.' },
             { name: 'painel', desc: 'Painel web', usage: 'painel', example: 'O.painel', about: 'Link do painel de configuração do servidor.' },
@@ -100,31 +121,37 @@ function listCategories() {
 }
 
 function getCategory(id) {
-    const key = String(id || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
+    const key = strip(id);
     if (CATEGORIES[key]) return CATEGORIES[key];
+    // aliases de categoria
+    const aliases = {
+        interacao: 'interacoes',
+        interacoes: 'interacoes',
+        social: 'interacoes',
+        gifs: 'interacoes',
+        anime: 'interacoes',
+        economia: 'economia',
+        money: 'economia',
+        eter: 'economia',
+        jogos: 'jogos',
+        games: 'jogos',
+        moderacao: 'moderacao',
+        mod: 'moderacao',
+        staff: 'moderacao',
+        utilidade: 'utilidade',
+        utils: 'utilidade',
+        util: 'utilidade'
+    };
+    if (aliases[key] && CATEGORIES[aliases[key]]) return CATEGORIES[aliases[key]];
     return (
         listCategories().find(
-            (c) =>
-                c.id === key ||
-                c.label.toLowerCase() === key ||
-                c.label
-                    .toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '') === key
+            (c) => strip(c.id) === key || strip(c.label) === key
         ) || null
     );
 }
 
 function findCommand(query) {
-    const q = String(query || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/^\//, '')
-        .trim();
+    const q = strip(query);
     if (!q) return null;
 
     const aliases = {
@@ -156,13 +183,37 @@ function findCommand(query) {
         top: 'rank',
         lb: 'rank',
         roubar: 'rob',
-        steal: 'rob'
+        steal: 'rob',
+        // interações com acento / sinônimos
+        abracar: 'abraco',
+        abraco: 'abraco',
+        hug: 'abraco',
+        beijar: 'beijo',
+        kiss: 'beijo',
+        cafunezinho: 'cafune',
+        cuddle: 'cafune',
+        lamber: 'lambida',
+        lick: 'lambida',
+        wave: 'acenar',
+        blush: 'corar',
+        smile: 'sorrir',
+        laugh: 'rir',
+        happy: 'rir',
+        handhold: 'maos',
+        maosdadas: 'maos',
+        wink: 'piscadela',
+        piscar: 'piscadela',
+        dancar: 'dancar',
+        kill: 'matar',
+        arremessar: 'yeet'
     };
 
     const name = aliases[q] || q;
 
     for (const cat of listCategories()) {
-        const cmd = cat.commands.find((c) => c.name === name || c.name === q);
+        const cmd = cat.commands.find(
+            (c) => strip(c.name) === name || strip(c.name) === q || strip(c.desc) === q
+        );
         if (cmd) return { ...cmd, category: cat };
     }
     return null;

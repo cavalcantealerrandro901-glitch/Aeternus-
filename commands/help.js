@@ -2,7 +2,8 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     StringSelectMenuBuilder,
-    SlashCommandBuilder
+    SlashCommandBuilder,
+    MessageFlags
 } = require('discord.js');
 const { getPrefix } = require('../utils/settings');
 const {
@@ -11,7 +12,18 @@ const {
     findCommand
 } = require('../utils/commandCatalog');
 
+function strip(s) {
+    return String(s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+}
+
 function introEmbed(client, prefix, guild) {
+    const cats = listCategories()
+        .map((c) => `${c.emoji} **${c.label}** (\`${c.id}\`)`)
+        .join('\n');
     return new EmbedBuilder()
         .setColor(0xa78bfa)
         .setAuthor({
@@ -24,9 +36,12 @@ function introEmbed(client, prefix, guild) {
                 `Prefixo: \`${prefix}\` · também funciona com **/**`,
                 guild ? `Servidor: **${guild.name}**` : null,
                 '',
-                'Escolha uma **categoria** no menu.',
-                `Detalhe de um comando: \`${prefix}ajuda <comando>\``,
-                `Ex.: \`${prefix}ajuda saldo\``
+                'Escolha uma **categoria** no menu abaixo.',
+                `Ou: \`${prefix}ajuda <categoria>\` · \`${prefix}ajuda <comando>\``,
+                `Ex.: \`${prefix}ajuda interações\` · \`${prefix}ajuda abraço\``,
+                '',
+                '**Categorias**',
+                cats
             ]
                 .filter((x) => x != null)
                 .join('\n')
@@ -42,9 +57,13 @@ function categoryEmbed(cat, prefix) {
         .setColor(0x8b5cf6)
         .setTitle(`${cat.emoji}  ${cat.label}`)
         .setDescription(
-            [cat.description, '', lines.join('\n'), '', `Detalhe: \`${prefix}ajuda <comando>\``].join(
-                '\n'
-            )
+            [
+                cat.description,
+                '',
+                lines.join('\n'),
+                '',
+                `Detalhe: \`${prefix}ajuda <comando>\` (aceita acentos)`
+            ].join('\n')
         );
 }
 
@@ -52,10 +71,6 @@ function commandEmbed(cmd, prefix, liveCmd) {
     const usage = cmd.usage || cmd.name;
     const example = cmd.example || `${prefix}${cmd.name}`;
     const about = cmd.about || cmd.desc || liveCmd?.description || '—';
-    const aliases =
-        Array.isArray(liveCmd?.aliases) && liveCmd.aliases.length
-            ? liveCmd.aliases.map((a) => `\`${prefix}${a}\``).join(', ')
-            : null;
 
     const emb = new EmbedBuilder()
         .setColor(0x38bdf8)
@@ -83,7 +98,9 @@ function commandEmbed(cmd, prefix, liveCmd) {
                 inline: false
             }
         );
-    if (aliases) emb.setFooter({ text: `Aliases: ${liveCmd.aliases.join(', ')}` });
+    if (Array.isArray(liveCmd?.aliases) && liveCmd.aliases.length) {
+        emb.setFooter({ text: `Aliases: ${liveCmd.aliases.join(', ')}` });
+    }
     return emb;
 }
 
@@ -109,15 +126,13 @@ async function sendHelp(ctx, args = []) {
     const guild = ctx.guild;
     const client = ctx.client;
     const prefix = getPrefix(guild?.id);
-    const sub = (
+    const subRaw =
         args[0] ||
         (isSlash
             ? ctx.options?.getString?.('comando') || ctx.options?.getString?.('categoria')
             : '') ||
-        ''
-    )
-        .toLowerCase()
-        .trim();
+        '';
+    const sub = strip(subRaw);
 
     const reply = async (payload) => {
         if (isSlash) {
@@ -128,7 +143,17 @@ async function sendHelp(ctx, args = []) {
     };
 
     if (sub) {
-        const found = findCommand(sub);
+        // 1) categoria (interações, economia…)
+        const cat = getCategory(sub);
+        if (cat) {
+            return reply({
+                embeds: [categoryEmbed(cat, prefix)],
+                components: [menuRow(cat.id)]
+            });
+        }
+
+        // 2) comando no catálogo (com acentos)
+        const found = findCommand(subRaw);
         if (found) {
             const live =
                 client.commands?.get(found.name) ||
@@ -140,15 +165,17 @@ async function sendHelp(ctx, args = []) {
             });
         }
 
-        const cat = getCategory(sub);
-        if (cat) {
-            return reply({
-                embeds: [categoryEmbed(cat, prefix)],
-                components: [menuRow(cat.id)]
-            });
+        // 3) comando vivo no client (aliases)
+        let liveOnly = client.commands?.get(sub) || client.commands?.get(subRaw.toLowerCase());
+        if (!liveOnly) {
+            for (const [, c] of client.commands || []) {
+                const names = [c.name, ...(c.aliases || [])].map(strip);
+                if (names.includes(sub)) {
+                    liveOnly = c;
+                    break;
+                }
+            }
         }
-
-        const liveOnly = client.commands?.get(sub);
         if (liveOnly) {
             const fake = {
                 name: liveOnly.name,
@@ -165,10 +192,12 @@ async function sendHelp(ctx, args = []) {
         }
 
         return reply({
-            content: `Não encontrei \`${sub}\`.\nUse \`${prefix}ajuda\` ou uma categoria: ${listCategories()
-                .map((c) => c.id)
-                .join(', ')}.`,
-            ephemeral: isSlash
+            content:
+                `Não encontrei \`${subRaw}\`.\n` +
+                `Use \`${prefix}ajuda\` ou uma categoria: ${listCategories()
+                    .map((c) => c.id)
+                    .join(', ')}.`,
+            flags: isSlash ? MessageFlags.Ephemeral : undefined
         });
     }
 
@@ -188,7 +217,7 @@ module.exports = {
         .addStringOption((o) =>
             o
                 .setName('comando')
-                .setDescription('Comando ou categoria (ex: saldo, economia)')
+                .setDescription('Comando ou categoria (ex: saldo, interações, abraço)')
                 .setRequired(false)
         ),
 
@@ -207,7 +236,10 @@ module.exports = {
         const prefix = getPrefix(interaction.guild?.id);
         const cat = getCategory(interaction.values?.[0]);
         if (!cat) {
-            return interaction.reply({ content: 'Categoria inválida.', ephemeral: true });
+            return interaction.reply({
+                content: 'Categoria inválida.',
+                flags: MessageFlags.Ephemeral
+            });
         }
         return interaction.update({
             embeds: [categoryEmbed(cat, prefix)],
