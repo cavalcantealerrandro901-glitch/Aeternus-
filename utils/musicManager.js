@@ -1,18 +1,23 @@
 /**
- * Filas Shoukaku — prioridade SoundCloud, retries sem sair da call,
- * painel com botões.
+ * Filas Shoukaku — anti-falha:
+ * prioridade SoundCloud, multi-node, retries, sem sair da call,
+ * lock contra race, rejoin de voz, botões seguros.
  */
 const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags
 } = require('discord.js');
 
-const MAX_PLAY_RETRIES = 3;
+const MAX_PLAY_RETRIES = 4;
+const MAX_RESOLVE_TRIES = 2;
 
 /** @type {Map<string, GuildQueue>} */
 const queues = new Map();
+/** @type {Map<string, boolean>} */
+const playLocks = new Map();
 
 class GuildQueue {
     constructor(guildId) {
@@ -21,12 +26,13 @@ class GuildQueue {
         this.current = null;
         this.textChannelId = null;
         this.volume = 80;
-        this.loop = 0; // 0 off, 1 track, 2 queue
+        this.loop = 0;
         this.playing = false;
         this.paused = false;
         this.retries = 0;
         this.panelMessageId = null;
         this.voiceChannelId = null;
+        this.lastAdvance = 0;
     }
 }
 
@@ -37,6 +43,7 @@ function getQueue(guildId) {
 
 function deleteQueue(guildId) {
     queues.delete(guildId);
+    playLocks.delete(guildId);
 }
 
 function formatMs(ms) {
@@ -50,7 +57,7 @@ function formatMs(ms) {
 
 function progressBar(pos, len, size = 12) {
     if (!len || len <= 0) return '▬'.repeat(size);
-    const ratio = Math.min(1, Math.max(0, pos / len));
+    const ratio = Math.min(1, Math.max(0, Number(pos) / Number(len)));
     const filled = Math.round(size * ratio);
     return '━'.repeat(filled) + '●' + '─'.repeat(Math.max(0, size - filled - 1));
 }
@@ -90,16 +97,15 @@ function trackEmbed(track, q, title = 'Tocando agora') {
     const source = String(info.sourceName || '—').slice(0, 32);
     const loopLabel = q?.loop === 1 ? 'Faixa' : q?.loop === 2 ? 'Fila' : 'Off';
     const queueN = (q?.tracks?.length || 0) + (q?.current ? 1 : 0);
+    const safeTitle = String(info.title || 'Desconhecido').slice(0, 200);
+    const uri = info.uri || info.url || '#';
 
     const embed = new EmbedBuilder()
         .setColor(0x7c3aed)
-        .setAuthor({
-            name: 'Aeternus Music',
-            iconURL: 'https://cdn.discordapp.com/emojis/741612713310879824.webp?size=64'
-        })
+        .setAuthor({ name: 'Aeternus Music' })
         .setTitle(`🎵  ${title}`)
         .setDescription(
-            `### [${info.title || 'Desconhecido'}](${info.uri || info.url || '#'})\n` +
+            `### [${safeTitle}](${uri})\n` +
                 `👤 **${String(info.author || 'Artista').slice(0, 80)}**\n\n` +
                 `\`${progressBar(0, info.length || 1)}\`\n` +
                 `⏱️ \`${info.isStream ? 'AO VIVO' : '0:00'} / ${info.isStream ? '∞' : formatMs(info.length)}\``
@@ -108,55 +114,47 @@ function trackEmbed(track, q, title = 'Tocando agora') {
             { name: 'Fonte', value: `\`${source}\``, inline: true },
             { name: 'Volume', value: `\`${q?.volume ?? 80}%\``, inline: true },
             { name: 'Loop', value: `\`${loopLabel}\``, inline: true },
-            {
-                name: 'Fila',
-                value: `\`${queueN}\` faixa(s)`,
-                inline: true
-            },
+            { name: 'Fila', value: `\`${queueN}\` faixa(s)`, inline: true },
             {
                 name: 'Pedido por',
                 value: track.requester ? `<@${track.requester}>` : '—',
                 inline: true
             }
         )
-        .setFooter({ text: 'SoundCloud prioritário · retries automáticos' })
+        .setFooter({ text: 'SoundCloud prioritário · recuperação automática' })
         .setTimestamp();
 
-    if (info.artworkUrl || info.thumbnail) {
-        embed.setThumbnail(info.artworkUrl || info.thumbnail);
-    }
+    const art = info.artworkUrl || info.thumbnail;
+    if (art && /^https?:\/\//i.test(art)) embed.setThumbnail(art);
     return embed;
 }
 
 function isUrl(q) {
     return /^https?:\/\//i.test(String(q || '').trim());
 }
-
 function isYoutubeUrl(q) {
     return /youtube\.com|youtu\.be|music\.youtube\.com/i.test(String(q || ''));
 }
-
 function isSpotifyUrl(q) {
     return /open\.spotify\.com|spotify\.com/i.test(String(q || ''));
 }
-
 function isDeezerUrl(q) {
     return /deezer\.com/i.test(String(q || ''));
 }
 
-/** Só SoundCloud primeiro; resto é fallback */
 function searchIdentifiers(raw) {
     const q = String(raw || '').trim();
     if (!q) return [];
     if (isUrl(q)) return [q];
-    // SC 2x (variações) → outras fontes
+    const clean = q.replace(/\s+/g, ' ').slice(0, 180);
     return [
-        `scsearch:${q}`,
-        `scsearch:${q} audio`,
-        `dzsearch:${q}`,
-        `spsearch:${q}`,
-        `ytmsearch:${q}`,
-        `ytsearch:${q}`
+        `scsearch:${clean}`,
+        `scsearch:${clean} official`,
+        `scsearch:${clean} audio`,
+        `dzsearch:${clean}`,
+        `spsearch:${clean}`,
+        `ytmsearch:${clean}`,
+        `ytsearch:${clean}`
     ];
 }
 
@@ -166,11 +164,12 @@ function parseResolveResult(result) {
     if (loadType === 'error' || loadType === 'LOAD_FAILED') return null;
     if (loadType === 'empty' || loadType === 'NO_MATCHES') return null;
 
-    if (loadType === 'track') {
+    if (loadType === 'track' && result.data) {
         return { type: 'track', tracks: [result.data], playlistName: null };
     }
     if (loadType === 'playlist') {
         const list = result.data?.tracks || [];
+        if (!list.length) return null;
         return {
             type: 'playlist',
             tracks: list,
@@ -179,9 +178,10 @@ function parseResolveResult(result) {
     }
     if (loadType === 'search') {
         const list = Array.isArray(result.data) ? result.data : [];
+        if (!list.length) return null;
         return { type: 'search', tracks: list.slice(0, 1), playlistName: null };
     }
-    if (result.tracks?.length) {
+    if (Array.isArray(result.tracks) && result.tracks.length) {
         return {
             type: 'legacy',
             tracks: result.tracks,
@@ -191,58 +191,88 @@ function parseResolveResult(result) {
     return null;
 }
 
-async function resolveTracks(shoukaku, query) {
-    const node = shoukaku.getIdealNode();
-    if (!node) throw new Error('Nenhum node Lavalink conectado.');
+function listNodes(shoukaku) {
+    const nodes = [];
+    try {
+        for (const [, n] of shoukaku.nodes || []) {
+            if (!n) continue;
+            const st = n.state;
+            if (st === 2 || st === 'CONNECTED' || n.sessionId) nodes.push(n);
+        }
+    } catch (_) {}
+    if (!nodes.length) {
+        try {
+            const ideal = shoukaku.getIdealNode?.();
+            if (ideal) nodes.push(ideal);
+        } catch (_) {}
+    }
+    return nodes;
+}
 
+async function resolveOnNode(node, identifier) {
+    if (!node?.rest?.resolve) return null;
+    try {
+        const result = await Promise.race([
+            node.rest.resolve(identifier),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12_000))
+        ]);
+        return parseResolveResult(result);
+    } catch (_) {
+        return null;
+    }
+}
+
+async function resolveTracks(shoukaku, query) {
     const identifiers = searchIdentifiers(query);
     if (!identifiers.length) throw new Error('Query vazia.');
 
-    for (const identifier of identifiers) {
-        try {
-            const result = await node.rest.resolve(identifier);
-            const parsed = parseResolveResult(result);
-            if (parsed?.tracks?.length) {
-                return { ...parsed, usedQuery: identifier, nodeName: node.name };
+    const nodes = listNodes(shoukaku);
+    if (!nodes.length) throw new Error('Nenhum node Lavalink conectado. Aguarde alguns segundos.');
+
+    // Passada 1: todos os identificadores no node ideal + outros
+    for (let pass = 0; pass < MAX_RESOLVE_TRIES; pass++) {
+        for (const node of nodes) {
+            for (const identifier of identifiers) {
+                const parsed = await resolveOnNode(node, identifier);
+                if (parsed?.tracks?.length) {
+                    return {
+                        ...parsed,
+                        usedQuery: identifier,
+                        nodeName: node.name
+                    };
+                }
             }
-        } catch (_) {
-            /* tenta próxima fonte */
+        }
+        if (pass === 0) await sleep(400);
+    }
+
+    // Passada 2: mirror de URL
+    if (isUrl(query)) {
+        for (const node of nodes) {
+            const sc = await mirrorByTitle(node, query);
+            if (sc) return sc;
         }
     }
 
-    if (isUrl(query) && isYoutubeUrl(query)) {
-        const sc = await mirrorByTitle(node, query, 'youtube');
-        if (sc) return sc;
-    }
-    if (isUrl(query) && (isSpotifyUrl(query) || isDeezerUrl(query))) {
-        const sc = await mirrorByTitle(node, query, 'mirror');
-        if (sc) return sc;
-    }
-
-    throw new Error('Nada encontrado. Tente outro nome ou link do **SoundCloud**.');
+    throw new Error('Nada encontrado. Tente outro nome ou um link do **SoundCloud**.');
 }
 
-async function mirrorByTitle(node, url, tag) {
+async function mirrorByTitle(node, url) {
     try {
-        const meta = await node.rest.resolve(url).catch(() => null);
-        const title =
-            meta?.data?.info?.title ||
-            meta?.data?.tracks?.[0]?.info?.title ||
-            meta?.tracks?.[0]?.info?.title ||
-            null;
-        const author =
-            meta?.data?.info?.author || meta?.tracks?.[0]?.info?.author || '';
+        const meta = await resolveOnNode(node, url);
+        const t = meta?.tracks?.[0];
+        const title = t?.info?.title;
+        const author = t?.info?.author || '';
         if (!title) return null;
         const q = author ? `${title} ${author}` : title;
-        const sc = await node.rest.resolve(`scsearch:${q}`);
-        const parsed = parseResolveResult(sc);
+        const parsed = await resolveOnNode(node, `scsearch:${q}`);
         if (parsed?.tracks?.length) {
             return {
                 ...parsed,
                 usedQuery: `scsearch:${q}`,
                 nodeName: node.name,
                 fallbackMirror: true,
-                fallbackFromYoutube: tag === 'youtube'
+                fallbackFromYoutube: isYoutubeUrl(url)
             };
         }
     } catch (_) {}
@@ -251,43 +281,59 @@ async function mirrorByTitle(node, url, tag) {
 
 async function trySoundcloudMirror(shoukaku, track) {
     const title = track?.info?.title;
-    const author = track?.info?.author || '';
     if (!title) return null;
-    const node = shoukaku.getIdealNode();
-    if (!node) return null;
+    const author = track?.info?.author || '';
     const q = author ? `${title} ${author}` : title;
-    try {
-        const result = await node.rest.resolve(`scsearch:${q}`);
-        const parsed = parseResolveResult(result);
+    const nodes = listNodes(shoukaku);
+    for (const node of nodes) {
+        const parsed = await resolveOnNode(node, `scsearch:${q}`);
         if (parsed?.tracks?.[0]) return wrapTrack(parsed.tracks[0], track.requester);
-    } catch (_) {}
+        const parsed2 = await resolveOnNode(node, `scsearch:${title}`);
+        if (parsed2?.tracks?.[0]) return wrapTrack(parsed2.tracks[0], track.requester);
+    }
     return null;
 }
 
 function wrapTrack(raw, requesterId) {
+    const encoded = raw?.encoded || raw?.track;
+    if (!encoded) return null;
     return {
-        encoded: raw.encoded || raw.track,
+        encoded,
         info: raw.info || raw,
         requester: requesterId,
         pluginInfo: raw.pluginInfo || {}
     };
 }
 
-async function ensurePlayer(shoukaku, guild, voiceChannelId) {
-    let player = shoukaku.players.get(guild.id);
-    if (player) return player;
-
-    const shardId = guild.shardId ?? guild.shard?.id ?? 0;
-    player = await shoukaku.joinVoiceChannel({
-        guildId: guild.id,
-        channelId: voiceChannelId,
-        shardId,
-        deaf: true
-    });
-    return player;
+function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Sai da call só quando não há mais o que tocar */
+async function ensurePlayer(shoukaku, guild, voiceChannelId) {
+    let player = shoukaku.players.get(guild.id);
+    if (player) {
+        // já conectado — ok
+        return player;
+    }
+
+    const shardId = guild.shardId ?? guild.shard?.id ?? 0;
+    for (let i = 0; i < 3; i++) {
+        try {
+            player = await shoukaku.joinVoiceChannel({
+                guildId: guild.id,
+                channelId: voiceChannelId,
+                shardId,
+                deaf: true
+            });
+            if (player) return player;
+        } catch (e) {
+            if (i === 2) throw new Error('Não consegui entrar no canal de voz. Tente de novo.');
+            await sleep(800 * (i + 1));
+        }
+    }
+    throw new Error('Falha ao conectar na call.');
+}
+
 async function leaveIfIdle(client, guildId) {
     const shoukaku = client.shoukaku;
     if (!shoukaku) return;
@@ -306,17 +352,12 @@ async function notifyChannel(client, guildId, content, color = 0xf87171) {
         const q = getQueue(guildId);
         if (!q.textChannelId) return;
         const ch = await client.channels.fetch(q.textChannelId).catch(() => null);
-        if (ch?.isTextBased()) {
-            await ch
-                .send({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor(color)
-                            .setDescription(content)
-                    ]
-                })
-                .catch(() => {});
-        }
+        if (!ch?.isTextBased()) return;
+        await ch
+            .send({
+                embeds: [new EmbedBuilder().setColor(color).setDescription(String(content).slice(0, 1900))]
+            })
+            .catch(() => {});
     } catch (_) {}
 }
 
@@ -345,12 +386,12 @@ async function sendOrUpdatePanel(client, guildId, track) {
 }
 
 async function attemptPlay(player, track, volume) {
+    if (!track?.encoded) throw new Error('track sem encoded');
     await player.playTrack({ track: { encoded: track.encoded } });
-    // volume suave: aplica em etapas leves
-    const target = Math.max(1, Math.min(100, volume || 80));
+    const target = Math.max(1, Math.min(100, Number(volume) || 80));
     try {
-        await player.setGlobalVolume(Math.min(40, target));
-        await new Promise((r) => setTimeout(r, 120));
+        await player.setGlobalVolume(Math.min(35, target));
+        await sleep(100);
         await player.setGlobalVolume(target);
     } catch (_) {
         try {
@@ -360,135 +401,179 @@ async function attemptPlay(player, track, volume) {
 }
 
 async function playNext(client, guildId) {
-    const shoukaku = client.shoukaku;
-    if (!shoukaku) return;
-
-    const q = getQueue(guildId);
-    const player = shoukaku.players.get(guildId);
-    if (!player) return;
-
-    if (q.loop === 1 && q.current) {
-        // repete
-    } else if (q.loop === 2 && q.current) {
-        q.tracks.push(q.current);
-        q.current = null;
-    } else if (q.retries === 0) {
-        q.current = null;
-    }
-    // se retries > 0, mantém current para re-tentar
-
-    let next = q.current;
-    if (!next) {
-        next = q.tracks.shift();
-        q.retries = 0;
-    }
-    if (!next) {
-        await leaveIfIdle(client, guildId);
-        return;
-    }
-
-    q.current = next;
-    q.playing = true;
-    q.paused = false;
+    if (playLocks.get(guildId)) return;
+    playLocks.set(guildId, true);
 
     try {
-        await attemptPlay(player, next, q.volume);
-        q.retries = 0;
-        await sendOrUpdatePanel(client, guildId, next);
-    } catch (e) {
-        console.warn('[music] playTrack', e?.message || e);
-        await handlePlayFailure(client, guildId, next, e?.message || 'erro');
+        const shoukaku = client.shoukaku;
+        if (!shoukaku) return;
+
+        const q = getQueue(guildId);
+        let player = shoukaku.players.get(guildId);
+
+        // rejoin se player sumiu mas ainda há fila
+        if (!player && q.voiceChannelId && (q.current || q.tracks.length)) {
+            try {
+                const guild = await client.guilds.fetch(guildId).catch(() => null);
+                if (guild) {
+                    player = await ensurePlayer(shoukaku, guild, q.voiceChannelId);
+                    bindPlayerEvents(client, player, guildId);
+                }
+            } catch (_) {
+                await sleep(1000);
+                return;
+            }
+        }
+        if (!player) return;
+
+        // anti double-fire
+        const now = Date.now();
+        if (now - (q.lastAdvance || 0) < 250 && q.playing && q.current) return;
+        q.lastAdvance = now;
+
+        if (q.loop === 1 && q.current && q.retries === 0) {
+            // keep current
+        } else if (q.loop === 2 && q.current && q.retries === 0) {
+            q.tracks.push(q.current);
+            q.current = null;
+        } else if (q.retries === 0) {
+            q.current = null;
+        }
+
+        let next = q.current;
+        if (!next) {
+            next = q.tracks.shift();
+            q.retries = 0;
+        }
+        if (!next) {
+            await leaveIfIdle(client, guildId);
+            return;
+        }
+
+        q.current = next;
+        q.playing = true;
+        q.paused = false;
+
+        try {
+            await attemptPlay(player, next, q.volume);
+            q.retries = 0;
+            await sendOrUpdatePanel(client, guildId, next);
+        } catch (e) {
+            console.warn('[music] playTrack', e?.message || e);
+            await handlePlayFailure(client, guildId, next, e?.message || 'erro');
+        }
+    } finally {
+        playLocks.set(guildId, false);
     }
 }
 
 async function handlePlayFailure(client, guildId, track, reason) {
+    if (!track) {
+        const q = getQueue(guildId);
+        q.current = null;
+        q.retries = 0;
+        if (q.tracks.length) return playNext(client, guildId);
+        return leaveIfIdle(client, guildId);
+    }
+
     const shoukaku = client.shoukaku;
     const q = getQueue(guildId);
     q.retries = (q.retries || 0) + 1;
 
-    // 1) mirror SoundCloud
+    // mirror SC
     if (!track.__scTried) {
         track.__scTried = true;
-        const mirror = await trySoundcloudMirror(shoukaku, track);
-        if (mirror) {
-            await notifyChannel(
-                client,
-                guildId,
-                `🔄 Reproduzindo pelo **SoundCloud**: **${mirror.info?.title || track.info?.title}**`,
-                0x34d399
-            );
-            q.current = mirror;
-            q.retries = 0;
-            return playNext(client, guildId);
-        }
+        try {
+            const mirror = await trySoundcloudMirror(shoukaku, track);
+            if (mirror) {
+                q.current = mirror;
+                q.retries = 0;
+                return playNext(client, guildId);
+            }
+        } catch (_) {}
     }
 
-    // 2) retry mesma faixa
     if (q.retries < MAX_PLAY_RETRIES) {
-        await notifyChannel(
-            client,
-            guildId,
-            `⏳ Tentativa **${q.retries}/${MAX_PLAY_RETRIES}** — **${track.info?.title || 'faixa'}**\n_${String(reason).slice(0, 120)}_\nPermaneço na call.`,
-            0xfbbf24
-        );
-        await new Promise((r) => setTimeout(r, 1500 * q.retries));
+        await sleep(600 * q.retries);
         return playNext(client, guildId);
     }
 
-    // 3) esgotou retries → próxima da fila (ainda na call)
-    await notifyChannel(
-        client,
-        guildId,
-        `⏭️ Sem sucesso com **${track.info?.title || 'faixa'}** após ${MAX_PLAY_RETRIES} tentativas. Seguindo a fila…`,
-        0xf87171
-    );
+    // esgotou — próxima (fica na call)
     q.current = null;
     q.retries = 0;
 
     if (q.tracks.length) {
+        await notifyChannel(
+            client,
+            guildId,
+            `⏭️ Pulando faixa indisponível e seguindo a fila…`,
+            0xfbbf24
+        );
         return playNext(client, guildId);
     }
-    // só agora sai
+
+    await notifyChannel(
+        client,
+        guildId,
+        `Não consegui reproduzir. Fila vazia — saindo da call.`,
+        0xf87171
+    );
     await leaveIfIdle(client, guildId);
 }
 
 function bindPlayerEvents(client, player, guildId) {
-    if (player.__aeternusBound) return;
+    if (!player || player.__aeternusBound) return;
     player.__aeternusBound = true;
 
     player.on('end', (data) => {
-        const reason = data?.reason || data;
-        if (reason === 'replaced') return;
+        try {
+            const reason = data?.reason || data;
+            if (reason === 'replaced') return;
 
-        if (reason === 'loadFailed') {
             const q = getQueue(guildId);
-            handlePlayFailure(client, guildId, q.current, 'loadFailed').catch(() => {});
-            return;
-        }
+            if (reason === 'loadFailed') {
+                handlePlayFailure(client, guildId, q.current, 'loadFailed').catch(() => {});
+                return;
+            }
 
-        // fim normal → zera retries e avança
-        const q = getQueue(guildId);
-        q.retries = 0;
-        if (q.loop !== 1) q.current = null;
-        playNext(client, guildId).catch((e) => console.warn('[music] end', e?.message || e));
+            q.retries = 0;
+            if (q.loop !== 1) q.current = null;
+            playNext(client, guildId).catch(() => {});
+        } catch (_) {}
     });
 
     player.on('stuck', () => {
-        const q = getQueue(guildId);
-        handlePlayFailure(client, guildId, q.current, 'stuck').catch(() => {});
+        try {
+            const q = getQueue(guildId);
+            handlePlayFailure(client, guildId, q.current, 'stuck').catch(() => {});
+        } catch (_) {}
     });
 
     player.on('closed', () => {
-        // voz fechada pelo Discord — limpa estado
-        deleteQueue(guildId);
+        try {
+            const q = getQueue(guildId);
+            // se ainda tem fila, tenta rejoin em vez de apagar tudo
+            if (q.tracks.length || q.current) {
+                setTimeout(() => {
+                    playNext(client, guildId).catch(() => {});
+                }, 1500);
+            } else {
+                deleteQueue(guildId);
+            }
+        } catch (_) {}
     });
 
     player.on('exception', (data) => {
-        const q = getQueue(guildId);
-        const msg =
-            data?.exception?.message || data?.message || 'exception';
-        console.warn(`[music] exception ${guildId}: ${String(msg).slice(0, 120)}`);
-        handlePlayFailure(client, guildId, q.current, msg).catch(() => {});
+        try {
+            const q = getQueue(guildId);
+            const msg = data?.exception?.message || data?.message || 'exception';
+            console.warn(`[music] exception ${guildId}: ${String(msg).slice(0, 100)}`);
+            handlePlayFailure(client, guildId, q.current, msg).catch(() => {});
+        } catch (_) {}
+    });
+
+    player.on('error', () => {
+        /* engole — tratado via exception/end */
     });
 }
 
@@ -496,10 +581,23 @@ async function enqueue(client, { guild, voiceChannelId, textChannelId, query, re
     const shoukaku = client.shoukaku;
     if (!shoukaku) throw new Error('Sistema de música não inicializado.');
 
-    const resolved = await resolveTracks(shoukaku, query);
-    const wrapped = resolved.tracks
-        .filter((t) => t && (t.encoded || t.track))
-        .map((t) => wrapTrack(t, requesterId));
+    let resolved;
+    try {
+        resolved = await resolveTracks(shoukaku, query);
+    } catch (e) {
+        // última chance: só SC com query limpa
+        const nodes = listNodes(shoukaku);
+        const q = String(query || '').replace(/https?:\/\/\S+/g, '').trim();
+        if (q && nodes[0]) {
+            const p = await resolveOnNode(nodes[0], `scsearch:${q}`);
+            if (p?.tracks?.length) resolved = { ...p, usedQuery: `scsearch:${q}` };
+        }
+        if (!resolved) throw e;
+    }
+
+    const wrapped = (resolved.tracks || [])
+        .map((t) => wrapTrack(t, requesterId))
+        .filter(Boolean);
 
     if (!wrapped.length) throw new Error('Nenhuma faixa válida.');
 
@@ -530,121 +628,137 @@ async function enqueue(client, { guild, voiceChannelId, textChannelId, query, re
     };
 }
 
-/** Botões do painel */
+async function safeReply(interaction, payload) {
+    try {
+        if (interaction.deferred || interaction.replied) {
+            return interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
+        }
+        return interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+    } catch (_) {}
+}
+
 async function handleMusicButton(interaction, client) {
-    const parts = String(interaction.customId || '').split(':');
-    // music:action:guildId
-    const action = parts[1];
-    const guildId = parts[2] || interaction.guildId;
-    if (!guildId || guildId !== interaction.guildId) {
-        return interaction.reply({ content: 'Sessão inválida.', ephemeral: true });
-    }
-
-    const member = interaction.member;
-    const voiceId = member?.voice?.channelId;
-    const q = getQueue(guildId);
-    const shoukaku = client.shoukaku;
-    const player = shoukaku?.players?.get(guildId);
-
-    if (!voiceId || (q.voiceChannelId && voiceId !== q.voiceChannelId)) {
-        return interaction.reply({
-            content: 'Entre no mesmo canal de voz do bot.',
-            ephemeral: true
-        });
-    }
-
-    if (action === 'pause') {
-        if (!player || !q.current) {
-            return interaction.reply({ content: 'Nada tocando.', ephemeral: true });
+    try {
+        const parts = String(interaction.customId || '').split(':');
+        const action = parts[1];
+        const guildId = parts[2] || interaction.guildId;
+        if (!guildId || guildId !== interaction.guildId) {
+            return safeReply(interaction, { content: 'Sessão inválida.' });
         }
-        if (q.paused) {
-            await player.setPaused(false);
-            q.paused = false;
-        } else {
-            await player.setPaused(true);
-            q.paused = true;
-        }
-        await interaction.update({
-            embeds: [trackEmbed(q.current, q, q.paused ? 'Pausado' : 'Tocando agora')],
-            components: [controlRow(guildId, q.paused)]
-        }).catch(() => interaction.deferUpdate());
-        return;
-    }
 
-    if (action === 'skip') {
-        if (!player || !q.current) {
-            return interaction.reply({ content: 'Nada para pular.', ephemeral: true });
+        const member = interaction.member;
+        const voiceId = member?.voice?.channelId;
+        const q = getQueue(guildId);
+        const shoukaku = client.shoukaku;
+        const player = shoukaku?.players?.get(guildId);
+
+        if (!voiceId || (q.voiceChannelId && voiceId !== q.voiceChannelId)) {
+            return safeReply(interaction, { content: 'Entre no mesmo canal de voz do bot.' });
         }
-        q.retries = 0;
-        q.current = null;
-        await interaction.reply({ content: '⏭️ Pulando…', ephemeral: true }).catch(() => {});
+
+        if (action === 'pause') {
+            if (!player || !q.current) return safeReply(interaction, { content: 'Nada tocando.' });
+            try {
+                if (q.paused) {
+                    await player.setPaused(false);
+                    q.paused = false;
+                } else {
+                    await player.setPaused(true);
+                    q.paused = true;
+                }
+                await interaction
+                    .update({
+                        embeds: [trackEmbed(q.current, q, q.paused ? 'Pausado' : 'Tocando agora')],
+                        components: [controlRow(guildId, q.paused)]
+                    })
+                    .catch(() => interaction.deferUpdate().catch(() => {}));
+            } catch (_) {
+                await interaction.deferUpdate().catch(() => {});
+            }
+            return;
+        }
+
+        if (action === 'skip') {
+            if (!player || !q.current) return safeReply(interaction, { content: 'Nada para pular.' });
+            q.retries = 0;
+            q.current = null;
+            await safeReply(interaction, { content: '⏭️ Pulando…' });
+            try {
+                await player.stopTrack();
+            } catch (_) {
+                playNext(client, guildId).catch(() => {});
+            }
+            return;
+        }
+
+        if (action === 'stop') {
+            q.tracks = [];
+            q.current = null;
+            q.retries = 0;
+            q.playing = false;
+            try {
+                await player?.stopTrack?.();
+            } catch (_) {}
+            try {
+                await interaction.update({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(0x6b7280)
+                            .setTitle('⏹️  Parado')
+                            .setDescription('Fila limpa.')
+                    ],
+                    components: []
+                });
+            } catch (_) {
+                await interaction.deferUpdate().catch(() => {});
+            }
+            await leaveIfIdle(client, guildId);
+            return;
+        }
+
+        if (action === 'queue') {
+            const lines = [];
+            if (q.current) {
+                lines.push(`**▶** ${q.current.info?.title || '?'} — <@${q.current.requester}>`);
+            }
+            q.tracks.slice(0, 10).forEach((t, i) => {
+                lines.push(`\`${i + 1}.\` ${t.info?.title || '?'} — <@${t.requester}>`);
+            });
+            if (!lines.length) lines.push('_Fila vazia._');
+            if (q.tracks.length > 10) lines.push(`_…e mais ${q.tracks.length - 10}_`);
+            return safeReply(interaction, {
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0xa78bfa)
+                        .setTitle('📜 Fila')
+                        .setDescription(lines.join('\n').slice(0, 3900))
+                ]
+            });
+        }
+
+        if (action === 'loop') {
+            q.loop = (q.loop + 1) % 3;
+            const label = q.loop === 0 ? 'Off' : q.loop === 1 ? 'Faixa' : 'Fila';
+            if (q.current) {
+                await interaction
+                    .update({
+                        embeds: [trackEmbed(q.current, q)],
+                        components: [controlRow(guildId, q.paused)]
+                    })
+                    .catch(() => {});
+            } else {
+                await interaction.deferUpdate().catch(() => {});
+            }
+            return safeReply(interaction, { content: `🔁 Loop: **${label}**` });
+        }
+
+        return safeReply(interaction, { content: 'Ação desconhecida.' });
+    } catch (e) {
+        console.warn('[music] button', e?.message || e);
         try {
-            await player.stopTrack();
-        } catch (_) {
-            playNext(client, guildId).catch(() => {});
-        }
-        return;
-    }
-
-    if (action === 'stop') {
-        q.tracks = [];
-        q.current = null;
-        q.retries = 0;
-        q.playing = false;
-        try {
-            await player?.stopTrack?.();
+            await interaction.deferUpdate();
         } catch (_) {}
-        await interaction.update({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0x6b7280)
-                    .setTitle('⏹️  Parado')
-                    .setDescription('Fila limpa. Saindo do canal…')
-            ],
-            components: []
-        }).catch(() => {});
-        await leaveIfIdle(client, guildId);
-        return;
     }
-
-    if (action === 'queue') {
-        const lines = [];
-        if (q.current) {
-            lines.push(`**▶** ${q.current.info?.title || '?'} — <@${q.current.requester}>`);
-        }
-        q.tracks.slice(0, 10).forEach((t, i) => {
-            lines.push(`\`${i + 1}.\` ${t.info?.title || '?'} — <@${t.requester}>`);
-        });
-        if (!lines.length) lines.push('_Fila vazia._');
-        if (q.tracks.length > 10) lines.push(`_…e mais ${q.tracks.length - 10}_`);
-
-        return interaction.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0xa78bfa)
-                    .setTitle('📜 Fila')
-                    .setDescription(lines.join('\n'))
-            ],
-            ephemeral: true
-        });
-    }
-
-    if (action === 'loop') {
-        q.loop = (q.loop + 1) % 3;
-        const label = q.loop === 0 ? 'Off' : q.loop === 1 ? 'Faixa' : 'Fila';
-        if (q.current) {
-            await interaction.update({
-                embeds: [trackEmbed(q.current, q)],
-                components: [controlRow(guildId, q.paused)]
-            }).catch(() => {});
-        }
-        return interaction.followUp({
-            content: `🔁 Loop: **${label}**`,
-            ephemeral: true
-        }).catch(() => {});
-    }
-
-    return interaction.reply({ content: 'Ação desconhecida.', ephemeral: true }).catch(() => {});
 }
 
 module.exports = {

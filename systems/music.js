@@ -1,83 +1,96 @@
 /**
- * Sistema de música — Shoukaku + múltiplos nodes Lavalink.
- * Aplica token OAuth do YouTube (env do bot) em cada node ao conectar.
+ * Sistema de música — Shoukaku endurecido (reconnect, failover, sem spam).
  */
 const { Shoukaku, Connectors } = require('shoukaku');
 const { getNodes } = require('../utils/musicNodes');
 const musicManager = require('../utils/musicManager');
 const youtubeOauth = require('../utils/youtubeOauth');
 
-/** evita flood no log / autoRepair */
 const lastLog = new Map();
-function throttledLog(key, fn, ms = 60_000) {
+function throttledLog(key, fn, ms = 90_000) {
     const now = Date.now();
     const prev = lastLog.get(key) || 0;
     if (now - prev < ms) return;
     lastLog.set(key, now);
-    fn();
+    try {
+        fn();
+    } catch (_) {}
 }
 
 function setup(client) {
     const nodes = getNodes();
     if (!nodes.length) {
-        console.warn('[music] Nenhum node configurado — música desativada.');
+        console.warn('[music] Nenhum node — música desativada.');
         return;
     }
 
-    const shoukaku = new Shoukaku(new Connectors.DiscordJS(client), nodes, {
-        moveOnDisconnect: true,
-        resume: true,
-        resumeTimeout: 60,
-        reconnectTries: 6,
-        reconnectInterval: 12,
-        restTimeout: 45,
-        userAgent: 'Aeternus/2.0 (Shoukaku)',
-        voiceConnectionTimeout: 30
-    });
+    let shoukaku;
+    try {
+        shoukaku = new Shoukaku(new Connectors.DiscordJS(client), nodes, {
+            moveOnDisconnect: true,
+            resume: true,
+            resumeTimeout: 90,
+            reconnectTries: 12,
+            reconnectInterval: 8,
+            restTimeout: 30,
+            userAgent: 'Aeternus/2.1 (Shoukaku)',
+            voiceConnectionTimeout: 45,
+            nodeResolver: (map) => {
+                // prefere node com menos players / conectado
+                let best = null;
+                let bestScore = Infinity;
+                for (const node of map.values()) {
+                    const st = node.state;
+                    const connected = st === 2 || st === 'CONNECTED' || !!node.sessionId;
+                    if (!connected) continue;
+                    const players = node.players?.size ?? 0;
+                    const pen = node.penalties ?? 0;
+                    const score = players * 10 + pen;
+                    if (score < bestScore) {
+                        bestScore = score;
+                        best = node;
+                    }
+                }
+                return best || map.values().next().value || null;
+            }
+        });
+    } catch (e) {
+        console.error('[music] falha ao iniciar Shoukaku:', e.message);
+        return;
+    }
 
     client.shoukaku = shoukaku;
 
     shoukaku.on('ready', (name, reconnected) => {
-        throttledLog(
-            `ready:${name}`,
-            () =>
-                console.log(
-                    `🎵 [lavalink] node pronto: ${name}${reconnected ? ' (reconectado)' : ''}`
-                ),
-            15_000
-        );
+        throttledLog(`ready:${name}`, () => {
+            console.log(
+                `🎵 [lavalink] node pronto: ${name}${reconnected ? ' (reconectado)' : ''}`
+            );
+        }, 20_000);
 
-        // Envia refresh token do bot → plugin youtube do node
         const node = shoukaku.nodes.get(name);
         if (node) {
-            youtubeOauth.applyYoutubeOauthToNode(node).catch((e) => {
-                console.warn('[music] oauth on ready:', e.message);
-            });
+            youtubeOauth.applyYoutubeOauthToNode(node).catch(() => {});
         }
     });
 
     shoukaku.on('error', (name, error) => {
         const msg = error?.message || String(error || '');
-        if (/ETIMEDOUT|ECONNREFUSED|ENOTFOUND|ECONNRESET|socket hang up|1006/i.test(msg)) {
-            throttledLog(`err:${name}`, () => {
-                console.warn(`🎵 [lavalink] ${name} offline/instável: ${msg}`);
-            });
-            return;
-        }
-        throttledLog(`err2:${name}:${msg.slice(0, 40)}`, () => {
-            console.error(`🎵 [lavalink] erro em ${name}:`, msg);
+        // nunca console.error em erros de rede esperados (autoRepair)
+        throttledLog(`err:${name}:${msg.slice(0, 30)}`, () => {
+            console.warn(`🎵 [lavalink] ${name}: ${msg.slice(0, 120)}`);
         });
     });
 
-    shoukaku.on('close', (name, code, reason) => {
+    shoukaku.on('close', (name, code) => {
         throttledLog(`close:${name}:${code}`, () => {
-            console.warn(`🎵 [lavalink] fechado ${name} · ${code} · ${reason || ''}`);
+            console.warn(`🎵 [lavalink] fechado ${name} · ${code}`);
         });
     });
 
-    shoukaku.on('disconnect', (name, count) => {
+    shoukaku.on('disconnect', (name) => {
         throttledLog(`disc:${name}`, () => {
-            console.warn(`🎵 [lavalink] disconnect ${name} · players: ${count}`);
+            console.warn(`🎵 [lavalink] disconnect ${name}`);
         });
     });
 
@@ -85,27 +98,27 @@ function setup(client) {
         if (process.env.MUSIC_DEBUG === '1') console.log(`[music:debug] ${name}`, info);
     });
 
+    // evita uncaught de eventos do player
+    process.on?.('unhandledRejection', (err) => {
+        const m = err?.message || String(err || '');
+        if (/shoukaku|lavalink|voice/i.test(m)) {
+            console.warn('[music] rejection engolida:', m.slice(0, 120));
+        }
+    });
+
     const logActive = () => {
-        console.log(
-            `🎵 [music] Shoukaku · configurados: ${nodes.length} · mapa: ${[...shoukaku.nodes.keys()].join(', ') || '—'}`
-        );
-        // segunda tentativa (nodes que já estavam ready antes do listener)
-        youtubeOauth.applyToAllNodes(shoukaku).catch(() => {});
+        try {
+            console.log(
+                `🎵 [music] nodes: ${nodes.length} · mapa: ${[...shoukaku.nodes.keys()].join(', ') || '—'}`
+            );
+            youtubeOauth.applyToAllNodes(shoukaku).catch(() => {});
+        } catch (_) {}
     };
 
     client.on('clientReady', logActive);
     client.on('ready', logActive);
 
-    const found = youtubeOauth.getRefreshTokenFromEnv();
-    if (found) {
-        console.log(`[music] YouTube OAuth token detectado no env (${found.key}) — será enviado aos nodes`);
-    } else {
-        console.log(
-            '[music] Sem token YouTube no env do bot. Use YOUTUBE_OAUTH_REFRESH_TOKEN se tiver.'
-        );
-    }
-
-    console.log(`[music] Shoukaku · ${nodes.length} node(s) configurado(s)`);
+    console.log(`[music] Shoukaku · ${nodes.length} node(s)`);
     for (const n of nodes) {
         console.log(`  → ${n.name} @ ${n.url} (secure=${!!n.secure})`);
     }
