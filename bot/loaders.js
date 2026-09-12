@@ -59,6 +59,35 @@ const SLASH_NAME_MAP = {
     userinfo: 'userinfo'
 };
 
+/** Comandos só prefixo — não registram slash (evita teto 100 da API) */
+const PREFIX_ONLY = new Set([
+    // interações / GIFs
+    'abraco',
+    'beijo',
+    'tapa',
+    'carinho',
+    'cutucar',
+    'morder',
+    'bonk',
+    'highfive',
+    'chorar',
+    'dancar',
+    'cafune',
+    'acenar',
+    'corar',
+    'sorrir',
+    'rir',
+    'maos',
+    'lambida',
+    'yeet',
+    'matar',
+    'piscadela',
+    // utilidades pouco usadas em slash
+    'avatar',
+    'serverinfo',
+    'userinfo'
+]);
+
 function sanitizeSlashName(name) {
     return String(name || '')
         .toLowerCase()
@@ -69,6 +98,9 @@ function sanitizeSlashName(name) {
 
 function ensureSlashData(cmd) {
     if (cmd.data) return;
+    if (PREFIX_ONLY.has(cmd.name)) return;
+    if (cmd.slash === false || cmd.noSlash === true) return;
+
     const n = sanitizeSlashName(SLASH_NAME_MAP[cmd.name] || cmd.name);
     if (!n || n.length < 1) return;
 
@@ -90,6 +122,10 @@ function ensureSlashData(cmd) {
 function loadCommands(client) {
     const dir = path.join(__dirname, '..', 'commands');
     if (!fs.existsSync(dir)) return;
+
+    let slashCount = 0;
+    const MAX_SLASH = 95; // margem abaixo do teto 100
+
     for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
         try {
             const full = path.join(dir, file);
@@ -97,10 +133,22 @@ function loadCommands(client) {
             const cmd = require(full);
             if (!cmd?.name) continue;
 
-            ensureSlashData(cmd);
-
             const mainName = String(cmd.name).toLowerCase().trim();
             cmd.name = mainName;
+
+            // interações registradas via utils/interaction já trazem .data — remove se prefix-only
+            if (PREFIX_ONLY.has(mainName) || cmd.slash === false || cmd.noSlash === true) {
+                delete cmd.data;
+            } else {
+                ensureSlashData(cmd);
+            }
+
+            // teto de segurança
+            if (cmd.data && slashCount >= MAX_SLASH) {
+                console.warn(`[slash] teto ${MAX_SLASH} — /${cmd.data.name} não registrado`);
+                delete cmd.data;
+            }
+
             client.commands.set(mainName, cmd);
             if (Array.isArray(cmd.aliases)) {
                 for (const a of cmd.aliases) {
@@ -111,6 +159,7 @@ function loadCommands(client) {
 
             if (cmd.data?.name) {
                 client.slash.set(cmd.data.name, cmd);
+                slashCount++;
                 console.log(`⚡ [SLASH] /${cmd.data.name}`);
             }
 
@@ -119,6 +168,8 @@ function loadCommands(client) {
             console.error(`Erro comando ${file}:`, e.message);
         }
     }
+
+    console.log(`[slash] total preparados: ${slashCount} (teto API=100)`);
 }
 
 function loadEvents(client) {
@@ -157,4 +208,4 @@ function loadSystems(client) {
     }
 }
 
-module.exports = { loadCommands, loadEvents, loadSystems };
+module.exports = { loadCommands, loadEvents, loadSystems, PREFIX_ONLY };

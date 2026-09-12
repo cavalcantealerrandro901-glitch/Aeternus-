@@ -1,13 +1,10 @@
 /**
  * Envia o refresh token do YouTube do bot para o node Lavalink (plugin youtube-source).
- * POST /youtube { refreshToken, skipInitialization }
+ * Rota do plugin: POST /youtube (FORA do prefixo /v4 do Shoukaku).
  *
- * Variáveis aceitas no Render do BOT:
- *   YOUTUBE_OAUTH_REFRESH_TOKEN
- *   YOUTUBE_REFRESH_TOKEN
- *   PLUGINS_YOUTUBE_OAUTH_REFRESHTOKEN
- *   YOUTUBE_TOKEN
- *   GOOGLE_REFRESH_TOKEN
+ * Env aceitos no BOT:
+ *   YOUTUBE_OAUTH_REFRESH_TOKEN | YOUTUBE_REFRESH_TOKEN |
+ *   PLUGINS_YOUTUBE_OAUTH_REFRESHTOKEN | YOUTUBE_TOKEN | GOOGLE_REFRESH_TOKEN
  */
 
 function getRefreshTokenFromEnv() {
@@ -26,52 +23,73 @@ function getRefreshTokenFromEnv() {
     return null;
 }
 
+/** Extrai base URL (sem /v4) e auth a partir do node Shoukaku */
+function getNodeHttp(node) {
+    const rest = node?.rest;
+    if (!rest) return null;
+
+    // rest.url = https://host:443/v4
+    let base = String(rest.url || '').replace(/\/v\d+\/?$/, '');
+    if (!base && node.options) {
+        const secure = !!node.options.secure;
+        const host = String(node.options.url || '').replace(/^https?:\/\//, '');
+        base = `${secure ? 'https' : 'http'}://${host}`;
+    }
+    const auth = rest.auth || node.options?.auth || null;
+    if (!base || !auth) return null;
+    return { base, auth };
+}
+
 /**
  * @param {import('shoukaku').Node} node
  */
 async function applyYoutubeOauthToNode(node) {
     const found = getRefreshTokenFromEnv();
     if (!found) {
-        console.log(
-            '[music] YouTube OAuth: nenhum token no env do bot (YOUTUBE_OAUTH_REFRESH_TOKEN etc.)'
-        );
         return { ok: false, reason: 'no_token' };
     }
 
-    const name = node?.name || '?';
-    try {
-        // Shoukaku Node.rest — path relativo à base do node
-        const res = await node.rest.post('/youtube', {
-            refreshToken: found.token,
-            skipInitialization: true
-        });
+    const http = getNodeHttp(node);
+    if (!http) {
+        console.warn('[music] YouTube OAuth: não consegui ler URL/auth do node');
+        return { ok: false, reason: 'no_http' };
+    }
 
-        console.log(
-            `🎵 [music] YouTube OAuth aplicado em ${name} (env=${found.key})`,
-            res && typeof res === 'object' ? JSON.stringify(res).slice(0, 120) : ''
-        );
-        return { ok: true, node: name, envKey: found.key };
-    } catch (e1) {
-        // algumas builds usam body em formato diferente / rota sem barra
-        try {
-            const res = await node.rest.post('youtube', {
+    const name = node?.name || '?';
+    const url = `${http.base}/youtube`;
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                Authorization: http.auth,
+                'Content-Type': 'application/json',
+                'User-Agent': 'Aeternus/2.0'
+            },
+            body: JSON.stringify({
                 refreshToken: found.token,
                 skipInitialization: true
-            });
-            console.log(`🎵 [music] YouTube OAuth aplicado em ${name} (rota alt)`, res);
-            return { ok: true, node: name, envKey: found.key };
-        } catch (e2) {
-            const msg = e2?.message || e1?.message || String(e2 || e1);
-            console.warn(`🎵 [music] falha ao aplicar YouTube OAuth em ${name}: ${msg}`);
-            return { ok: false, reason: msg, node: name };
+            })
+        });
+
+        const text = await res.text().catch(() => '');
+        if (!res.ok) {
+            console.warn(
+                `🎵 [music] YouTube OAuth HTTP ${res.status} em ${name}: ${text.slice(0, 200)}`
+            );
+            return { ok: false, reason: `http_${res.status}`, node: name };
         }
+
+        console.log(
+            `🎵 [music] YouTube OAuth OK em ${name} (env=${found.key}) ${text.slice(0, 80)}`
+        );
+        return { ok: true, node: name, envKey: found.key };
+    } catch (e) {
+        console.warn(`🎵 [music] falha YouTube OAuth em ${name}: ${e.message || e}`);
+        return { ok: false, reason: e.message, node: name };
     }
 }
 
-/**
- * Aplica em todos os nodes prontos do Shoukaku.
- * @param {import('shoukaku').Shoukaku} shoukaku
- */
 async function applyToAllNodes(shoukaku) {
     if (!shoukaku?.nodes) return;
     for (const [, node] of shoukaku.nodes) {

@@ -3,53 +3,28 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    SlashCommandBuilder,
     MessageFlags
 } = require('discord.js');
 const gifs = require('./gifs');
 
 const ACTIONS = {};
 
-const NEKOS = {
-    hug: 'hug',
-    kiss: 'kiss',
-    slap: 'slap',
-    pat: 'pat',
-    poke: 'poke',
-    bite: 'bite',
-    highfive: 'highfive',
-    cry: 'cry',
-    dance: 'dance',
-    bonk: 'baka',
-    abraco: 'hug',
-    beijo: 'kiss',
-    tapa: 'slap',
-    carinho: 'pat',
-    cutucar: 'poke',
-    morder: 'bite',
-    chorar: 'cry',
-    dancar: 'dance'
-};
-
 function register(def) {
     ACTIONS[def.name] = def;
-    const data = new SlashCommandBuilder()
-        .setName(String(def.name).slice(0, 32))
-        .setDescription(String(def.description || def.name).slice(0, 100))
-        .addUserOption((o) =>
-            o.setName('usuario').setDescription('Membro').setRequired(false)
-        );
+    // Sem SlashCommandBuilder aqui — interações ficam só em prefixo (teto 100 slash)
     return {
         name: def.name,
         aliases: def.aliases || [],
         description: def.description || def.name,
         category: 'interacao',
-        data,
+        slash: false,
+        noSlash: true,
         async execute(message) {
             await run(message, def, {});
         },
         async executeSlash(interaction) {
-            const target = interaction.options.getUser('usuario');
+            // fallback se ainda existir slash antigo cacheado
+            const target = interaction.options?.getUser?.('usuario');
             const fake = {
                 author: interaction.user,
                 client: interaction.client,
@@ -63,12 +38,9 @@ function register(def) {
         async handleComponent(interaction) {
             const parts = String(interaction.customId || '').split(':');
 
-            // Formatos:
-            //  nome:devolver:quemRecebeu:quemEnviou
-            //  act:devolver:nome:quemRecebeu:quemEnviou  (legado)
             let actionName;
-            let fromId; // quem pode clicar (recebeu)
-            let toId; // quem recebe a devolução (autor original)
+            let fromId;
+            let toId;
 
             if (parts[0] === 'act' && parts[1] === 'devolver') {
                 actionName = parts[2];
@@ -102,7 +74,6 @@ function register(def) {
                 });
             }
 
-            // Desativa o botão na mensagem original
             try {
                 const disabled = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
@@ -133,25 +104,8 @@ function register(def) {
     };
 }
 
-async function fetchNekos(key) {
-    const ep = NEKOS[key] || NEKOS.hug;
-    try {
-        const res = await fetch(`https://nekos.best/api/v2/${ep}`, {
-            headers: { Accept: 'application/json' }
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        const url = data?.results?.[0]?.url;
-        return url || null;
-    } catch {
-        return null;
-    }
-}
-
 async function pickGif(def) {
     const key = def.gif || def.name;
-    const online = await fetchNekos(key);
-    if (online) return online;
     if (typeof gifs.pickAsync === 'function') {
         try {
             const a = await gifs.pickAsync(key);
@@ -171,7 +125,7 @@ async function run(message, def, opts) {
                 new EmbedBuilder()
                     .setColor(def.color || 0xf472b6)
                     .setTitle(`${def.returnEmoji || '✨'}  ${def.name}`)
-                    .setDescription('Mencione alguém ou use a opção **usuario**.')
+                    .setDescription('Mencione alguém (ex.: `O.' + def.name + ' @user`).')
             ]
         });
     }
@@ -199,13 +153,10 @@ async function run(message, def, opts) {
     const content = target ? `${author} ➜ ${target}` : `${author}`;
     const components = [];
 
-    // Botão devolver: só se houver alvo humano e não for uma devolução em cadeia infinita opcional
-    // (ainda permite devolver a devolução — o botão fica na nova mensagem)
     if (target && !target.bot) {
         components.push(
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    // root = nome do comando → interactionCreate encontra handleComponent
                     .setCustomId(`${def.name}:devolver:${target.id}:${author.id}`)
                     .setLabel(def.returnLabel || 'Devolver')
                     .setEmoji(def.returnEmoji || '🔁')
@@ -216,7 +167,6 @@ async function run(message, def, opts) {
 
     await message.reply({ content, embeds: [embed], components });
 
-    // Bots “devolvem” sozinhos
     if (target?.bot && !opts.isReturn) {
         setTimeout(async () => {
             try {
