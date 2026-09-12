@@ -1,5 +1,6 @@
 /**
  * Filas e controle de players Shoukaku (1 fila por guild).
+ * Busca multi-fonte: SoundCloud → Deezer → Spotify → YT Music → YouTube.
  */
 const { EmbedBuilder } = require('discord.js');
 
@@ -39,6 +40,7 @@ function formatMs(ms) {
 
 function trackEmbed(track, title = 'Tocando agora') {
     const info = track?.info || {};
+    const source = String(info.sourceName || '—').slice(0, 32);
     return new EmbedBuilder()
         .setColor(0xa78bfa)
         .setTitle(`🎵 ${title}`)
@@ -56,7 +58,7 @@ function trackEmbed(track, title = 'Tocando agora') {
             },
             {
                 name: 'Fonte',
-                value: String(info.sourceName || '—').slice(0, 32),
+                value: source,
                 inline: true
             },
             {
@@ -77,12 +79,36 @@ function isYoutubeUrl(q) {
     return /youtube\.com|youtu\.be|music\.youtube\.com/i.test(String(q || ''));
 }
 
-/** Prefixos de busca em ordem de tentativa (nodes públicos quebram YT com frequência) */
+function isSoundcloudUrl(q) {
+    return /soundcloud\.com/i.test(String(q || ''));
+}
+
+function isSpotifyUrl(q) {
+    return /open\.spotify\.com|spotify\.com/i.test(String(q || ''));
+}
+
+function isDeezerUrl(q) {
+    return /deezer\.com/i.test(String(q || ''));
+}
+
+/**
+ * Ordem de busca (texto livre):
+ * 1. SoundCloud — mais estável em nodes free
+ * 2. Deezer / Spotify (metadados; o node pode resolver stream)
+ * 3. YouTube Music / YouTube — por último (quebra com frequência)
+ */
 function searchIdentifiers(raw) {
     const q = String(raw || '').trim();
     if (!q) return [];
     if (isUrl(q)) return [q];
-    return [`ytsearch:${q}`, `scsearch:${q}`, `ytmsearch:${q}`];
+
+    return [
+        `scsearch:${q}`,
+        `dzsearch:${q}`,
+        `spsearch:${q}`,
+        `ytmsearch:${q}`,
+        `ytsearch:${q}`
+    ];
 }
 
 function parseResolveResult(result) {
@@ -119,7 +145,7 @@ function parseResolveResult(result) {
 }
 
 /**
- * Resolve com fallback entre fontes (YouTube → SoundCloud → YT Music).
+ * Resolve com fallback entre fontes.
  */
 async function resolveTracks(shoukaku, query) {
     const node = shoukaku.getIdealNode();
@@ -144,27 +170,43 @@ async function resolveTracks(shoukaku, query) {
                 );
             }
         } catch (e) {
-            errors.push(`${identifier}: ${e.message || e}`);
+            // dzsearch/spsearch podem não existir no node — ignora em silêncio
+            const msg = e.message || String(e);
+            if (!/not enabled|unknown|unsupported|400/i.test(msg)) {
+                errors.push(`${identifier}: ${msg}`);
+            }
         }
     }
 
-    // URL do YouTube falhou → tenta buscar o título no SoundCloud se possível
+    // URL YouTube falhou → tenta título no SoundCloud
     if (isUrl(query) && isYoutubeUrl(query)) {
+        const sc = await fallbackYoutubeToSoundcloud(node, query);
+        if (sc) return sc;
+    }
+
+    // Spotify / Deezer URL: tenta extrair e buscar no SC
+    if (isUrl(query) && (isSpotifyUrl(query) || isDeezerUrl(query))) {
         try {
             const meta = await node.rest.resolve(query).catch(() => null);
             const title =
                 meta?.data?.info?.title ||
+                meta?.data?.tracks?.[0]?.info?.title ||
                 meta?.tracks?.[0]?.info?.title ||
                 null;
+            const author =
+                meta?.data?.info?.author ||
+                meta?.tracks?.[0]?.info?.author ||
+                '';
             if (title) {
-                const sc = await node.rest.resolve(`scsearch:${title}`);
+                const q2 = author ? `${title} ${author}` : title;
+                const sc = await node.rest.resolve(`scsearch:${q2}`);
                 const parsed = parseResolveResult(sc);
                 if (parsed?.tracks?.length) {
                     return {
                         ...parsed,
-                        usedQuery: `scsearch:${title}`,
+                        usedQuery: `scsearch:${q2}`,
                         nodeName: node.name,
-                        fallbackFromYoutube: true
+                        fallbackMirror: true
                     };
                 }
             }
@@ -175,8 +217,48 @@ async function resolveTracks(shoukaku, query) {
     throw new Error(
         hint
             ? `Não achei uma fonte tocável. ${hint}`
-            : 'Nada encontrado (YouTube costuma falhar em nodes públicos). Tente outro nome ou link do SoundCloud.'
+            : 'Nada encontrado. Tente outro nome ou um link do **SoundCloud**.'
     );
+}
+
+async function fallbackYoutubeToSoundcloud(node, youtubeUrl) {
+    try {
+        const meta = await node.rest.resolve(youtubeUrl).catch(() => null);
+        const title =
+            meta?.data?.info?.title ||
+            meta?.tracks?.[0]?.info?.title ||
+            null;
+        if (!title) return null;
+        const sc = await node.rest.resolve(`scsearch:${title}`);
+        const parsed = parseResolveResult(sc);
+        if (parsed?.tracks?.length) {
+            return {
+                ...parsed,
+                usedQuery: `scsearch:${title}`,
+                nodeName: node.name,
+                fallbackFromYoutube: true
+            };
+        }
+    } catch (_) {}
+    return null;
+}
+
+/** Se a faixa YouTube falhar no play, tenta achar no SoundCloud pelo título */
+async function trySoundcloudMirror(shoukaku, track) {
+    const title = track?.info?.title;
+    const author = track?.info?.author || '';
+    if (!title) return null;
+    const node = shoukaku.getIdealNode();
+    if (!node) return null;
+    const q = author ? `${title} ${author}` : title;
+    try {
+        const result = await node.rest.resolve(`scsearch:${q}`);
+        const parsed = parseResolveResult(result);
+        if (parsed?.tracks?.[0]) {
+            return wrapTrack(parsed.tracks[0], track.requester);
+        }
+    } catch (_) {}
+    return null;
 }
 
 function wrapTrack(raw, requesterId) {
@@ -208,11 +290,11 @@ function exceptionMessage(data) {
         data?.message ||
         (typeof data === 'string' ? data : '') ||
         '';
-    if (/requires login|All clients failed|No supported audio/i.test(msg)) {
-        return 'O YouTube bloqueou esta faixa neste node (login/OAuth). Pulando… Tente SoundCloud ou outro título.';
+    if (/requires login|All clients failed|No supported audio|Read timed out/i.test(msg)) {
+        return 'Fonte bloqueada neste node. Tentando outra plataforma…';
     }
     if (msg) return msg.split('\n')[0].slice(0, 180);
-    return 'Erro ao decodificar a faixa. Pulando…';
+    return 'Erro ao decodificar a faixa.';
 }
 
 async function notifyChannel(client, guildId, content) {
@@ -226,7 +308,7 @@ async function notifyChannel(client, guildId, content) {
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0xf87171)
-                            .setTitle('⚠️ Faixa ignorada')
+                            .setTitle('⚠️ Faixa')
                             .setDescription(content)
                     ]
                 })
@@ -272,6 +354,28 @@ async function playNext(client, guildId) {
         await player.setGlobalVolume(q.volume);
     } catch (e) {
         console.warn('[music] playTrack', e?.message || e);
+        // tenta mirror SoundCloud
+        const mirror = await trySoundcloudMirror(shoukaku, next);
+        if (mirror) {
+            q.current = mirror;
+            try {
+                await player.playTrack({ track: { encoded: mirror.encoded } });
+                await player.setGlobalVolume(q.volume);
+                if (q.textChannelId) {
+                    const ch = await client.channels.fetch(q.textChannelId).catch(() => null);
+                    if (ch?.isTextBased()) {
+                        await ch
+                            .send({
+                                embeds: [
+                                    trackEmbed(mirror, 'Tocando (SoundCloud)')
+                                ]
+                            })
+                            .catch(() => {});
+                    }
+                }
+                return;
+            } catch (_) {}
+        }
         await notifyChannel(
             client,
             guildId,
@@ -296,14 +400,37 @@ function bindPlayerEvents(client, player, guildId) {
     player.on('end', (data) => {
         const reason = data?.reason || data;
         if (reason === 'replaced') return;
-        // loadFailed também dispara end em alguns nodes
         if (reason === 'loadFailed') {
             const q = getQueue(guildId);
-            const title = q.current?.info?.title || 'faixa';
+            const failed = q.current;
+            const title = failed?.info?.title || 'faixa';
+            const src = failed?.info?.sourceName || '';
+            // YouTube loadFailed → tenta SoundCloud uma vez
+            if (/youtube/i.test(src) && failed && !failed.__scTried) {
+                failed.__scTried = true;
+                trySoundcloudMirror(client.shoukaku, failed)
+                    .then((mirror) => {
+                        if (mirror) {
+                            q.tracks.unshift(mirror);
+                            q.current = null;
+                            return playNext(client, guildId);
+                        }
+                        return notifyChannel(
+                            client,
+                            guildId,
+                            `Falha ao carregar **${title}**. Pulando…`
+                        ).then(() => {
+                            q.current = null;
+                            return playNext(client, guildId);
+                        });
+                    })
+                    .catch(() => playNext(client, guildId));
+                return;
+            }
             notifyChannel(
                 client,
                 guildId,
-                `Falha ao carregar **${title}** (fonte bloqueada). Pulando…`
+                `Falha ao carregar **${title}**. Pulando…`
             ).finally(() => playNext(client, guildId).catch(() => {}));
             return;
         }
@@ -321,15 +448,34 @@ function bindPlayerEvents(client, player, guildId) {
 
     player.on('exception', (data) => {
         const q = getQueue(guildId);
-        const title = q.current?.info?.title || 'faixa';
+        const failed = q.current;
+        const title = failed?.info?.title || 'faixa';
         const human = exceptionMessage(data);
-        // warn (não error) para não spammar autoRepair
         console.warn(`[music] exception ${guildId}: ${human}`);
-        notifyChannel(
-            client,
-            guildId,
-            `**${title}**\n${human}`
-        ).finally(() => {
+
+        const src = failed?.info?.sourceName || '';
+        if (failed && !failed.__scTried && /youtube|error/i.test(src + human)) {
+            failed.__scTried = true;
+            trySoundcloudMirror(client.shoukaku, failed)
+                .then((mirror) => {
+                    if (mirror) {
+                        q.tracks.unshift(mirror);
+                        q.current = null;
+                        return playNext(client, guildId);
+                    }
+                    return notifyChannel(client, guildId, `**${title}**\n${human}`).then(() => {
+                        q.current = null;
+                        return playNext(client, guildId);
+                    });
+                })
+                .catch(() => {
+                    q.current = null;
+                    playNext(client, guildId).catch(() => {});
+                });
+            return;
+        }
+
+        notifyChannel(client, guildId, `**${title}**\n${human}`).finally(() => {
             q.current = null;
             playNext(client, guildId).catch(() => {});
         });
@@ -371,7 +517,8 @@ async function enqueue(client, { guild, voiceChannelId, textChannelId, query, re
         first: wrapped[0],
         queueSize: q.tracks.length + (q.current ? 1 : 0),
         usedQuery: resolved.usedQuery || null,
-        fallbackFromYoutube: !!resolved.fallbackFromYoutube
+        fallbackFromYoutube: !!resolved.fallbackFromYoutube,
+        fallbackMirror: !!resolved.fallbackMirror
     };
 }
 

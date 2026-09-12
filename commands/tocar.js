@@ -4,17 +4,24 @@ const musicManager = require('../utils/musicManager');
 module.exports = {
     name: 'tocar',
     aliases: ['play', 'p', 'toca'],
-    description: 'Toca uma música ou playlist no canal de voz',
+    description: 'Toca música (SoundCloud, Deezer, Spotify, YouTube…)',
     data: new SlashCommandBuilder()
         .setName('tocar')
-        .setDescription('Toca música no canal de voz')
+        .setDescription('Toca música no canal de voz (várias fontes)')
         .addStringOption((o) =>
-            o.setName('busca').setDescription('Nome ou URL da música').setRequired(true)
+            o
+                .setName('busca')
+                .setDescription('Nome ou URL (SoundCloud, Spotify, Deezer, YouTube…)')
+                .setRequired(true)
         ),
 
     async execute(message, args) {
         const query = args.join(' ').trim();
-        if (!query) return message.reply('Use: `O.tocar <nome ou url>`');
+        if (!query) {
+            return message.reply(
+                'Use: `O.tocar <nome ou url>`\nFontes: **SoundCloud**, Deezer, Spotify, YouTube.'
+            );
+        }
         return run(message, query);
     },
 
@@ -39,6 +46,21 @@ async function run(message, query) {
     }
 }
 
+function sourceLabel(usedQuery, info) {
+    if (info?.sourceName) return String(info.sourceName);
+    const u = String(usedQuery || '');
+    if (u.startsWith('scsearch:')) return 'soundcloud';
+    if (u.startsWith('dzsearch:')) return 'deezer';
+    if (u.startsWith('spsearch:')) return 'spotify';
+    if (u.startsWith('ytmsearch:')) return 'youtube-music';
+    if (u.startsWith('ytsearch:')) return 'youtube';
+    if (/soundcloud/i.test(u)) return 'soundcloud';
+    if (/spotify/i.test(u)) return 'spotify';
+    if (/deezer/i.test(u)) return 'deezer';
+    if (/youtu/i.test(u)) return 'youtube';
+    return 'auto';
+}
+
 async function play(ctx, query) {
     const member = ctx.member || ctx.guild?.members?.cache?.get(ctx.user?.id);
     const voice = member?.voice?.channel;
@@ -57,7 +79,9 @@ async function play(ctx, query) {
     }
 
     const node = ctx.client.shoukaku.getIdealNode();
-    if (!node) throw new Error('Nenhum node Lavalink online. Aguarde a conexão ou configure nodes estáveis.');
+    if (!node) {
+        throw new Error('Nenhum node Lavalink online. Aguarde a conexão ou configure nodes estáveis.');
+    }
 
     const userId = ctx.author?.id || ctx.user?.id;
     const channelId = ctx.channel?.id;
@@ -84,12 +108,20 @@ async function play(ctx, query) {
     }
 
     const info = res.first?.info || {};
+    const fonte = sourceLabel(res.usedQuery, info);
+    const note =
+        res.fallbackFromYoutube || res.fallbackMirror
+            ? '\n_Espelho automático (fonte original indisponível)._'
+            : '';
+
     return {
         embeds: [
             new EmbedBuilder()
                 .setColor(0xa78bfa)
                 .setTitle(res.queueSize <= 1 ? '▶️ Tocando' : '➕ Na fila')
-                .setDescription(`**[${info.title || 'Música'}](${info.uri || '#'})**`)
+                .setDescription(
+                    `**[${info.title || 'Música'}](${info.uri || '#'})**${note}`
+                )
                 .addFields(
                     { name: 'Autor', value: String(info.author || '—').slice(0, 80), inline: true },
                     {
@@ -97,6 +129,7 @@ async function play(ctx, query) {
                         value: info.isStream ? 'Live' : musicManager.formatMs(info.length),
                         inline: true
                     },
+                    { name: 'Fonte', value: fonte, inline: true },
                     { name: 'Node', value: node.name, inline: true }
                 )
                 .setThumbnail(info.artworkUrl || null)
