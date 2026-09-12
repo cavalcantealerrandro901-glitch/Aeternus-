@@ -1,4 +1,9 @@
-const { EmbedBuilder, SlashCommandBuilder, ChannelType } = require('discord.js');
+const {
+    EmbedBuilder,
+    SlashCommandBuilder,
+    ChannelType,
+    MessageFlags
+} = require('discord.js');
 const musicManager = require('../utils/musicManager');
 
 module.exports = {
@@ -27,7 +32,7 @@ module.exports = {
 
     async executeSlash(i) {
         const query = i.options.getString('busca', true);
-        await i.deferReply();
+        await i.deferReply({ flags: MessageFlags.Ephemeral });
         try {
             const result = await play(i, query);
             return i.editReply(result);
@@ -46,9 +51,20 @@ module.exports = {
 async function run(message, query) {
     try {
         const result = await play(message, query);
-        return message.reply(result);
+        // Prefixo: Discord não tem ephemeral — apaga a confirmação após 12s
+        // O painel público com botões continua no canal
+        const sent = await message.reply({
+            ...result,
+            allowedMentions: { repliedUser: false }
+        });
+        setTimeout(() => {
+            sent.delete().catch(() => {});
+        }, 12_000);
+        return sent;
     } catch (e) {
-        return message.reply(`❌ ${e.message || e}`);
+        const err = await message.reply(`❌ ${e.message || e}`);
+        setTimeout(() => err.delete().catch(() => {}), 10_000);
+        return err;
     }
 }
 
@@ -104,6 +120,7 @@ async function play(ctx, query) {
                     .setDescription(
                         `**${res.playlistName}**\n+**${res.added}** faixa(s)\nTotal: **${res.queueSize}**`
                     )
+                    .setFooter({ text: 'Só você vê esta confirmação' })
             ]
         };
     }
@@ -115,7 +132,6 @@ async function play(ctx, query) {
             ? '\n_Alternativa automática (fonte original indisponível)._'
             : '';
 
-    // confirmação curta — o painel com botões vem do manager
     return {
         embeds: [
             new EmbedBuilder()
@@ -134,7 +150,7 @@ async function play(ctx, query) {
                     }
                 )
                 .setThumbnail(info.artworkUrl || null)
-                .setFooter({ text: 'Painel de controle abaixo · SoundCloud prioritário' })
+                .setFooter({ text: 'Só você vê esta confirmação · painel público abaixo' })
         ]
     };
 }
