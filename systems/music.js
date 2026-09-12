@@ -1,10 +1,11 @@
 /**
  * Sistema de música — Shoukaku + múltiplos nodes Lavalink.
- * Balanceamento por penalidade, moveOnDisconnect e reconexão.
+ * Aplica token OAuth do YouTube (env do bot) em cada node ao conectar.
  */
 const { Shoukaku, Connectors } = require('shoukaku');
 const { getNodes } = require('../utils/musicNodes');
 const musicManager = require('../utils/musicManager');
+const youtubeOauth = require('../utils/youtubeOauth');
 
 /** evita flood no log / autoRepair */
 const lastLog = new Map();
@@ -27,7 +28,6 @@ function setup(client) {
         moveOnDisconnect: true,
         resume: true,
         resumeTimeout: 60,
-        // menos agressivo: nodes públicos caem o tempo todo
         reconnectTries: 6,
         reconnectInterval: 12,
         restTimeout: 45,
@@ -46,11 +46,18 @@ function setup(client) {
                 ),
             15_000
         );
+
+        // Envia refresh token do bot → plugin youtube do node
+        const node = shoukaku.nodes.get(name);
+        if (node) {
+            youtubeOauth.applyYoutubeOauthToNode(node).catch((e) => {
+                console.warn('[music] oauth on ready:', e.message);
+            });
+        }
     });
 
     shoukaku.on('error', (name, error) => {
         const msg = error?.message || String(error || '');
-        // timeouts / closes de node público não precisam de stack spam
         if (/ETIMEDOUT|ECONNREFUSED|ENOTFOUND|ECONNRESET|socket hang up|1006/i.test(msg)) {
             throttledLog(`err:${name}`, () => {
                 console.warn(`🎵 [lavalink] ${name} offline/instável: ${msg}`);
@@ -79,21 +86,24 @@ function setup(client) {
     });
 
     const logActive = () => {
-        const ready = [];
-        for (const [n, node] of shoukaku.nodes) {
-            // State.CONNECTED === 2 em várias versões; também aceita string
-            const st = node.state;
-            if (st === 2 || st === 'CONNECTED' || node.destroyed === false) {
-                ready.push(n);
-            }
-        }
         console.log(
             `🎵 [music] Shoukaku · configurados: ${nodes.length} · mapa: ${[...shoukaku.nodes.keys()].join(', ') || '—'}`
         );
+        // segunda tentativa (nodes que já estavam ready antes do listener)
+        youtubeOauth.applyToAllNodes(shoukaku).catch(() => {});
     };
 
     client.on('clientReady', logActive);
     client.on('ready', logActive);
+
+    const found = youtubeOauth.getRefreshTokenFromEnv();
+    if (found) {
+        console.log(`[music] YouTube OAuth token detectado no env (${found.key}) — será enviado aos nodes`);
+    } else {
+        console.log(
+            '[music] Sem token YouTube no env do bot. Use YOUTUBE_OAUTH_REFRESH_TOKEN se tiver.'
+        );
+    }
 
     console.log(`[music] Shoukaku · ${nodes.length} node(s) configurado(s)`);
     for (const n of nodes) {
