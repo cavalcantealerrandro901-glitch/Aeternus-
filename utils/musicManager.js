@@ -55,6 +55,11 @@ function trackEmbed(track, title = 'Tocando agora') {
                 inline: true
             },
             {
+                name: 'Fonte',
+                value: String(info.sourceName || '—').slice(0, 32),
+                inline: true
+            },
+            {
                 name: 'Pedido por',
                 value: track.requester ? `<@${track.requester}>` : '—',
                 inline: true
@@ -68,37 +73,25 @@ function isUrl(q) {
     return /^https?:\/\//i.test(String(q || '').trim());
 }
 
-function buildQuery(raw) {
-    const q = String(raw || '').trim();
-    if (!q) return null;
-    if (isUrl(q)) return q;
-    return `ytsearch:${q}`;
+function isYoutubeUrl(q) {
+    return /youtube\.com|youtu\.be|music\.youtube\.com/i.test(String(q || ''));
 }
 
-/**
- * Resolve tracks no node ideal do Shoukaku.
- */
-async function resolveTracks(shoukaku, query) {
-    const node = shoukaku.getIdealNode();
-    if (!node) throw new Error('Nenhum node Lavalink conectado. Aguarde ou configure LAVALINK_NODES.');
+/** Prefixos de busca em ordem de tentativa (nodes públicos quebram YT com frequência) */
+function searchIdentifiers(raw) {
+    const q = String(raw || '').trim();
+    if (!q) return [];
+    if (isUrl(q)) return [q];
+    return [`ytsearch:${q}`, `scsearch:${q}`, `ytmsearch:${q}`];
+}
 
-    const identifier = buildQuery(query);
-    if (!identifier) throw new Error('Query vazia.');
-
-    const result = await node.rest.resolve(identifier);
-    if (!result) throw new Error('Sem resposta do Lavalink.');
-
+function parseResolveResult(result) {
+    if (!result) return null;
     const loadType = result.loadType || result.load_type;
 
-    if (loadType === 'error' || loadType === 'LOAD_FAILED') {
-        const msg = result.data?.message || result.exception?.message || 'Falha ao carregar.';
-        throw new Error(msg);
-    }
-    if (loadType === 'empty' || loadType === 'NO_MATCHES') {
-        throw new Error('Nada encontrado para essa busca.');
-    }
+    if (loadType === 'error' || loadType === 'LOAD_FAILED') return null;
+    if (loadType === 'empty' || loadType === 'NO_MATCHES') return null;
 
-    // Lavalink v4
     if (loadType === 'track') {
         return { type: 'track', tracks: [result.data], playlistName: null };
     }
@@ -115,7 +108,6 @@ async function resolveTracks(shoukaku, query) {
         return { type: 'search', tracks: list.slice(0, 1), playlistName: null };
     }
 
-    // v3 compat
     if (result.tracks?.length) {
         return {
             type: 'legacy',
@@ -123,8 +115,68 @@ async function resolveTracks(shoukaku, query) {
             playlistName: result.playlistInfo?.name || null
         };
     }
+    return null;
+}
 
-    throw new Error('Formato de resposta Lavalink desconhecido.');
+/**
+ * Resolve com fallback entre fontes (YouTube → SoundCloud → YT Music).
+ */
+async function resolveTracks(shoukaku, query) {
+    const node = shoukaku.getIdealNode();
+    if (!node) throw new Error('Nenhum node Lavalink conectado. Aguarde ou configure LAVALINK_NODES.');
+
+    const identifiers = searchIdentifiers(query);
+    if (!identifiers.length) throw new Error('Query vazia.');
+
+    const errors = [];
+
+    for (const identifier of identifiers) {
+        try {
+            const result = await node.rest.resolve(identifier);
+            const parsed = parseResolveResult(result);
+            if (parsed?.tracks?.length) {
+                return { ...parsed, usedQuery: identifier, nodeName: node.name };
+            }
+            const loadType = result?.loadType || result?.load_type;
+            if (loadType === 'error' || loadType === 'LOAD_FAILED') {
+                errors.push(
+                    `${identifier}: ${result?.data?.message || result?.exception?.message || 'falha'}`
+                );
+            }
+        } catch (e) {
+            errors.push(`${identifier}: ${e.message || e}`);
+        }
+    }
+
+    // URL do YouTube falhou → tenta buscar o título no SoundCloud se possível
+    if (isUrl(query) && isYoutubeUrl(query)) {
+        try {
+            const meta = await node.rest.resolve(query).catch(() => null);
+            const title =
+                meta?.data?.info?.title ||
+                meta?.tracks?.[0]?.info?.title ||
+                null;
+            if (title) {
+                const sc = await node.rest.resolve(`scsearch:${title}`);
+                const parsed = parseResolveResult(sc);
+                if (parsed?.tracks?.length) {
+                    return {
+                        ...parsed,
+                        usedQuery: `scsearch:${title}`,
+                        nodeName: node.name,
+                        fallbackFromYoutube: true
+                    };
+                }
+            }
+        } catch (_) {}
+    }
+
+    const hint = errors.slice(0, 2).join(' · ');
+    throw new Error(
+        hint
+            ? `Não achei uma fonte tocável. ${hint}`
+            : 'Nada encontrado (YouTube costuma falhar em nodes públicos). Tente outro nome ou link do SoundCloud.'
+    );
 }
 
 function wrapTrack(raw, requesterId) {
@@ -148,6 +200,39 @@ async function ensurePlayer(shoukaku, guild, voiceChannelId) {
         deaf: true
     });
     return player;
+}
+
+function exceptionMessage(data) {
+    const msg =
+        data?.exception?.message ||
+        data?.message ||
+        (typeof data === 'string' ? data : '') ||
+        '';
+    if (/requires login|All clients failed|No supported audio/i.test(msg)) {
+        return 'O YouTube bloqueou esta faixa neste node (login/OAuth). Pulando… Tente SoundCloud ou outro título.';
+    }
+    if (msg) return msg.split('\n')[0].slice(0, 180);
+    return 'Erro ao decodificar a faixa. Pulando…';
+}
+
+async function notifyChannel(client, guildId, content) {
+    try {
+        const q = getQueue(guildId);
+        if (!q.textChannelId) return;
+        const ch = await client.channels.fetch(q.textChannelId).catch(() => null);
+        if (ch?.isTextBased()) {
+            await ch
+                .send({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(0xf87171)
+                            .setTitle('⚠️ Faixa ignorada')
+                            .setDescription(content)
+                    ]
+                })
+                .catch(() => {});
+        }
+    } catch (_) {}
 }
 
 async function playNext(client, guildId) {
@@ -186,7 +271,12 @@ async function playNext(client, guildId) {
         await player.playTrack({ track: { encoded: next.encoded } });
         await player.setGlobalVolume(q.volume);
     } catch (e) {
-        console.error('[music] playTrack', e?.message || e);
+        console.warn('[music] playTrack', e?.message || e);
+        await notifyChannel(
+            client,
+            guildId,
+            `Não consegui tocar **${next.info?.title || 'faixa'}**. ${e.message || ''}`
+        );
         q.current = null;
         return playNext(client, guildId);
     }
@@ -206,7 +296,18 @@ function bindPlayerEvents(client, player, guildId) {
     player.on('end', (data) => {
         const reason = data?.reason || data;
         if (reason === 'replaced') return;
-        playNext(client, guildId).catch((e) => console.error('[music] end', e));
+        // loadFailed também dispara end em alguns nodes
+        if (reason === 'loadFailed') {
+            const q = getQueue(guildId);
+            const title = q.current?.info?.title || 'faixa';
+            notifyChannel(
+                client,
+                guildId,
+                `Falha ao carregar **${title}** (fonte bloqueada). Pulando…`
+            ).finally(() => playNext(client, guildId).catch(() => {}));
+            return;
+        }
+        playNext(client, guildId).catch((e) => console.warn('[music] end', e?.message || e));
     });
 
     player.on('stuck', () => {
@@ -219,8 +320,19 @@ function bindPlayerEvents(client, player, guildId) {
     });
 
     player.on('exception', (data) => {
-        console.error('[music] exception', guildId, data);
-        playNext(client, guildId).catch(() => {});
+        const q = getQueue(guildId);
+        const title = q.current?.info?.title || 'faixa';
+        const human = exceptionMessage(data);
+        // warn (não error) para não spammar autoRepair
+        console.warn(`[music] exception ${guildId}: ${human}`);
+        notifyChannel(
+            client,
+            guildId,
+            `**${title}**\n${human}`
+        ).finally(() => {
+            q.current = null;
+            playNext(client, guildId).catch(() => {});
+        });
     });
 }
 
@@ -257,7 +369,9 @@ async function enqueue(client, { guild, voiceChannelId, textChannelId, query, re
         added: resolved.type === 'playlist' ? wrapped.length : 1,
         playlistName: resolved.playlistName,
         first: wrapped[0],
-        queueSize: q.tracks.length + (q.current ? 1 : 0)
+        queueSize: q.tracks.length + (q.current ? 1 : 0),
+        usedQuery: resolved.usedQuery || null,
+        fallbackFromYoutube: !!resolved.fallbackFromYoutube
     };
 }
 
