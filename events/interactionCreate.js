@@ -1,5 +1,6 @@
 const cmdLock = require('../utils/cmdLock');
 const autoRepair = require('../utils/autoRepair');
+const musicManager = require('../utils/musicManager');
 const { Collection, PermissionFlagsBits } = require('discord.js');
 
 async function bridgeSlashToPrefix(interaction, cmd, client) {
@@ -115,9 +116,14 @@ module.exports = {
                 const id = interaction.customId || '';
                 const parts = id.split(':');
                 const root = parts[0] || '';
+
+                // Painel de música
+                if (root === 'music') {
+                    return musicManager.handleMusicButton(interaction, client);
+                }
+
                 let cmd = client.commands.get(root);
 
-                // Legado: act:devolver:nomeComando:from:to
                 if (!cmd && root === 'act' && parts[1] === 'devolver' && parts[2]) {
                     cmd = client.commands.get(parts[2]);
                 }
@@ -126,10 +132,8 @@ module.exports = {
                     cmd = client.commands.get('blackjack') || client.commands.get('bj');
                 }
 
-                // IDs de outros bots / sistemas externos → ignorar em silêncio
                 if (!cmd?.handleComponent) return;
 
-                // Só edita mensagens do próprio Aeternus
                 if (
                     interaction.message?.author?.id &&
                     client.user?.id &&

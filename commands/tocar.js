@@ -4,14 +4,14 @@ const musicManager = require('../utils/musicManager');
 module.exports = {
     name: 'tocar',
     aliases: ['play', 'p', 'toca'],
-    description: 'Toca música (SoundCloud, Deezer, Spotify, YouTube…)',
+    description: 'Toca música (SoundCloud prioritário)',
     data: new SlashCommandBuilder()
         .setName('tocar')
-        .setDescription('Toca música no canal de voz (várias fontes)')
+        .setDescription('Toca música no canal de voz')
         .addStringOption((o) =>
             o
                 .setName('busca')
-                .setDescription('Nome ou URL (SoundCloud, Spotify, Deezer, YouTube…)')
+                .setDescription('Nome ou URL (SoundCloud prioritário)')
                 .setRequired(true)
         ),
 
@@ -19,7 +19,7 @@ module.exports = {
         const query = args.join(' ').trim();
         if (!query) {
             return message.reply(
-                'Use: `O.tocar <nome ou url>`\nFontes: **SoundCloud**, Deezer, Spotify, YouTube.'
+                'Use: `O.tocar <nome ou url>`\nPrioridade: **SoundCloud** → Deezer → Spotify → YouTube.'
             );
         }
         return run(message, query);
@@ -33,6 +33,12 @@ module.exports = {
             return i.editReply(result);
         } catch (e) {
             return i.editReply({ content: `❌ ${e.message || e}` });
+        }
+    },
+
+    async handleComponent(interaction, client) {
+        if (String(interaction.customId || '').startsWith('music:')) {
+            return musicManager.handleMusicButton(interaction, client);
         }
     }
 };
@@ -55,9 +61,6 @@ function sourceLabel(usedQuery, info) {
     if (u.startsWith('ytmsearch:')) return 'youtube-music';
     if (u.startsWith('ytsearch:')) return 'youtube';
     if (/soundcloud/i.test(u)) return 'soundcloud';
-    if (/spotify/i.test(u)) return 'spotify';
-    if (/deezer/i.test(u)) return 'deezer';
-    if (/youtu/i.test(u)) return 'youtube';
     return 'auto';
 }
 
@@ -75,13 +78,11 @@ async function play(ctx, query) {
     }
 
     if (!ctx.client?.shoukaku) {
-        throw new Error('Música não inicializada. Verifique LAVALINK_NODES e os logs.');
+        throw new Error('Música não inicializada. Verifique LAVALINK_NODES.');
     }
 
     const node = ctx.client.shoukaku.getIdealNode();
-    if (!node) {
-        throw new Error('Nenhum node Lavalink online. Aguarde a conexão ou configure nodes estáveis.');
-    }
+    if (!node) throw new Error('Nenhum node Lavalink online.');
 
     const userId = ctx.author?.id || ctx.user?.id;
     const channelId = ctx.channel?.id;
@@ -98,10 +99,10 @@ async function play(ctx, query) {
         return {
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0xa78bfa)
-                    .setTitle('📑 Playlist adicionada')
+                    .setColor(0x7c3aed)
+                    .setTitle('📑 Playlist na fila')
                     .setDescription(
-                        `**${res.playlistName}**\n+**${res.added}** faixa(s) na fila.\nFila total: **${res.queueSize}**`
+                        `**${res.playlistName}**\n+**${res.added}** faixa(s)\nTotal: **${res.queueSize}**`
                     )
             ]
         };
@@ -111,28 +112,29 @@ async function play(ctx, query) {
     const fonte = sourceLabel(res.usedQuery, info);
     const note =
         res.fallbackFromYoutube || res.fallbackMirror
-            ? '\n_Espelho automático (fonte original indisponível)._'
+            ? '\n_Alternativa automática (fonte original indisponível)._'
             : '';
 
+    // confirmação curta — o painel com botões vem do manager
     return {
         embeds: [
             new EmbedBuilder()
-                .setColor(0xa78bfa)
-                .setTitle(res.queueSize <= 1 ? '▶️ Tocando' : '➕ Na fila')
+                .setColor(0x7c3aed)
+                .setTitle(res.queueSize <= 1 ? '✅ Pedido recebido' : '➕ Na fila')
                 .setDescription(
                     `**[${info.title || 'Música'}](${info.uri || '#'})**${note}`
                 )
                 .addFields(
-                    { name: 'Autor', value: String(info.author || '—').slice(0, 80), inline: true },
+                    { name: 'Fonte', value: `\`${fonte}\``, inline: true },
+                    { name: 'Node', value: `\`${node.name}\``, inline: true },
                     {
-                        name: 'Duração',
-                        value: info.isStream ? 'Live' : musicManager.formatMs(info.length),
+                        name: 'Fila',
+                        value: `\`${res.queueSize}\``,
                         inline: true
-                    },
-                    { name: 'Fonte', value: fonte, inline: true },
-                    { name: 'Node', value: node.name, inline: true }
+                    }
                 )
                 .setThumbnail(info.artworkUrl || null)
+                .setFooter({ text: 'Painel de controle abaixo · SoundCloud prioritário' })
         ]
     };
 }
