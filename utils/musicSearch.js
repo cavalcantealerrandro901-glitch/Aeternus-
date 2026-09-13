@@ -1,5 +1,6 @@
 /**
- * Busca: YouTube primeiro; se falhar → SoundCloud (fallback estável).
+ * Busca para bots Discord — SoundCloud prioritário (estável).
+ * YouTube desligado na busca (bloqueia muito em datacenter).
  */
 
 function isUrl(q) {
@@ -43,56 +44,84 @@ function expandQueries(raw) {
     const variants = [base];
     if (noAcc !== base) variants.push(noAcc);
 
-    const suffixes = ['official audio', 'official', 'lyrics', 'song', 'audio'];
+    const suffixes = [
+        'official',
+        'official audio',
+        'lyrics',
+        'song',
+        'music',
+        'audio',
+        'remix',
+        'live'
+    ];
     for (const s of suffixes) {
         variants.push(`${base} ${s}`);
         if (noAcc !== base) variants.push(`${noAcc} ${s}`);
     }
 
     if (short) {
-        variants.push(`${base} song`, `${base} music`, `${base} official audio`, `${base} track`);
+        variants.push(
+            `${base} song`,
+            `${base} music`,
+            `${base} official audio`,
+            `${base} track`,
+            `${base} remix`
+        );
     }
 
     if (base.includes(' - ')) {
         const [a, b] = base.split(' - ').map((x) => x.trim());
-        if (a && b) variants.push(`${a} ${b}`, `${b} ${a}`);
+        if (a && b) {
+            variants.push(`${a} ${b}`, `${b} ${a}`, `${a} ${b} official`);
+        }
     }
 
-    return uniq(variants).slice(0, 10);
+    return uniq(variants).slice(0, 14);
 }
 
 /**
- * Ordem:
- * 1. YouTube / YT Music
- * 2. SoundCloud (fallback)
- * 3. Deezer (extra)
+ * Ordem fixa:
+ * 1. SoundCloud (principal)
+ * 2. Deezer (reforço)
+ * 3. YouTube só se MUSIC_ALLOW_YOUTUBE=1
  */
 function searchIdentifiers(raw) {
     const q = String(raw || '').trim();
     if (!q) return [];
 
+    // Link SoundCloud → direto
+    if (isUrl(q) && isSoundcloudUrl(q)) return [q];
+
+    // Link YouTube → não resolve no YT; manager tenta mirror SC pelo título
+    if (isUrl(q) && isYoutubeUrl(q)) {
+        return [q]; // mirror no musicManager
+    }
+
+    // Outros links (spotify/deezer/http)
     if (isUrl(q)) return [q];
 
     const queries = expandQueries(q);
     const ids = [];
 
-    // YouTube primeiro
-    for (const query of queries) {
-        ids.push(`ytsearch:${query}`);
-        ids.push(`ytmsearch:${query}`);
-    }
-
-    // SoundCloud fallback
+    // SoundCloud — todas as variantes
     for (const query of queries) {
         ids.push(`scsearch:${query}`);
     }
 
-    // Deezer reforço
-    for (const query of queries.slice(0, 2)) {
+    // Deezer — top queries
+    for (const query of queries.slice(0, 3)) {
         ids.push(`dzsearch:${query}`);
     }
 
-    return uniq(ids).slice(0, 36);
+    // YouTube só se ativado explicitamente
+    if (process.env.MUSIC_ALLOW_YOUTUBE === '1') {
+        for (const query of queries.slice(0, 2)) {
+            ids.push(`ytsearch:${query}`);
+            ids.push(`ytmsearch:${query}`);
+        }
+    }
+
+    return uniq(ids).slice(0, 32);
 }
 
 module.exports = {
