@@ -9,14 +9,14 @@ const musicManager = require('../utils/musicManager');
 module.exports = {
     name: 'tocar',
     aliases: ['play', 'p', 'toca'],
-    description: 'Toca música (SoundCloud prioritário)',
+    description: 'Toca música via SoundCloud (estável para bots)',
     data: new SlashCommandBuilder()
         .setName('tocar')
-        .setDescription('Toca música no canal de voz')
+        .setDescription('Toca música (SoundCloud prioritário)')
         .addStringOption((o) =>
             o
                 .setName('busca')
-                .setDescription('Nome ou URL (SoundCloud prioritário)')
+                .setDescription('Nome ou link do SoundCloud')
                 .setRequired(true)
         ),
 
@@ -24,7 +24,9 @@ module.exports = {
         const query = args.join(' ').trim();
         if (!query) {
             return message.reply(
-                'Use: `O.tocar <nome ou url>`\nPrioridade: **SoundCloud** → Deezer → Spotify → YouTube.'
+                'Use: `O.tocar <nome ou link>`\n' +
+                    'Fonte principal: **SoundCloud** (mais estável em bots Discord).\n' +
+                    'Dica: link do SoundCloud quase nunca falha.'
             );
         }
         return run(message, query);
@@ -51,15 +53,11 @@ module.exports = {
 async function run(message, query) {
     try {
         const result = await play(message, query);
-        // Prefixo: Discord não tem ephemeral — apaga a confirmação após 12s
-        // O painel público com botões continua no canal
         const sent = await message.reply({
             ...result,
             allowedMentions: { repliedUser: false }
         });
-        setTimeout(() => {
-            sent.delete().catch(() => {});
-        }, 12_000);
+        setTimeout(() => sent.delete().catch(() => {}), 12_000);
         return sent;
     } catch (e) {
         const err = await message.reply(`❌ ${e.message || e}`);
@@ -71,12 +69,9 @@ async function run(message, query) {
 function sourceLabel(usedQuery, info) {
     if (info?.sourceName) return String(info.sourceName);
     const u = String(usedQuery || '');
-    if (u.startsWith('scsearch:')) return 'soundcloud';
+    if (u.startsWith('scsearch:') || /soundcloud/i.test(u)) return 'soundcloud';
     if (u.startsWith('dzsearch:')) return 'deezer';
-    if (u.startsWith('spsearch:')) return 'spotify';
-    if (u.startsWith('ytmsearch:')) return 'youtube-music';
-    if (u.startsWith('ytsearch:')) return 'youtube';
-    if (/soundcloud/i.test(u)) return 'soundcloud';
+    if (u.startsWith('yt')) return 'youtube';
     return 'auto';
 }
 
@@ -115,12 +110,12 @@ async function play(ctx, query) {
         return {
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0x7c3aed)
+                    .setColor(0xff5500)
                     .setTitle('📑 Playlist na fila')
                     .setDescription(
                         `**${res.playlistName}**\n+**${res.added}** faixa(s)\nTotal: **${res.queueSize}**`
                     )
-                    .setFooter({ text: 'Só você vê esta confirmação' })
+                    .setFooter({ text: 'Só você vê esta confirmação · SoundCloud' })
             ]
         };
     }
@@ -129,13 +124,13 @@ async function play(ctx, query) {
     const fonte = sourceLabel(res.usedQuery, info);
     const note =
         res.fallbackFromYoutube || res.fallbackMirror
-            ? '\n_Alternativa automática (fonte original indisponível)._'
+            ? '\n_Encontrado no SoundCloud a partir do link original._'
             : '';
 
     return {
         embeds: [
             new EmbedBuilder()
-                .setColor(0x7c3aed)
+                .setColor(0xff5500)
                 .setTitle(res.queueSize <= 1 ? '✅ Pedido recebido' : '➕ Na fila')
                 .setDescription(
                     `**[${info.title || 'Música'}](${info.uri || '#'})**${note}`
@@ -143,14 +138,10 @@ async function play(ctx, query) {
                 .addFields(
                     { name: 'Fonte', value: `\`${fonte}\``, inline: true },
                     { name: 'Node', value: `\`${node.name}\``, inline: true },
-                    {
-                        name: 'Fila',
-                        value: `\`${res.queueSize}\``,
-                        inline: true
-                    }
+                    { name: 'Fila', value: `\`${res.queueSize}\``, inline: true }
                 )
                 .setThumbnail(info.artworkUrl || null)
-                .setFooter({ text: 'Só você vê esta confirmação · painel público abaixo' })
+                .setFooter({ text: 'SoundCloud prioritário · painel público abaixo' })
         ]
     };
 }

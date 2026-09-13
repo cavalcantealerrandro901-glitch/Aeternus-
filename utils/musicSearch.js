@@ -1,10 +1,19 @@
 /**
- * Monta identificadores de busca multi-fonte / multi-idioma.
- * Prioridade: SoundCloud → Deezer → Spotify → YT Music → YouTube.
+ * Busca otimizada para bots Discord.
+ * Fonte principal: SoundCloud (catálogo grande + menos bloqueio).
+ * YouTube só em último caso (quebra muito em datacenter).
  */
 
 function isUrl(q) {
     return /^https?:\/\//i.test(String(q || '').trim());
+}
+
+function isYoutubeUrl(q) {
+    return /youtube\.com|youtu\.be|music\.youtube\.com/i.test(String(q || ''));
+}
+
+function isSoundcloudUrl(q) {
+    return /soundcloud\.com/i.test(String(q || ''));
 }
 
 function stripAccents(s) {
@@ -25,55 +34,34 @@ function uniq(arr) {
     return out;
 }
 
-/**
- * Expande a query do usuário em várias formas:
- * - original
- * - sem acento
- * - com "official / audio / lyrics / song"
- * - nomes curtos (ex: sod) ganham reforço
- */
 function expandQueries(raw) {
     const base = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 180);
     if (!base) return [];
 
     const noAcc = stripAccents(base);
     const words = base.split(' ').filter(Boolean);
-    const short = words.length === 1 && base.length <= 6;
+    const short = words.length === 1 && base.length <= 8;
 
-    const variants = [base, noAcc];
+    const variants = [base];
+    if (noAcc !== base) variants.push(noAcc);
 
-    // reforço internacional / oficial
-    const suffixes = [
-        'official',
-        'official audio',
-        'official video',
-        'lyrics',
-        'song',
-        'music',
-        'audio',
-        'tema',
-        'música',
-        'musica'
-    ];
-
+    // Sufixos que ajudam a achar a faixa certa no SoundCloud
+    const suffixes = ['official', 'official audio', 'lyrics', 'song', 'music', 'audio'];
     for (const s of suffixes) {
         variants.push(`${base} ${s}`);
         if (noAcc !== base) variants.push(`${noAcc} ${s}`);
     }
 
-    // nomes curtos tipo "sod", "kpop", "bts"
     if (short) {
         variants.push(
             `${base} song`,
             `${base} music`,
             `${base} official audio`,
             `${base} track`,
-            `${base} remix`,
-            `${base} lyrics`
+            `${base} remix`
         );
     }
 
-    // se parecer artista+música com hífen
     if (base.includes(' - ')) {
         const [a, b] = base.split(' - ').map((x) => x.trim());
         if (a && b) {
@@ -81,38 +69,58 @@ function expandQueries(raw) {
         }
     }
 
-    return uniq(variants).slice(0, 14);
+    return uniq(variants).slice(0, 12);
 }
 
 /**
- * Lista de identifiers Lavalink na ordem de prioridade.
+ * Identifiers Lavalink — SoundCloud em primeiro (quase exclusivo).
  */
 function searchIdentifiers(raw) {
     const q = String(raw || '').trim();
     if (!q) return [];
+
+    // Link direto do SoundCloud → usa o link
+    if (isUrl(q) && isSoundcloudUrl(q)) return [q];
+
+    // Link do YouTube → NÃO resolve no YT; tenta achar no SC pelo texto da URL
+    // (o manager ainda faz mirror pelo título se precisar)
+    if (isUrl(q) && isYoutubeUrl(q)) {
+        // deixa o manager tratar mirror; aqui só devolve o URL como tentativa fraca
+        return [q];
+    }
+
+    // Outros links (spotify/deezer/http) → tenta direto
     if (isUrl(q)) return [q];
 
     const queries = expandQueries(q);
     const ids = [];
 
+    // === SoundCloud (principal) ===
     for (const query of queries) {
-        // SoundCloud primeiro (melhor para internacional em nodes free)
         ids.push(`scsearch:${query}`);
     }
-    for (const query of queries.slice(0, 4)) {
+
+    // === Deezer (metadados / algumas nodes streamam) — só top queries ===
+    for (const query of queries.slice(0, 2)) {
         ids.push(`dzsearch:${query}`);
-        ids.push(`spsearch:${query}`);
-    }
-    for (const query of queries.slice(0, 3)) {
-        ids.push(`ytmsearch:${query}`);
-        ids.push(`ytsearch:${query}`);
     }
 
-    return uniq(ids).slice(0, 40);
+    // === YouTube: desligado por padrão (quebra muito)
+    // Ative com MUSIC_ALLOW_YOUTUBE=1 no env do bot se quiser
+    if (process.env.MUSIC_ALLOW_YOUTUBE === '1') {
+        for (const query of queries.slice(0, 2)) {
+            ids.push(`ytmsearch:${query}`);
+            ids.push(`ytsearch:${query}`);
+        }
+    }
+
+    return uniq(ids).slice(0, 28);
 }
 
 module.exports = {
     isUrl,
+    isYoutubeUrl,
+    isSoundcloudUrl,
     stripAccents,
     expandQueries,
     searchIdentifiers
