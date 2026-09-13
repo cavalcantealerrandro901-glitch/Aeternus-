@@ -1,7 +1,5 @@
 /**
- * Busca otimizada para bots Discord.
- * Fonte principal: SoundCloud (catálogo grande + menos bloqueio).
- * YouTube só em último caso (quebra muito em datacenter).
+ * Busca: YouTube primeiro; se falhar → SoundCloud (fallback estável).
  */
 
 function isUrl(q) {
@@ -45,76 +43,56 @@ function expandQueries(raw) {
     const variants = [base];
     if (noAcc !== base) variants.push(noAcc);
 
-    // Sufixos que ajudam a achar a faixa certa no SoundCloud
-    const suffixes = ['official', 'official audio', 'lyrics', 'song', 'music', 'audio'];
+    const suffixes = ['official audio', 'official', 'lyrics', 'song', 'audio'];
     for (const s of suffixes) {
         variants.push(`${base} ${s}`);
         if (noAcc !== base) variants.push(`${noAcc} ${s}`);
     }
 
     if (short) {
-        variants.push(
-            `${base} song`,
-            `${base} music`,
-            `${base} official audio`,
-            `${base} track`,
-            `${base} remix`
-        );
+        variants.push(`${base} song`, `${base} music`, `${base} official audio`, `${base} track`);
     }
 
     if (base.includes(' - ')) {
         const [a, b] = base.split(' - ').map((x) => x.trim());
-        if (a && b) {
-            variants.push(`${a} ${b}`, `${b} ${a}`, `${a} ${b} official`);
-        }
+        if (a && b) variants.push(`${a} ${b}`, `${b} ${a}`);
     }
 
-    return uniq(variants).slice(0, 12);
+    return uniq(variants).slice(0, 10);
 }
 
 /**
- * Identifiers Lavalink — SoundCloud em primeiro (quase exclusivo).
+ * Ordem:
+ * 1. YouTube / YT Music
+ * 2. SoundCloud (fallback)
+ * 3. Deezer (extra)
  */
 function searchIdentifiers(raw) {
     const q = String(raw || '').trim();
     if (!q) return [];
 
-    // Link direto do SoundCloud → usa o link
-    if (isUrl(q) && isSoundcloudUrl(q)) return [q];
-
-    // Link do YouTube → NÃO resolve no YT; tenta achar no SC pelo texto da URL
-    // (o manager ainda faz mirror pelo título se precisar)
-    if (isUrl(q) && isYoutubeUrl(q)) {
-        // deixa o manager tratar mirror; aqui só devolve o URL como tentativa fraca
-        return [q];
-    }
-
-    // Outros links (spotify/deezer/http) → tenta direto
     if (isUrl(q)) return [q];
 
     const queries = expandQueries(q);
     const ids = [];
 
-    // === SoundCloud (principal) ===
+    // YouTube primeiro
+    for (const query of queries) {
+        ids.push(`ytsearch:${query}`);
+        ids.push(`ytmsearch:${query}`);
+    }
+
+    // SoundCloud fallback
     for (const query of queries) {
         ids.push(`scsearch:${query}`);
     }
 
-    // === Deezer (metadados / algumas nodes streamam) — só top queries ===
+    // Deezer reforço
     for (const query of queries.slice(0, 2)) {
         ids.push(`dzsearch:${query}`);
     }
 
-    // === YouTube: desligado por padrão (quebra muito)
-    // Ative com MUSIC_ALLOW_YOUTUBE=1 no env do bot se quiser
-    if (process.env.MUSIC_ALLOW_YOUTUBE === '1') {
-        for (const query of queries.slice(0, 2)) {
-            ids.push(`ytmsearch:${query}`);
-            ids.push(`ytsearch:${query}`);
-        }
-    }
-
-    return uniq(ids).slice(0, 28);
+    return uniq(ids).slice(0, 36);
 }
 
 module.exports = {
