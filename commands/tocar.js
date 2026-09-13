@@ -9,14 +9,14 @@ const musicManager = require('../utils/musicManager');
 module.exports = {
     name: 'tocar',
     aliases: ['play', 'p', 'toca'],
-    description: 'Toca música via SoundCloud',
+    description: 'Toca música (YouTube → fallback SoundCloud)',
     data: new SlashCommandBuilder()
         .setName('tocar')
-        .setDescription('Toca música (SoundCloud)')
+        .setDescription('Toca música no canal de voz')
         .addStringOption((o) =>
             o
                 .setName('busca')
-                .setDescription('Nome da música ou link do SoundCloud')
+                .setDescription('Nome ou URL (YouTube / SoundCloud)')
                 .setRequired(true)
         ),
 
@@ -24,9 +24,8 @@ module.exports = {
         const query = args.join(' ').trim();
         if (!query) {
             return message.reply(
-                'Use: `O.tocar <nome ou link>`\n' +
-                    'Fonte: **SoundCloud** (estável para bots).\n' +
-                    'Dica: link do SoundCloud quase nunca falha.'
+                'Use: `O.tocar <nome ou url>`\n' +
+                    'Ordem: **YouTube** → SoundCloud se falhar.'
             );
         }
         return run(message, query);
@@ -69,9 +68,9 @@ async function run(message, query) {
 function sourceLabel(usedQuery, info) {
     if (info?.sourceName) return String(info.sourceName);
     const u = String(usedQuery || '');
+    if (u.startsWith('ytsearch:') || u.startsWith('ytmsearch:') || /youtu/i.test(u)) return 'youtube';
     if (u.startsWith('scsearch:') || /soundcloud/i.test(u)) return 'soundcloud';
     if (u.startsWith('dzsearch:')) return 'deezer';
-    if (u.startsWith('yt') || /youtu/i.test(u)) return 'youtube';
     return 'auto';
 }
 
@@ -110,12 +109,12 @@ async function play(ctx, query) {
         return {
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0xff5500)
+                    .setColor(0xff0000)
                     .setTitle('📑 Playlist na fila')
                     .setDescription(
                         `**${res.playlistName}**\n+**${res.added}** faixa(s)\nTotal: **${res.queueSize}**`
                     )
-                    .setFooter({ text: 'Só você vê esta confirmação · SoundCloud' })
+                    .setFooter({ text: 'Só você vê esta confirmação' })
             ]
         };
     }
@@ -124,13 +123,13 @@ async function play(ctx, query) {
     const fonte = sourceLabel(res.usedQuery, info);
     const note =
         res.fallbackFromYoutube || res.fallbackMirror
-            ? '\n_Espelho automático no SoundCloud._'
+            ? '\n_YouTube falhou → tocando via SoundCloud._'
             : '';
 
     return {
         embeds: [
             new EmbedBuilder()
-                .setColor(0xff5500)
+                .setColor(fonte === 'soundcloud' ? 0xff5500 : 0xff0000)
                 .setTitle(res.queueSize <= 1 ? '✅ Pedido recebido' : '➕ Na fila')
                 .setDescription(
                     `**[${info.title || 'Música'}](${info.uri || '#'})**${note}`
@@ -141,7 +140,7 @@ async function play(ctx, query) {
                     { name: 'Fila', value: `\`${res.queueSize}\``, inline: true }
                 )
                 .setThumbnail(info.artworkUrl || null)
-                .setFooter({ text: 'SoundCloud · painel público abaixo' })
+                .setFooter({ text: 'YouTube prioritário · fallback SoundCloud' })
         ]
     };
 }
