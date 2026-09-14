@@ -8,50 +8,77 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-function deniedMsg(user, bankBal, guild) {
-    const prefix = guild?.id ? getPrefix(guild.id) : 'O.';
+function prefixOf(guild) {
+    return guild?.id ? getPrefix(guild.id) : 'O.';
+}
+
+/** Banco vazio / sem saldo para sacar */
+function msgEmpty(guild, bankBal) {
+    const prefix = prefixOf(guild);
     return (
-        `Infelizmente seu saque foi negado. Atualmente você tem ✨ **${fmt(bankBal)}** éter no seu banco. Use \`/ver-banco\` ou \`${prefix}banco\`.`
+        `😔 Infelizmente seu saque foi negado. Atualmente você tem ✨ **${fmt(bankBal)}** éter no seu banco. Use \`/ver-banco\` ou \`${prefix}banco\`.`
+    );
+}
+
+/** Tentou sacar mais do que tem */
+function msgTooMuch() {
+    return '⚠️ Você tá tentando sacar o que você não tem. Use um valor válido.';
+}
+
+/** Comando / número inválido */
+function msgInvalid(guild) {
+    const prefix = prefixOf(guild);
+    return (
+        `❓ Comando inválido. Use \`${prefix}sacar <valor>\` — aceitamos *all* e *half*.`
     );
 }
 
 async function run(user, amountRaw, guild, reply) {
     const userId = user.id;
     const bankBal = bank.get(userId);
-    const prefix = guild?.id ? getPrefix(guild.id) : 'O.';
+    const prefix = prefixOf(guild);
+    const raw = amountRaw == null ? '' : String(amountRaw).trim();
 
-    if (bankBal <= 0) {
-        return reply({
-            content: deniedMsg(user, bankBal, guild),
-            allowedMentions: { users: [userId] }
-        });
+    if (!raw) {
+        return reply({ content: msgInvalid(guild) });
     }
 
-    const bet = resolveBet(amountRaw, bankBal, { label: '✨' });
+    if (bankBal <= 0) {
+        return reply({ content: msgEmpty(guild, bankBal) });
+    }
+
+    const bet = resolveBet(raw, bankBal, { label: '✨' });
     if (!bet.ok) {
-        // valor inválido / maior que o banco
-        if (/insuficiente|maior|saldo|all|half|valor/i.test(String(bet.error || ''))) {
-            return reply({
-                content: deniedMsg(user, bankBal, guild),
-                allowedMentions: { users: [userId] }
-            });
+        const err = String(bet.error || '').toLowerCase();
+        // número/comando inválido
+        if (
+            /inválid|invalid|número|number|formato|parse|nan|não reconhec/i.test(err) ||
+            (!/\d/.test(raw) && !/^(all|half|tudo|metade)$/i.test(raw))
+        ) {
+            return reply({ content: msgInvalid(guild) });
         }
-        return reply({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
+        // pediu mais do que tem
+        if (/insuficiente|maior|saldo|não tem|nao tem|excede/i.test(err)) {
+            return reply({ content: msgTooMuch() });
+        }
+        return reply({ content: msgInvalid(guild) });
     }
 
     if (bet.amount > bankBal) {
-        return reply({
-            content: deniedMsg(user, bankBal, guild),
-            allowedMentions: { users: [userId] }
-        });
+        return reply({ content: msgTooMuch() });
+    }
+
+    if (bet.amount <= 0) {
+        return reply({ content: msgInvalid(guild) });
     }
 
     const result = bank.withdraw(userId, bet.amount, eter);
     if (!result.ok) {
-        return reply({
-            content: deniedMsg(user, bank.get(userId), guild),
-            allowedMentions: { users: [userId] }
-        });
+        const err = String(result.error || '').toLowerCase();
+        if (/insuficiente|cofre/i.test(err)) {
+            return reply({ content: msgTooMuch() });
+        }
+        return reply({ content: msgEmpty(guild, bank.get(userId)) });
     }
 
     const emb = new EmbedBuilder()
