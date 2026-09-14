@@ -1,24 +1,16 @@
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const bank = require('../utils/bank');
+const { getPrefix } = require('../utils/settings');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-function getPrefix(guild) {
-    try {
-        const store = require('../utils/store');
-        const data = store.load('prefixes.json', {});
-        if (guild?.id && data[guild.id]) return String(data[guild.id]);
-    } catch (_) {}
-    return process.env.PREFIX || 'O.';
-}
-
 function buildEmbed(user, guild) {
     const wallet = eter.get(user.id);
     const bankBal = bank.get(user.id);
-    const prefix = getPrefix(guild);
+    const prefix = guild?.id ? getPrefix(guild.id) : 'O.';
 
     return new EmbedBuilder()
         .setColor(0x86efac)

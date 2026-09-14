@@ -2,18 +2,10 @@ const { EmbedBuilder, SlashCommandBuilder, MessageFlags } = require('discord.js'
 const eter = require('../utils/eter');
 const bank = require('../utils/bank');
 const { resolveBet } = require('../utils/parseAmount');
+const { getPrefix } = require('../utils/settings');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
-}
-
-function getPrefix(guild) {
-    try {
-        const store = require('../utils/store');
-        const data = store.load('prefixes.json', {});
-        if (guild?.id && data[guild.id]) return String(data[guild.id]);
-    } catch (_) {}
-    return process.env.PREFIX || 'O.';
 }
 
 async function run(user, amountRaw, guild, reply) {
@@ -29,7 +21,7 @@ async function run(user, amountRaw, guild, reply) {
         return reply({ content: `❌ ${result.error}`, flags: MessageFlags.Ephemeral });
     }
 
-    const prefix = getPrefix(guild);
+    const prefix = guild?.id ? getPrefix(guild.id) : 'O.';
 
     const emb = new EmbedBuilder()
         .setColor(0x86efac)
