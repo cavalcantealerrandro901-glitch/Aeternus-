@@ -36,7 +36,7 @@ function rankLine(userId, label) {
 function acceptRow(id, count) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`pix:accept:${id}`)
+            .setCustomId(`pay:accept:${id}`)
             .setLabel(`Aceitar (${count}/2)`)
             .setStyle(ButtonStyle.Success)
             .setDisabled(count >= 2)
@@ -123,15 +123,14 @@ async function createTransfer(channel, from, to, amount) {
         try {
             const m = await channel.messages.fetch(p.messageId).catch(() => null);
             if (m) {
-                await m.edit({
-                    content:
-                        buildInviteText(
-                            `<@${p.fromId}>`,
-                            `<@${p.toId}>`,
-                            p.amount
-                        ) + '\n\n**Expirado** — ninguém concluiu a tempo.',
-                    components: []
-                }).catch(() => {});
+                await m
+                    .edit({
+                        content:
+                            buildInviteText(`<@${p.fromId}>`, `<@${p.toId}>`, p.amount) +
+                            '\n\n**Expirado** — ninguém concluiu a tempo.',
+                        components: []
+                    })
+                    .catch(() => {});
             }
         } catch (_) {}
     }, TIMEOUT_MS);
@@ -148,15 +147,16 @@ async function finishTransfer(interaction, p) {
     if (amount > bal) {
         await interaction.message
             .edit({
-                content:
-                    `Transferência cancelada: <@${p.fromId}> não tem mais ✨ **${fmt(amount)}** na carteira.`,
+                content: `Transferência cancelada: <@${p.fromId}> não tem mais ✨ **${fmt(amount)}** na carteira.`,
                 components: []
             })
             .catch(() => {});
-        return interaction.followUp({
-            content: 'Saldo insuficiente no momento da confirmação.',
-            flags: MessageFlags.Ephemeral
-        }).catch(() => {});
+        return interaction
+            .followUp({
+                content: 'Saldo insuficiente no momento da confirmação.',
+                flags: MessageFlags.Ephemeral
+            })
+            .catch(() => {});
     }
 
     eter.remove(p.fromId, amount, { reason: 'pix', to: p.toId });
@@ -177,7 +177,8 @@ async function finishTransfer(interaction, p) {
 
     await interaction.message
         .edit({
-            content: buildInviteText(`<@${p.fromId}>`, `<@${p.toId}>`, amount) +
+            content:
+                buildInviteText(`<@${p.fromId}>`, `<@${p.toId}>`, amount) +
                 '\n\n**Concluída** (2/2).',
             components: []
         })
@@ -228,7 +229,6 @@ module.exports = {
         const amount = bet.amount;
         if (amount <= 0) return message.reply('Valor inválido.');
 
-        // Uma mensagem por destinatário
         for (const to of targets) {
             await createTransfer(message.channel, message.author, to, amount);
         }
@@ -269,9 +269,9 @@ module.exports = {
     },
 
     async handleComponent(interaction) {
-        if (!String(interaction.customId || '').startsWith('pix:accept:')) return;
+        if (!String(interaction.customId || '').startsWith('pay:accept:')) return;
 
-        const id = interaction.customId.split(':')[2];
+        const id = interaction.customId.split(':').slice(2).join(':');
         const p = pending.get(id);
         if (!p || p.done) {
             return interaction.reply({
@@ -282,10 +282,9 @@ module.exports = {
 
         if (Date.now() > p.expires) {
             pending.delete(id);
-            await interaction.update({
-                content: 'Pedido expirado.',
-                components: []
-            }).catch(() => {});
+            await interaction
+                .update({ content: 'Pedido expirado.', components: [] })
+                .catch(() => {});
             return;
         }
 
@@ -308,17 +307,11 @@ module.exports = {
         const count = p.accepted.size;
 
         if (count < 2) {
-            await interaction.update({
-                components: [acceptRow(id, count)]
-            });
+            await interaction.update({ components: [acceptRow(id, count)] });
             return;
         }
 
-        // 2/2
-        await interaction.update({
-            components: [acceptRow(id, 2)]
-        }).catch(() => {});
-
+        await interaction.update({ components: [acceptRow(id, 2)] }).catch(() => {});
         await finishTransfer(interaction, p);
     }
 };
