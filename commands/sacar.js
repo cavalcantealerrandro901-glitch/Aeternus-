@@ -8,20 +8,51 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
+function deniedMsg(user, bankBal, guild) {
+    const prefix = guild?.id ? getPrefix(guild.id) : 'O.';
+    return (
+        `Infelizmente seu saque foi negado. Atualmente você tem ✨ **${fmt(bankBal)}** éter no seu banco. Use \`/ver-banco\` ou \`${prefix}banco\`.`
+    );
+}
+
 async function run(user, amountRaw, guild, reply) {
     const userId = user.id;
     const bankBal = bank.get(userId);
+    const prefix = guild?.id ? getPrefix(guild.id) : 'O.';
+
+    if (bankBal <= 0) {
+        return reply({
+            content: deniedMsg(user, bankBal, guild),
+            allowedMentions: { users: [userId] }
+        });
+    }
+
     const bet = resolveBet(amountRaw, bankBal, { label: '✨' });
     if (!bet.ok) {
+        // valor inválido / maior que o banco
+        if (/insuficiente|maior|saldo|all|half|valor/i.test(String(bet.error || ''))) {
+            return reply({
+                content: deniedMsg(user, bankBal, guild),
+                allowedMentions: { users: [userId] }
+            });
+        }
         return reply({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
+    }
+
+    if (bet.amount > bankBal) {
+        return reply({
+            content: deniedMsg(user, bankBal, guild),
+            allowedMentions: { users: [userId] }
+        });
     }
 
     const result = bank.withdraw(userId, bet.amount, eter);
     if (!result.ok) {
-        return reply({ content: `❌ ${result.error}`, flags: MessageFlags.Ephemeral });
+        return reply({
+            content: deniedMsg(user, bank.get(userId), guild),
+            allowedMentions: { users: [userId] }
+        });
     }
-
-    const prefix = guild?.id ? getPrefix(guild.id) : 'O.';
 
     const emb = new EmbedBuilder()
         .setColor(0x86efac)
