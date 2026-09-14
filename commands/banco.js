@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const bank = require('../utils/bank');
 
@@ -6,68 +6,38 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-const TIPS = [
-    'Seu cofre protege o éter de roubos e apostas impulsivas.',
-    'Deposite o que não for usar — a segurança vale ouro.',
-    'Grandes fortunas nascem de depósitos consistentes.',
-    'O banco não dorme: seu éter fica seguro enquanto você joga.',
-    'Retire só o necessário. O resto permanece protegido.'
-];
-
-function tipFor(userId) {
-    const n = Number(String(userId).slice(-4)) || 0;
-    return TIPS[n % TIPS.length];
+function getPrefix(guild) {
+    try {
+        const store = require('../utils/store');
+        const data = store.load('prefixes.json', {});
+        if (guild?.id && data[guild.id]) return String(data[guild.id]);
+    } catch (_) {}
+    return process.env.PREFIX || 'O.';
 }
 
-function statusLine(bankBal) {
-    if (bankBal <= 0) return '🗭 Cofre vazio — nada depositado ainda.';
-    if (bankBal < 10_000) return '🌱 Cofre em crescimento.';
-    if (bankBal < 100_000) return '💼 Reserva sólida.';
-    if (bankBal < 1_000_000) return '🏛️ Patrimônio respeitável.';
-    return '👑 Cofre de elite.';
-}
-
-function buildEmbed(user) {
+function buildText(user, guild) {
     const wallet = eter.get(user.id);
     const bankBal = bank.get(user.id);
-    const total = wallet + bankBal;
-    const pct = total > 0 ? Math.round((bankBal / total) * 100) : 0;
+    const prefix = getPrefix(guild);
 
-    return new EmbedBuilder()
-        .setColor(0x38bdf8)
-        .setAuthor({
-            name: `AETERNUS BANCO • @${user.username}`,
-            iconURL: user.displayAvatarURL({ size: 64 })
-        })
-        .setTitle('🏦 Extrato do Cofre')
-        .setDescription(
-            [
-                statusLine(bankBal),
-                '',
-                `👛 **Em Mãos:** ${fmt(wallet)} Éter`,
-                `🏦 **No Cofre:** ${fmt(bankBal)} Éter`,
-                `💎 **Fortuna Total:** ${fmt(total)} Éter`,
-                '',
-                `📊 **Protegido:** ${pct}% da fortuna está no banco`,
-                '',
-                `_${tipFor(user.id)}_`
-            ].join('\n')
-        )
-        .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .addFields(
-            {
-                name: '📥 Depositar',
-                value: '`O.dep <valor>` · `/depositar-eter`',
-                inline: true
-            },
-            {
-                name: '📤 Sacar',
-                value: '`O.sacar <valor>` · `/sacar-eter`',
-                inline: true
-            }
-        )
-        .setFooter({ text: 'Aeternus · banco seguro' })
-        .setTimestamp();
+    return [
+        '🏦 **BANCO AETERNUS**',
+        '',
+        '*Aqui você poderá depositar éter para que os outros não o roubem de você. Basta continuar coletando o daily diariamente com `/diario` ou `' +
+            prefix +
+            'daily`.*',
+        '',
+        '----------------------------------------',
+        '',
+        '📋 **STATUS BANCÁRIOS**',
+        '',
+        `${user} você tem depositado: ✨ **${fmt(bankBal)}** éter.`,
+        `👛 *Em mãos:* ✨ **${fmt(wallet)}** éter.`,
+        '',
+        '----------------------------------------',
+        '',
+        '💡 Use `/depositar-eter` ou `/sacar-eter` para proteger e sacar a quantia quando quiser!!! ✨'
+    ].join('\n');
 }
 
 module.exports = {
@@ -83,11 +53,17 @@ module.exports = {
 
     async execute(message) {
         const user = message.mentions.users.first() || message.author;
-        await message.reply({ embeds: [buildEmbed(user)] });
+        await message.reply({
+            content: buildText(user, message.guild),
+            allowedMentions: { users: [user.id] }
+        });
     },
 
     async executeSlash(i) {
         const user = i.options.getUser('usuario') || i.user;
-        await i.reply({ embeds: [buildEmbed(user)] });
+        await i.reply({
+            content: buildText(user, i.guild),
+            allowedMentions: { users: [user.id] }
+        });
     }
 };
