@@ -18,7 +18,7 @@ const TOTAL = 16,
 const HOUSE = 0.96;
 const IDLE_MS = 6 * 60 * 1000;
 const BET_MIN = 100;
-const BET_MAX = 50_000_000;
+const BET_MAX = 10_000_000;
 const IDLE_CASH_RATE = 0.5;
 
 const WIN_IMG_PATH = WIN_IMG_FROM_UTIL || path.join(__dirname, '..', 'assets', 'mines-win.jpg');
@@ -28,6 +28,10 @@ let PARTIDA_SEQ = 1000;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
+}
+
+function msgBetRange() {
+    return '💸 Valor inválido, o mínimo de apostas é **100** éter e o máximo é **10m**.';
 }
 
 function minesResultThumb(kind) {
@@ -363,9 +367,6 @@ module.exports = {
             return message.reply(msgInvalid);
         }
 
-        // Ordem: mines <bombas> [valor]
-        // Só bombas = modo diversão
-        // bombas + valor = apostado
         const bombsRaw = parseInt(a0, 10);
         if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
             return message.reply(msgBombsInvalid);
@@ -399,13 +400,7 @@ module.exports = {
                 );
             }
             if (bet.amount < BET_MIN || bet.amount > BET_MAX) {
-                return message.reply(
-                    '💸 Valor inválido. Aposta entre **✨ ' +
-                        fmt(BET_MIN) +
-                        '** e **✨ ' +
-                        fmt(BET_MAX) +
-                        '**.'
-                );
+                return message.reply(msgBetRange());
             }
             amount = bet.amount;
             eter.remove(message.author.id, amount, { reason: 'mines start' });
@@ -487,15 +482,7 @@ module.exports = {
                     });
                 }
                 if (bet.amount < BET_MIN || bet.amount > BET_MAX) {
-                    return interaction.reply({
-                        content:
-                            '💸 Valor inválido. Aposta entre **✨ ' +
-                            fmt(BET_MIN) +
-                            '** e **✨ ' +
-                            fmt(BET_MAX) +
-                            '**.',
-                        flags: 64
-                    });
+                    return interaction.reply({ content: msgBetRange(), flags: 64 });
                 }
                 eter.remove(game.userId, bet.amount, { reason: 'mines again' });
                 amount = bet.amount;
