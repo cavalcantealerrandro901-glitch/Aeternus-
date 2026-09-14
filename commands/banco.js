@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const bank = require('../utils/bank');
 
@@ -15,29 +15,32 @@ function getPrefix(guild) {
     return process.env.PREFIX || 'O.';
 }
 
-function buildText(user, guild) {
+function buildEmbed(user, guild) {
     const wallet = eter.get(user.id);
     const bankBal = bank.get(user.id);
     const prefix = getPrefix(guild);
 
-    return [
-        '🏦 **BANCO AETERNUS**',
-        '',
-        '*Aqui você poderá depositar éter para que os outros não o roubem de você. Basta continuar coletando o daily diariamente com `/diario` ou `' +
-            prefix +
-            'daily`.*',
-        '',
-        '----------------------------------------',
-        '',
-        '📋 **STATUS BANCÁRIOS**',
-        '',
-        `${user} você tem depositado: ✨ **${fmt(bankBal)}** éter.`,
-        `👛 *Em mãos:* ✨ **${fmt(wallet)}** éter.`,
-        '',
-        '----------------------------------------',
-        '',
-        '💡 Use `/depositar-eter` ou `/sacar-eter` para proteger e sacar a quantia quando quiser!!! ✨'
-    ].join('\n');
+    return new EmbedBuilder()
+        .setColor(0x86efac)
+        .setTitle('🏦 BANCO AETERNUS')
+        .setDescription(
+            [
+                '*Aqui você poderá depositar éter para que os outros não o roubem de você. Basta continuar coletando o daily diariamente com `/diario` ou `' +
+                    prefix +
+                    'daily`.*',
+                '',
+                '----------------------------------------',
+                '',
+                '📋 **STATUS BANCÁRIOS**',
+                '',
+                `Você tem depositado: ✨ **${fmt(bankBal)}** éter.`,
+                `👛 *Em mãos:* ✨ **${fmt(wallet)}** éter.`,
+                '',
+                '----------------------------------------',
+                '',
+                '💡 Use `/depositar-eter` ou `/sacar-eter` para proteger e sacar a quantia quando quiser!!! ✨'
+            ].join('\n')
+        );
 }
 
 module.exports = {
@@ -54,7 +57,8 @@ module.exports = {
     async execute(message) {
         const user = message.mentions.users.first() || message.author;
         await message.reply({
-            content: buildText(user, message.guild),
+            content: `${user}`,
+            embeds: [buildEmbed(user, message.guild)],
             allowedMentions: { users: [user.id] }
         });
     },
@@ -62,7 +66,8 @@ module.exports = {
     async executeSlash(i) {
         const user = i.options.getUser('usuario') || i.user;
         await i.reply({
-            content: buildText(user, i.guild),
+            content: `${user}`,
+            embeds: [buildEmbed(user, i.guild)],
             allowedMentions: { users: [user.id] }
         });
     }
