@@ -17,12 +17,12 @@ function globalRank(userId) {
     return idx + 1;
 }
 
-function buildText(viewerId, target) {
+function buildText(viewer, target) {
     const bal = eter.get(target.id);
     const rank = globalRank(target.id);
     const rankStr = rank != null ? String(rank) : '—';
 
-    if (String(viewerId) === String(target.id)) {
+    if (String(viewer.id) === String(target.id)) {
         return [
             `${target} Você possui ✨ **${fmt(bal)}** éter`,
             `e está em **#${rankStr}** global.`,
@@ -32,15 +32,16 @@ function buildText(viewerId, target) {
     }
 
     return [
-        `O ${target} possui ✨ **${fmt(bal)}** éter`,
+        `${viewer} O ${target} possui ✨ **${fmt(bal)}** éter`,
         `e você sabia que ${target} está em **#${rankStr}** lugar do rank global?`
     ].join('\n');
 }
 
-async function run(viewerId, target, reply) {
+async function run(viewer, target, reply) {
+    const mentionIds = [...new Set([viewer.id, target.id])];
     return reply({
-        content: buildText(viewerId, target),
-        allowedMentions: { users: [target.id] }
+        content: buildText(viewer, target),
+        allowedMentions: { users: mentionIds }
     });
 }
 
@@ -57,11 +58,11 @@ module.exports = {
 
     async execute(message) {
         const user = message.mentions.users.first() || message.author;
-        await run(message.author.id, user, (p) => message.reply(p));
+        await run(message.author, user, (p) => message.reply(p));
     },
 
     async executeSlash(interaction) {
         const user = interaction.options.getUser('usuario') || interaction.user;
-        await run(interaction.user.id, user, (p) => interaction.reply(p));
+        await run(interaction.user, user, (p) => interaction.reply(p));
     }
 };
