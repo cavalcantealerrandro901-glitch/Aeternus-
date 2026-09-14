@@ -12,9 +12,7 @@ try {
     if (typeof mw.ensureMinesWinImage === 'function') mw.ensureMinesWinImage();
 } catch (_) {}
 
-const COLS = 4,
-    ROWS = 4,
-    TOTAL = 16,
+const TOTAL = 16,
     MAX_BOMBS = 11;
 const HOUSE = 0.96;
 const IDLE_MS = 6 * 60 * 1000;
@@ -29,22 +27,6 @@ let PARTIDA_SEQ = 1000;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
-}
-
-function fmtWhen(ts) {
-    const d = new Date(ts || Date.now());
-    const pad = (x) => String(x).padStart(2, '0');
-    return (
-        pad(d.getDate()) +
-        '/' +
-        pad(d.getMonth() + 1) +
-        '/' +
-        d.getFullYear() +
-        ' às ' +
-        pad(d.getHours()) +
-        ':' +
-        pad(d.getMinutes())
-    );
 }
 
 function minesResultThumb(kind) {
@@ -72,74 +54,6 @@ function minesResultFiles(game) {
         files.push(new AttachmentBuilder(LOSE_IMG_PATH, { name: 'mines-lose.jpg' }));
     }
     return files;
-}
-
-function panelPayload(game, extra, reveal) {
-    const emb = panelEmbed(game, extra, reveal);
-    const files = minesResultFiles(game);
-    if (game.cashed && !game.fun && files.some((f) => f.name === 'mines-win.jpg')) {
-        emb.setThumbnail('attachment://mines-win.jpg');
-    } else if (game.dead && files.some((f) => f.name === 'mines-lose.jpg')) {
-        emb.setThumbnail('attachment://mines-lose.jpg');
-    }
-    return {
-        embeds: [emb],
-        components: fullComponents(game, reveal, potentialAt),
-        files: files.length ? files : []
-    };
-}
-
-function clearTimer(game) {
-    if (game?._timer) {
-        clearTimeout(game._timer);
-        game._timer = null;
-    }
-}
-
-function touch(game, client) {
-    clearTimer(game);
-    game._last = Date.now();
-    game._timer = setTimeout(async () => {
-        if (!games.has(game.id) || game.dead || game.cashed) return;
-        game.cashed = true;
-        game._idleAuto = true;
-        let note = null;
-        if (!game.fun && game.opened.size > 0) {
-            const full = potentialAt(game.amount, game.opened.size, game.bombCount);
-            const win = Math.max(0, Math.floor(full * IDLE_CASH_RATE));
-            game._lastWin = win;
-            if (win > 0) eter.add(game.userId, win, { reason: 'mines idle auto' });
-            note =
-                '⏱️ Tempo esgotado — saque automático (metade): ✨ **' +
-                fmt(win) +
-                '**.';
-        } else if (!game.fun && game.opened.size === 0) {
-            game._lastWin = game.amount;
-            eter.add(game.userId, game.amount, { reason: 'mines idle refund' });
-            note = '⏱️ Tempo esgotado — aposta devolvida: ✨ **' + fmt(game.amount) + '**.';
-        } else {
-            note = '⏱️ Tempo esgotado.';
-        }
-        try {
-            const ch = await client.channels.fetch(game.channelId).catch(() => null);
-            if (ch?.isTextBased?.() && game.messageId) {
-                const main = await ch.messages.fetch(game.messageId).catch(() => null);
-                if (main) {
-                    const p = panelPayload(game, note, true);
-                    await main
-                        .edit({
-                            content: main.content || '<@' + game.userId + '>',
-                            embeds: p.embeds,
-                            components: p.components,
-                            files: p.files || []
-                        })
-                        .catch(() => {});
-                }
-            }
-        } catch (e) {
-            console.warn('[mines] idle end:', e.message);
-        }
-    }, IDLE_MS);
 }
 
 function multAt(opened, bombs) {
@@ -172,43 +86,48 @@ function potentialAt(amount, opened, bombs) {
     return Math.floor(Number(amount || 0) * multAt(opened, bombs));
 }
 
+/** Frase acima do botão Tentar novamente */
 function resultBanner(game) {
     if (!game.dead && !game.cashed) return null;
+
     if (game._idleAuto) {
-        if (game.fun) return '⏱️ Encerrado por inatividade.';
+        if (game.fun) return '⏱️ Tempo esgotado. Clique no botão abaixo e tente novamente!!!';
         const win = game._lastWin || 0;
         if (game.opened.size > 0) {
             return (
-                '⏱️ Saque automático · ✨ **' +
+                '⏱️ Tempo esgotado — saque automático de ✨ **' +
                 fmt(win) +
-                '** · casas **' +
-                game.opened.size +
-                '**'
+                '**. Clique no botão abaixo e tente novamente!!!'
             );
         }
-        return '⏱️ Aposta devolvida · ✨ **' + fmt(win) + '**';
+        return (
+            '⏱️ Tempo esgotado — aposta devolvida (✨ **' +
+            fmt(win) +
+            '**). Clique no botão abaixo e tente novamente!!!'
+        );
     }
-    if (game.cashed && game.fun) return '🏁 Encerrado (diversão).';
+
+    if (game.cashed && game.fun) {
+        return '🏁 Partida encerrada (diversão). Clique no botão abaixo e tente novamente!!!';
+    }
+
     if (game.cashed && !game.fun) {
         const win = game._lastWin || potentialAt(game.amount, game.opened.size, game.bombCount);
         const profit = Math.max(0, win - game.amount);
         return (
-            '✅ Sacou **✨ ' +
+            'Parabéns! Você conseguiu sair sem encontrar nenhuma bomba, sacando a tempo ✨ **' +
             fmt(win) +
-            '** · lucro **✨ ' +
+            '** éter com um lucro de ✨ **' +
             fmt(profit) +
-            '** · **' +
-            game.opened.size +
-            '** casas · ×' +
-            multAt(game.opened.size, game.bombCount)
+            '**. Clique no botão abaixo e tente novamente!!!'
         );
     }
+
+    // perda
     return (
-        '💥 Explodiu · perdeu ✨ **' +
+        'Cabô!!! Você encontrou uma bomba e teve uma perda de ✨ **' +
         fmt(game.amount) +
-        '** · casas seguras **' +
-        game.opened.size +
-        '**'
+        '** éter. Mas não desanime, clique no botão abaixo e tenta recuperar!!!'
     );
 }
 
@@ -216,39 +135,40 @@ function panelEmbed(game, extra, reveal) {
     const opened = game.opened.size;
     const bombs = game.bombCount;
     const safeTotal = TOTAL - bombs;
+    const restantes = Math.max(0, safeTotal - opened);
     const curM = multAt(opened, bombs);
     const nextM = opened < safeTotal ? multAt(opened + 1, bombs) : curM;
     const nextPay = potentialAt(game.amount, opened + 1, bombs);
-    const curPay = potentialAt(game.amount, opened, bombs);
 
     let color = 0x5865f2;
     if (game.dead) color = 0xed4245;
     else if (game.cashed) color = 0x57f287;
     else if (opened > 0) color = 0xfee75c;
 
-    const left1 = game.fun
-        ? '💰 Aposta: diversão'
-        : '💰 Aposta: **' + fmt(game.amount) + ' Éter**';
-    const right1 = '📈 Multi: **' + curM.toFixed(2) + 'x**';
-    const left2 = '💣 Minas: **' + bombs + '** (**' + opened + '/' + safeTotal + '**)';
-    const right2 = game.fun
-        ? '⚡ Próx: **' + nextM.toFixed(2) + 'x**'
+    const apostado = game.fun ? 'diversão' : fmt(game.amount) + ' éter';
+    const proxLine = game.fun
+        ? '⚡ **Próximo Multiplicador:** ' + nextM.toFixed(2) + 'x'
         : opened < safeTotal
-          ? '⚡ Próx: **' + nextM.toFixed(2) + 'x** (✨ **' + fmt(nextPay) + '**)'
-          : '⚡ Final: **' + curM.toFixed(2) + 'x** (✨ **' + fmt(curPay) + '**)';
+          ? '⚡ **Próximo Multiplicador:** ' +
+            nextM.toFixed(2) +
+            'x (✨ ' +
+            fmt(nextPay) +
+            ' éter)'
+          : '⚡ **Próximo Multiplicador:** — (todas as casas seguras abertas)';
 
     const lines = [
-        left1 + '       ' + right1,
-        left2 + '       ' + right2,
+        '**Apostado:** ' + apostado,
+        '💣 **Bombas:** ' + bombs,
+        '　　**Casas restantes:** ' + restantes + '/' + safeTotal,
+        '📈 **Multiplicador:** ' + curM.toFixed(2) + 'x',
+        proxLine,
         '',
-        '─────────────────────────────────',
-        '───────── ' + fmtWhen(game._last || Date.now()) + ' ─────────',
         '🎮 Partida **#' + (game.number || '—') + '**'
     ];
 
     const banner = extra || resultBanner(game);
     if (banner) {
-        lines.push('', String(banner));
+        lines.push('', '─────────────────', '', String(banner));
     }
 
     const emb = new EmbedBuilder()
@@ -264,6 +184,66 @@ function panelEmbed(game, extra, reveal) {
         if (u) emb.setThumbnail(u);
     }
     return emb;
+}
+
+function panelPayload(game, extra, reveal) {
+    const emb = panelEmbed(game, extra, reveal);
+    const files = minesResultFiles(game);
+    if (game.cashed && !game.fun && files.some((f) => f.name === 'mines-win.jpg')) {
+        emb.setThumbnail('attachment://mines-win.jpg');
+    } else if (game.dead && files.some((f) => f.name === 'mines-lose.jpg')) {
+        emb.setThumbnail('attachment://mines-lose.jpg');
+    }
+    return {
+        embeds: [emb],
+        components: fullComponents(game, reveal, potentialAt),
+        files: files.length ? files : []
+    };
+}
+
+function clearTimer(game) {
+    if (game?._timer) {
+        clearTimeout(game._timer);
+        game._timer = null;
+    }
+}
+
+function touch(game, client) {
+    clearTimer(game);
+    game._last = Date.now();
+    game._timer = setTimeout(async () => {
+        if (!games.has(game.id) || game.dead || game.cashed) return;
+        game.cashed = true;
+        game._idleAuto = true;
+        if (!game.fun && game.opened.size > 0) {
+            const full = potentialAt(game.amount, game.opened.size, game.bombCount);
+            const win = Math.max(0, Math.floor(full * IDLE_CASH_RATE));
+            game._lastWin = win;
+            if (win > 0) eter.add(game.userId, win, { reason: 'mines idle auto' });
+        } else if (!game.fun && game.opened.size === 0) {
+            game._lastWin = game.amount;
+            eter.add(game.userId, game.amount, { reason: 'mines idle refund' });
+        }
+        try {
+            const ch = await client.channels.fetch(game.channelId).catch(() => null);
+            if (ch?.isTextBased?.() && game.messageId) {
+                const main = await ch.messages.fetch(game.messageId).catch(() => null);
+                if (main) {
+                    const p = panelPayload(game, null, true);
+                    await main
+                        .edit({
+                            content: main.content || '<@' + game.userId + '>',
+                            embeds: p.embeds,
+                            components: p.components,
+                            files: p.files || []
+                        })
+                        .catch(() => {});
+                }
+            }
+        } catch (e) {
+            console.warn('[mines] idle end:', e.message);
+        }
+    }, IDLE_MS);
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
@@ -492,7 +472,7 @@ module.exports = {
 
             const ng = makeGame(game.userId, amount, bombCount, fun, {
                 channelId: interaction.channelId,
-                sourceMessageId: interaction.message?.id
+                sourceMessageId: game.sourceMessageId || interaction.message?.id
             });
 
             const payload = panelPayload(ng);
@@ -503,14 +483,9 @@ module.exports = {
                     embeds: payload.embeds,
                     components: payload.components,
                     files: payload.files || [],
-                    reply: game.sourceMessageId
-                        ? { messageReference: game.sourceMessageId, failIfNotExists: false }
-                        : interaction.message?.id
-                          ? {
-                                messageReference: interaction.message.id,
-                                failIfNotExists: false
-                            }
-                          : undefined
+                    reply: ng.sourceMessageId
+                        ? { messageReference: ng.sourceMessageId, failIfNotExists: false }
+                        : undefined
                 })
                 .catch(() => null);
 
