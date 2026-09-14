@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, MessageFlags } = require('discord.js');
 const eter = require('../utils/eter');
 const bank = require('../utils/bank');
 const { resolveBet } = require('../utils/parseAmount');
@@ -7,53 +7,52 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-const OK_PHRASES = [
-    'Saque liberado. Use com sabedoria.',
-    'O cofre abriu — o éter voltou às suas mãos.',
-    'Retirada concluída. Boa sorte nas próximas jogadas.',
-    'Transação aprovada. O restante permanece protegido.'
-];
-
-function phrase(userId) {
-    const n = Number(String(userId).slice(-3)) || 0;
-    return OK_PHRASES[n % OK_PHRASES.length];
+function getPrefix(guild) {
+    try {
+        const store = require('../utils/store');
+        const data = store.load('prefixes.json', {});
+        if (guild?.id && data[guild.id]) return String(data[guild.id]);
+    } catch (_) {}
+    return process.env.PREFIX || 'O.';
 }
 
-async function run(user, amountRaw, reply) {
+async function run(user, amountRaw, guild, reply) {
     const userId = user.id;
     const bankBal = bank.get(userId);
     const bet = resolveBet(amountRaw, bankBal, { label: '✨' });
     if (!bet.ok) {
-        return reply({ content: `❌ ${bet.error}`, flags: 64 });
+        return reply({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
     }
 
     const result = bank.withdraw(userId, bet.amount, eter);
     if (!result.ok) {
-        return reply({ content: `❌ ${result.error}`, flags: 64 });
+        return reply({ content: `❌ ${result.error}`, flags: MessageFlags.Ephemeral });
     }
 
+    const prefix = getPrefix(guild);
+
     const emb = new EmbedBuilder()
-        .setColor(0x38bdf8)
-        .setAuthor({
-            name: '🔮 AETERNUS BANCO',
-            iconURL: user.displayAvatarURL({ size: 64 })
-        })
-        .setTitle('📤 Saque Realizado')
+        .setColor(0x86efac)
+        .setTitle('💸 SAQUE REALIZADO!!')
         .setDescription(
             [
-                phrase(userId),
+                '----------------------------------------',
                 '',
-                `💰 **Valor retirado:** − ${fmt(result.amount)} Éter`,
-                `👛 **Em Mãos agora:** ${fmt(result.wallet)} Éter`,
-                `🏦 **No Cofre agora:** ${fmt(result.bank)} Éter`,
-                `💎 **Fortuna total:** ${fmt(result.wallet + result.bank)} Éter`
+                `Você sacou ✨ **${fmt(result.amount)}** éter`,
+                '',
+                `🏦 E agora você possui no banco ✨ **${fmt(result.bank)}** éter`,
+                '',
+                '---------------------------------------',
+                '',
+                `💡 Dica: use \`/depositar-eter\` ou \`${prefix}depositar <valor>\`.`
             ].join('\n')
-        )
-        .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'Aeternus · saque confirmado' })
-        .setTimestamp();
+        );
 
-    return reply({ embeds: [emb] });
+    return reply({
+        content: `${user}`,
+        embeds: [emb],
+        allowedMentions: { users: [userId] }
+    });
 }
 
 module.exports = {
@@ -71,14 +70,10 @@ module.exports = {
         ),
 
     async execute(message, args) {
-        await run(message.author, args[0], (p) => message.reply(p));
+        await run(message.author, args[0], message.guild, (p) => message.reply(p));
     },
 
     async executeSlash(i) {
-        await run(i.user, i.options.getString('valor', true), (p) => {
-            if (typeof p === 'string') return i.reply({ content: p, flags: 64 });
-            if (p.content && !p.embeds) return i.reply({ ...p, flags: p.flags ?? 64 });
-            return i.reply(p);
-        });
+        await run(i.user, i.options.getString('valor', true), i.guild, (p) => i.reply(p));
     }
 };
