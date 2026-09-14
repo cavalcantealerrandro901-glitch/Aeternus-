@@ -1,59 +1,106 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, MessageFlags } = require('discord.js');
 const eter = require('../utils/eter');
 const bank = require('../utils/bank');
 const { resolveBet } = require('../utils/parseAmount');
+const { getPrefix } = require('../utils/settings');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-const OK_PHRASES = [
-    'Seu éter entrou no cofre com segurança.',
-    'Depósito confirmado. O patrimônio cresce em silêncio.',
-    'Guardado com cuidado — longe de riscos desnecessários.',
-    'Transação concluída. O banco agradece a confiança.'
-];
-
-function phrase(userId) {
-    const n = Number(String(userId).slice(-3)) || 0;
-    return OK_PHRASES[n % OK_PHRASES.length];
+function prefixOf(guild) {
+    return guild?.id ? getPrefix(guild.id) : 'O.';
 }
 
-async function run(user, amountRaw, reply) {
+/** Carteira vazia / sem saldo para depositar */
+function msgEmpty(guild, wallet) {
+    const prefix = prefixOf(guild);
+    return (
+        `😔 Infelizmente seu depósito foi negado. Atualmente você tem ✨ **${fmt(wallet)}** éter na carteira. Use \`/ver-banco\` ou \`${prefix}banco\`.`
+    );
+}
+
+/** Tentou depositar mais do que tem em mãos */
+function msgTooMuch() {
+    return '⚠️ Você tá tentando depositar o que você não tem. Use um valor válido.';
+}
+
+/** Comando / número inválido */
+function msgInvalid(guild) {
+    const prefix = prefixOf(guild);
+    return (
+        `❓ Comando inválido. Use \`${prefix}depositar <valor>\` — aceitamos *all* e *half*.`
+    );
+}
+
+async function run(user, amountRaw, guild, reply) {
     const userId = user.id;
     const wallet = eter.get(userId);
-    const bet = resolveBet(amountRaw, wallet, { label: '✨' });
+    const prefix = prefixOf(guild);
+    const raw = amountRaw == null ? '' : String(amountRaw).trim();
+
+    if (!raw) {
+        return reply({ content: msgInvalid(guild) });
+    }
+
+    if (wallet <= 0) {
+        return reply({ content: msgEmpty(guild, wallet) });
+    }
+
+    const bet = resolveBet(raw, wallet, { label: '✨' });
     if (!bet.ok) {
-        return reply({ content: `❌ ${bet.error}`, flags: 64 });
+        const err = String(bet.error || '').toLowerCase();
+        if (
+            /inválid|invalid|número|number|formato|parse|nan|não reconhec/i.test(err) ||
+            (!/\d/.test(raw) && !/^(all|half|tudo|metade)$/i.test(raw))
+        ) {
+            return reply({ content: msgInvalid(guild) });
+        }
+        if (/insuficiente|maior|saldo|não tem|nao tem|excede/i.test(err)) {
+            return reply({ content: msgTooMuch() });
+        }
+        return reply({ content: msgInvalid(guild) });
+    }
+
+    if (bet.amount > wallet) {
+        return reply({ content: msgTooMuch() });
+    }
+
+    if (bet.amount <= 0) {
+        return reply({ content: msgInvalid(guild) });
     }
 
     const result = bank.deposit(userId, bet.amount, eter);
     if (!result.ok) {
-        return reply({ content: `❌ ${result.error}`, flags: 64 });
+        const err = String(result.error || '').toLowerCase();
+        if (/insuficiente|carteira/i.test(err)) {
+            return reply({ content: msgTooMuch() });
+        }
+        return reply({ content: msgEmpty(guild, eter.get(userId)) });
     }
 
     const emb = new EmbedBuilder()
-        .setColor(0x22c55e)
-        .setAuthor({
-            name: '🔮 AETERNUS BANCO',
-            iconURL: user.displayAvatarURL({ size: 64 })
-        })
-        .setTitle('📥 Depósito Realizado')
+        .setColor(0x86efac)
+        .setTitle('📥 DEPÓSITO REALIZADO!!')
         .setDescription(
             [
-                phrase(userId),
+                '----------------------------------------',
                 '',
-                `💰 **Valor guardado:** + ${fmt(result.amount)} Éter`,
-                `👛 **Em Mãos agora:** ${fmt(result.wallet)} Éter`,
-                `🏦 **No Cofre agora:** ${fmt(result.bank)} Éter`,
-                `💎 **Fortuna total:** ${fmt(result.wallet + result.bank)} Éter`
+                `Você depositou ✨ **${fmt(result.amount)}** éter`,
+                '',
+                `🏦 E agora você possui no banco ✨ **${fmt(result.bank)}** éter`,
+                '',
+                '---------------------------------------',
+                '',
+                `💡 Dica: use \`/sacar-eter\` ou \`${prefix}sacar <valor>\`.`
             ].join('\n')
-        )
-        .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'Aeternus · depósito seguro' })
-        .setTimestamp();
+        );
 
-    return reply({ embeds: [emb] });
+    return reply({
+        content: `${user}`,
+        embeds: [emb],
+        allowedMentions: { users: [userId] }
+    });
 }
 
 module.exports = {
@@ -71,14 +118,10 @@ module.exports = {
         ),
 
     async execute(message, args) {
-        await run(message.author, args[0], (p) => message.reply(p));
+        await run(message.author, args[0], message.guild, (p) => message.reply(p));
     },
 
     async executeSlash(i) {
-        await run(i.user, i.options.getString('valor', true), (p) => {
-            if (typeof p === 'string') return i.reply({ content: p, flags: 64 });
-            if (p.content && !p.embeds) return i.reply({ ...p, flags: p.flags ?? 64 });
-            return i.reply(p);
-        });
+        await run(i.user, i.options.getString('valor', true), i.guild, (p) => i.reply(p));
     }
 };
