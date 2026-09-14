@@ -1,21 +1,24 @@
 const { EmbedBuilder, SlashCommandBuilder, MessageFlags } = require('discord.js');
 const eter = require('../utils/eter');
+const bank = require('../utils/bank');
 const store = require('../utils/store');
 
 const CD = 15 * 60 * 1000; // 15 min
-const MIN_TARGET = 100;
-const SUCCESS_CHANCE = 0.5; // 50%
+const MIN_HAND = 100; // mínimo na carteira do alvo
+const SUCCESS_CHANCE = 0.55; // 55% ganha / 45% perde
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
+function randBetween(min, max) {
+    return min + Math.random() * (max - min);
+}
+
 async function resolveTarget(message, args) {
-    // 1) menção
     let user = message.mentions?.users?.first?.() || null;
     if (user) return user;
 
-    // 2) ID ou @ bruto nos args
     const raw = (args || []).find((a) => /\d{15,20}/.test(a));
     if (raw) {
         const id = String(raw).replace(/[<@!>]/g, '');
@@ -23,7 +26,6 @@ async function resolveTarget(message, args) {
         if (user) return user;
     }
 
-    // 3) resposta a uma mensagem
     if (message.reference?.messageId) {
         const ref = await message.channel.messages
             .fetch(message.reference.messageId)
@@ -42,11 +44,12 @@ async function run(thief, target, reply) {
                     .setColor(0xf59e0b)
                     .setTitle('🕵️ Roubar')
                     .setDescription(
-                        'Mencione alguém para roubar.\n' +
+                        'Rouba **só o que está na carteira** (o banco está protegido).\n\n' +
                             '**Exemplos:**\n' +
                             '`O.roubar @usuario`\n' +
                             '`O.roubar 123456789012345678`\n' +
-                            'Ou responda a mensagem da pessoa com `O.roubar`'
+                            'Ou responda a mensagem com `O.roubar`\n\n' +
+                            '**Regras:** 55% sucesso (26–40% da carteira) · 45% falha (14–22% do seu saldo)'
                     )
             ]
         });
@@ -63,10 +66,17 @@ async function run(thief, target, reply) {
         return reply(`⏳ Aguarde **${m}** minuto(s) para tentar roubar de novo.`);
     }
 
-    const targetBal = eter.get(target.id);
-    if (targetBal < MIN_TARGET) {
+    // Só carteira (mãos) — banco protegido
+    const targetHand = eter.get(target.id);
+    const targetBank = bank.get(target.id);
+
+    if (targetHand < MIN_HAND) {
         return reply(
-            `❌ **${target.username}** não tem éter suficiente (mínimo ✨ **${fmt(MIN_TARGET)}** na carteira).`
+            `❌ **${target.username}** não tem éter suficiente **na carteira** ` +
+                `(mínimo ✨ **${fmt(MIN_HAND)}** em mãos).\n` +
+                (targetBank > 0
+                    ? `_O que está no banco (✨ ${fmt(targetBank)}) não pode ser roubado._`
+                    : '')
         );
     }
 
@@ -76,10 +86,10 @@ async function run(thief, target, reply) {
     const success = Math.random() < SUCCESS_CHANCE;
 
     if (success) {
-        // 5% a 20% do saldo do alvo
-        const pct = 0.05 + Math.random() * 0.15;
-        let amount = Math.floor(targetBal * pct);
-        amount = Math.max(50, Math.min(amount, targetBal));
+        // 26% a 40% da carteira do alvo
+        const pct = randBetween(0.26, 0.4);
+        let amount = Math.floor(targetHand * pct);
+        amount = Math.max(1, Math.min(amount, targetHand));
 
         eter.remove(target.id, amount, { reason: 'roubo' });
         eter.add(thief.id, amount, { reason: 'roubo' });
@@ -90,16 +100,18 @@ async function run(thief, target, reply) {
                     .setColor(0x22c55e)
                     .setTitle('💰 Roubo bem-sucedido')
                     .setDescription(
-                        `**${thief.username}** roubou ✨ **${fmt(amount)}** de **${target.username}**.`
+                        `**${thief.username}** roubou ✨ **${fmt(amount)}** ` +
+                            `(${(pct * 100).toFixed(1)}% da carteira) de **${target.username}**.\n` +
+                            `_O banco da vítima continua seguro._`
                     )
                     .addFields(
                         {
-                            name: 'Seu saldo',
+                            name: 'Sua carteira',
                             value: `✨ **${fmt(eter.get(thief.id))}**`,
                             inline: true
                         },
                         {
-                            name: `Saldo de ${target.username}`,
+                            name: `Carteira de ${target.username}`,
                             value: `✨ **${fmt(eter.get(target.id))}**`,
                             inline: true
                         }
@@ -110,10 +122,11 @@ async function run(thief, target, reply) {
         });
     }
 
-    // Falhou — multa
-    const thiefBal = eter.get(thief.id);
-    let fine = 200 + Math.floor(Math.random() * 800);
-    fine = Math.min(fine, thiefBal);
+    // Falhou — perde 14% a 22% do próprio saldo (carteira)
+    const thiefHand = eter.get(thief.id);
+    const failPct = randBetween(0.14, 0.22);
+    let fine = Math.floor(thiefHand * failPct);
+    fine = Math.min(fine, thiefHand);
     if (fine > 0) eter.remove(thief.id, fine, { reason: 'roubo falhou' });
 
     return reply({
@@ -124,11 +137,11 @@ async function run(thief, target, reply) {
                 .setDescription(
                     `**${target.username}** te pegou no flagra!\n` +
                         (fine > 0
-                            ? `Você perdeu ✨ **${fmt(fine)}** de multa.`
-                            : 'Você não tinha éter para pagar multa.')
+                            ? `Você perdeu ✨ **${fmt(fine)}** (${(failPct * 100).toFixed(1)}% da sua carteira).`
+                            : 'Você não tinha éter na carteira para perder.')
                 )
                 .addFields({
-                    name: 'Seu saldo',
+                    name: 'Sua carteira',
                     value: `✨ **${fmt(eter.get(thief.id))}**`,
                     inline: true
                 })
@@ -141,10 +154,10 @@ async function run(thief, target, reply) {
 module.exports = {
     name: 'rob',
     aliases: ['roubar', 'steal'],
-    description: 'Rouba éter de outro usuário',
+    description: 'Rouba éter da carteira de outro usuário (banco protegido)',
     data: new SlashCommandBuilder()
         .setName('roubar')
-        .setDescription('Rouba éter de um usuário')
+        .setDescription('Rouba éter da carteira de um usuário')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Quem você quer roubar').setRequired(true)
         ),
