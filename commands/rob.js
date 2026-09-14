@@ -36,7 +36,7 @@ async function resolveTarget(message, args) {
     return null;
 }
 
-async function run(thief, target, reply) {
+async function run(thief, target, reply, botId) {
     if (!target) {
         return reply({
             embeds: [
@@ -49,7 +49,7 @@ async function run(thief, target, reply) {
                             '`O.roubar @usuario`\n' +
                             '`O.roubar 123456789012345678`\n' +
                             'Ou responda a mensagem com `O.roubar`\n\n' +
-                            '**Regras:** 55% sucesso (26–40% da carteira) · 45% falha (14–22% do seu saldo)'
+                            '**Regras:** 55% sucesso (26–40% da carteira) · 45% falha (14–22% do seu saldo → bot)'
                     )
             ]
         });
@@ -91,8 +91,8 @@ async function run(thief, target, reply) {
         let amount = Math.floor(targetHand * pct);
         amount = Math.max(1, Math.min(amount, targetHand));
 
-        eter.remove(target.id, amount, { reason: 'roubo' });
-        eter.add(thief.id, amount, { reason: 'roubo' });
+        eter.remove(target.id, amount, { reason: 'roubo', to: thief.id });
+        eter.add(thief.id, amount, { reason: 'roubo', from: target.id });
 
         return reply({
             embeds: [
@@ -122,12 +122,18 @@ async function run(thief, target, reply) {
         });
     }
 
-    // Falhou — perde 14% a 22% do próprio saldo (carteira)
+    // Falhou — perde 14% a 22% da carteira; valor vai para o bot
     const thiefHand = eter.get(thief.id);
     const failPct = randBetween(0.14, 0.22);
     let fine = Math.floor(thiefHand * failPct);
     fine = Math.min(fine, thiefHand);
-    if (fine > 0) eter.remove(thief.id, fine, { reason: 'roubo falhou' });
+
+    if (fine > 0) {
+        eter.remove(thief.id, fine, { reason: 'roubo falhou', to: botId });
+        if (botId) {
+            eter.add(botId, fine, { reason: 'multa de roubo', from: thief.id });
+        }
+    }
 
     return reply({
         embeds: [
@@ -137,7 +143,7 @@ async function run(thief, target, reply) {
                 .setDescription(
                     `**${target.username}** te pegou no flagra!\n` +
                         (fine > 0
-                            ? `Você perdeu ✨ **${fmt(fine)}** (${(failPct * 100).toFixed(1)}% da sua carteira).`
+                            ? `Você perdeu ✨ **${fmt(fine)}** (${(failPct * 100).toFixed(1)}% da carteira) — valor creditado ao **bot**.`
                             : 'Você não tinha éter na carteira para perder.')
                 )
                 .addFields({
@@ -164,16 +170,23 @@ module.exports = {
 
     async execute(message, args) {
         const target = await resolveTarget(message, args);
-        await run(message.author, target, (p) => message.reply(p));
+        const botId = message.client.user?.id;
+        await run(message.author, target, (p) => message.reply(p), botId);
     },
 
     async executeSlash(i) {
         const target = i.options.getUser('usuario', true);
-        await run(i.user, target, (p) => {
-            if (typeof p === 'string') {
-                return i.reply({ content: p, flags: MessageFlags.Ephemeral });
-            }
-            return i.reply(p);
-        });
+        const botId = i.client.user?.id;
+        await run(
+            i.user,
+            target,
+            (p) => {
+                if (typeof p === 'string') {
+                    return i.reply({ content: p, flags: MessageFlags.Ephemeral });
+                }
+                return i.reply(p);
+            },
+            botId
+        );
     }
 };
