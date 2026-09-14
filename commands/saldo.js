@@ -24,7 +24,7 @@ function buildText(viewerId, target) {
 
     if (String(viewerId) === String(target.id)) {
         return [
-            `Você possui ✨ **${fmt(bal)}** éter`,
+            `${target} Você possui ✨ **${fmt(bal)}** éter`,
             `e está em **#${rankStr}** global.`,
             '',
             'Comandos disponíveis: `/minas` e `/ver_saldo`.'
