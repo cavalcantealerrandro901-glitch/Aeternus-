@@ -8,7 +8,7 @@ function all() {
 
 function list(userId, limit = 15) {
     const arr = all()[userId] || [];
-    return arr.slice(0, limit);
+    return arr.slice(0, Math.max(1, Math.min(limit, MAX)));
 }
 
 /**
@@ -25,7 +25,7 @@ function log(userId, entry) {
         reason: entry.reason || 'movimento',
         from: entry.from || null,
         to: entry.to || null,
-        currency: entry.currency || 'flocos',
+        currency: entry.currency || 'eter',
         at: Date.now()
     });
     data[userId] = data[userId].slice(0, MAX);
@@ -38,17 +38,17 @@ function logTransfer(fromId, toId, amount) {
     log(fromId, {
         type: 'out',
         amount: n,
-        reason: 'transferência enviada',
+        reason: 'pix',
         to: toId,
-        currency: 'flocos'
+        currency: 'eter'
     });
     log(toId, {
         type: 'in',
         amount: n,
-        reason: 'transferência recebida',
+        reason: 'pix',
         from: fromId,
-        currency: 'flocos'
+        currency: 'eter'
     });
 }
 
-module.exports = { list, log, logTransfer };
+module.exports = { list, log, logTransfer, all, MAX };
