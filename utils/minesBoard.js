@@ -67,9 +67,11 @@ function controlsRow(game, potentialFn) {
             ? potentialFn(game.amount, game.opened.size, game.bombCount)
             : 0;
     const canCash = game.opened.size > 0 && !ended;
+
+    // Discord: emoji do botão é separado do label (máx. 80 chars no texto)
     const cashLabel = game.fun
-        ? padLabel('Encerrar')
-        : padLabel('Sacar ' + fmt(pot));
+        ? 'Encerrar'
+        : `Sacar ( ✨${fmt(pot)} éter )`.slice(0, 80);
 
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -86,8 +88,8 @@ function controlsRow(game, potentialFn) {
             .setDisabled(false),
         new ButtonBuilder()
             .setCustomId('minas:cash:' + game.id)
-            .setLabel(String(cashLabel).slice(0, 80))
-            .setEmoji(game.fun ? '🏁' : '🟩')
+            .setLabel(cashLabel)
+            .setEmoji(game.fun ? '🏁' : '💰')
             .setStyle(ButtonStyle.Success)
             .setDisabled(ended || (!game.fun && !canCash))
     );
