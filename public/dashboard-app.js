@@ -49,6 +49,44 @@ document.querySelectorAll('.nb').forEach(function (b) {
   });
 });
 
+function updatePrefixExamples(p) {
+  p = (p && String(p).trim()) || 'O.';
+  const el = $('prefixExamples');
+  if (!el) return;
+  el.innerHTML =
+    '<li><code>' + p + 'ajuda</code></li>' +
+    '<li><code>' + p + 'saldo</code></li>' +
+    '<li><code>' + p + 'daily</code></li>' +
+    '<li><code>' + p + 'mines 3 1000</code></li>';
+}
+
+async function savePrefix() {
+  if (!gid) return toast('Selecione um servidor', true);
+  let p = val('prefixInput');
+  if (!p) return toast('Informe um prefixo', true);
+  if (p.length > 5) return toast('Máximo 5 caracteres', true);
+  if (/\s/.test(p)) return toast('Não use espaços no prefixo', true);
+  const r = await fetch('/api/guild/' + gid + '/prefix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prefix: p })
+  });
+  const j = await r.json().catch(function () { return {}; });
+  if (!r.ok || j.error) return toast(j.error || 'Erro ao salvar', true);
+  const saved = (j.prefix && String(j.prefix)) || p;
+  if ($('prefixInput')) $('prefixInput').value = saved;
+  if ($('prefixCurrent')) $('prefixCurrent').innerHTML = 'Prefixo: <b>' + saved.replace(/</g, '<') + '</b>';
+  updatePrefixExamples(saved);
+  if (data && data.settings) data.settings.prefix = saved;
+  toast('Prefixo atualizado: ' + saved);
+}
+
+function resetPrefix() {
+  if ($('prefixInput')) $('prefixInput').value = 'O.';
+  updatePrefixExamples('O.');
+  return savePrefix();
+}
+
 async function loadMe() {
   const r = await fetch('/api/me');
   if (!r.ok) { location.href = '/login'; return; }
@@ -109,6 +147,11 @@ async function selectGuild(id, name) {
 
   if ($('ecoMin')) $('ecoMin').value = (s.economy && s.economy.dailyMin) != null ? s.economy.dailyMin : 5000;
   if ($('ecoMax')) $('ecoMax').value = (s.economy && s.economy.dailyMax) != null ? s.economy.dailyMax : 50000;
+
+  const curPrefix = (s.prefix && String(s.prefix).trim()) || 'O.';
+  if ($('prefixInput')) $('prefixInput').value = curPrefix;
+  if ($('prefixCurrent')) $('prefixCurrent').innerHTML = 'Prefixo: <b>' + curPrefix.replace(/</g, '<') + '</b>';
+  updatePrefixExamples(curPrefix);
 
   const ov = $('ovStats');
   if (ov) {
