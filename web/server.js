@@ -2,7 +2,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const crypto = require('crypto');
-const { getSettings, setSettings } = require('../utils/settings');
+const { getSettings, setSettings, getPrefix, setPrefix, normalizePrefix } = require('../utils/settings');
 
 const PORT = process.env.PORT || 10000;
 const CLIENT_ID = process.env.CLIENT_ID || '';
@@ -109,6 +109,29 @@ function setup(client) {
             .filter((c) => c.isTextBased?.() || c.type === 0 || c.type === 5)
             .map((c) => ({ id: c.id, name: c.name, type: c.type }));
         res.json({ guild: { id: guild.id, name: guild.name }, settings, roles, channels });
+    });
+
+    app.post('/api/guild/:id/prefix', (req, res) => {
+        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
+        const guild = client.guilds.cache.get(req.params.id);
+        if (!guild) return res.status(404).json({ error: 'not found' });
+        const raw = req.body?.prefix;
+        if (raw == null || String(raw).trim() === '') {
+            return res.status(400).json({ error: 'Informe um prefixo' });
+        }
+        if (/\s/.test(String(raw).trim())) {
+            return res.status(400).json({ error: 'Não use espaços no prefixo' });
+        }
+        const cleaned = normalizePrefix(raw);
+        if (!cleaned || cleaned.length < 1) {
+            return res.status(400).json({ error: 'Prefixo inválido' });
+        }
+        try {
+            setPrefix(guild.id, cleaned);
+            return res.json({ ok: true, prefix: getPrefix(guild.id) });
+        } catch (e) {
+            return res.status(500).json({ error: e.message });
+        }
     });
 
     app.post('/api/guild/:id/settings', (req, res) => {
