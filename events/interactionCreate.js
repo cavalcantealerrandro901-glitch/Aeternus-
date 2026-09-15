@@ -3,6 +3,11 @@ const autoRepair = require('../utils/autoRepair');
 const musicManager = require('../utils/musicManager');
 const { Collection, PermissionFlagsBits } = require('discord.js');
 
+function isUnknownInteraction(err) {
+    const code = err?.code ?? err?.rawError?.code;
+    return code === 10062 || /unknown interaction/i.test(String(err?.message || ''));
+}
+
 async function bridgeSlashToPrefix(interaction, cmd, client) {
     const raw = interaction.options?.getString?.('args') || '';
     const args = raw.trim() ? raw.trim().split(/\s+/) : [];
@@ -117,7 +122,6 @@ module.exports = {
                 const parts = id.split(':');
                 const root = parts[0] || '';
 
-                // Painel de música
                 if (root === 'music') {
                     return musicManager.handleMusicButton(interaction, client);
                 }
@@ -145,6 +149,14 @@ module.exports = {
                 await cmd.handleComponent(interaction, client);
             }
         } catch (e) {
+            // 10062 = interação já expirou / já respondida — não spammar DM
+            if (isUnknownInteraction(e)) {
+                console.warn(
+                    '[interaction] 10062 ignorado ·',
+                    interaction.customId || interaction.commandName || '?'
+                );
+                return;
+            }
             await autoRepair.handleCommandError({
                 cmdName: interaction.commandName || interaction.customId || 'interaction',
                 error: e,

@@ -1,4 +1,4 @@
-const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder, MessageFlags } = require('discord.js');
 const path = require('path');
 const fs = require('fs');
 const eter = require('../utils/eter');
@@ -34,6 +34,39 @@ function msgBetRange() {
     return '💸 Valor inválido, o mínimo de apostas é **100** éter e o máximo é **10m**.';
 }
 
+function isUnknownInteraction(err) {
+    const code = err?.code ?? err?.rawError?.code;
+    return code === 10062 || /unknown interaction/i.test(String(err?.message || ''));
+}
+
+async function safeReply(interaction, payload) {
+    try {
+        if (interaction.deferred || interaction.replied) {
+            return await interaction.followUp(payload);
+        }
+        return await interaction.reply(payload);
+    } catch (e) {
+        if (!isUnknownInteraction(e)) throw e;
+    }
+}
+
+async function safeUpdate(interaction, payload) {
+    try {
+        if (interaction.deferred || interaction.replied) {
+            return await interaction.editReply(payload);
+        }
+        return await interaction.update(payload);
+    } catch (e) {
+        if (isUnknownInteraction(e)) {
+            try {
+                await interaction.message?.edit?.(payload);
+            } catch (_) {}
+            return;
+        }
+        throw e;
+    }
+}
+
 function minesResultThumb(kind) {
     const envWin = String(process.env.MINES_IMG_WIN || process.env.MINES_WIN_IMAGE || '').trim();
     const envLose = String(process.env.MINES_IMG_LOSE || process.env.MINES_LOSE_IMAGE || '').trim();
@@ -47,8 +80,7 @@ function minesResultThumb(kind) {
         return null;
     }
     if (envLose && /^https?:\/\//i.test(envLose)) return envLose.slice(0, 512);
-    if (base && fs.existsSync(LOSE_IMG_PATH)) return base + '/mines-lose.jpg';
-    return null;
+    if (base && fs.existsSync(LOSE_IMG_PATH)) return base + '/mines-lose.jpg';n    return null;
 }
 
 function minesResultFiles(game) {
@@ -460,9 +492,23 @@ module.exports = {
         const gameId = parts[2];
         const game = games.get(gameId);
 
-        if (!game) return interaction.reply({ content: 'Partida expirada.', flags: 64 });
+        if (!game) {
+            return safeReply(interaction, {
+                content: 'Partida expirada. Use o comando de novo.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
         if (interaction.user.id !== game.userId) {
-            return interaction.reply({ content: 'Não é a sua partida.', flags: 64 });
+            return safeReply(interaction, {
+                content: 'Não é a sua partida.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
+        // Resposta imediata para não estourar os 3s do Discord
+        const boardActions = new Set(['cell', 'random', 'cash', 'refresh']);
+        if (boardActions.has(action) && !interaction.deferred && !interaction.replied) {
+            await interaction.deferUpdate().catch(() => {});
         }
 
         if (action === 'again') {
@@ -473,16 +519,19 @@ module.exports = {
                 const wallet = eter.get(game.userId);
                 const bet = resolveBet(String(game.amount), wallet, { label: '✨' });
                 if (!bet.ok) {
-                    return interaction.reply({
+                    return safeReply(interaction, {
                         content:
                             '💸 Valor inválido, você está tentando apostar um valor que você não tem, ✨ **' +
                             fmt(wallet) +
                             '** éter.',
-                        flags: 64
+                        flags: MessageFlags.Ephemeral
                     });
                 }
                 if (bet.amount < BET_MIN || bet.amount > BET_MAX) {
-                    return interaction.reply({ content: msgBetRange(), flags: 64 });
+                    return safeReply(interaction, {
+                        content: msgBetRange(),
+                        flags: MessageFlags.Ephemeral
+                    });
                 }
                 eter.remove(game.userId, bet.amount, { reason: 'mines again' });
                 amount = bet.amount;
@@ -491,15 +540,11 @@ module.exports = {
             games.delete(gameId);
             clearTimer(game);
 
-            try {
-                await interaction.update({
-                    content: interaction.message.content || startContent(game.userId),
-                    embeds: interaction.message.embeds,
-                    components: []
-                });
-            } catch (_) {
-                await interaction.deferUpdate().catch(() => {});
-            }
+            await safeUpdate(interaction, {
+                content: interaction.message.content || startContent(game.userId),
+                embeds: interaction.message.embeds,
+                components: []
+            });
 
             await minesCash.deleteCashMessage(client, game).catch(() => {});
             await closePreviousGames(game.userId, client);
@@ -533,36 +578,56 @@ module.exports = {
         }
 
         if ((game.dead || game.cashed) && action !== 'refresh') {
-            return interaction.reply({ content: 'Jogo já encerrado.', flags: 64 });
+            return safeReply(interaction, {
+                content: 'Jogo já encerrado.',
+                flags: MessageFlags.Ephemeral
+            });
         }
 
         touch(game, client);
 
         if (action === 'refresh') {
-            await interaction.update(panelPayload(game, null, game.dead || game.cashed));
+            await safeUpdate(interaction, panelPayload(game, null, game.dead || game.cashed));
             return;
         }
 
         if (action === 'random') {
             const idx = pickRandom(game);
-            if (idx == null) return interaction.reply({ content: 'Nenhuma casa.', flags: 64 });
+            if (idx == null) {
+                return safeReply(interaction, {
+                    content: 'Nenhuma casa.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
             const res = openCell(game, idx);
-            await interaction.update(
+            await safeUpdate(
+                interaction,
                 res.bomb || res.autoWin ? endPayload(game) : panelPayload(game)
             );
+            await minesCash.syncCashMessage(client, game).catch(() => {});
             return;
         }
 
         if (action === 'cell') {
             const idx = Number(parts[3]);
             if (!Number.isInteger(idx) || idx < 0 || idx >= TOTAL) {
-                return interaction.reply({ content: 'Casa inválida.', flags: 64 });
+                return safeReply(interaction, {
+                    content: 'Casa inválida.',
+                    flags: MessageFlags.Ephemeral
+                });
             }
             const res = openCell(game, idx);
-            if (!res.ok) return interaction.reply({ content: 'Casa já aberta.', flags: 64 });
-            await interaction.update(
+            if (!res.ok) {
+                return safeReply(interaction, {
+                    content: 'Casa já aberta.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            await safeUpdate(
+                interaction,
                 res.bomb || res.autoWin ? endPayload(game) : panelPayload(game)
             );
+            await minesCash.syncCashMessage(client, game).catch(() => {});
             return;
         }
 
@@ -570,9 +635,9 @@ module.exports = {
             if (game.fun) {
                 game.cashed = true;
             } else if (!game.opened.size) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Abra pelo menos uma casa antes de sacar.',
-                    flags: 64
+                    flags: MessageFlags.Ephemeral
                 });
             } else {
                 game.cashed = true;
@@ -580,7 +645,8 @@ module.exports = {
                 game._lastWin = win;
                 eter.add(game.userId, win, { reason: 'mines cash' });
             }
-            await interaction.update(endPayload(game));
+            await safeUpdate(interaction, endPayload(game));
+            await minesCash.syncCashMessage(client, game).catch(() => {});
         }
     }
 };
