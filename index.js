@@ -6,6 +6,47 @@ const { connect } = require('./utils/mongo');
 const store = require('./utils/store');
 const { getToken } = require('./utils/env');
 
+function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+}
+
+function isTransientLoginError(err) {
+    const msg = String(err?.message || err || '').toLowerCase();
+    const code = err?.code || err?.status || '';
+    return (
+        msg.includes('503') ||
+        msg.includes('502') ||
+        msg.includes('504') ||
+        msg.includes('unexpected server response') ||
+        msg.includes('econnreset') ||
+        msg.includes('etimedout') ||
+        msg.includes('enotfound') ||
+        msg.includes('socket hang up') ||
+        msg.includes('cloudflare') ||
+        code === 'ECONNRESET' ||
+        code === 'ETIMEDOUT'
+    );
+}
+
+async function loginWithRetry(client, token, attempts = 8) {
+    let lastErr;
+    for (let i = 1; i <= attempts; i++) {
+        try {
+            await client.login(token);
+            return;
+        } catch (err) {
+            lastErr = err;
+            if (!isTransientLoginError(err) || i === attempts) throw err;
+            const wait = Math.min(60_000, 2000 * Math.pow(1.6, i - 1));
+            console.warn(
+                `[login] tentativa ${i}/${attempts} falhou (${err.message || err}). Nova em ${Math.round(wait / 1000)}s…`
+            );
+            await sleep(wait);
+        }
+    }
+    throw lastErr;
+}
+
 async function main() {
     await connect();
     await store.hydrate();
@@ -44,6 +85,14 @@ async function main() {
     client.slash = new Collection();
     client.prefixDefault = 'O.';
 
+    // erros de shard antes do ready não devem derrubar o processo sozinhos
+    client.on('error', (err) => {
+        console.warn('[client] error:', err?.message || err);
+    });
+    client.on('shardError', (err) => {
+        console.warn('[shard] error:', err?.message || err);
+    });
+
     loadCommands(client);
     loadEvents(client);
     loadSystems(client);
@@ -61,7 +110,7 @@ async function main() {
     process.once('SIGINT', () => shutdown('SIGINT'));
     process.once('SIGTERM', () => shutdown('SIGTERM'));
 
-    await client.login(token);
+    await loginWithRetry(client, token);
 }
 
 main().catch((e) => {
@@ -70,7 +119,6 @@ main().catch((e) => {
 });
 
 // unhandledRejection / uncaughtException são capturados pelo systems/autoRepair
-// (reportError → DM do OWNER_ID). Mantém log de fallback se o sistema ainda não carregou.
 process.on('unhandledRejection', (err) => {
     try {
         const ar = require('./utils/autoRepair');
