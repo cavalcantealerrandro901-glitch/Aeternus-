@@ -80,7 +80,8 @@ function minesResultThumb(kind) {
         return null;
     }
     if (envLose && /^https?:\/\//i.test(envLose)) return envLose.slice(0, 512);
-    if (base && fs.existsSync(LOSE_IMG_PATH)) return base + '/mines-lose.jpg';n    return null;
+    if (base && fs.existsSync(LOSE_IMG_PATH)) return base + '/mines-lose.jpg';
+    return null;
 }
 
 function minesResultFiles(game) {
@@ -505,7 +506,6 @@ module.exports = {
             });
         }
 
-        // Resposta imediata para não estourar os 3s do Discord
         const boardActions = new Set(['cell', 'random', 'cash', 'refresh']);
         if (boardActions.has(action) && !interaction.deferred && !interaction.replied) {
             await interaction.deferUpdate().catch(() => {});
