@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
+const actionStats = require('../utils/actionStats');
 
 const PAGE_SIZE = 6;
 
@@ -17,11 +18,9 @@ function medal(i) {
     return ['🥇', '🥈', '🥉'][i] || `**#${i + 1}**`;
 }
 
-/** Nome visual @user sem ping real */
 function displayTag(user, fallbackId) {
     if (!user) return `@usuário-${String(fallbackId).slice(-4)}`;
     const name = user.globalName || user.username || `id-${fallbackId}`;
-    // texto plano — Discord não notifica
     return `@${name}`;
 }
 
@@ -37,7 +36,8 @@ function parseMode(args) {
         .replace(/[\u0300-\u036f]/g, '')
         .trim();
 
-    if (a === 'xp' || a === 'nivel' || a === 'level' || a === 'exp') return 'xp';
+    if (a === 'xp' || a === 'nivel' || a === 'level' || a === 'exp' || a === 'topxp') return 'xp';
+    if (a === 'tapa' || a === 'slap' || a === 'toptapa') return 'tapa';
 
     if (
         a === 'local' ||
@@ -63,6 +63,15 @@ function modeMeta(mode) {
             scope: 'local'
         };
     }
+    if (mode === 'tapa') {
+        return {
+            title: '🏆 Ranking Tapa · Servidor',
+            emoji: '👋',
+            unit: 'tapas',
+            color: 0xfb7185,
+            scope: 'local'
+        };
+    }
     if (mode === 'local') {
         return {
             title: '🏆 Ranking Éter · Servidor',
@@ -82,6 +91,23 @@ function modeMeta(mode) {
 }
 
 async function buildList(mode, guild) {
+    if (mode === 'tapa') {
+        const raw = actionStats.all('tapa', guild?.id) || {};
+        let entries = Object.entries(raw).map(([id, v]) => ({
+            id,
+            value: Number(v || 0),
+            level: 0
+        }));
+        if (guild) {
+            const memberIds = new Set();
+            try {
+                const members = await guild.members.fetch().catch(() => null);
+                if (members) members.forEach((m) => memberIds.add(m.id));
+            } catch (_) {}
+            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
+        }
+        return entries.filter((e) => e.value > 0).sort((a, b) => b.value - a.value);
+    }
     if (mode === 'xp') {
         const data = xp.all() || {};
         let entries = Object.entries(data).map(([id, v]) => ({
@@ -177,7 +203,7 @@ async function pageEmbed(client, list, mode, page, guildName) {
             ].join('\n')
         )
         .setFooter({
-            text: `Página ${p + 1}/${totalPages} · O.rank · O.rank local · O.rank xp`
+            text: `Página ${p + 1}/${totalPages} · O.rank · O.rank xp · O.rank tapa`
         })
         .setTimestamp();
 }
@@ -214,7 +240,8 @@ function helpEmbed() {
                 '**Comandos**',
                 '`O.rank` — ranking **global** de Éter',
                 '`O.rank eter` / `O.rank local` — Éter **deste servidor**',
-                '`O.rank xp` — XP **deste servidor**',
+                '`O.rank xp` / `O.topxp` — XP **deste servidor**',
+                '`O.rank tapa` / `O.toptapa` — Tapas **deste servidor**',
                 '',
                 '**Navegação**',
                 '⬅️ Voltar · 👤 Ver meu rank · ➡️ Próximo',
@@ -227,7 +254,7 @@ function helpEmbed() {
 
 async function sendRank(ctx, mode, page = 0) {
     const guild = ctx.guild;
-    if ((mode === 'local' || mode === 'xp') && !guild) {
+    if ((mode === 'local' || mode === 'xp' || mode === 'tapa') && !guild) {
         return {
             content: '❌ Este ranking é por servidor. Use em um servidor.',
             ephemeral: true
@@ -247,8 +274,8 @@ async function sendRank(ctx, mode, page = 0) {
 
 module.exports = {
     name: 'rank',
-    aliases: ['top', 'leaderboard', 'lb', 'ranking'],
-    description: 'Ranking global, éter local e XP local (paginado)',
+    aliases: ['top', 'leaderboard', 'lb', 'ranking', 'topxp', 'toptapa', 'top-xp', 'top-tapa'],
+    description: 'Ranking global, éter local, XP e tapa (paginado)',
 
     async execute(message, args) {
         const raw = String(args?.[0] || '').toLowerCase();
@@ -269,13 +296,13 @@ module.exports = {
         const mode = parts[2] || 'global';
         let page = parseInt(parts[3], 10) || 0;
 
-        if (!['global', 'local', 'xp'].includes(mode)) {
+        if (!['global', 'local', 'xp', 'tapa'].includes(mode)) {
             return interaction.reply({ content: 'Modo inválido.', ephemeral: true });
         }
 
         if (action === 'me') {
             const guild = interaction.guild;
-            if ((mode === 'local' || mode === 'xp') && !guild) {
+            if ((mode === 'local' || mode === 'xp' || mode === 'tapa') && !guild) {
                 return interaction.reply({
                     content: '❌ Ranking local só funciona em servidor.',
                     ephemeral: true
