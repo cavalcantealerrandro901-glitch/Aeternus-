@@ -8,9 +8,12 @@ const {
     MessageFlags
 } = require('discord.js');
 const drops = require('../utils/drops');
-const { getSettings } = require('../utils/settings');
+const { getSettings, getPrefix } = require('../utils/settings');
 const { schedule } = require('../systems/drops');
 
+const LIST_PAGE = 10;
+
+/** Participar + Sair na mesma linha; Participantes ao lado */
 function joinRow(dropId, count = 0) {
     const n = Math.max(0, Number(count) || 0);
     return new ActionRowBuilder().addComponents(
@@ -20,16 +23,65 @@ function joinRow(dropId, count = 0) {
             .setStyle(ButtonStyle.Success)
             .setEmoji('✅'),
         new ButtonBuilder()
-            .setCustomId('drop:list:' + dropId)
-            .setLabel('Participantes')
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji('👥'),
-        new ButtonBuilder()
             .setCustomId('drop:leave:' + dropId)
             .setLabel('Sair')
             .setStyle(ButtonStyle.Danger)
-            .setEmoji('🚪')
+            .setEmoji('🚪'),
+        new ButtonBuilder()
+            .setCustomId('drop:list:' + dropId + ':0')
+            .setLabel('Participantes')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('👥')
     );
+}
+
+function listNav(dropId, page, totalPages) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('drop:list:' + dropId + ':' + Math.max(0, page - 1))
+            .setLabel('Voltar')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page <= 0),
+        new ButtonBuilder()
+            .setCustomId('drop:listnoop')
+            .setLabel(page + 1 + '/' + totalPages)
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true),
+        new ButtonBuilder()
+            .setCustomId('drop:list:' + dropId + ':' + (page + 1))
+            .setLabel('Próximo')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page >= totalPages - 1)
+    );
+}
+
+function buildListPayload(drop, page) {
+    const entries = Object.entries(drop.participants || {});
+    const totalPages = Math.max(1, Math.ceil(entries.length / LIST_PAGE));
+    const p = Math.min(Math.max(0, page), totalPages - 1);
+    const slice = entries.slice(p * LIST_PAGE, p * LIST_PAGE + LIST_PAGE);
+
+    if (!entries.length) {
+        return {
+            content: 'Ninguém participando ainda.',
+            components: [],
+            flags: MessageFlags.Ephemeral
+        };
+    }
+
+    const lines = slice.map(function (pair, i) {
+        const id = pair[0];
+        const part = pair[1];
+        const n = p * LIST_PAGE + i + 1;
+        return n + '. <@' + id + '> · **' + (part.entries || 1) + '** entrada(s)';
+    });
+
+    return {
+        content: '**Participantes (' + entries.length + ')**\n' + lines.join('\n'),
+        components: [listNav(drop.id, p, totalPages)],
+        flags: MessageFlags.Ephemeral,
+        allowedMentions: { parse: [] }
+    };
 }
 
 function buildEmbed(drop, guild, authorTag) {
@@ -68,7 +120,7 @@ function buildEmbed(drop, guild, authorTag) {
                 '**Vencedores:** ' + (drop.winners || 1),
                 '**Termina:** <t:' + endsUnix + ':R> (<t:' + endsUnix + ':f>)',
                 '',
-                'Clique em **Participar** para entrar.',
+                'Clique em **Participar** para entrar ou **Sair** para desistir.',
                 reqLines.length ? '\n**Requisitos**\n' + reqLines.join('\n') : '',
                 vipBlock,
                 bypassBlock,
@@ -99,17 +151,26 @@ module.exports = {
     name: 'drop',
     aliases: ['sorteio', 'giveaway'],
     description: 'Cria um drop/sorteio',
+    usage: '<tempo> <ganhadores> <prêmio>',
     data: new SlashCommandBuilder()
         .setName('drop')
         .setDescription('Cria um drop')
         .addStringOption((o) =>
-            o.setName('premio').setDescription('Prêmio (ex: 10000 eter)').setRequired(true)
-        )
-        .addStringOption((o) =>
-            o.setName('tempo').setDescription('Duração (ex: 5m, 1h)').setRequired(false)
+            o.setName('tempo').setDescription('Duração (ex: 30s, 5m, 1h, 1d)').setRequired(true)
         )
         .addIntegerOption((o) =>
-            o.setName('vencedores').setDescription('Qtd de vencedores').setRequired(false)
+            o
+                .setName('ganhadores')
+                .setDescription('Quantidade de ganhadores')
+                .setRequired(true)
+                .setMinValue(1)
+                .setMaxValue(20)
+        )
+        .addStringOption((o) =>
+            o
+                .setName('premio')
+                .setDescription('Prêmio (ex: 10000 eter | Nitro 1 mês)')
+                .setRequired(true)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
@@ -117,13 +178,29 @@ module.exports = {
         if (!message.member || !message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
             return message.reply('❌ Precisa de **Gerenciar Servidor**.');
         }
-        const premio = args[0];
-        const tempo = args[1] || '5m';
-        const winners = Math.max(1, Math.min(20, Number(args[2]) || 1));
-        if (!premio) {
-            return message.reply('Uso: `O.drop <premio> [tempo] [vencedores]`');
+        const prefix = message.guild?.id ? getPrefix(message.guild.id) : 'O.';
+        const tempo = args[0];
+        const winnersRaw = args[1];
+        const premio = args.slice(2).join(' ').trim();
+
+        if (!tempo || !winnersRaw || !premio) {
+            return message.reply(
+                'Uso: `' + prefix + 'drop <tempo> <ganhadores> <prêmio>`\n' +
+                    'Ex.: `' + prefix + 'drop 5m 1 10000 eter` · `' + prefix + 'drop 1h 3 Nitro 1 mês`'
+            );
         }
-        return createDropMsg(message, { premio: premio, tempo: tempo, winners: winners, isSlash: false });
+
+        const winners = Math.max(1, Math.min(20, parseInt(winnersRaw, 10) || 0));
+        if (!winners) {
+            return message.reply('❌ Quantidade de ganhadores inválida (1–20).');
+        }
+
+        return createDropMsg(message, {
+            premio,
+            tempo,
+            winners,
+            isSlash: false
+        });
     },
 
     async executeSlash(i) {
@@ -135,9 +212,9 @@ module.exports = {
         }
         await i.deferReply({ flags: MessageFlags.Ephemeral });
         return createDropMsg(i, {
+            tempo: i.options.getString('tempo', true),
+            winners: Math.max(1, Math.min(20, i.options.getInteger('ganhadores', true) || 1)),
             premio: i.options.getString('premio', true),
-            tempo: i.options.getString('tempo') || '5m',
-            winners: Math.max(1, Math.min(20, i.options.getInteger('vencedores') || 1)),
             isSlash: true
         });
     },
@@ -145,6 +222,35 @@ module.exports = {
     async handleComponent(interaction) {
         const parts = (interaction.customId || '').split(':');
         const action = parts[1];
+
+        if (action === 'listnoop') {
+            return interaction.deferUpdate().catch(() => {});
+        }
+
+        // drop:list:dropId:page
+        if (action === 'list') {
+            const dropId = parts[2];
+            const page = parseInt(parts[3], 10) || 0;
+            const drop = drops.getDrop(dropId);
+            if (!drop || drop.ended) {
+                return interaction
+                    .reply({
+                        content: 'Este drop já encerrou ou não existe mais.',
+                        flags: MessageFlags.Ephemeral
+                    })
+                    .catch(() => {});
+            }
+            const payload = buildListPayload(drop, page);
+            if (interaction.replied || interaction.deferred) {
+                return interaction.editReply(payload).catch(() => interaction.followUp(payload));
+            }
+            // se já é update de botão de paginação na mesma msg efêmera
+            if (interaction.message && interaction.message.flags?.has?.(MessageFlags.Ephemeral)) {
+                return interaction.update(payload).catch(() => interaction.reply(payload));
+            }
+            return interaction.reply(payload).catch(() => {});
+        }
+
         const dropId = parts.slice(2).join(':');
         if (!action || !dropId) {
             return interaction
@@ -160,28 +266,6 @@ module.exports = {
                     flags: MessageFlags.Ephemeral
                 })
                 .catch(() => {});
-        }
-
-        if (action === 'list') {
-            const entries = Object.entries(drop.participants || {});
-            if (!entries.length) {
-                return interaction.reply({
-                    content: 'Ninguém participando ainda.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-            const lines = entries.slice(0, 30).map(function (pair, i) {
-                const id = pair[0];
-                const p = pair[1];
-                return i + 1 + '. <@' + id + '> · **' + (p.entries || 1) + '** entrada(s)';
-            });
-            const more =
-                entries.length > 30 ? '\n… e mais ' + (entries.length - 30) : '';
-            return interaction.reply({
-                content:
-                    '**Participantes (' + entries.length + ')**\n' + lines.join('\n') + more,
-                flags: MessageFlags.Ephemeral
-            });
         }
 
         if (action === 'leave') {
@@ -211,7 +295,7 @@ module.exports = {
 
             if (drop.participants && drop.participants[interaction.user.id]) {
                 return interaction.reply({
-                    content: 'Você já está participando.',
+                    content: 'Você já está participando. Use **Sair** para desistir.',
                     flags: MessageFlags.Ephemeral
                 });
             }

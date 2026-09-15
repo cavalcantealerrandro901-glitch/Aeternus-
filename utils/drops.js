@@ -35,14 +35,34 @@ function formatDuration(ms) {
     return h + 'h' + (m % 60 ? m % 60 + 'm' : '');
 }
 
+/**
+ * Prêmio:
+ * - "10000 eter" / "10000 éter" → éter
+ * - "500 xp" → XP
+ * - "Nitro 1 mês" / qualquer texto → prêmio manual (label)
+ */
 function parsePrize(raw) {
     const t = String(raw || '').trim();
-    const m = t.match(/^(\d+(?:[.,]\d+)?)\s*(eter|éter|xp|\S+)?$/i);
-    if (!m) return { type: 'eter', amount: 0, label: t || '—' };
-    const amount = Math.floor(Number(String(m[1]).replace(',', '.')) || 0);
-    const unit = String(m[2] || 'eter').toLowerCase();
-    if (unit === 'xp') return { type: 'xp', amount, label: amount.toLocaleString('pt-BR') + ' XP' };
-    return { type: 'eter', amount, label: amount.toLocaleString('pt-BR') + ' Éter' };
+    if (!t) return { type: 'text', amount: 0, label: '—' };
+
+    const mNumUnit = t.match(/^(\d+(?:[.,]\d+)?)\s*(eter|éter|xp)$/i);
+    if (mNumUnit) {
+        const amount = Math.floor(Number(String(mNumUnit[1]).replace(',', '.')) || 0);
+        const unit = String(mNumUnit[2]).toLowerCase();
+        if (unit === 'xp') {
+            return { type: 'xp', amount, label: amount.toLocaleString('pt-BR') + ' XP' };
+        }
+        return { type: 'eter', amount, label: amount.toLocaleString('pt-BR') + ' Éter' };
+    }
+
+    // só número → assume éter
+    const mOnlyNum = t.match(/^(\d+(?:[.,]\d+)?)$/);
+    if (mOnlyNum) {
+        const amount = Math.floor(Number(String(mOnlyNum[1]).replace(',', '.')) || 0);
+        return { type: 'eter', amount, label: amount.toLocaleString('pt-BR') + ' Éter' };
+    }
+
+    return { type: 'text', amount: 0, label: t };
 }
 
 function parseReqFlags(text) {
@@ -125,8 +145,11 @@ function payPrize(userId, prize) {
         xp.addXp(userId, prize.amount);
         return true;
     }
-    eter.add(userId, prize.amount, { reason: 'drop prize' });
-    return true;
+    if (prize.type === 'eter') {
+        eter.add(userId, prize.amount, { reason: 'drop prize' });
+        return true;
+    }
+    return false;
 }
 
 function guildDropConf(guildId) {
