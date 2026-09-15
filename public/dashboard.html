@@ -11,6 +11,7 @@
     <div class="brand"><span></span> Aeternus</div>
     <button class="nb on" data-p="servers">🏠 Servidores</button>
     <button class="nb" data-p="overview" disabled>📊 Visão geral</button>
+    <button class="nb" data-p="prefix" disabled>⌨️ Prefixo</button>
     <button class="nb" data-p="welcome" disabled>👋 Entrada / Saída</button>
     <button class="nb" data-p="mod" disabled>🛡️ Automod</button>
     <button class="nb" data-p="drops" disabled>🎁 Drops</button>
@@ -31,6 +32,28 @@
       <h2>Visão geral</h2>
       <p class="sub" id="ovName">—</p>
       <div class="card"><div class="stats" id="ovStats"></div></div>
+    </section>
+
+    <section class="panel" id="prefix">
+      <h2>Prefixo dos comandos</h2>
+      <p class="sub">Define o texto usado antes dos comandos de prefixo neste servidor (ex.: <code>O.</code>, <code>!</code>, <code>a!</code>).</p>
+      <div class="card">
+        <h3>⌨️ Prefixo atual</h3>
+        <p class="hint" id="prefixCurrent">Prefixo: <b>O.</b></p>
+        <label class="f">Novo prefixo</label>
+        <input type="text" id="prefixInput" maxlength="5" placeholder="Ex.: O. ou !" style="max-width:220px"/>
+        <p class="hint">Entre 1 e 5 caracteres. Sem espaços no início/fim. O padrão é <code>O.</code>.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn ok" type="button" onclick="savePrefix()">Salvar prefixo</button>
+          <button class="btn" type="button" onclick="resetPrefix()">Restaurar O.</button>
+        </div>
+        <p class="hint" style="margin-top:14px">Exemplos com o prefixo configurado:</p>
+        <ul class="hint" id="prefixExamples" style="margin:6px 0 0 18px">
+          <li><code>O.ajuda</code></li>
+          <li><code>O.saldo</code></li>
+          <li><code>O.daily</code></li>
+        </ul>
+      </div>
     </section>
 
     <section class="panel" id="welcome">
@@ -54,86 +77,79 @@
 
     <section class="panel" id="mod">
       <h2>Automod</h2>
-      <p class="sub">Proteção básica contra spam e convites.</p>
+      <p class="sub">Filtros básicos de proteção do chat.</p>
       <div class="card">
-        <div class="tg"><span>Automod ativo</span><label class="switch"><input type="checkbox" id="amEnabled" checked/><span class="slider"></span></label></div>
-        <div class="tg"><span>Anti-spam</span><label class="switch"><input type="checkbox" id="amSpam" checked/><span class="slider"></span></label></div>
-        <div class="tg"><span>Anti-convite</span><label class="switch"><input type="checkbox" id="amInvite" checked/><span class="slider"></span></label></div>
+        <div class="tg"><span>Automod ativo</span><label class="switch"><input type="checkbox" id="amEnabled"/><span class="slider"></span></label></div>
+        <div class="tg"><span>Anti-spam</span><label class="switch"><input type="checkbox" id="amSpam"/><span class="slider"></span></label></div>
+        <div class="tg"><span>Anti-convite</span><label class="switch"><input type="checkbox" id="amInvite"/><span class="slider"></span></label></div>
         <button class="btn ok" type="button" onclick="saveAutomod()">Salvar</button>
       </div>
     </section>
 
     <section class="panel" id="drops">
       <h2>Drops</h2>
-      <p class="sub">Requisitos, VIP e cargos especiais nos sorteios.</p>
+      <p class="sub">Configuração de requisitos e entradas extras dos drops.</p>
       <div class="card">
         <div class="tg"><span>Drops ativos</span><label class="switch"><input type="checkbox" id="dropEnabled" checked/><span class="slider"></span></label></div>
         <label class="f">Canal padrão</label><select id="dropChannel"></select>
-        <label class="f">Nível mínimo</label><input id="dropMinLevel" type="number" min="0" value="0"/>
-        <label class="f">VIP · entradas extras</label>
-        <div id="dropVipList" class="hint">Nenhum</div>
+        <label class="f">Nível mínimo</label><input type="number" id="dropMinLevel" min="0" value="0"/>
+        <h3>Entradas extras (VIP)</h3>
         <div class="row">
           <select id="dropVipRole"></select>
-          <input id="dropVipEntries" type="number" min="1" value="1" style="max-width:5rem"/>
-          <input id="dropVipLabel" placeholder="Nome"/>
-          <button class="btn ghost" type="button" onclick="dropVipAdd()" style="margin-top:0">+</button>
+          <input type="number" id="dropVipEntries" min="0" value="1" style="max-width:100px"/>
+          <button class="btn" type="button" onclick="addDropVip()">Add</button>
         </div>
-        <label class="f">Cargos bloqueados</label>
-        <div id="dropBlockedList" class="hint">Nenhum</div>
+        <div id="dropVipList" class="list"></div>
+        <h3>Cargos bloqueados</h3>
         <div class="row">
           <select id="dropBlockedRole"></select>
-          <button class="btn ghost" type="button" onclick="dropBlockedAdd()" style="margin-top:0">Bloquear</button>
+          <button class="btn" type="button" onclick="addDropBlocked()">Add</button>
         </div>
-        <label class="f">Cargos que ignoram requisitos</label>
-        <p class="hint">Entra sem nível/cargo exigido. Cargo bloqueado ainda impede.</p>
-        <div id="dropBypassList" class="hint">Nenhum</div>
+        <div id="dropBlockedList" class="list"></div>
+        <h3>Cargos que ignoram requisitos</h3>
         <div class="row">
           <select id="dropBypassRole"></select>
-          <button class="btn ghost" type="button" onclick="dropBypassAdd()" style="margin-top:0">Adicionar</button>
+          <button class="btn" type="button" onclick="addDropBypass()">Add</button>
         </div>
-        <button class="btn ok" type="button" onclick="dropSave()">Salvar drops</button>
+        <div id="dropBypassList" class="list"></div>
+        <button class="btn ok" type="button" onclick="saveDrops()">Salvar drops</button>
       </div>
     </section>
 
     <section class="panel" id="partnership">
       <h2>Parcerias</h2>
-      <p class="sub">Anúncio público, cargo do representante e notificação.</p>
+      <p class="sub">Canal, cargos e texto usados no sistema de parceria.</p>
       <div class="card">
         <div class="tg"><span>Sistema ativo</span><label class="switch"><input type="checkbox" id="partEnabled" checked/><span class="slider"></span></label></div>
-        <label class="f">Canal</label><select id="partChannel"></select>
-        <label class="f">Cargo do representante</label>
-        <p class="hint">Aplicado automaticamente ao representante ao registrar a parceria.</p>
-        <select id="partRole"></select>
-        <label class="f">Cargo de notificação</label>
-        <p class="hint">Mencionado no anúncio. Pode ser sobrescrito no comando com a opção notificar.</p>
-        <select id="partNotifyRole"></select>
-        <label class="f">Frase</label><textarea id="partPhrase" rows="4"></textarea>
-        <label class="f">Imagem (URL)</label><input id="partImage"/>
+        <label class="f">Canal de postagem</label><select id="partChannel"></select>
+        <label class="f">Cargo do representante</label><select id="partRole"></select>
+        <label class="f">Cargo de notificação</label><select id="partNotifyRole"></select>
+        <label class="f">Frase / template</label><textarea id="partPhrase" rows="4"></textarea>
+        <label class="f">Imagem (URL)</label><input type="text" id="partImage" placeholder="https://..."/>
         <button class="btn ok" type="button" onclick="partSave()">Salvar parcerias</button>
       </div>
     </section>
 
     <section class="panel" id="economy">
       <h2>Economia</h2>
-      <p class="sub">Faixa do daily (Éter).</p>
+      <p class="sub">Faixa do daily (valores base do servidor).</p>
       <div class="card">
-        <label class="f">Daily mínimo</label><input id="ecoMin" type="number" min="0"/>
-        <label class="f">Daily máximo</label><input id="ecoMax" type="number" min="0"/>
+        <label class="f">Daily mínimo</label><input type="number" id="ecoMin" value="5000"/>
+        <label class="f">Daily máximo</label><input type="number" id="ecoMax" value="50000"/>
         <button class="btn ok" type="button" onclick="saveEconomy()">Salvar</button>
       </div>
     </section>
 
     <section class="panel" id="me">
       <h2>Conta</h2>
-      <p class="sub">Sua sessão no painel.</p>
       <div class="card">
-        <p class="hint" id="meInfo">—</p>
-        <a class="btn ghost" href="/logout" style="display:inline-block;text-decoration:none">Sair</a>
+        <p id="meInfo">—</p>
+        <a class="btn" href="/logout">Sair</a>
       </div>
     </section>
   </main>
 
-  <div class="toast" id="toast"></div>
+  <div id="toast"></div>
   <script src="/dashboard-app.js"></script>
 </body>
 </html>
