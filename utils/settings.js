@@ -148,7 +148,20 @@ function getSettings(guildId) {
     return out;
 }
 
+function normalizePrefix(raw) {
+    let p = raw == null ? '' : String(raw).trim();
+    if (!p) p = 'O.';
+    if (p.length > 5) p = p.slice(0, 5);
+    p = p.replace(/\s+/g, '');
+    if (!p) p = 'O.';
+    return p;
+}
+
 function setSettings(guildId, patch) {
+    if (patch && Object.prototype.hasOwnProperty.call(patch, 'prefix')) {
+        patch = { ...patch, prefix: normalizePrefix(patch.prefix) };
+    }
+
     const all = store.load('guilds.json', {});
     all[guildId] = deepMerge(all[guildId] || {}, patch);
     if (patch.drops?.extraEntries) {
@@ -191,9 +204,11 @@ function setSettings(guildId, patch) {
 }
 
 function getPrefix(guildId) {
-    const p = getSettings(guildId).prefix;
-    const s = p == null ? '' : String(p).trim();
-    return s || 'O.';
+    return normalizePrefix(getSettings(guildId).prefix);
 }
 
-module.exports = { getSettings, setSettings, getPrefix, DEFAULT };
+function setPrefix(guildId, prefix) {
+    return setSettings(guildId, { prefix: normalizePrefix(prefix) });
+}
+
+module.exports = { getSettings, setSettings, getPrefix, setPrefix, normalizePrefix, DEFAULT };
