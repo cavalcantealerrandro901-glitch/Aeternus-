@@ -6,12 +6,12 @@ const {
     MessageFlags
 } = require('discord.js');
 const gifs = require('./gifs');
+const actionStats = require('./actionStats');
 
 const ACTIONS = {};
 
 function register(def) {
     ACTIONS[def.name] = def;
-    // Sem SlashCommandBuilder aqui — interações ficam só em prefixo (teto 100 slash)
     return {
         name: def.name,
         aliases: def.aliases || [],
@@ -23,7 +23,6 @@ function register(def) {
             await run(message, def, {});
         },
         async executeSlash(interaction) {
-            // fallback se ainda existir slash antigo cacheado
             const target = interaction.options?.getUser?.('usuario');
             const fake = {
                 author: interaction.user,
@@ -166,6 +165,10 @@ async function run(message, def, opts) {
     }
 
     await message.reply({ content, embeds: [embed], components });
+
+    try {
+        actionStats.add(def.name, author.id, message.guild?.id);
+    } catch (_) {}
 
     if (target?.bot && !opts.isReturn) {
         setTimeout(async () => {
