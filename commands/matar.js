@@ -1,12 +1,13 @@
 const { register } = require('../utils/interaction');
+
 module.exports = register({
     name: 'matar',
-    aliases: ['kill', 'elimina'],
-    description: '“Mata” alguém (brincadeira)',
+    aliases: ['kill', 'elimina', 'assassinar'],
+    description: '“Mata” alguém de brincadeira (GIF de eliminação)',
     gif: 'kill',
-    target: '{author} eliminou {target} (de brincadeira)!',
-    botReply: '{bot} ressuscitou e eliminou {author}!',
+    target: '{author} eliminou {target}! 💀',
+    botReply: '{bot} voltou dos mortos e eliminou {author}!',
     returnLabel: 'Vingar',
     returnEmoji: '💀',
-    color: 0x94a3b8
+    color: 0x64748b
 });

@@ -1,6 +1,7 @@
 /**
  * GIFs de interação — cada ação só usa GIFs da própria categoria.
  * Ordem: waifu.pics → nekos.best → otakugifs → pool local (≥40).
+ * matar/kill: NUNCA usa slap — só kill, kick e bully.
  */
 
 const WAIFU = {
@@ -24,9 +25,10 @@ const WAIFU = {
     lick: 'lick',
     yeet: 'yeet',
     kill: 'kill',
+    kick: 'kick',
+    bully: 'bully',
     cringe: 'cringe',
     glomp: 'glomp',
-    bully: 'bully',
     abraco: 'hug',
     beijo: 'kiss',
     tapa: 'slap',
@@ -81,8 +83,8 @@ const NEKOS = {
     maos: 'handhold',
     lambida: 'lick',
     piscadela: 'wink',
-    bonk: 'baka',
-    kill: 'slap'
+    bonk: 'baka'
+    // kill/matar NÃO mapeiam para slap
 };
 
 const OTAKU = {
@@ -117,10 +119,9 @@ const OTAKU = {
     rir: 'happy',
     lambida: 'lick',
     piscadela: 'wink',
-    matar: 'slap',
-    kill: 'slap',
     bonk: 'slap',
     yeet: 'slap'
+    // kill/matar NÃO mapeiam para slap
 };
 
 function nekosRange(cat, n) {
@@ -148,17 +149,21 @@ const BASE = {
     lick: nekosRange('lick', 20),
     highfive: nekosRange('highfive', 20),
     yeet: nekosRange('yeet', 20),
-    // bonk / kill: APIs dedicadas; fallback local em slap/baka (mesma vibe)
     bonk: nekosRange('baka', 15).concat(nekosRange('slap', 10)),
-    kill: nekosRange('slap', 20).concat(nekosRange('baka', 10))
+    // kill: sem fallback de tapa — só preenche via API (kill/kick/bully)
+    kill: []
 };
+
+/** Cache em memória de GIFs de eliminação coletados em runtime */
+const KILL_CACHE = [];
 
 /** Expande só dentro da mesma categoria — nunca mistura ações */
 function expandTo40(key, list) {
     const out = [...new Set((list || []).filter(Boolean))];
+    if (!out.length) return out;
     let n = 0;
     while (out.length < 40) {
-        const base = out[n % Math.max(out.length, 1)] || 'https://cdn.nekos.best/hug/1.gif';
+        const base = out[n % out.length];
         const sep = base.includes('?') ? '&' : '?';
         out.push(base + sep + 'v=' + n);
         n += 1;
@@ -195,25 +200,36 @@ const ALIAS = {
     bonk: 'bonk'
 };
 for (const [a, b] of Object.entries(ALIAS)) {
-    if (!LOCAL[a]) LOCAL[a] = LOCAL[b] || LOCAL.hug;
+    if (!LOCAL[a] || !LOCAL[a].length) LOCAL[a] = LOCAL[b] || [];
 }
 
 function resolveKey(category) {
     const c = String(category || 'hug').toLowerCase();
-    if (LOCAL[c]) return c;
+    if (c === 'matar' || c === 'kill') return 'kill';
+    if (LOCAL[c] && LOCAL[c].length) return c;
     if (ALIAS[c]) return ALIAS[c];
     if (WAIFU[c]) return WAIFU[c];
     return 'hug';
 }
 
+function isKillKey(category) {
+    const c = String(category || '').toLowerCase();
+    return c === 'kill' || c === 'matar';
+}
+
 function pickLocal(category) {
+    if (isKillKey(category)) {
+        const pool = KILL_CACHE.length ? KILL_CACHE : LOCAL.kill || [];
+        if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
+        return null;
+    }
     const key = resolveKey(category);
-    const list = LOCAL[key] || LOCAL.hug;
+    const list = LOCAL[key] || LOCAL.hug || [];
+    if (!list.length) return null;
     return list[Math.floor(Math.random() * list.length)];
 }
 
-async function fetchWaifu(category) {
-    const ep = WAIFU[category] || WAIFU[resolveKey(category)];
+async function fetchWaifuEndpoint(ep) {
     if (!ep) return null;
     try {
         const res = await fetch('https://api.waifu.pics/sfw/' + ep, {
@@ -227,7 +243,37 @@ async function fetchWaifu(category) {
     }
 }
 
+async function fetchWaifu(category) {
+    if (isKillKey(category)) return null; // tratado em fetchKillGif
+    const ep = WAIFU[category] || WAIFU[resolveKey(category)];
+    return fetchWaifuEndpoint(ep);
+}
+
+/**
+ * GIFs de eliminação: kill → kick → bully (waifu.pics).
+ * Nunca usa slap/tapa.
+ */
+async function fetchKillGif() {
+    const order = ['kill', 'kill', 'kill', 'kick', 'bully', 'kill', 'kick'];
+    for (const ep of order) {
+        const url = await fetchWaifuEndpoint(ep);
+        if (url && !/slap/i.test(url)) {
+            if (!KILL_CACHE.includes(url)) {
+                KILL_CACHE.push(url);
+                if (KILL_CACHE.length > 60) KILL_CACHE.shift();
+            }
+            return url;
+        }
+    }
+    // cache preenchido em usos anteriores
+    if (KILL_CACHE.length) {
+        return KILL_CACHE[Math.floor(Math.random() * KILL_CACHE.length)];
+    }
+    return null;
+}
+
 async function fetchNekos(category) {
+    if (isKillKey(category)) return null; // nekos não tem kill real
     const ep = NEKOS[category] || NEKOS[resolveKey(category)];
     if (!ep) return null;
     try {
@@ -243,6 +289,7 @@ async function fetchNekos(category) {
 }
 
 async function fetchOtaku(category) {
+    if (isKillKey(category)) return null;
     const ep = OTAKU[category] || OTAKU[resolveKey(category)];
     if (!ep) return null;
     try {
@@ -260,6 +307,12 @@ async function fetchOtaku(category) {
 
 /** API online da MESMA ação → local da mesma ação */
 async function pickAsync(category) {
+    if (isKillKey(category)) {
+        const k = await fetchKillGif();
+        if (k) return k;
+        return pickLocal('kill');
+    }
+
     const key = resolveKey(category);
     const online =
         (await fetchWaifu(key)) || (await fetchNekos(key)) || (await fetchOtaku(key));
@@ -272,6 +325,7 @@ function pick(category) {
 }
 
 function count(category) {
+    if (isKillKey(category)) return KILL_CACHE.length || (LOCAL.kill || []).length;
     const key = resolveKey(category);
     return (LOCAL[key] || []).length;
 }
@@ -285,5 +339,6 @@ module.exports = {
     fetchWaifu,
     fetchNekos,
     fetchOtaku,
+    fetchKillGif,
     resolveKey
 };
