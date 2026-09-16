@@ -8,7 +8,7 @@ const {
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
-const TIMEOUT_MS = 15 * 60 * 1000;
+const TIMEOUT_MS = 60 * 1000;
 /** @type {Map<string, object>} */
 const pending = new Map();
 
@@ -38,6 +38,7 @@ function acceptRow(id, count) {
         new ButtonBuilder()
             .setCustomId(`pay:accept:${id}`)
             .setLabel(`Aceitar (${count}/2)`)
+            .setEmoji('✅')
             .setStyle(ButtonStyle.Success)
             .setDisabled(count >= 2)
     );
@@ -45,13 +46,38 @@ function acceptRow(id, count) {
 
 function buildInviteText(from, to, amount) {
     return [
-        `${from} está prestes a mandar ✨ **${fmt(amount)}** para ${to}.`,
+        '✦ **AETERNUS • TRANSFERÊNCIA**',
         '',
-        'Os dois precisam confirmar a transferência.',
-        'Só o remetente e o destinatário podem clicar em **Aceitar**.',
-        'Vocês têm **15 minutos**. Se o tempo acabar, o pedido é cancelado.',
+        `💸 ${from}`,
+        `└─ deseja enviar ✨ **${fmt(amount)}** éter para ${to}`,
         '',
-        'Nada é transferido até os dois aceitarem.'
+        '✅ Os dois usuários precisam aceitar para concluir a transferência.',
+        '',
+        '⚠️ **ATENÇÃO:** Antes de aceitar, confira cuidadosamente quem está enviando, quem está recebendo e o valor da transferência. Não aceite caso você não reconheça a solicitação ou tenha qualquer dúvida sobre os dados apresentados.',
+        '',
+        'Ao aceitar, você confirma que revisou todas as informações e autorizou a operação. Depois de concluída, a transferência **não poderá ser desfeita ou recuperada** pelo Aeternus.',
+        '',
+        '━━━━━━━━━━━━━━━━━━',
+        '⏳ **PRAZO PARA ACEITAR: 60 SEGUNDOS**',
+        '⚠️ Após 60 segundos, a solicitação expirará automaticamente.',
+        '━━━━━━━━━━━━━━━━━━',
+        '',
+        '───────────────',
+        '✧ Aeternus Economy'
+    ].join('\n');
+}
+
+function buildExpiredText(from, to, amount) {
+    return [
+        '✦ **AETERNUS • TRANSFERÊNCIA**',
+        '',
+        `💸 ${from}`,
+        `└─ desejava enviar ✨ **${fmt(amount)}** éter para ${to}`,
+        '',
+        '⏰ **Expirado** — o prazo de 60 segundos acabou e a transferência não foi concluída.',
+        '',
+        '───────────────',
+        '✧ Aeternus Economy'
     ].join('\n');
 }
 
@@ -125,9 +151,7 @@ async function createTransfer(channel, from, to, amount) {
             if (m) {
                 await m
                     .edit({
-                        content:
-                            buildInviteText(`<@${p.fromId}>`, `<@${p.toId}>`, p.amount) +
-                            '\n\n**Expirado** — ninguém concluiu a tempo.',
+                        content: buildExpiredText(`<@${p.fromId}>`, `<@${p.toId}>`, p.amount),
                         components: []
                     })
                     .catch(() => {});
@@ -147,7 +171,14 @@ async function finishTransfer(interaction, p) {
     if (amount > bal) {
         await interaction.message
             .edit({
-                content: `Transferência cancelada: <@${p.fromId}> não tem mais ✨ **${fmt(amount)}** na carteira.`,
+                content: [
+                    '✦ **AETERNUS • TRANSFERÊNCIA**',
+                    '',
+                    `Transferência cancelada: <@${p.fromId}> não tem mais ✨ **${fmt(amount)}** na carteira.`,
+                    '',
+                    '───────────────',
+                    '✧ Aeternus Economy'
+                ].join('\n'),
                 components: []
             })
             .catch(() => {});
@@ -166,20 +197,31 @@ async function finishTransfer(interaction, p) {
     const fromBal = eter.get(p.fromId);
 
     const body = [
-        `Transferência concluída.`,
+        '✦ **AETERNUS • TRANSFERÊNCIA CONCLUÍDA**',
         '',
         `Agora <@${p.toId}> possui ✨ **${fmt(toBal)}**`,
         rankLine(p.toId, `<@${p.toId}>`),
         '',
         `<@${p.fromId}> agora possui ✨ **${fmt(fromBal)}**`,
-        rankLine(p.fromId, `<@${p.fromId}>`)
+        rankLine(p.fromId, `<@${p.fromId}>`),
+        '',
+        '───────────────',
+        '✧ Aeternus Economy'
     ].join('\n');
 
     await interaction.message
         .edit({
-            content:
-                buildInviteText(`<@${p.fromId}>`, `<@${p.toId}>`, amount) +
-                '\n\n**Concluída** (2/2).',
+            content: [
+                '✦ **AETERNUS • TRANSFERÊNCIA**',
+                '',
+                `💸 <@${p.fromId}>`,
+                `└─ enviou ✨ **${fmt(amount)}** éter para <@${p.toId}>`,
+                '',
+                '✅ **Concluída** (2/2).',
+                '',
+                '───────────────',
+                '✧ Aeternus Economy'
+            ].join('\n'),
             components: []
         })
         .catch(() => {});
@@ -283,7 +325,10 @@ module.exports = {
         if (Date.now() > p.expires) {
             pending.delete(id);
             await interaction
-                .update({ content: 'Pedido expirado.', components: [] })
+                .update({
+                    content: buildExpiredText(`<@${p.fromId}>`, `<@${p.toId}>`, p.amount),
+                    components: []
+                })
                 .catch(() => {});
             return;
         }
