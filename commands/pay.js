@@ -8,7 +8,7 @@ const {
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
-const TIMEOUT_MS = 60 * 1000;
+const TIMEOUT_MS = 8 * 60 * 1000;
 /** @type {Map<string, object>} */
 const pending = new Map();
 
@@ -58,8 +58,8 @@ function buildInviteText(from, to, amount) {
         'Ao aceitar, você confirma que revisou todas as informações e autorizou a operação. Depois de concluída, a transferência **não poderá ser desfeita ou recuperada** pelo Aeternus.',
         '',
         '━━━━━━━━━━━━━━━━━━',
-        '⏳ **PRAZO PARA ACEITAR: 60 SEGUNDOS**',
-        '⚠️ Após 60 segundos, a solicitação expirará automaticamente.',
+        '⏳ **PRAZO PARA ACEITAR: 8 MINUTOS**',
+        '⚠️ Após 8 minutos, a solicitação expirará automaticamente.',
         '━━━━━━━━━━━━━━━━━━',
         '',
         '───────────────',
@@ -74,7 +74,7 @@ function buildExpiredText(from, to, amount) {
         `💸 ${from}`,
         `└─ desejava enviar ✨ **${fmt(amount)}** éter para ${to}`,
         '',
-        '⏰ **Expirado** — o prazo de 60 segundos acabou e a transferência não foi concluída.',
+        '⏰ **Expirado** — o prazo de 8 minutos acabou e a transferência não foi concluída.',
         '',
         '───────────────',
         '✧ Aeternus Economy'
@@ -113,21 +113,45 @@ async function resolveTargets(message, args) {
     return [];
 }
 
-async function createTransfer(channel, from, to, amount) {
+/**
+ * @param {import('discord.js').TextBasedChannel} channel
+ * @param {import('discord.js').User} from
+ * @param {import('discord.js').User} to
+ * @param {number} amount
+ * @param {{ replyToId?: string|null }} [opts]
+ */
+async function createTransfer(channel, from, to, amount, opts = {}) {
     const bal = eter.get(from.id);
     if (amount > bal) {
-        return channel.send(
-            `${from} saldo insuficiente para enviar ✨ **${fmt(amount)}** para ${to}. Carteira: ✨ **${fmt(bal)}**.`
-        );
+        const payload = {
+            content: `${from} saldo insuficiente para enviar ✨ **${fmt(amount)}** para ${to}. Carteira: ✨ **${fmt(bal)}**.`,
+            allowedMentions: { users: [from.id, to.id] }
+        };
+        if (opts.replyToId) {
+            payload.reply = { messageReference: opts.replyToId, failIfNotExists: false };
+        }
+        return channel.send(payload).catch(() => channel.send(payload));
     }
 
-    const id = `${Date.now().toString(36)}_${from.id.slice(-4)}_${to.id.slice(-4)}`;
+    const id = `${Date.now().toString(36)}_${from.id.slice(-4)}_${to.id.slice(-4)}_${Math.random().toString(36).slice(2, 6)}`;
     const text = buildInviteText(from, to, amount);
-    const msg = await channel.send({
+
+    const sendPayload = {
         content: text,
         components: [acceptRow(id, 0)],
         allowedMentions: { users: [from.id, to.id] }
-    });
+    };
+    if (opts.replyToId) {
+        sendPayload.reply = { messageReference: opts.replyToId, failIfNotExists: false };
+    }
+
+    let msg;
+    try {
+        msg = await channel.send(sendPayload);
+    } catch (_) {
+        delete sendPayload.reply;
+        msg = await channel.send(sendPayload);
+    }
 
     const entry = {
         id,
@@ -137,6 +161,7 @@ async function createTransfer(channel, from, to, amount) {
         accepted: new Set(),
         channelId: channel.id,
         messageId: msg.id,
+        sourceMessageId: opts.replyToId || null,
         expires: Date.now() + TIMEOUT_MS,
         done: false
     };
@@ -226,18 +251,19 @@ async function finishTransfer(interaction, p) {
         })
         .catch(() => {});
 
-    await interaction.channel
-        .send({
+    // Confirmação marca a mensagem da transferência
+    const confPayload = {
+        content: body,
+        reply: { messageReference: p.messageId, failIfNotExists: false },
+        allowedMentions: { users: [p.fromId, p.toId] }
+    };
+
+    await interaction.channel.send(confPayload).catch(() =>
+        interaction.channel.send({
             content: body,
-            reply: { messageReference: p.messageId, failIfNotExists: false },
             allowedMentions: { users: [p.fromId, p.toId] }
         })
-        .catch(() =>
-            interaction.channel.send({
-                content: body,
-                allowedMentions: { users: [p.fromId, p.toId] }
-            })
-        );
+    );
 }
 
 module.exports = {
@@ -271,8 +297,12 @@ module.exports = {
         const amount = bet.amount;
         if (amount <= 0) return message.reply('Valor inválido.');
 
+        // Uma mensagem por pessoa, cada uma respondendo ao comando
+        const replyToId = message.id || null;
         for (const to of targets) {
-            await createTransfer(message.channel, message.author, to, amount);
+            await createTransfer(message.channel, message.author, to, amount, {
+                replyToId
+            });
         }
     },
 
@@ -302,12 +332,16 @@ module.exports = {
             });
         }
 
+        // Resposta pública que a transferência responde (marca o “comando”)
         await i.reply({
-            content: 'Pedido de transferência criado.',
-            flags: MessageFlags.Ephemeral
+            content: `✦ Pedido de transferência para ${to} — ✨ **${fmt(bet.amount)}** éter`,
+            allowedMentions: { users: [to.id] }
         });
+        const cmdMsg = await i.fetchReply().catch(() => null);
 
-        await createTransfer(i.channel, i.user, to, bet.amount);
+        await createTransfer(i.channel, i.user, to, bet.amount, {
+            replyToId: cmdMsg?.id || null
+        });
     },
 
     async handleComponent(interaction) {
