@@ -208,9 +208,14 @@ function panelPayload(game, extra, reveal) {
     } else if (game.dead && files.some((f) => f.name === 'mines-lose.jpg')) {
         emb.setThumbnail('attachment://mines-lose.jpg');
     }
-    // Tabuleiro sozinho; vitória/perda vai na mensagem FINAL (depois)
+    const embeds = [emb];
+    const ended = !!(game.dead || game.cashed || reveal);
+    if (ended) {
+        const re = resultEmbed(game, extra);
+        if (re) embeds.push(re);
+    }
     return {
-        embeds: [emb],
+        embeds,
         components: fullComponents(game, reveal, potentialAt),
         files: files.length ? files : []
     };
@@ -253,7 +258,7 @@ function touch(game, client) {
                             files: p.files || []
                         })
                         .catch(() => {});
-                    await minesCash.syncCashMessage(client, game, potentialAt).catch(() => {});
+                    await minesCash.syncCashMessage(client, game).catch(() => {});
                 }
             }
         } catch (e) {
@@ -437,7 +442,7 @@ module.exports = {
 
         game.messageId = msg.id;
         game.channelId = message.channel.id;
-        await minesCash.syncCashMessage(client, game, potentialAt).catch(() => {});
+        await minesCash.syncCashMessage(client, game).catch(() => {});
         touch(game, client);
     },
 
@@ -529,16 +534,6 @@ module.exports = {
             await minesCash.deleteCashMessage(client, game).catch(() => {});
             await closePreviousGames(game.userId, client);
 
-            // Desativa botões do tabuleiro antigo
-            try {
-                if (game.messageId && interaction.channel) {
-                    const main = await interaction.channel.messages.fetch(game.messageId).catch(() => null);
-                    if (main) {
-                        await main.edit({ components: [] }).catch(() => {});
-                    }
-                }
-            } catch (_) {}
-
             const ng = makeGame(game.userId, amount, bombCount, fun, {
                 channelId: interaction.channelId,
                 sourceMessageId: game.sourceMessageId || interaction.message?.id
@@ -559,7 +554,7 @@ module.exports = {
                 ng.messageId = sent.id;
                 ng.channelId = interaction.channelId;
             }
-            await minesCash.syncCashMessage(client, ng, potentialAt).catch(() => {});
+            await minesCash.syncCashMessage(client, ng).catch(() => {});
             touch(ng, client);
             return;
         }
@@ -591,7 +586,7 @@ module.exports = {
                 interaction,
                 res.bomb || res.autoWin ? endPayload(game) : panelPayload(game)
             );
-            await minesCash.syncCashMessage(client, game, potentialAt).catch(() => {});
+            await minesCash.syncCashMessage(client, game).catch(() => {});
             return;
         }
 
@@ -614,7 +609,7 @@ module.exports = {
                 interaction,
                 res.bomb || res.autoWin ? endPayload(game) : panelPayload(game)
             );
-            await minesCash.syncCashMessage(client, game, potentialAt).catch(() => {});
+            await minesCash.syncCashMessage(client, game).catch(() => {});
             return;
         }
 
@@ -633,7 +628,7 @@ module.exports = {
                 eter.add(game.userId, win, { reason: 'mines cash' });
             }
             await safeUpdate(interaction, endPayload(game));
-            await minesCash.syncCashMessage(client, game, potentialAt).catch(() => {});
+            await minesCash.syncCashMessage(client, game).catch(() => {});
         }
     }
 };
