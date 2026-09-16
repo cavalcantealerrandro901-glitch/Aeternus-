@@ -74,20 +74,11 @@ function register(def) {
             }
 
             try {
-                const disabled = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(interaction.customId)
-                        .setLabel(actionDef.returnLabel || 'Devolvido')
-                        .setEmoji(actionDef.returnEmoji || '✅')
-                        .setStyle(ButtonStyle.Success)
-                        .setDisabled(true)
+                const disabled = ActionRowBuilder.from(interaction.message.components[0]).setComponents(
+                    ButtonBuilder.from(interaction.message.components[0].components[0]).setDisabled(true)
                 );
-                await interaction.update({ components: [disabled] }).catch(async () => {
-                    await interaction.deferUpdate().catch(() => {});
-                });
-            } catch (_) {
-                await interaction.deferUpdate().catch(() => {});
-            }
+                await interaction.update({ components: [disabled] }).catch(() => {});
+            } catch (_) {}
 
             const fake = {
                 author: fromUser,
@@ -95,7 +86,7 @@ function register(def) {
                 guild: interaction.guild,
                 channel: interaction.channel,
                 mentions: { users: { first: () => toUser } },
-                reply: (p) => interaction.followUp(p)
+                reply: (payload) => interaction.followUp(payload)
             };
 
             await run(fake, actionDef, { forcedTarget: toUser, isReturn: true });
@@ -105,13 +96,25 @@ function register(def) {
 
 async function pickGif(def) {
     const key = def.gif || def.name;
-    if (typeof gifs.pickAsync === 'function') {
-        try {
+    try {
+        if (typeof gifs.pickAsync === 'function') {
             const a = await gifs.pickAsync(key);
             if (a) return a;
-        } catch (_) {}
+        }
+    } catch (e) {
+        console.warn('[interaction] pickAsync', key, e.message);
     }
-    return gifs.pick(key);
+    try {
+        const b = gifs.pick(key);
+        if (b) return b;
+    } catch (_) {}
+    // último recurso matar
+    if (String(key).toLowerCase() === 'kill' || String(key).toLowerCase() === 'matar') {
+        if (Array.isArray(gifs.KILL_LOCAL) && gifs.KILL_LOCAL.length) {
+            return gifs.KILL_LOCAL[Math.floor(Math.random() * gifs.KILL_LOCAL.length)];
+        }
+    }
+    return null;
 }
 
 async function run(message, def, opts) {
@@ -123,40 +126,47 @@ async function run(message, def, opts) {
             embeds: [
                 new EmbedBuilder()
                     .setColor(def.color || 0xf472b6)
-                    .setTitle(`${def.returnEmoji || '✨'}  ${def.name}`)
+                    .setTitle((def.returnEmoji || '✨') + '  ' + def.name)
                     .setDescription('Mencione alguém (ex.: `O.' + def.name + ' @user`).')
             ]
         });
     }
-    if (target && target.id === author.id && !def.allowSelf)
+    if (target && target.id === author.id && !def.allowSelf) {
         return message.reply(def.selfMsg || 'Não pode usar em si mesmo.');
+    }
 
     const gif = await pickGif(def);
     const text = target
         ? (def.target || '{author} → {target}')
-              .replace(/{author}/g, `**${author.username}**`)
-              .replace(/{target}/g, `**${target.username}**`)
-        : (def.solo || '{author}').replace(/{author}/g, `**${author.username}**`);
+              .replace(/{author}/g, '**' + author.username + '**')
+              .replace(/{target}/g, '**' + target.username + '**')
+        : (def.solo || '{author}').replace(/{author}/g, '**' + author.username + '**');
 
     const embed = new EmbedBuilder()
         .setColor(def.color || 0xf472b6)
         .setAuthor({
-            name: `${author.username}`,
+            name: String(author.username),
             iconURL: author.displayAvatarURL({ size: 64 })
         })
         .setDescription(text)
         .setTimestamp();
-    if (gif) embed.setImage(gif);
+
+    if (gif) {
+        embed.setImage(gif);
+    } else {
+        console.warn('[interaction] sem GIF para', def.name, def.gif);
+    }
+
     if (target) embed.setThumbnail(target.displayAvatarURL({ size: 64 }));
 
-    const content = target ? `${author} ➜ ${target}` : `${author}`;
+    const content = target ? author.toString() + ' ➜ ' + target.toString() : author.toString();
     const components = [];
 
     if (target && !target.bot) {
         components.push(
             new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`${def.name}:devolver:${target.id}:${author.id}`)
+                    .setCustomId(def.name + ':devolver:' + target.id + ':' + author.id)
                     .setLabel(def.returnLabel || 'Devolver')
                     .setEmoji(def.returnEmoji || '🔁')
                     .setStyle(ButtonStyle.Secondary)
@@ -175,8 +185,8 @@ async function run(message, def, opts) {
             try {
                 const replyGif = await pickGif(def);
                 const botText = (def.botReply || '{bot} devolveu para {author}!')
-                    .replace(/{bot}/g, `**${target.username}**`)
-                    .replace(/{author}/g, `**${author.username}**`);
+                    .replace(/{bot}/g, '**' + target.username + '**')
+                    .replace(/{author}/g, '**' + author.username + '**');
                 const botEmbed = new EmbedBuilder()
                     .setColor(def.color || 0xf472b6)
                     .setDescription(botText)
@@ -185,14 +195,14 @@ async function run(message, def, opts) {
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
-                        .setCustomId(`${def.name}:devolver:${author.id}:${target.id}`)
+                        .setCustomId(def.name + ':devolver:' + author.id + ':' + target.id)
                         .setLabel(def.returnLabel || 'Devolver')
                         .setEmoji(def.returnEmoji || '🔁')
                         .setStyle(ButtonStyle.Secondary)
                 );
 
                 await message.channel.send({
-                    content: `${target} ➜ ${author}`,
+                    content: target.toString() + ' ➜ ' + author.toString(),
                     embeds: [botEmbed],
                     components: [row]
                 });

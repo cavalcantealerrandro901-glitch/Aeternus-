@@ -1,8 +1,89 @@
 /**
- * GIFs de interação — cada ação só usa GIFs da própria categoria.
- * Ordem: waifu.pics → nekos.best → otakugifs → pool local (≥40).
- * matar/kill: NUNCA usa slap — só kill, kick e bully.
+ * GIFs de interação
+ * Ordem: gifukai → otakugifs → waifu.pics → pool local
+ * matar: só kill / kick / punch / shoot (nunca tapa)
  */
+
+const UA = { 'User-Agent': 'AeternusBot/1.0 (+discord)', Accept: 'application/json' };
+
+/** Mapa ação → endpoint gifukai */
+const GIFUKAI = {
+    hug: 'hug',
+    kiss: 'kiss',
+    slap: 'slap',
+    pat: 'pat',
+    poke: 'poke',
+    bite: 'bite',
+    cry: 'cry',
+    dance: 'dance',
+    blush: 'blush',
+    smile: 'smile',
+    wink: 'wink',
+    cuddle: 'cuddle',
+    lick: 'lick',
+    wave: 'wave',
+    happy: 'happy',
+    highfive: 'highfive',
+    kick: 'kick',
+    punch: 'punch',
+    shoot: 'shoot',
+    kill: 'kill',
+    abraco: 'hug',
+    beijo: 'kiss',
+    tapa: 'slap',
+    carinho: 'pat',
+    cutucar: 'poke',
+    morder: 'bite',
+    chorar: 'cry',
+    dancar: 'dance',
+    cafune: 'cuddle',
+    acenar: 'wave',
+    corar: 'blush',
+    sorrir: 'smile',
+    rir: 'happy',
+    lambida: 'lick',
+    piscadela: 'wink',
+    matar: 'kill',
+    yeet: 'punch',
+    bonk: 'slap'
+};
+
+const OTAKU = {
+    hug: 'hug',
+    kiss: 'kiss',
+    slap: 'slap',
+    pat: 'pat',
+    poke: 'poke',
+    bite: 'bite',
+    cry: 'cry',
+    dance: 'dance',
+    blush: 'blush',
+    smile: 'smile',
+    wink: 'wink',
+    cuddle: 'cuddle',
+    lick: 'lick',
+    wave: 'wave',
+    happy: 'happy',
+    highfive: 'highfive',
+    punch: 'punch',
+    abraco: 'hug',
+    beijo: 'kiss',
+    tapa: 'slap',
+    carinho: 'pat',
+    cutucar: 'poke',
+    morder: 'bite',
+    chorar: 'cry',
+    dancar: 'dance',
+    cafune: 'cuddle',
+    acenar: 'wave',
+    corar: 'blush',
+    sorrir: 'smile',
+    rir: 'happy',
+    lambida: 'lick',
+    piscadela: 'wink',
+    bonk: 'slap',
+    yeet: 'punch'
+};
 
 const WAIFU = {
     hug: 'hug',
@@ -27,8 +108,6 @@ const WAIFU = {
     kill: 'kill',
     kick: 'kick',
     bully: 'bully',
-    cringe: 'cringe',
-    glomp: 'glomp',
     abraco: 'hug',
     beijo: 'kiss',
     tapa: 'slap',
@@ -48,134 +127,30 @@ const WAIFU = {
     piscadela: 'wink'
 };
 
-const NEKOS = {
-    hug: 'hug',
-    kiss: 'kiss',
-    slap: 'slap',
-    pat: 'pat',
-    poke: 'poke',
-    bite: 'bite',
-    highfive: 'highfive',
-    cry: 'cry',
-    dance: 'dance',
-    wave: 'wave',
-    blush: 'blush',
-    smile: 'smile',
-    happy: 'happy',
-    wink: 'wink',
-    handhold: 'handhold',
-    cuddle: 'cuddle',
-    lick: 'lick',
-    yeet: 'yeet',
-    abraco: 'hug',
-    beijo: 'kiss',
-    tapa: 'slap',
-    carinho: 'pat',
-    cutucar: 'poke',
-    morder: 'bite',
-    chorar: 'cry',
-    dancar: 'dance',
-    cafune: 'cuddle',
-    acenar: 'wave',
-    corar: 'blush',
-    sorrir: 'smile',
-    rir: 'happy',
-    maos: 'handhold',
-    lambida: 'lick',
-    piscadela: 'wink',
-    bonk: 'baka'
-    // kill/matar NÃO mapeiam para slap
-};
+/** Pool local de eliminação (gifukai CDN — estável) */
+const KILL_LOCAL = [
+    'https://cdn.gifukai.com/kill/dd0b8b75-c9ae-4683-a687-6a902f79b38a.gif',
+    'https://cdn.gifukai.com/kill/1d1c0b0e-2ee3-4115-a427-ca874c07b5ba.gif',
+    'https://cdn.gifukai.com/kick/456e3479-3088-4d0b-8b82-657ef67a407a.gif',
+    'https://cdn.gifukai.com/kick/8240a6d9-ccc4-4876-9a54-cbeb5a1c9e95.gif',
+    'https://cdn.gifukai.com/kick/439768be-17bc-4dbb-af44-bebffeddd4dd.gif',
+    'https://cdn.gifukai.com/kick/f92088e9-dcf8-424b-82f7-35ff5a976156.gif',
+    'https://cdn.gifukai.com/kick/e879262e-1c8e-48be-ad22-0d11093e4578.gif',
+    'https://cdn.gifukai.com/kick/f890a1fe-ea44-4d9c-a918-da963fa1610e.gif',
+    'https://cdn.gifukai.com/punch/07ea48a3-6e72-4890-9a72-c02b8f04c3c5.gif',
+    'https://cdn.gifukai.com/punch/d7ceee9a-5bc6-40f6-aa0b-1941407849c5.gif',
+    'https://cdn.gifukai.com/punch/d82bb7ac-5bad-4b98-8d68-1da3c6100f7c.gif',
+    'https://cdn.gifukai.com/punch/c5f95b59-2041-4855-9cde-9406cffb84d6.gif',
+    'https://cdn.gifukai.com/punch/1e5c4511-070a-4ce4-8e34-0ca72a32c115.gif',
+    'https://cdn.gifukai.com/punch/6a608670-3863-4231-955a-ae95a123e00d.gif',
+    'https://cdn.gifukai.com/shoot/308975a7-f70b-470c-8155-66a354d84c79.gif',
+    'https://cdn.gifukai.com/shoot/eb29e251-9b69-4b85-a2f7-9f5f1deddc12.gif',
+    'https://cdn.gifukai.com/shoot/88fb0876-ba58-438a-9170-4b1db929da68.gif',
+    'https://cdn.gifukai.com/shoot/a23a0a8f-2894-4428-a5aa-3f146c8f841c.gif',
+    'https://cdn.gifukai.com/shoot/998846ce-8b29-49cc-ab81-c8fa315bb1d3.gif'
+];
 
-const OTAKU = {
-    hug: 'hug',
-    kiss: 'kiss',
-    slap: 'slap',
-    pat: 'pat',
-    poke: 'poke',
-    bite: 'bite',
-    cry: 'cry',
-    dance: 'dance',
-    blush: 'blush',
-    smile: 'smile',
-    wink: 'wink',
-    cuddle: 'cuddle',
-    lick: 'lick',
-    wave: 'wave',
-    happy: 'happy',
-    highfive: 'highfive',
-    abraco: 'hug',
-    beijo: 'kiss',
-    tapa: 'slap',
-    carinho: 'pat',
-    cutucar: 'poke',
-    morder: 'bite',
-    chorar: 'cry',
-    dancar: 'dance',
-    cafune: 'cuddle',
-    acenar: 'wave',
-    corar: 'blush',
-    sorrir: 'smile',
-    rir: 'happy',
-    lambida: 'lick',
-    piscadela: 'wink',
-    bonk: 'slap',
-    yeet: 'slap'
-    // kill/matar NÃO mapeiam para slap
-};
-
-function nekosRange(cat, n) {
-    const arr = [];
-    for (let i = 1; i <= n; i++) arr.push('https://cdn.nekos.best/' + cat + '/' + i + '.gif');
-    return arr;
-}
-
-const BASE = {
-    hug: nekosRange('hug', 20),
-    kiss: nekosRange('kiss', 20),
-    slap: nekosRange('slap', 20),
-    pat: nekosRange('pat', 20),
-    poke: nekosRange('poke', 20),
-    bite: nekosRange('bite', 20),
-    cuddle: nekosRange('cuddle', 20),
-    dance: nekosRange('dance', 20),
-    cry: nekosRange('cry', 20),
-    wave: nekosRange('wave', 20),
-    blush: nekosRange('blush', 20),
-    smile: nekosRange('smile', 20),
-    happy: nekosRange('happy', 20),
-    wink: nekosRange('wink', 20),
-    handhold: nekosRange('handhold', 20),
-    lick: nekosRange('lick', 20),
-    highfive: nekosRange('highfive', 20),
-    yeet: nekosRange('yeet', 20),
-    bonk: nekosRange('baka', 15).concat(nekosRange('slap', 10)),
-    // kill: sem fallback de tapa — só preenche via API (kill/kick/bully)
-    kill: []
-};
-
-/** Cache em memória de GIFs de eliminação coletados em runtime */
-const KILL_CACHE = [];
-
-/** Expande só dentro da mesma categoria — nunca mistura ações */
-function expandTo40(key, list) {
-    const out = [...new Set((list || []).filter(Boolean))];
-    if (!out.length) return out;
-    let n = 0;
-    while (out.length < 40) {
-        const base = out[n % out.length];
-        const sep = base.includes('?') ? '&' : '?';
-        out.push(base + sep + 'v=' + n);
-        n += 1;
-        if (n > 80) break;
-    }
-    return out.slice(0, 48);
-}
-
-const LOCAL = {};
-for (const [k, list] of Object.entries(BASE)) {
-    LOCAL[k] = expandTo40(k, list);
-}
+const KILL_CACHE = [...KILL_LOCAL];
 
 const ALIAS = {
     abraco: 'hug',
@@ -194,21 +169,14 @@ const ALIAS = {
     maos: 'handhold',
     lambida: 'lick',
     matar: 'kill',
-    piscadela: 'wink',
-    highfive: 'highfive',
-    yeet: 'yeet',
-    bonk: 'bonk'
+    piscadela: 'wink'
 };
-for (const [a, b] of Object.entries(ALIAS)) {
-    if (!LOCAL[a] || !LOCAL[a].length) LOCAL[a] = LOCAL[b] || [];
-}
 
 function resolveKey(category) {
     const c = String(category || 'hug').toLowerCase();
     if (c === 'matar' || c === 'kill') return 'kill';
-    if (LOCAL[c] && LOCAL[c].length) return c;
     if (ALIAS[c]) return ALIAS[c];
-    if (WAIFU[c]) return WAIFU[c];
+    if (GIFUKAI[c] || WAIFU[c] || OTAKU[c]) return c;
     return 'hug';
 }
 
@@ -217,128 +185,114 @@ function isKillKey(category) {
     return c === 'kill' || c === 'matar';
 }
 
-function pickLocal(category) {
-    if (isKillKey(category)) {
-        const pool = KILL_CACHE.length ? KILL_CACHE : LOCAL.kill || [];
-        if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
-        return null;
-    }
-    const key = resolveKey(category);
-    const list = LOCAL[key] || LOCAL.hug || [];
-    if (!list.length) return null;
+function pickFrom(list) {
+    if (!list || !list.length) return null;
     return list[Math.floor(Math.random() * list.length)];
 }
 
-async function fetchWaifuEndpoint(ep) {
-    if (!ep) return null;
+async function fetchJson(url) {
     try {
-        const res = await fetch('https://api.waifu.pics/sfw/' + ep, {
-            headers: { Accept: 'application/json' }
-        });
+        const res = await fetch(url, { headers: UA });
         if (!res.ok) return null;
-        const data = await res.json();
-        return data?.url || null;
+        return await res.json();
     } catch {
         return null;
     }
 }
 
-async function fetchWaifu(category) {
-    if (isKillKey(category)) return null; // tratado em fetchKillGif
-    const ep = WAIFU[category] || WAIFU[resolveKey(category)];
-    return fetchWaifuEndpoint(ep);
+async function fetchGifukai(action) {
+    const ep = GIFUKAI[action] || GIFUKAI[resolveKey(action)];
+    if (!ep) return null;
+    const data = await fetchJson('https://api.gifukai.com/v1/' + encodeURIComponent(ep));
+    return data?.url || null;
 }
 
-/**
- * GIFs de eliminação: kill → kick → bully (waifu.pics).
- * Nunca usa slap/tapa.
- */
+async function fetchOtaku(action) {
+    if (isKillKey(action)) return null;
+    const ep = OTAKU[action] || OTAKU[resolveKey(action)];
+    if (!ep) return null;
+    const data = await fetchJson(
+        'https://api.otakugifs.xyz/gif?reaction=' + encodeURIComponent(ep)
+    );
+    return data?.url || null;
+}
+
+async function fetchWaifu(action) {
+    const ep = WAIFU[action] || WAIFU[resolveKey(action)];
+    if (!ep) return null;
+    const data = await fetchJson('https://api.waifu.pics/sfw/' + encodeURIComponent(ep));
+    return data?.url || null;
+}
+
+/** matar: kill → kick → punch → shoot (gifukai) + pool local */
 async function fetchKillGif() {
-    const order = ['kill', 'kill', 'kill', 'kick', 'bully', 'kill', 'kick'];
+    const order = ['kill', 'kill', 'kick', 'punch', 'shoot', 'kill', 'kick', 'punch'];
     for (const ep of order) {
-        const url = await fetchWaifuEndpoint(ep);
-        if (url && !/slap/i.test(url)) {
-            if (!KILL_CACHE.includes(url)) {
-                KILL_CACHE.push(url);
-                if (KILL_CACHE.length > 60) KILL_CACHE.shift();
+        try {
+            const data = await fetchJson('https://api.gifukai.com/v1/' + ep);
+            const url = data?.url;
+            if (url) {
+                if (!KILL_CACHE.includes(url)) {
+                    KILL_CACHE.push(url);
+                    if (KILL_CACHE.length > 80) KILL_CACHE.shift();
+                }
+                return url;
             }
+        } catch (_) {}
+    }
+    // waifu kill/kick como reforço
+    for (const ep of ['kill', 'kick', 'bully']) {
+        const url = await fetchWaifu(ep);
+        if (url) {
+            if (!KILL_CACHE.includes(url)) KILL_CACHE.push(url);
             return url;
         }
     }
-    // cache preenchido em usos anteriores
-    if (KILL_CACHE.length) {
-        return KILL_CACHE[Math.floor(Math.random() * KILL_CACHE.length)];
-    }
+    return pickFrom(KILL_CACHE);
+}
+
+function pickLocal(category) {
+    if (isKillKey(category)) return pickFrom(KILL_CACHE);
     return null;
 }
 
-async function fetchNekos(category) {
-    if (isKillKey(category)) return null; // nekos não tem kill real
-    const ep = NEKOS[category] || NEKOS[resolveKey(category)];
-    if (!ep) return null;
-    try {
-        const res = await fetch('https://nekos.best/api/v2/' + ep, {
-            headers: { Accept: 'application/json' }
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data?.results?.[0]?.url || null;
-    } catch {
-        return null;
-    }
-}
-
-async function fetchOtaku(category) {
-    if (isKillKey(category)) return null;
-    const ep = OTAKU[category] || OTAKU[resolveKey(category)];
-    if (!ep) return null;
-    try {
-        const res = await fetch(
-            'https://api.otakugifs.xyz/gif?reaction=' + encodeURIComponent(ep),
-            { headers: { Accept: 'application/json' } }
-        );
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data?.url || null;
-    } catch {
-        return null;
-    }
-}
-
-/** API online da MESMA ação → local da mesma ação */
 async function pickAsync(category) {
     if (isKillKey(category)) {
         const k = await fetchKillGif();
         if (k) return k;
-        return pickLocal('kill');
+        return pickFrom(KILL_LOCAL);
     }
 
     const key = resolveKey(category);
     const online =
-        (await fetchWaifu(key)) || (await fetchNekos(key)) || (await fetchOtaku(key));
+        (await fetchGifukai(key)) || (await fetchOtaku(key)) || (await fetchWaifu(key));
     if (online) return online;
+
+    // último recurso: tentar gifukai de novo no alias
+    const again = await fetchGifukai(key);
+    if (again) return again;
+
     return pickLocal(key);
 }
 
 function pick(category) {
-    return pickLocal(category);
+    if (isKillKey(category)) return pickFrom(KILL_CACHE) || pickFrom(KILL_LOCAL);
+    return null;
 }
 
 function count(category) {
-    if (isKillKey(category)) return KILL_CACHE.length || (LOCAL.kill || []).length;
-    const key = resolveKey(category);
-    return (LOCAL[key] || []).length;
+    if (isKillKey(category)) return KILL_CACHE.length;
+    return 0;
 }
 
 module.exports = {
-    LOCAL,
-    MAP: LOCAL,
     pick,
     pickAsync,
     count,
-    fetchWaifu,
-    fetchNekos,
-    fetchOtaku,
     fetchKillGif,
-    resolveKey
+    fetchGifukai,
+    fetchOtaku,
+    fetchWaifu,
+    resolveKey,
+    KILL_LOCAL
 };
