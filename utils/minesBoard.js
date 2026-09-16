@@ -105,13 +105,13 @@ function againRow(game) {
 }
 
 /**
- * Até 5 rows: 4 tabuleiro + 1 controles (jogo ativo).
- * Ao terminar: só tabuleiro revelado (resultado vai na mensagem final).
+ * 4 tabuleiro + 1 controles (ativo)
+ * OU 4 tabuleiro + 1 again (encerrado) — frase de vitória/perda no embed
  */
 function fullComponents(game, reveal = false, potentialFn = null) {
     const ended = !!(game.dead || game.cashed || reveal);
     if (ended) {
-        return boardRows(game, true);
+        return [...boardRows(game, true), againRow(game)];
     }
     return [...boardRows(game, false), controlsRow(game, potentialFn)];
 }
