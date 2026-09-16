@@ -8,20 +8,23 @@ const eter = require('../utils/eter');
 const xp = require('../utils/xp');
 const actionStats = require('../utils/actionStats');
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 5;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
 function medal(i) {
-    return ['🥇', '🥈', '🥉'][i] || `**#${i + 1}**`;
+    if (i === 0) return '🥇';
+    if (i === 1) return '🥈';
+    if (i === 2) return '🥉';
+    return String(i + 1).padStart(2, '0');
 }
 
 function displayTag(user, fallbackId) {
-    if (!user) return `@usuário-${String(fallbackId).slice(-4)}`;
-    const name = user.globalName || user.username || `id-${fallbackId}`;
-    return `@${name}`;
+    if (!user) return '@usuário-' + String(fallbackId).slice(-4);
+    const name = user.globalName || user.username || 'id-' + fallbackId;
+    return '@' + name;
 }
 
 function parseMode(args) {
@@ -56,8 +59,9 @@ function parseMode(args) {
 function modeMeta(mode) {
     if (mode === 'xp') {
         return {
-            title: '🏆 Ranking XP · Servidor',
-            emoji: '⭐',
+            rankLabel: 'XP',
+            titleEmoji: '⭐',
+            unitEmoji: '⭐',
             unit: 'XP',
             color: 0xa78bfa,
             scope: 'local'
@@ -65,8 +69,9 @@ function modeMeta(mode) {
     }
     if (mode === 'tapa') {
         return {
-            title: '🏆 Ranking Tapa · Servidor',
-            emoji: '👋',
+            rankLabel: 'Tapa',
+            titleEmoji: '👋',
+            unitEmoji: '👋',
             unit: 'tapas',
             color: 0xfb7185,
             scope: 'local'
@@ -74,16 +79,18 @@ function modeMeta(mode) {
     }
     if (mode === 'local') {
         return {
-            title: '🏆 Ranking Éter · Servidor',
-            emoji: '✨',
+            rankLabel: 'Éter',
+            titleEmoji: '✨',
+            unitEmoji: '✨',
             unit: 'éter',
             color: 0x22d3ee,
             scope: 'local'
         };
     }
     return {
-        title: '🏆 Ranking Éter · Global',
-        emoji: '✨',
+        rankLabel: 'Éter',
+        titleEmoji: '🏆',
+        unitEmoji: '✨',
         unit: 'éter',
         color: 0xfbbf24,
         scope: 'global'
@@ -108,6 +115,7 @@ async function buildList(mode, guild) {
         }
         return entries.filter((e) => e.value > 0).sort((a, b) => b.value - a.value);
     }
+
     if (mode === 'xp') {
         const data = xp.all() || {};
         let entries = Object.entries(data).map(([id, v]) => ({
@@ -158,72 +166,105 @@ function findMyRank(list, userId) {
     };
 }
 
-async function pageEmbed(client, list, mode, page, guildName) {
+function formatDate() {
+    try {
+        return new Date().toLocaleString('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (_) {
+        return new Date().toLocaleString('pt-BR');
+    }
+}
+
+async function pageEmbed(client, list, mode, page, guild) {
     const meta = modeMeta(mode);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     const p = Math.min(Math.max(0, page), totalPages - 1);
     const start = p * PAGE_SIZE;
     const slice = list.slice(start, start + PAGE_SIZE);
 
-    const blocks = [];
+    const lines = [];
     for (let i = 0; i < slice.length; i++) {
         const e = slice[i];
         const pos = start + i;
         const u = await client.users.fetch(e.id).catch(() => null);
         const tag = displayTag(u, e.id);
-        const extra =
-            mode === 'xp' && e.level != null ? `\n   Nv. **${e.level}**` : '';
+        const val =
+            mode === 'xp' && e.level != null
+                ? meta.unitEmoji + ' ' + fmt(e.value) + ' · Nv. ' + e.level
+                : meta.unitEmoji + ' ' + fmt(e.value);
 
-        blocks.push(
-            [
-                `${medal(pos)}  **${tag}**`,
-                `   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
-            ].join('\n')
-        );
+        lines.push(medal(pos) + '° ' + tag + ' = ' + val);
     }
 
-    const body = blocks.length
-        ? blocks.join('\n\n──────────────────\n\n')
-        : '_Ninguém no ranking ainda._';
+    const body = lines.length ? lines.join('\n\n') : '_Ninguém no ranking ainda._';
 
-    const scopeLine =
-        meta.scope === 'local'
-            ? `Servidor: **${guildName || 'este servidor'}**`
-            : 'Todos os servidores do bot';
+    const isLocal = meta.scope === 'local';
+    const guildName = guild?.name || 'Servidor';
+    const title = isLocal
+        ? meta.titleEmoji + ' RANK · ' + guildName.toUpperCase()
+        : meta.titleEmoji + ' RANK ' + meta.rankLabel.toUpperCase() + ' · AETERNUS';
 
-    return new EmbedBuilder()
+    const emb = new EmbedBuilder()
         .setColor(meta.color)
-        .setTitle(meta.title)
+        .setTitle(title)
         .setDescription(
             [
-                scopeLine,
-                `Total no ranking: **${fmt(list.length)}** · **${PAGE_SIZE}** por página`,
+                '━━━━━━━━━━━━━━━━━━━━',
                 '',
-                body
+                body,
+                '',
+                '━━━━━━━━━━━━━━━━━━━━'
             ].join('\n')
         )
         .setFooter({
-            text: `Página ${p + 1}/${totalPages} · O.rank · O.rank xp · O.rank tapa`
-        })
-        .setTimestamp();
+            text:
+                'Rank ' +
+                meta.rankLabel +
+                (isLocal ? ' · ' + guildName : '') +
+                ' · Aeternus · ' +
+                formatDate() +
+                ' · Pág. ' +
+                (p + 1) +
+                '/' +
+                totalPages
+        });
+
+    if (isLocal && guild) {
+        const icon = guild.iconURL?.({ size: 128 }) || null;
+        emb.setAuthor({
+            name: guildName,
+            iconURL: icon || undefined
+        });
+        if (icon) emb.setThumbnail(icon);
+    } else {
+        emb.setAuthor({ name: 'Aeternus · Ranking Global' });
+    }
+
+    return emb;
 }
 
 function navRow(mode, page, totalPages) {
     const maxPage = Math.max(0, totalPages - 1);
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`rank:prev:${mode}:${page}`)
+            .setCustomId('rank:prev:' + mode + ':' + page)
             .setLabel('Voltar')
             .setEmoji('⬅️')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(page <= 0),
         new ButtonBuilder()
-            .setCustomId(`rank:me:${mode}:${page}`)
+            .setCustomId('rank:me:' + mode + ':' + page)
             .setLabel('Ver meu rank')
             .setEmoji('👤')
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
-            .setCustomId(`rank:next:${mode}:${page}`)
+            .setCustomId('rank:next:' + mode + ':' + page)
             .setLabel('Próximo')
             .setEmoji('➡️')
             .setStyle(ButtonStyle.Secondary)
@@ -246,13 +287,14 @@ function helpEmbed() {
                 '**Navegação**',
                 '⬅️ Voltar · 👤 Ver meu rank · ➡️ Próximo',
                 '',
-                `${PAGE_SIZE} membros por página.`
+                PAGE_SIZE + ' membros por página.'
             ].join('\n')
         )
         .setFooter({ text: 'Aeternus · Rank' });
 }
 
-async function sendRank(ctx, mode, page = 0) {
+async function sendRank(ctx, mode, page) {
+    page = page || 0;
     const guild = ctx.guild;
     if ((mode === 'local' || mode === 'xp' || mode === 'tapa') && !guild) {
         return {
@@ -264,7 +306,7 @@ async function sendRank(ctx, mode, page = 0) {
     const list = await buildList(mode, guild);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     const p = Math.min(Math.max(0, page), totalPages - 1);
-    const emb = await pageEmbed(ctx.client, list, mode, p, guild?.name);
+    const emb = await pageEmbed(ctx.client, list, mode, p, guild);
 
     return {
         embeds: [emb],
@@ -318,9 +360,13 @@ module.exports = {
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x64748b)
-                            .setTitle(`${meta.emoji} Seu rank`)
+                            .setTitle(meta.titleEmoji + ' Seu rank')
                             .setDescription(
-                                `Você ainda não aparece no **${meta.title}**.\nGanhe ${meta.unit} para entrar na lista!`
+                                'Você ainda não aparece no ranking de **' +
+                                    meta.rankLabel +
+                                    '**.\nGanhe ' +
+                                    meta.unit +
+                                    ' para entrar na lista!'
                             )
                     ],
                     ephemeral: true
@@ -328,7 +374,7 @@ module.exports = {
             }
 
             const pageOfMe = Math.floor((mine.rank - 1) / PAGE_SIZE);
-            const extra = mode === 'xp' ? ` · Nível **${mine.level}**` : '';
+            const extra = mode === 'xp' ? ' · Nível **' + mine.level + '**' : '';
 
             return interaction.reply({
                 embeds: [
@@ -338,19 +384,19 @@ module.exports = {
                             name: interaction.user.username,
                             iconURL: interaction.user.displayAvatarURL({ size: 64 })
                         })
-                        .setTitle(`${meta.emoji} Seu rank`)
+                        .setTitle(meta.titleEmoji + ' Seu rank')
                         .setDescription(
                             [
-                                `**${meta.title}**`,
+                                '**Rank ' + meta.rankLabel + '**',
                                 '',
-                                `🏆 Posição: **#${mine.rank}** de **${fmt(list.length)}**`,
-                                `${meta.emoji} **${fmt(mine.value)}** ${meta.unit}${extra}`,
+                                '🏆 Posição: **#' + mine.rank + '** de **' + fmt(list.length) + '**',
+                                meta.unitEmoji + ' **' + fmt(mine.value) + '** ' + meta.unit + extra,
                                 '',
-                                `_Você está na página ${pageOfMe + 1}._`
+                                '_Você está na página ' + (pageOfMe + 1) + '._'
                             ].join('\n')
                         )
                         .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
-                        .setTimestamp()
+                        .setFooter({ text: 'Aeternus · ' + formatDate() })
                 ],
                 ephemeral: true
             });
