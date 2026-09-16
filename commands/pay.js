@@ -7,6 +7,7 @@ const {
 } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
+const { getPrefix } = require('../utils/settings');
 
 const TIMEOUT_MS = 8 * 60 * 1000;
 /** @type {Map<string, object>} */
@@ -124,7 +125,7 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
     const bal = eter.get(from.id);
     if (amount > bal) {
         const payload = {
-            content: `${from} saldo insuficiente para enviar ✨ **${fmt(amount)}** para ${to}. Carteira: ✨ **${fmt(bal)}**.`,
+            content: `💸 ${from}, saldo insuficiente para enviar ✨ **${fmt(amount)}** para ${to}.\nCarteira: ✨ **${fmt(bal)}**.`,
             allowedMentions: { users: [from.id, to.id] }
         };
         if (opts.replyToId) {
@@ -251,7 +252,6 @@ async function finishTransfer(interaction, p) {
         })
         .catch(() => {});
 
-    // Confirmação marca a mensagem da transferência
     const confPayload = {
         content: body,
         reply: { messageReference: p.messageId, failIfNotExists: false },
@@ -285,19 +285,31 @@ module.exports = {
 
     async execute(message, args) {
         const targets = await resolveTargets(message, args);
+        const prefix = message.guild?.id ? getPrefix(message.guild.id) : 'O.';
+
         if (!targets.length) {
-            return message.reply('Mencione alguém: `O.pix @usuario 1000`');
+            return message.reply(
+                `💸 Mencione alguém para enviar éter.\nUse: \`${prefix}pix @usuario <valor>\``
+            );
         }
 
         const amountRaw = parseAmountArg(args);
         const bal = eter.get(message.author.id);
         const bet = resolveBet(amountRaw, bal, { label: '✨' });
-        if (!bet.ok) return message.reply(bet.error || 'Valor inválido.');
+        if (!bet.ok) {
+            return message.reply(
+                bet.error ||
+                    `💸 Valor inválido. Use: \`${prefix}pix @usuario <valor>\` (ex: 1000, 1k, half, all).`
+            );
+        }
 
         const amount = bet.amount;
-        if (amount <= 0) return message.reply('Valor inválido.');
+        if (amount <= 0) {
+            return message.reply(
+                `💸 Valor inválido. Use: \`${prefix}pix @usuario <valor>\``
+            );
+        }
 
-        // Uma mensagem por pessoa, cada uma respondendo ao comando
         const replyToId = message.id || null;
         for (const to of targets) {
             await createTransfer(message.channel, message.author, to, amount, {
@@ -332,7 +344,6 @@ module.exports = {
             });
         }
 
-        // Resposta pública que a transferência responde (marca o “comando”)
         await i.reply({
             content: `✦ Pedido de transferência para ${to} — ✨ **${fmt(bet.amount)}** éter`,
             allowedMentions: { users: [to.id] }
