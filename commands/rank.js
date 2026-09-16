@@ -97,7 +97,46 @@ function modeMeta(mode) {
     };
 }
 
-async function buildList(mode, guild) {
+/** Só membros humanos — remove o bot (Aeternus) e qualquer bot */
+async function humanMemberIds(guild) {
+    const ids = new Set();
+    if (!guild) return ids;
+    try {
+        const members = await guild.members.fetch().catch(() => null);
+        if (members) {
+            members.forEach((m) => {
+                if (m.user && !m.user.bot) ids.add(m.id);
+            });
+        }
+    } catch (_) {}
+    return ids;
+}
+
+async function excludeBotsAndNonMembers(entries, client, guild, requireGuildMember) {
+    const botId = client?.user?.id || null;
+    let list = (entries || []).filter((e) => e && e.id && e.id !== botId);
+
+    if (requireGuildMember && guild) {
+        const humans = await humanMemberIds(guild);
+        if (humans.size) list = list.filter((e) => humans.has(e.id));
+        return list;
+    }
+
+    // global: remove bots
+    const out = [];
+    for (const e of list) {
+        let u = client?.users?.cache?.get(e.id) || null;
+        if (!u && client?.users) {
+            u = await client.users.fetch(e.id).catch(() => null);
+        }
+        if (u && u.bot) continue;
+        if (!u && botId && e.id === botId) continue;
+        out.push(e);
+    }
+    return out;
+}
+
+async function buildList(mode, guild, client) {
     if (mode === 'tapa') {
         const raw = actionStats.all('tapa', guild?.id) || {};
         let entries = Object.entries(raw).map(([id, v]) => ({
@@ -105,14 +144,7 @@ async function buildList(mode, guild) {
             value: Number(v || 0),
             level: 0
         }));
-        if (guild) {
-            const memberIds = new Set();
-            try {
-                const members = await guild.members.fetch().catch(() => null);
-                if (members) members.forEach((m) => memberIds.add(m.id));
-            } catch (_) {}
-            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
-        }
+        entries = await excludeBotsAndNonMembers(entries, client, guild, true);
         return entries.filter((e) => e.value > 0).sort((a, b) => b.value - a.value);
     }
 
@@ -123,16 +155,7 @@ async function buildList(mode, guild) {
             value: Number(v?.xp || 0),
             level: Number(v?.level || 0)
         }));
-
-        if (guild) {
-            const memberIds = new Set();
-            try {
-                const members = await guild.members.fetch().catch(() => null);
-                if (members) members.forEach((m) => memberIds.add(m.id));
-            } catch (_) {}
-            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
-        }
-
+        entries = await excludeBotsAndNonMembers(entries, client, guild, true);
         return entries
             .filter((e) => e.value > 0)
             .sort((a, b) => b.value - a.value || b.level - a.level);
@@ -144,15 +167,8 @@ async function buildList(mode, guild) {
         value: Number(v || 0)
     }));
 
-    if (mode === 'local' && guild) {
-        const memberIds = new Set();
-        try {
-            const members = await guild.members.fetch().catch(() => null);
-            if (members) members.forEach((m) => memberIds.add(m.id));
-        } catch (_) {}
-        if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
-    }
-
+    const requireMember = mode === 'local';
+    entries = await excludeBotsAndNonMembers(entries, client, guild, requireMember);
     return entries.filter((e) => e.value > 0).sort((a, b) => b.value - a.value);
 }
 
@@ -193,6 +209,7 @@ async function pageEmbed(client, list, mode, page, guild) {
         const e = slice[i];
         const pos = start + i;
         const u = await client.users.fetch(e.id).catch(() => null);
+        if (u?.bot) continue;
         const tag = displayTag(u, e.id);
         const val =
             mode === 'xp' && e.level != null
@@ -208,7 +225,7 @@ async function pageEmbed(client, list, mode, page, guild) {
     const guildName = guild?.name || 'Servidor';
     const title = isLocal
         ? meta.titleEmoji + ' RANK · ' + guildName.toUpperCase()
-        : meta.titleEmoji + ' RANK ' + meta.rankLabel.toUpperCase() + ' · AETERNUS';
+        : meta.titleEmoji + ' RANK ' + meta.rankLabel.toUpperCase() + ' · GLOBAL';
 
     const emb = new EmbedBuilder()
         .setColor(meta.color)
@@ -226,8 +243,8 @@ async function pageEmbed(client, list, mode, page, guild) {
             text:
                 'Rank ' +
                 meta.rankLabel +
-                (isLocal ? ' · ' + guildName : '') +
-                ' · Aeternus · ' +
+                (isLocal ? ' · ' + guildName : ' · Global') +
+                ' · ' +
                 formatDate() +
                 ' · Pág. ' +
                 (p + 1) +
@@ -243,7 +260,7 @@ async function pageEmbed(client, list, mode, page, guild) {
         });
         if (icon) emb.setThumbnail(icon);
     } else {
-        emb.setAuthor({ name: 'Aeternus · Ranking Global' });
+        emb.setAuthor({ name: 'Ranking Global' });
     }
 
     return emb;
@@ -275,7 +292,7 @@ function navRow(mode, page, totalPages) {
 function helpEmbed() {
     return new EmbedBuilder()
         .setColor(0xa78bfa)
-        .setTitle('🏆 Rankings Aeternus')
+        .setTitle('🏆 Rankings')
         .setDescription(
             [
                 '**Comandos**',
@@ -287,10 +304,10 @@ function helpEmbed() {
                 '**Navegação**',
                 '⬅️ Voltar · 👤 Ver meu rank · ➡️ Próximo',
                 '',
-                PAGE_SIZE + ' membros por página.'
+                PAGE_SIZE + ' membros por página · apenas usuários (sem bots).'
             ].join('\n')
         )
-        .setFooter({ text: 'Aeternus · Rank' });
+        .setFooter({ text: 'Rank' });
 }
 
 async function sendRank(ctx, mode, page) {
@@ -303,7 +320,7 @@ async function sendRank(ctx, mode, page) {
         };
     }
 
-    const list = await buildList(mode, guild);
+    const list = await buildList(mode, guild, ctx.client);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     const p = Math.min(Math.max(0, page), totalPages - 1);
     const emb = await pageEmbed(ctx.client, list, mode, p, guild);
@@ -351,7 +368,7 @@ module.exports = {
                 });
             }
 
-            const list = await buildList(mode, guild);
+            const list = await buildList(mode, guild, interaction.client);
             const mine = findMyRank(list, interaction.user.id);
             const meta = modeMeta(mode);
 
@@ -396,7 +413,7 @@ module.exports = {
                             ].join('\n')
                         )
                         .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
-                        .setFooter({ text: 'Aeternus · ' + formatDate() })
+                        .setFooter({ text: formatDate() })
                 ],
                 ephemeral: true
             });
