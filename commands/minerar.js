@@ -4,10 +4,6 @@ const store = require('../utils/store');
 
 const CD_MS = 5 * 60 * 1000;
 
-/**
- * Tabela de drops estilo Minecraft (peso → chance relativa).
- * rewardMin/Max em éter.
- */
 const ORES = [
     {
         id: 'nada',
@@ -138,7 +134,7 @@ const ORES = [
     {
         id: 'netherite',
         name: 'Fragmento de Netherita',
-        emoji: '<:netherite:0>'.replace('<:netherite:0>', '🌑'),
+        emoji: '🌑',
         weight: 1,
         min: 200_000,
         max: 400_000,
@@ -150,11 +146,6 @@ const ORES = [
         ]
     }
 ];
-
-// Corrige emoji netherite (sem custom emoji inválido)
-ORES.forEach((o) => {
-    if (o.id === 'netherite') o.emoji = '🌑';
-});
 
 const BIOMES = [
     'caverna de ardósia',
@@ -187,8 +178,8 @@ function formatCd(ms) {
     const s = Math.ceil(ms / 1000);
     const m = Math.floor(s / 60);
     const r = s % 60;
-    if (m <= 0) return `**${r}s**`;
-    return `**${m}m ${String(r).padStart(2, '0')}s**`;
+    if (m <= 0) return '**' + r + 's**';
+    return '**' + m + 'm ' + String(r).padStart(2, '0') + 's**';
 }
 
 function pickWeighted(list) {
@@ -228,9 +219,9 @@ function waitEmbed(user, left) {
         .setDescription(
             [
                 'Sua picareta ainda está esquentando do último turno.',
-                `Aguarde ${formatCd(left)} para minerar de novo.`,
+                'Aguarde ' + formatCd(left) + ' para minerar de novo.',
                 '',
-                '_Cooldown: 5 minutos._'
+                '_Quando o tempo acabar, você recebe um aviso no PV._'
             ].join('\n')
         );
 }
@@ -239,26 +230,26 @@ function resultEmbed(user, ore, amount, balance, biome) {
     const line = pickLine(ore);
     const got =
         amount > 0
-            ? `Você vendeu o minério por **✨ ${fmt(amount)}**.`
+            ? 'Você vendeu o minério por **✨ ' + fmt(amount) + '**.'
             : 'Nenhum éter desta vez.';
 
     return new EmbedBuilder()
         .setColor(ore.color || 0x5865f2)
         .setAuthor({
-            name: `${user.username} · Mineração`,
+            name: user.username + ' · Mineração',
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle(`${ore.emoji} ${ore.name}`)
+        .setTitle(ore.emoji + ' ' + ore.name)
         .setDescription(
             [
-                `📍 **Local:** ${biome}`,
+                '📍 **Local:** ' + biome,
                 '',
                 line,
                 '',
                 got,
-                `**Saldo:** ✨ **${fmt(balance)}**`,
+                '**Saldo:** ✨ **' + fmt(balance) + '**',
                 '',
-                '_Próxima mineração em 5 minutos._'
+                '_Próxima mineração em 5 minutos · aviso no PV quando liberar._'
             ].join('\n')
         )
         .setFooter({ text: 'Aeternus · Mundo de mineração' });

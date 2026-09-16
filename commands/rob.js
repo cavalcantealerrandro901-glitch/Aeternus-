@@ -49,13 +49,21 @@ async function run(thief, target, reply, botId) {
     const left = CD - (Date.now() - last);
     if (left > 0) {
         const m = Math.ceil(left / 60000);
-        return reply(`Aguarde **${m}** min.`);
+        return reply(
+            '⏳ Aguarde **' +
+                m +
+                '** min para roubar de novo.\n_Quando o tempo acabar, você recebe um aviso no PV._'
+        );
     }
 
     const targetHand = eter.get(target.id);
     if (targetHand < MIN_HAND) {
         return reply(
-            `**${target.username}** precisa ter pelo menos ✨ **${fmt(MIN_HAND)}** na carteira.`
+            '**' +
+                target.username +
+                '** precisa ter pelo menos ✨ **' +
+                fmt(MIN_HAND) +
+                '** na carteira.'
         );
     }
 
@@ -76,21 +84,26 @@ async function run(thief, target, reply, botId) {
                     .setColor(0x22c55e)
                     .setTitle('Roubo bem-sucedido')
                     .setDescription(
-                        `Você roubou ✨ **${fmt(amount)}** de **${target.username}**.`
+                        'Você roubou ✨ **' +
+                            fmt(amount) +
+                            '** de **' +
+                            target.username +
+                            '**.'
                     )
                     .addFields(
                         {
                             name: 'Sua carteira',
-                            value: `✨ **${fmt(eter.get(thief.id))}**`,
+                            value: '✨ **' + fmt(eter.get(thief.id)) + '**',
                             inline: true
                         },
                         {
                             name: target.username,
-                            value: `✨ **${fmt(eter.get(target.id))}**`,
+                            value: '✨ **' + fmt(eter.get(target.id)) + '**',
                             inline: true
                         }
                     )
                     .setThumbnail(target.displayAvatarURL({ size: 64 }))
+                    .setFooter({ text: 'Cooldown 15 min · aviso no PV quando liberar' })
             ]
         });
     }
@@ -112,15 +125,16 @@ async function run(thief, target, reply, botId) {
                 .setTitle('Roubo falhou')
                 .setDescription(
                     fine > 0
-                        ? `Você perdeu ✨ **${fmt(fine)}** (creditado ao bot).`
+                        ? 'Você perdeu ✨ **' + fmt(fine) + '** (creditado ao bot).'
                         : 'Você não tinha éter para perder.'
                 )
                 .addFields({
                     name: 'Sua carteira',
-                    value: `✨ **${fmt(eter.get(thief.id))}**`,
+                    value: '✨ **' + fmt(eter.get(thief.id)) + '**',
                     inline: true
                 })
                 .setThumbnail(target.displayAvatarURL({ size: 64 }))
+                .setFooter({ text: 'Cooldown 15 min · aviso no PV quando liberar' })
         ]
     });
 }
@@ -128,12 +142,13 @@ async function run(thief, target, reply, botId) {
 module.exports = {
     name: 'rob',
     aliases: ['roubar', 'steal'],
-    description: 'Rouba éter da carteira de um usuário',
+    description: 'Tenta roubar éter da carteira de outro usuário',
+    category: 'economia',
     data: new SlashCommandBuilder()
         .setName('roubar')
-        .setDescription('Rouba éter da carteira de um usuário')
+        .setDescription('Tenta roubar éter da carteira de alguém')
         .addUserOption((o) =>
-            o.setName('usuario').setDescription('Alvo').setRequired(true)
+            o.setName('usuario').setDescription('Alvo do roubo').setRequired(true)
         ),
 
     async execute(message, args) {
