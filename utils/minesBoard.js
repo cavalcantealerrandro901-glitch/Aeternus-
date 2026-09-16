@@ -68,7 +68,6 @@ function controlsRow(game, potentialFn) {
             : 0;
     const canCash = game.opened.size > 0 && !ended;
 
-    // Discord: emoji do botão é separado do label (máx. 80 chars no texto)
     const cashLabel = game.fun
         ? 'Encerrar'
         : `Sacar ( ✨${fmt(pot)} éter )`.slice(0, 80);
@@ -106,13 +105,13 @@ function againRow(game) {
 }
 
 /**
- * Tudo na mesma mensagem (máx. 5 rows):
- * 4 tabuleiro + 1 controles  OU  4 tabuleiro + 1 again
+ * Até 5 rows: 4 tabuleiro + 1 controles (jogo ativo).
+ * Ao terminar: só tabuleiro revelado (resultado vai na mensagem final).
  */
 function fullComponents(game, reveal = false, potentialFn = null) {
     const ended = !!(game.dead || game.cashed || reveal);
     if (ended) {
-        return [...boardRows(game, true), againRow(game)];
+        return boardRows(game, true);
     }
     return [...boardRows(game, false), controlsRow(game, potentialFn)];
 }
