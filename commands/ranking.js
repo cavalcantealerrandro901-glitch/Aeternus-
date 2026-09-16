@@ -1,51 +1,50 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
-const eter = require('../utils/eter');
+/** Atalho: ranking / top local → rank local (mesmo layout) */
+const rank = require('./rank');
+const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: 'ranking',
-    aliases: ['top', 'lb'],
-    description: 'Ranking do servidor',
-    data: new SlashCommandBuilder().setName('ranking-servidor').setDescription('Ranking do servidor'),
+    aliases: ['top', 'lb', 'leaderboard', 'topeter', 'top-eter'],
+    description: 'Ranking de éter deste servidor',
+    category: 'economia',
+    data: new SlashCommandBuilder()
+        .setName('ranking-servidor')
+        .setDescription('Ranking de éter deste servidor'),
 
-    async execute(message) {
-        const members = await message.guild.members.fetch().catch(() => null);
-        if (!members) return message.reply('❌ Não consegui listar membros.');
-        const rows = [...members.values()]
-            .filter((m) => !m.user.bot)
-            .map((m) => ({ id: m.id, tag: m.user.username, bal: eter.get(m.id) }))
-            .sort((a, b) => b.bal - a.bal)
-            .slice(0, 10);
-        const lines = rows.map(
-            (r, i) => `**${i + 1}.** ${r.tag} — ✨ **${Number(r.bal).toLocaleString('pt-BR')}**`
-        );
-        await message.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0xa78bfa)
-                    .setTitle(`Ranking · ${message.guild.name}`)
-                    .setDescription(lines.join('\n') || 'Vazio')
-            ]
-        });
+    async execute(message, args, client) {
+        return rank.execute(message, ['local', ...(args || [])], client);
     },
 
     async executeSlash(i) {
-        const members = await i.guild.members.fetch().catch(() => null);
-        if (!members) return i.reply({ content: '❌ Não consegui listar membros.', ephemeral: true });
-        const rows = [...members.values()]
-            .filter((m) => !m.user.bot)
-            .map((m) => ({ id: m.id, tag: m.user.username, bal: eter.get(m.id) }))
-            .sort((a, b) => b.bal - a.bal)
-            .slice(0, 10);
-        const lines = rows.map(
-            (r, idx) => `**${idx + 1}.** ${r.tag} — ✨ **${Number(r.bal).toLocaleString('pt-BR')}**`
+        // reaproveita o rank local com a mesma interface e botões
+        const payload = await rank.execute(
+            {
+                guild: i.guild,
+                client: i.client,
+                author: i.user,
+                reply: (p) => i.reply(typeof p === 'string' ? { content: p } : p)
+            },
+            ['local'],
+            i.client
         );
-        await i.reply({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0xa78bfa)
-                    .setTitle(`Ranking · ${i.guild.name}`)
-                    .setDescription(lines.join('\n') || 'Vazio')
-            ]
-        });
-    }
+        // rank.execute já chama message.reply; para slash usamos sendRank via fake message
+        // fallback direto:
+        if (payload) return;
+    },
+
+    handleComponent: rank.handleComponent
+};
+
+// executeSlash correto — rank não exporta sendRank; implementamos via proxy message
+module.exports.executeSlash = async function executeSlash(i) {
+    const fakeMessage = {
+        guild: i.guild,
+        client: i.client,
+        author: i.user,
+        reply: async (payload) => {
+            if (i.deferred || i.replied) return i.followUp(payload);
+            return i.reply(payload);
+        }
+    };
+    return rank.execute(fakeMessage, ['local']);
 };
