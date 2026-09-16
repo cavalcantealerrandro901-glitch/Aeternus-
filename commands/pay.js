@@ -30,15 +30,15 @@ function globalRank(userId) {
 
 function rankLine(userId, label) {
     const r = globalRank(userId);
-    if (!r) return `${label} ainda não está no rank global.`;
-    return `${label} está em **#${r.rank}** no rank global.`;
+    if (!r) return label + ' ainda não está no rank global.';
+    return label + ' está em **#' + r.rank + '** no rank global.';
 }
 
 function acceptRow(id, count) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId(`pay:accept:${id}`)
-            .setLabel(`Aceitar (${count}/2)`)
+            .setCustomId('pay:accept:' + id)
+            .setLabel('Aceitar (' + count + '/2)')
             .setEmoji('✅')
             .setStyle(ButtonStyle.Success)
             .setDisabled(count >= 2)
@@ -49,8 +49,8 @@ function buildInviteText(from, to, amount) {
     return [
         '✦ **AETERNUS • TRANSFERÊNCIA**',
         '',
-        `💸 ${from}`,
-        `└─ deseja enviar ✨ **${fmt(amount)}** éter para ${to}`,
+        '💸 ' + from,
+        '└─ deseja enviar ✨ **' + fmt(amount) + '** éter para ' + to,
         '',
         '✅ Os dois usuários precisam aceitar para concluir a transferência.',
         '',
@@ -72,8 +72,8 @@ function buildExpiredText(from, to, amount) {
     return [
         '✦ **AETERNUS • TRANSFERÊNCIA**',
         '',
-        `💸 ${from}`,
-        `└─ desejava enviar ✨ **${fmt(amount)}** éter para ${to}`,
+        '💸 ' + from,
+        '└─ desejava enviar ✨ **' + fmt(amount) + '** éter para ' + to,
         '',
         '⏰ **Expirado** — o prazo de 8 minutos acabou e a transferência não foi concluída.',
         '',
@@ -114,18 +114,20 @@ async function resolveTargets(message, args) {
     return [];
 }
 
-/**
- * @param {import('discord.js').TextBasedChannel} channel
- * @param {import('discord.js').User} from
- * @param {import('discord.js').User} to
- * @param {number} amount
- * @param {{ replyToId?: string|null }} [opts]
- */
 async function createTransfer(channel, from, to, amount, opts = {}) {
     const bal = eter.get(from.id);
     if (amount > bal) {
         const payload = {
-            content: `💸 ${from}, saldo insuficiente para enviar ✨ **${fmt(amount)}** para ${to}.\nCarteira: ✨ **${fmt(bal)}**.`,
+            content:
+                '💸 ' +
+                from +
+                ', saldo insuficiente para enviar ✨ **' +
+                fmt(amount) +
+                '** para ' +
+                to +
+                '.\nCarteira: ✨ **' +
+                fmt(bal) +
+                '**.',
             allowedMentions: { users: [from.id, to.id] }
         };
         if (opts.replyToId) {
@@ -134,7 +136,14 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
         return channel.send(payload).catch(() => channel.send(payload));
     }
 
-    const id = `${Date.now().toString(36)}_${from.id.slice(-4)}_${to.id.slice(-4)}_${Math.random().toString(36).slice(2, 6)}`;
+    const id =
+        Date.now().toString(36) +
+        '_' +
+        from.id.slice(-4) +
+        '_' +
+        to.id.slice(-4) +
+        '_' +
+        Math.random().toString(36).slice(2, 6);
     const text = buildInviteText(from, to, amount);
 
     const sendPayload = {
@@ -177,7 +186,7 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
             if (m) {
                 await m
                     .edit({
-                        content: buildExpiredText(`<@${p.fromId}>`, `<@${p.toId}>`, p.amount),
+                        content: buildExpiredText('<@' + p.fromId + '>', '<@' + p.toId + '>', p.amount),
                         components: []
                     })
                     .catch(() => {});
@@ -200,7 +209,11 @@ async function finishTransfer(interaction, p) {
                 content: [
                     '✦ **AETERNUS • TRANSFERÊNCIA**',
                     '',
-                    `Transferência cancelada: <@${p.fromId}> não tem mais ✨ **${fmt(amount)}** na carteira.`,
+                    'Transferência cancelada: <@' +
+                        p.fromId +
+                        '> não tem mais ✨ **' +
+                        fmt(amount) +
+                        '** na carteira.',
                     '',
                     '───────────────',
                     '✧ Aeternus Economy'
@@ -225,11 +238,11 @@ async function finishTransfer(interaction, p) {
     const body = [
         '✦ **AETERNUS • TRANSFERÊNCIA CONCLUÍDA**',
         '',
-        `Agora <@${p.toId}> possui ✨ **${fmt(toBal)}**`,
-        rankLine(p.toId, `<@${p.toId}>`),
+        'Agora <@' + p.toId + '> possui ✨ **' + fmt(toBal) + '**',
+        rankLine(p.toId, '<@' + p.toId + '>'),
         '',
-        `<@${p.fromId}> agora possui ✨ **${fmt(fromBal)}**`,
-        rankLine(p.fromId, `<@${p.fromId}>`),
+        '<@' + p.fromId + '> agora possui ✨ **' + fmt(fromBal) + '**',
+        rankLine(p.fromId, '<@' + p.fromId + '>'),
         '',
         '───────────────',
         '✧ Aeternus Economy'
@@ -240,8 +253,8 @@ async function finishTransfer(interaction, p) {
             content: [
                 '✦ **AETERNUS • TRANSFERÊNCIA**',
                 '',
-                `💸 <@${p.fromId}>`,
-                `└─ enviou ✨ **${fmt(amount)}** éter para <@${p.toId}>`,
+                '💸 <@' + p.fromId + '>',
+                '└─ enviou ✨ **' + fmt(amount) + '** éter para <@' + p.toId + '>',
                 '',
                 '✅ **Concluída** (2/2).',
                 '',
@@ -289,7 +302,9 @@ module.exports = {
 
         if (!targets.length) {
             return message.reply(
-                `💸 Mencione alguém para enviar éter.\nUse: \`${prefix}pix @usuario <valor>\``
+                '💸 Mencione alguém para enviar éter.\nUse: `' +
+                    prefix +
+                    'pix @usuario <valor>`'
             );
         }
 
@@ -299,14 +314,16 @@ module.exports = {
         if (!bet.ok) {
             return message.reply(
                 bet.error ||
-                    `💸 Valor inválido. Use: \`${prefix}pix @usuario <valor>\` (ex: 1000, 1k, half, all).`
+                    ('💸 Valor inválido. Use: `' +
+                        prefix +
+                        'pix @usuario <valor>` (ex: 1000, 1k, half, all).')
             );
         }
 
         const amount = bet.amount;
         if (amount <= 0) {
             return message.reply(
-                `💸 Valor inválido. Use: \`${prefix}pix @usuario <valor>\``
+                '💸 Valor inválido. Use: `' + prefix + 'pix @usuario <valor>`'
             );
         }
 
@@ -345,7 +362,12 @@ module.exports = {
         }
 
         await i.reply({
-            content: `✦ Pedido de transferência para ${to} — ✨ **${fmt(bet.amount)}** éter`,
+            content:
+                '✦ Pedido de transferência para ' +
+                to.toString() +
+                ' — ✨ **' +
+                fmt(bet.amount) +
+                '** éter',
             allowedMentions: { users: [to.id] }
         });
         const cmdMsg = await i.fetchReply().catch(() => null);
@@ -371,7 +393,7 @@ module.exports = {
             pending.delete(id);
             await interaction
                 .update({
-                    content: buildExpiredText(`<@${p.fromId}>`, `<@${p.toId}>`, p.amount),
+                    content: buildExpiredText('<@' + p.fromId + '>', '<@' + p.toId + '>', p.amount),
                     components: []
                 })
                 .catch(() => {});
