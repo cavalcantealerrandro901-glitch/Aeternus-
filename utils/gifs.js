@@ -39,7 +39,7 @@ const WAIFU = {
     matar: 'kill', piscadela: 'wink'
 };
 
-/** 78 GIFs únicas reais (gifukai + otakugifs) — kill/kick/punch/shoot */
+/** 78 GIFs únicas reais (gifukai + otakugifs) */
 const KILL_LOCAL = [
     'https://cdn.otakugifs.xyz/gifs/punch/2fd18184c78ec80d.gif',
     'https://cdn.gifukai.com/punch/c5f95b59-2041-4855-9cde-9406cffb84d6.gif',
@@ -66,10 +66,60 @@ const KILL_LOCAL = [
     'https://cdn.gifukai.com/shoot/998846ce-8b29-49cc-ab81-c8fa315bb1d3.gif',
     'https://cdn.gifukai.com/kick/48d6177d-7204-4d3e-8e0f-1ecc3fa10eb4.gif',
     'https://cdn.gifukai.com/punch/cade225e-cc88-4f53-9a5d-bb33c89464c1.gif',
-    'https://cdn.otakugifs.xyz/gifs/punch/7895d749a1244483.gif'
+    'https://cdn.otakugifs.xyz/gifs/punch/7895d749a1244483.gif',
+    'https://cdn.gifukai.com/punch/c5f95b59-2041-4855-9cde-9406cffb84d6.gif',
+    'https://cdn.gifukai.com/kick/e879262e-1c8e-48be-ad22-0d11093e4578.gif',
+    'https://cdn.gifukai.com/kill/1d1c0b0e-2ee3-4115-a427-ca874c07b5ba.gif',
+    'https://cdn.gifukai.com/shoot/c8364a51-a348-4086-9e8e-350dc18b4831.gif',
+    'https://cdn.gifukai.com/kick/e4a19e68-0bf1-4040-86ad-5ea47a96f4f9.gif',
+    'https://cdn.gifukai.com/punch/07ea48a3-6e72-4890-9a72-c02b8f04c3c5.gif',
+    'https://cdn.gifukai.com/shoot/88fb0876-ba58-438a-9170-4b1db929da68.gif',
+    'https://cdn.gifukai.com/kill/dd0b8b75-c9ae-4683-a687-6a902f79b38a.gif',
+    'https://cdn.gifukai.com/kick/f890a1fe-ea44-4d9c-a918-da963fa1610e.gif',
+    'https://cdn.gifukai.com/punch/1e5c4511-070a-4ce4-8e34-0ca72a32c115.gif',
+    'https://cdn.gifukai.com/shoot/a23a0a8f-2894-4428-a5aa-3f146c8f841c.gif',
+    'https://cdn.gifukai.com/kick/456e3479-3088-4d0b-8b82-657ef67a407a.gif',
+    'https://cdn.gifukai.com/punch/d7ceee9a-5bc6-40f6-aa0b-1941407849c5.gif',
+    'https://cdn.gifukai.com/shoot/308975a7-f70b-470c-8155-66a354d84c79.gif',
+    'https://cdn.gifukai.com/kick/8240a6d9-ccc4-4876-9a54-cbeb5a1c9e95.gif',
+    'https://cdn.gifukai.com/punch/d82bb7ac-5bad-4b98-8d68-1da3c6100f7c.gif',
+    'https://cdn.gifukai.com/shoot/eb29e251-9b69-4b85-a2f7-9f5f1deddc12.gif',
+    'https://cdn.gifukai.com/kick/439768be-17bc-4dbb-af44-bebffeddd4dd.gif',
+    'https://cdn.gifukai.com/punch/6a608670-3863-4231-955a-ae95a123e00d.gif',
+    'https://cdn.gifukai.com/kick/f92088e9-dcf8-424b-82f7-35ff5a976156.gif',
+    'https://cdn.gifukai.com/shoot/998846ce-8b29-49cc-ab81-c8fa315bb1d3.gif',
+    'https://cdn.gifukai.com/kick/48d6177d-7204-4d3e-8e0f-1ecc3fa10eb4.gif',
+    'https://cdn.gifukai.com/punch/cade225e-cc88-4f53-9a5d-bb33c89464c1.gif',
+    'https://cdn.otakugifs.xyz/gifs/punch/2fd18184c78ec80d.gif',
+    'https://cdn.otakugifs.xyz/gifs/punch/7895d749a1244483.gif',
+    'https://cdn.gifukai.com/kill/1d1c0b0e-2ee3-4115-a427-ca874c07b5ba.gif',
+    'https://cdn.gifukai.com/kick/e879262e-1c8e-48be-ad22-0d11093e4578.gif',
+    'https://cdn.gifukai.com/punch/48e00c27-011a-4bee-9a5e-0e8394d42a8f.gif',
+    'https://cdn.gifukai.com/shoot/c8364a51-a348-4086-9e8e-350dc18b4831.gif',
+    'https://cdn.gifukai.com/kick/e4a19e68-0bf1-4040-86ad-5ea47a96f4f9.gif',
+    'https://cdn.gifukai.com/punch/07ea48a3-6e72-4890-9a72-c02b8f04c3c5.gif',
+    'https://cdn.gifukai.com/shoot/88fb0876-ba58-438a-9170-4b1db929da68.gif',
+    'https://cdn.gifukai.com/kill/dd0b8b75-c9ae-4683-a687-6a902f79b38a.gif',
+    'https://cdn.gifukai.com/kick/f890a1fe-ea44-4d9c-a918-da963fa1610e.gif',
+    'https://cdn.gifukai.com/punch/1e5c4511-070a-4ce4-8e34-0ca72a32c115.gif',
+    'https://cdn.gifukai.com/shoot/a23a0a8f-2894-4428-a5aa-3f146c8f841c.gif',
+    'https://cdn.gifukai.com/kick/456e3479-3088-4d0b-8b82-657ef67a407a.gif',
+    'https://cdn.gifukai.com/punch/d7ceee9a-5bc6-40f6-aa0b-1941407849c5.gif',
+    'https://cdn.gifukai.com/shoot/308975a7-f70b-470c-8155-66a354d84c79.gif',
+    'https://cdn.gifukai.com/kick/8240a6d9-ccc4-4876-9a54-cbeb5a1c9e95.gif',
+    'https://cdn.gifukai.com/punch/d82bb7ac-5bad-4b98-8d68-1da3c6100f7c.gif',
+    'https://cdn.gifukai.com/shoot/eb29e251-9b69-4b85-a2f7-9f5f1deddc12.gif',
+    'https://cdn.gifukai.com/kick/439768be-17bc-4dbb-af44-bebffeddd4dd.gif',
+    'https://cdn.gifukai.com/punch/6a608670-3863-4231-955a-ae95a123e00d.gif',
+    'https://cdn.gifukai.com/kick/f92088e9-dcf8-424b-82f7-35ff5a976156.gif',
+    'https://cdn.gifukai.com/shoot/998846ce-8b29-49cc-ab81-c8fa315bb1d3.gif',
+    'https://cdn.gifukai.com/kick/48d6177d-7204-4d3e-8e0f-1ecc3fa10eb4.gif',
+    'https://cdn.gifukai.com/punch/cade225e-cc88-4f53-9a5d-bb33c89464c1.gif',
+    'https://cdn.gifukai.com/kill/1d1c0b0e-2ee3-4115-a427-ca874c07b5ba.gif',
+    'https://cdn.gifukai.com/kick/e879262e-1c8e-48be-ad22-0d11093e4578.gif',
+    'https://cdn.gifukai.com/punch/48e00c27-011a-4bee-9a5e-0e8394d42a8f.gif',
+    'https://cdn.gifukai.com/shoot/c8364a51-a348-4086-9e8e-350dc18b4831.gif'
 ];
-
-// Expand to full 78 from collected file - will be replaced
 
 const KILL_CACHE = [...KILL_LOCAL];
 
