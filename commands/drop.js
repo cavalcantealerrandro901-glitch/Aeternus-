@@ -73,7 +73,16 @@ function buildListPayload(drop, page) {
         const id = pair[0];
         const part = pair[1];
         const tickets = part && part.entries ? part.entries : 1;
-        return p * LIST_PAGE + i + 1 + '. <@' + id + '> · ' + tickets + ' entrada(s)';
+        return (
+            p * LIST_PAGE +
+            i +
+            1 +
+            '. <@' +
+            id +
+            '> · ' +
+            tickets +
+            ' entrada(s)'
+        );
     });
 
     return {
@@ -84,72 +93,66 @@ function buildListPayload(drop, page) {
 }
 
 function buildEmbed(drop, guild, authorTag) {
-    const conf = getSettings(guild.id).drops || {};
-    const req = drop.requirements || conf.requirements || {};
-    const ends = drop.endsAt ? Math.floor(drop.endsAt / 1000) : null;
-    const count = Object.keys(drop.participants || {}).length;
-
-    const lines = [
-        '**Prêmio:** ' + (drop.prize?.label || '—'),
-        '**Ganhadores:** ' + (drop.winners || 1),
-        '**Participantes:** ' + count,
-        ends ? '**Encerra:** <t:' + ends + ':R> (<t:' + ends + ':f>)' : null
-    ].filter(Boolean);
-
-    // VIP / extras do painel (não alterar lógica)
-    const vipLines = [];
-    if (Array.isArray(conf.vipExtras) && conf.vipExtras.length) {
-        for (const v of conf.vipExtras) {
-            if (!v || !v.roleId) continue;
-            vipLines.push(
-                '<@&' + v.roleId + '> · +' + (v.entries || 1) + ' entrada(s)'
-            );
-        }
-    }
-    if (vipLines.length) {
-        lines.push('');
-        lines.push('**VIP / entradas extras**');
-        lines.push(...vipLines);
+    const endsUnix = Math.floor((drop.endsAt || Date.now()) / 1000);
+    const total = drops.participantCount(drop);
+    const req = drops.getRequirements(guild.id, drop);
+    const reqLines = [];
+    if (req.minLevel > 0) reqLines.push('• Nível mínimo: **' + req.minLevel + '**');
+    if (req.requiredRoleIds && req.requiredRoleIds.length) {
+        const names = req.requiredRoleIds
+            .map((id) => guild.roles.cache.get(id))
+            .filter(Boolean)
+            .map((r) => String(r));
+        if (names.length) reqLines.push('• Cargo exigido: ' + names.join(', '));
     }
 
-    if (req.blockedRoleId || (Array.isArray(req.blockedRoles) && req.blockedRoles.length)) {
-        const blocked = req.blockedRoleId
-            ? [req.blockedRoleId]
-            : req.blockedRoles;
-        lines.push('');
-        lines.push('**Não pode participar**');
-        lines.push(blocked.map((id) => '<@&' + id + '>').join(' · '));
-    }
-
-    if (req.bypassRoleId) {
-        lines.push('');
-        lines.push('**Ignora requisitos:** <@&' + req.bypassRoleId + '>');
-    }
+    const panelInfo = drops.formatDropPanelInfo(guild, guild.id);
+    const vipBlock = panelInfo.vipLines.length
+        ? '\n**VIP · entradas extras**\n' + panelInfo.vipLines.join('\n')
+        : '';
+    const blockedBlock = panelInfo.blocked.length
+        ? '\n**Não pode participar**\n' +
+          panelInfo.blocked.map((b) => '• ' + b).join('\n')
+        : '';
+    const bypassBlock = (panelInfo.bypass || []).length
+        ? '\n**Ignora requisitos**\n' +
+          panelInfo.bypass.map((b) => '• ' + b).join('\n')
+        : '';
 
     return new EmbedBuilder()
         .setColor(0xa78bfa)
-        .setTitle('🎁 Drop')
-        .setDescription(lines.join('\n'))
-        .setFooter({ text: 'Por ' + (authorTag || 'staff') })
-        .setTimestamp(drop.endsAt ? new Date(drop.endsAt) : undefined);
+        .setTitle('🎁 DROP EM ANDAMENTO')
+        .setDescription(
+            [
+                '**Prêmio:** ' + (drop.prize && drop.prize.label ? drop.prize.label : '—'),
+                '**Vencedores:** ' + (drop.winners || 1),
+                '**Termina:** <t:' + endsUnix + ':R> (<t:' + endsUnix + ':f>)',
+                '',
+                'Clique em **Participar** para entrar ou **Sair** para desistir.',
+                reqLines.length ? '\n**Requisitos**\n' + reqLines.join('\n') : '',
+                vipBlock,
+                bypassBlock,
+                blockedBlock
+            ]
+                .filter((x) => x != null && x !== '')
+                .join('\n')
+        )
+        .setFooter({ text: 'Por ' + (authorTag || 'staff') + ' · ' + total + ' participante(s)' })
+        .setTimestamp(drop.endsAt);
 }
 
 async function refreshDropMessage(interaction, drop) {
-    if (!drop) return;
+    const guild = interaction.guild;
     let authorTag = drop.createdByTag || 'staff';
     if (!drop.createdByTag && drop.createdBy) {
         const u = await interaction.client.users.fetch(drop.createdBy).catch(() => null);
         if (u) authorTag = u.tag;
     }
-    const guild = interaction.guild;
     const embed = buildEmbed(drop, guild, authorTag);
-    const count = Object.keys(drop.participants || {}).length;
-    try {
-        await interaction.message.edit({
-            embeds: [embed],
-            components: [joinRow(drop.id, count)]
-        });
-    } catch (_) {}
+    const count = drops.participantCount(drop);
+    await interaction.message
+        .edit({ embeds: [embed], components: [joinRow(drop.id, count)] })
+        .catch(() => {});
 }
 
 /** Máximo de drops criados num único comando */
@@ -302,12 +305,14 @@ module.exports = {
             created++;
         }
 
-        return i.editReply({
-            content:
-                created > 1
-                    ? '✅ **' + created + '** drops publicados neste chat.'
-                    : '✅ Drop publicado.'
-        }).catch(() => {});
+        return i
+            .editReply({
+                content:
+                    created > 1
+                        ? '✅ **' + created + '** drops publicados neste chat.'
+                        : '✅ Drop publicado.'
+            })
+            .catch(() => {});
     },
 
     async handleComponent(interaction) {
@@ -366,10 +371,14 @@ module.exports = {
             }
 
             const member = interaction.member;
-            const check = drops.canJoin(member, drop);
+            const check = drops.canJoin
+                ? drops.canJoin(member, drop)
+                : drops.checkRequirements
+                  ? drops.checkRequirements(member, drop)
+                  : { ok: true };
             if (!check.ok) {
                 return interaction.reply({
-                    content: check.error || 'Você não pode participar.',
+                    content: (check.fails && check.fails[0]) || check.error || 'Você não pode participar.',
                     flags: MessageFlags.Ephemeral
                 });
             }
@@ -410,9 +419,9 @@ async function createDropMsg(ctx, opts) {
     const conf = getSettings(guild.id).drops || {};
     if (conf.enabled === false) {
         const msg = '❌ Drops desativados no painel.';
-        if (isSlash && !opts.silent) return ctx.editReply({ content: msg });
-        if (!opts.silent) return ctx.reply(msg);
-        return null;
+        if (opts.silent) return null;
+        if (isSlash) return ctx.editReply({ content: msg });
+        return ctx.reply(msg);
     }
 
     const prize = drops.parsePrize(premio);
@@ -427,7 +436,8 @@ async function createDropMsg(ctx, opts) {
             winners: winners,
             endsAt: endsAt,
             participants: {},
-            requirements: conf.requirements || {}
+            requirements: conf.requirements || {},
+            guildId: guild.id
         },
         guild,
         author.tag
