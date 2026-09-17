@@ -39,9 +39,6 @@ async function resolveTarget(message, args) {
     return null;
 }
 
-/**
- * Verifica se o alvo tem o cargo anti-roubo no servidor.
- */
 async function hasAntiRob(guild, userId) {
     if (!guild || !userId) return false;
     try {
@@ -53,10 +50,6 @@ async function hasAntiRob(guild, userId) {
     }
 }
 
-/**
- * Remove éter do alvo: primeiro da carteira, depois do banco.
- * @returns {{ fromWallet: number, fromBank: number, total: number }}
- */
 function stealFromTarget(targetId, amount) {
     let left = Math.max(0, Math.floor(Number(amount) || 0));
     let fromWallet = 0;
@@ -80,16 +73,14 @@ function stealFromTarget(targetId, amount) {
 }
 
 function protectedMessage(target) {
+    const name = target.username || 'Este usuário';
     return [
-        '🛡️ **PROTEÇÃO ATIVA**',
+        '🔐 **Escudo ativo**',
         '',
-        '**' + (target.username || 'Este usuário') + '** não pode ser roubado.',
+        '**' + name + '** está sob proteção do cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
+        'Carteira e banco ficam fora do alcance de qualquer roubo.',
         '',
-        'Aparentemente ele comprou o cargo <@&' +
-            ANTI_ROB_ROLE_ID +
-            '>, então está protegido contra roubos.',
-        '',
-        '💎 Quer a mesma proteção? Adquira o cargo e fique imune a roubos na carteira e no banco.'
+        '💎 Quer a mesma imunidade? Fale com a equipe e garanta o cargo.'
     ].join('\n');
 }
 
@@ -101,7 +92,6 @@ async function run(thief, target, reply, botId, guild) {
     if (target.bot) return reply('Não dá para roubar bots.');
     if (target.id === thief.id) return reply('Você não pode roubar a si mesmo.');
 
-    // Anti-roubo por cargo
     if (await hasAntiRob(guild, target.id)) {
         return reply({
             content: protectedMessage(target),
