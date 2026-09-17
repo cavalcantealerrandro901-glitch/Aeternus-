@@ -25,17 +25,17 @@ async function buildEmbed(user, guild) {
     const bankBal = bank.get(user.id);
     const safe = await isProtected(guild, user.id);
 
-    const title = safe ? '🏦 Aeternus banco · seguro' : '🏦 Aeternus banco · não seguro';
+    const title = safe ? '🏦 Aeternus banco · seguro' : '🏦 Aeternus banco · sem proteção';
 
     const statusLine = safe
-        ? '🛡️ Seu banco está **seguro** pela compra do cargo <@&' +
+        ? '🛡️ Seu banco está **protegido** graças ao cargo <@&' +
           ANTI_ROB_ROLE_ID +
-          '> — ninguém poderá roubá-lo.'
-        : '⚠️ Seu banco **não está seguro**. Sem o cargo de anti-roubo, sua carteira e seu banco podem ser alvos de roubo.';
+          '>. Ninguém consegue roubar o seu éter.'
+        : '⚠️ Seu banco está **exposto**. Sem o cargo de proteção, ladrões podem levar éter da sua **carteira** e do seu **banco**.';
 
     const tip = safe
-        ? '💡 *Proteção ativa. Mantenha o cargo para continuar imune a roubos.*'
-        : '💡 *Compre o cargo de anti-roubos. Basta falar com a nossa equipe.*';
+        ? '💡 *Proteção ativa — mantenha o cargo para continuar imune.*'
+        : '💡 *Quer dormir tranquilo? Fale com a equipe e garanta o cargo de anti-roubo.*';
 
     const color = safe ? 0x86efac : 0xfbbf24;
 
