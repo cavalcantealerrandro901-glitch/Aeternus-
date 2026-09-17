@@ -25,19 +25,32 @@ async function buildEmbed(user, guild) {
     const bankBal = bank.get(user.id);
     const safe = await isProtected(guild, user.id);
 
-    const title = safe ? '🏦 Aeternus Banco · Protegido' : '🏦 Aeternus Banco · Desprotegido';
+    const title = safe
+        ? '🔐 Aeternus Banco · Protegido'
+        : '🚨 Aeternus Banco · Desprotegido';
 
     const statusLine = safe
-        ? '🛡️ **Proteção ativa.**\nSeu cofre conta com o cargo <@&' +
-          ANTI_ROB_ROLE_ID +
-          '> — o seu éter está fora do alcance de qualquer roubo.'
-        : '⚠️ **Atenção: sem proteção.**\nEnquanto você não tiver o cargo anti-roubo, tanto a **carteira** quanto o **banco** podem ser alvo de roubo.';
+        ? [
+              '🟢 **Status:** seguro',
+              '🛡️ **Proteção ativa.**',
+              'Seu cofre conta com o cargo <@&' +
+                  ANTI_ROB_ROLE_ID +
+                  '> — o seu éter está fora do alcance de qualquer roubo.'
+          ].join('\n')
+        : [
+              '🔴 **Status:** exposto',
+              '⚠️ **Atenção: sem proteção.**',
+              'Enquanto você não tiver o cargo anti-roubo, tanto a **carteira** quanto o **banco** podem ser alvo de roubo.'
+          ].join('\n');
 
     const tip = safe
-        ? '✨ *Seu éter está em boas mãos. Mantenha o cargo e continue seguro.*'
+        ? '✅ *Seu éter está em boas mãos. Mantenha o cargo e continue seguro.*'
         : '💎 *Garanta o cargo anti-roubo com a equipe e deixe seu éter realmente seguro.*';
 
-    const color = safe ? 0x86efac : 0xfbbf24;
+    const vaultIcon = safe ? '🔒' : '📭';
+    const handIcon = safe ? '👛' : '🪙';
+
+    const color = safe ? 0x22c55e : 0xf59e0b;
 
     return new EmbedBuilder()
         .setColor(color)
@@ -46,14 +59,14 @@ async function buildEmbed(user, guild) {
             [
                 statusLine,
                 '',
-                '----------------------------------------',
+                '━━━━━━━━━━━━━━━━━━━━',
                 '',
                 '📋 **STATUS BANCÁRIOS**',
                 '',
-                '💰 *Você tem depositado:* ✨ **' + fmt(bankBal) + '** éter.',
-                '👛 *Em mãos:* ✨ **' + fmt(wallet) + '** éter.',
+                vaultIcon + ' *Você tem depositado:* ✨ **' + fmt(bankBal) + '** éter.',
+                handIcon + ' *Em mãos:* ✨ **' + fmt(wallet) + '** éter.',
                 '',
-                '----------------------------------------',
+                '━━━━━━━━━━━━━━━━━━━━',
                 '',
                 tip
             ].join('\n')
