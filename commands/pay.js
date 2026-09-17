@@ -9,7 +9,45 @@ const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const { getPrefix } = require('../utils/settings');
 
-const TIMEOUT_MS = 8 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = 8 * 60 * 1000;
+
+/** Prazos permitidos no slash */
+const TIMEOUT_CHOICES = [
+    { name: '7 minutos', value: '7m' },
+    { name: '8 minutos (padrão)', value: '8m' },
+    { name: '1 hora', value: '1h' },
+    { name: '12 horas', value: '12h' },
+    { name: '1 dia', value: '1d' },
+    { name: '3 dias', value: '3d' },
+    { name: '5 dias', value: '5d' }
+];
+
+function parseTimeout(raw) {
+    const s = String(raw || '').trim().toLowerCase();
+    if (!s) return DEFAULT_TIMEOUT_MS;
+    const m = s.match(/^(\d+)\s*(m|min|h|hr|d)?$/i);
+    if (!m) return DEFAULT_TIMEOUT_MS;
+    const n = Math.max(1, parseInt(m[1], 10) || 1);
+    const u = (m[2] || 'm').toLowerCase();
+    let ms;
+    if (u.startsWith('h')) ms = n * 60 * 60 * 1000;
+    else if (u.startsWith('d')) ms = n * 24 * 60 * 60 * 1000;
+    else ms = n * 60 * 1000;
+    // mín. 1 min · máx. 7 dias
+    return Math.min(7 * 24 * 60 * 60 * 1000, Math.max(60 * 1000, ms));
+}
+
+function formatTimeout(ms) {
+    const s = Math.floor(Number(ms) / 1000);
+    if (s < 60) return s + ' segundo' + (s === 1 ? '' : 's');
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + ' minuto' + (m === 1 ? '' : 's');
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + ' hora' + (h === 1 ? '' : 's');
+    const d = Math.floor(h / 24);
+    return d + ' dia' + (d === 1 ? '' : 's');
+}
+
 /** @type {Map<string, object>} */
 const pending = new Map();
 
@@ -55,9 +93,10 @@ function mention(u) {
     return String(u);
 }
 
-function buildInviteText(from, to, amount) {
+function buildInviteText(from, to, amount, timeoutMs) {
     const fromM = mention(from);
     const toM = mention(to);
+    const label = formatTimeout(timeoutMs || DEFAULT_TIMEOUT_MS).toUpperCase();
     return [
         '✦ **AETERNUS • TRANSFERÊNCIA**',
         '',
@@ -71,8 +110,8 @@ function buildInviteText(from, to, amount) {
         'Ao aceitar, você confirma que revisou todas as informações e autorizou a operação. Depois de concluída, a transferência **não poderá ser desfeita ou recuperada** pelo Aeternus.',
         '',
         '━━━━━━━━━━━━━━━━━━',
-        '⏳ **PRAZO PARA ACEITAR: 8 MINUTOS**',
-        '⚠️ Após 8 minutos, a solicitação expirará automaticamente.',
+        '⏳ **PRAZO PARA ACEITAR: ' + label + '**',
+        '⚠️ Após esse prazo, a solicitação expirará automaticamente.',
         '━━━━━━━━━━━━━━━━━━',
         '',
         '───────────────',
@@ -155,7 +194,8 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
         to.id.slice(-4) +
         '_' +
         Math.random().toString(36).slice(2, 6);
-    const text = buildInviteText(from, to, amount);
+    const timeoutMs = opts.timeoutMs || DEFAULT_TIMEOUT_MS;
+    const text = buildInviteText(from, to, amount, timeoutMs);
 
     const sendPayload = {
         content: text,
@@ -183,7 +223,8 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
         channelId: channel.id,
         messageId: msg.id,
         sourceMessageId: opts.replyToId || null,
-        expires: Date.now() + TIMEOUT_MS,
+        expires: Date.now() + timeoutMs,
+        timeoutMs,
         done: false
     };
     pending.set(id, entry);
@@ -202,7 +243,7 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
                 });
             }
         } catch (_) {}
-    }, TIMEOUT_MS);
+    }, timeoutMs);
 
     return msg;
 }
@@ -219,11 +260,9 @@ async function finishTransfer(interaction, p) {
                 content: [
                     '✦ **AETERNUS • TRANSFERÊNCIA**',
                     '',
-                    'Transferência cancelada: <@' +
-                        p.fromId +
-                        '> não tem mais ✨ **' +
-                        fmt(amount) +
-                        '** na carteira.',
+                    '💸 Saldo insuficiente no momento da conclusão.',
+                    mention(p.fromId) + ' → ' + mention(p.toId),
+                    'Valor: ✨ **' + fmt(amount) + '**',
                     '',
                     '───────────────',
                     '✧ Aeternus Economy'
@@ -232,72 +271,55 @@ async function finishTransfer(interaction, p) {
                 allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
             })
             .catch(() => {});
-        return interaction
-            .followUp({
-                content: 'Saldo insuficiente no momento da confirmação.',
-                flags: MessageFlags.Ephemeral
-            })
-            .catch(() => {});
+        return;
     }
 
-    eter.remove(p.fromId, amount, { reason: 'pix', to: p.toId });
-    eter.add(p.toId, amount, { reason: 'pix', from: p.fromId });
+    eter.remove(p.fromId, amount, { reason: 'transferência', to: p.toId });
+    eter.add(p.toId, amount, { reason: 'transferência', from: p.fromId });
 
-    const toBal = eter.get(p.toId);
     const fromBal = eter.get(p.fromId);
+    const toBal = eter.get(p.toId);
 
-    const body = [
+    const doneText = [
         '✦ **AETERNUS • TRANSFERÊNCIA CONCLUÍDA**',
         '',
-        'Agora <@' + p.toId + '> possui ✨ **' + fmt(toBal) + '**',
-        rankLine(p.toId, '<@' + p.toId + '>'),
+        '✅ Transferência concluída.',
         '',
-        '<@' + p.fromId + '> agora possui ✨ **' + fmt(fromBal) + '**',
-        rankLine(p.fromId, '<@' + p.fromId + '>'),
+        mention(p.toId) + ' agora possui ✨ **' + fmt(toBal) + '**',
+        rankLine(p.toId, mention(p.toId)),
+        '',
+        mention(p.fromId) + ' agora possui ✨ **' + fmt(fromBal) + '**',
+        rankLine(p.fromId, mention(p.fromId)),
         '',
         '───────────────',
         '✧ Aeternus Economy'
     ].join('\n');
 
-    await interaction.message
-        .edit({
-            content: [
-                '✦ **AETERNUS • TRANSFERÊNCIA**',
-                '',
-                '💸 <@' + p.fromId + '> → <@' + p.toId + '>',
-                '└─ enviou ✨ **' + fmt(amount) + '** éter para <@' + p.toId + '>',
-                '',
-                '✅ **Concluída** (2/2).',
-                '',
-                '───────────────',
-                '✧ Aeternus Economy'
-            ].join('\n'),
-            components: [],
-            allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
-        })
-        .catch(() => {});
-
-    const confPayload = {
-        content: body,
-        reply: { messageReference: p.messageId, failIfNotExists: false },
-        allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
+    const replyPayload = {
+        content: doneText,
+        allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] },
+        reply: {
+            messageReference: interaction.message.id,
+            failIfNotExists: false
+        }
     };
 
-    await interaction.channel.send(confPayload).catch(() =>
-        interaction.channel.send({
-            content: body,
-            allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
-        })
-    );
+    try {
+        await interaction.channel.send(replyPayload);
+    } catch (_) {
+        delete replyPayload.reply;
+        await interaction.channel.send(replyPayload).catch(() => {});
+    }
 }
 
 module.exports = {
     name: 'pay',
-    aliases: ['pagar', 'transferir', 'pix'],
-    description: 'Envia éter com confirmação dos dois lados',
+    aliases: ['pix', 'enviar', 'transferir', 'pagar'],
+    description: 'Enviar éter para outro usuário (os dois precisam aceitar)',
+    category: 'economia',
     data: new SlashCommandBuilder()
-        .setName('pagar')
-        .setDescription('Envia éter (pix) com confirmação')
+        .setName('pay')
+        .setDescription('Enviar éter (os dois precisam aceitar)')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Quem vai receber').setRequired(true)
         )
@@ -306,6 +328,21 @@ module.exports = {
                 .setName('valor')
                 .setDescription('Valor (ex: 1000, 1k, half, all)')
                 .setRequired(true)
+        )
+        .addStringOption((o) =>
+            o
+                .setName('prazo')
+                .setDescription('Tempo até cancelar se ninguém aceitar')
+                .setRequired(false)
+                .addChoices(
+                    { name: '7 minutos', value: '7m' },
+                    { name: '8 minutos (padrão)', value: '8m' },
+                    { name: '1 hora', value: '1h' },
+                    { name: '12 horas', value: '12h' },
+                    { name: '1 dia', value: '1d' },
+                    { name: '3 dias', value: '3d' },
+                    { name: '5 dias', value: '5d' }
+                )
         ),
 
     async execute(message, args) {
@@ -386,8 +423,12 @@ module.exports = {
         });
         const cmdMsg = await i.fetchReply().catch(() => null);
 
+        const prazoRaw = i.options.getString('prazo') || '8m';
+        const timeoutMs = parseTimeout(prazoRaw);
+
         await createTransfer(i.channel, i.user, to, bet.amount, {
-            replyToId: cmdMsg?.id || null
+            replyToId: cmdMsg?.id || null,
+            timeoutMs
         });
     },
 
@@ -435,7 +476,7 @@ module.exports = {
 
         if (count < 2) {
             await interaction.update({
-                content: buildInviteText(p.fromId, p.toId, p.amount),
+                content: buildInviteText(p.fromId, p.toId, p.amount, p.timeoutMs),
                 components: [acceptRow(id, count)],
                 allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
             });
@@ -444,7 +485,7 @@ module.exports = {
 
         await interaction
             .update({
-                content: buildInviteText(p.fromId, p.toId, p.amount),
+                content: buildInviteText(p.fromId, p.toId, p.amount, p.timeoutMs),
                 components: [acceptRow(id, 2)],
                 allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
             })
