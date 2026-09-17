@@ -25,36 +25,31 @@ async function buildEmbed(user, guild) {
     const bankBal = bank.get(user.id);
     const safe = await isProtected(guild, user.id);
 
-    // Cores com bom contraste e menos dependentes de verde/vermelho
-    // Protegido: azul · Desprotegido: âmbar (melhor para daltonismo)
+    // Azul (protegido) × âmbar (desprotegido) — melhor para daltonismo
     const color = safe ? 0x3b82f6 : 0xd97706;
 
-    // Rótulos em TEXTO + símbolos de forma (não só cor)
     const badge = safe ? '【 PROTEGIDO 】' : '【 DESPROTEGIDO 】';
-    const shape = safe ? '■■■' : '▲▲▲';
-
-    const title = safe
-        ? '🔐 Aeternus Banco · ' + badge
-        : '⚠ Aeternus Banco · ' + badge;
+    const title = (safe ? '🔐 ' : '⚠ ') + 'Aeternus Banco · ' + badge;
 
     const statusLine = safe
         ? [
-              shape + ' **Estado: PROTEGIDO**',
-              '🔒 Proteção ativa pelo cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
-              'O seu éter está fora do alcance de qualquer roubo.'
+              '■■■ **Estado: PROTEGIDO**',
+              '',
+              '🔒 Seu cofre está protegido pelo cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
+              'Ninguém consegue roubar o éter que você guardou aqui.'
           ].join('\n')
         : [
-              shape + ' **Estado: DESPROTEGIDO**',
-              '⚠ Sem o cargo anti-roubo, carteira e banco podem ser alvo de roubo.',
-              'A proteção só vale com o cargo correspondente.'
+              '▲▲▲ **Estado: DESPROTEGIDO**',
+              '',
+              '⚠ Sem o cargo de proteção, carteira e banco ficam expostos.',
+              'Qualquer pessoa pode tentar roubar o seu éter.'
           ].join('\n');
 
     const tip = safe
-        ? '✔ Seu éter está em boas mãos. Mantenha o cargo e continue seguro.'
-        : '◆ Garanta o cargo anti-roubo com a equipe e deixe seu éter realmente seguro.';
+        ? '✔ Proteção ativa — mantenha o cargo e continue em segurança.'
+        : '◆ Fale com a equipe, adquira o cargo anti-roubo e proteja de vez o seu éter.';
 
-    // Ícones distintos por forma/significado (não só cor)
-    const vaultIcon = safe ? '🔒' : '⚠';
+    const vaultIcon = safe ? '🔒' : '📭';
     const handIcon = safe ? '👛' : '🪙';
 
     return new EmbedBuilder()
@@ -68,8 +63,8 @@ async function buildEmbed(user, guild) {
                 '',
                 '📋 **STATUS BANCÁRIOS**',
                 '',
-                vaultIcon + ' Depositado: ✨ **' + fmt(bankBal) + '** éter',
-                handIcon + ' Em mãos: ✨ **' + fmt(wallet) + '** éter',
+                vaultIcon + ' *Depositado:* ✨ **' + fmt(bankBal) + '** éter',
+                handIcon + ' *Em mãos:* ✨ **' + fmt(wallet) + '** éter',
                 '',
                 '━━━━━━━━━━━━━━━━━━━━',
                 '',
