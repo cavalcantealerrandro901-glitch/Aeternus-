@@ -72,13 +72,14 @@ function stealFromTarget(targetId, amount) {
     return { fromWallet, fromBank, total: fromWallet + fromBank };
 }
 
-function protectedMessage(target) {
-    const name = target.username || 'Este usuário';
+function protectedMessage(thief, target) {
     return [
         '🔐 **Escudo ativo**',
         '',
-        '**' + name + '** está sob proteção do cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
-        'Carteira e banco ficam fora do alcance de qualquer roubo.',
+        '<@' + thief.id + '> tentou roubar <@' + target.id + '>, mas não rolou.',
+        '<@' + target.id + '> está protegido pelo cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
+        '',
+        'Carteira e banco dele ficam fora do alcance de qualquer roubo.',
         '',
         '💎 Quer a mesma imunidade? Fale com a equipe e garanta o cargo.'
     ].join('\n');
@@ -94,8 +95,11 @@ async function run(thief, target, reply, botId, guild) {
 
     if (await hasAntiRob(guild, target.id)) {
         return reply({
-            content: protectedMessage(target),
-            allowedMentions: { roles: [ANTI_ROB_ROLE_ID] }
+            content: protectedMessage(thief, target),
+            allowedMentions: {
+                users: [String(thief.id), String(target.id)],
+                roles: [ANTI_ROB_ROLE_ID]
+            }
         });
     }
 
