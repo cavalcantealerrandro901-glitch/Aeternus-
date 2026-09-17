@@ -82,9 +82,6 @@ function setup(client) {
                         '** de forma manual.',
                     '',
                     'Esse cargo **não pode** ser dado pela interface do Discord nem por outros bots.',
-                    'Use apenas o comando:',
-                    '• `/cargo-membro`',
-                    '• ou o prefixo `cargo @membro @cargo`',
                     '',
                     'O cargo foi **retirado automaticamente**.'
                 ].join('\n');
