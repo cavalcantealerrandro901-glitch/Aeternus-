@@ -4,8 +4,11 @@ const bank = require('../utils/bank');
 const store = require('../utils/store');
 
 const CD = 15 * 60 * 1000;
-const MIN_HAND = 100;
+const MIN_TOTAL = 100;
 const SUCCESS_CHANCE = 0.55;
+
+/** Cargo de anti-roubo (proteção) */
+const ANTI_ROB_ROLE_ID = '1550256144138637423';
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -36,7 +39,61 @@ async function resolveTarget(message, args) {
     return null;
 }
 
-async function run(thief, target, reply, botId) {
+/**
+ * Verifica se o alvo tem o cargo anti-roubo no servidor.
+ */
+async function hasAntiRob(guild, userId) {
+    if (!guild || !userId) return false;
+    try {
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (!member) return false;
+        return member.roles.cache.has(ANTI_ROB_ROLE_ID);
+    } catch (_) {
+        return false;
+    }
+}
+
+/**
+ * Remove éter do alvo: primeiro da carteira, depois do banco.
+ * @returns {{ fromWallet: number, fromBank: number, total: number }}
+ */
+function stealFromTarget(targetId, amount) {
+    let left = Math.max(0, Math.floor(Number(amount) || 0));
+    let fromWallet = 0;
+    let fromBank = 0;
+
+    const hand = eter.get(targetId);
+    if (left > 0 && hand > 0) {
+        fromWallet = Math.min(left, hand);
+        eter.remove(targetId, fromWallet, { reason: 'roubo' });
+        left -= fromWallet;
+    }
+
+    const saved = bank.get(targetId);
+    if (left > 0 && saved > 0) {
+        fromBank = Math.min(left, saved);
+        bank.remove(targetId, fromBank);
+        left -= fromBank;
+    }
+
+    return { fromWallet, fromBank, total: fromWallet + fromBank };
+}
+
+function protectedMessage(target) {
+    return [
+        '🛡️ **PROTEÇÃO ATIVA**',
+        '',
+        '**' + (target.username || 'Este usuário') + '** não pode ser roubado.',
+        '',
+        'Aparentemente ele comprou o cargo <@&' +
+            ANTI_ROB_ROLE_ID +
+            '>, então está protegido contra roubos.',
+        '',
+        '💎 Quer a mesma proteção? Adquira o cargo e fique imune a roubos na carteira e no banco.'
+    ].join('\n');
+}
+
+async function run(thief, target, reply, botId, guild) {
     if (!target) {
         return reply('Mencione alguém: `O.roubar @usuario`');
     }
@@ -44,11 +101,19 @@ async function run(thief, target, reply, botId) {
     if (target.bot) return reply('Não dá para roubar bots.');
     if (target.id === thief.id) return reply('Você não pode roubar a si mesmo.');
 
+    // Anti-roubo por cargo
+    if (await hasAntiRob(guild, target.id)) {
+        return reply({
+            content: protectedMessage(target),
+            allowedMentions: { roles: [ANTI_ROB_ROLE_ID] }
+        });
+    }
+
     const cds = store.load('robcd.json', {});
     const last = Number(cds[thief.id] || 0);
-    const left = CD - (Date.now() - last);
-    if (left > 0) {
-        const m = Math.ceil(left / 60000);
+    const leftCd = CD - (Date.now() - last);
+    if (leftCd > 0) {
+        const m = Math.ceil(leftCd / 60000);
         return reply(
             '⏳ Aguarde **' +
                 m +
@@ -57,13 +122,21 @@ async function run(thief, target, reply, botId) {
     }
 
     const targetHand = eter.get(target.id);
-    if (targetHand < MIN_HAND) {
+    const targetBank = bank.get(target.id);
+    const targetTotal = targetHand + targetBank;
+
+    if (targetTotal < MIN_TOTAL) {
         return reply(
             '**' +
                 target.username +
                 '** precisa ter pelo menos ✨ **' +
-                fmt(MIN_HAND) +
-                '** na carteira.'
+                fmt(MIN_TOTAL) +
+                '** no total (carteira + banco).\n' +
+                'Carteira: ✨ **' +
+                fmt(targetHand) +
+                '** · Banco: ✨ **' +
+                fmt(targetBank) +
+                '**'
         );
     }
 
@@ -72,23 +145,30 @@ async function run(thief, target, reply, botId) {
 
     if (Math.random() < SUCCESS_CHANCE) {
         const pct = randBetween(0.26, 0.4);
-        let amount = Math.floor(targetHand * pct);
-        amount = Math.max(1, Math.min(amount, targetHand));
+        let amount = Math.floor(targetTotal * pct);
+        amount = Math.max(1, Math.min(amount, targetTotal));
 
-        eter.remove(target.id, amount, { reason: 'roubo', to: thief.id });
-        eter.add(thief.id, amount, { reason: 'roubo', from: target.id });
+        const taken = stealFromTarget(target.id, amount);
+        if (taken.total > 0) {
+            eter.add(thief.id, taken.total, { reason: 'roubo', from: target.id });
+        }
+
+        const parts = [];
+        if (taken.fromWallet > 0) parts.push('carteira ✨ **' + fmt(taken.fromWallet) + '**');
+        if (taken.fromBank > 0) parts.push('banco ✨ **' + fmt(taken.fromBank) + '**');
 
         return reply({
             embeds: [
                 new EmbedBuilder()
                     .setColor(0x22c55e)
-                    .setTitle('Roubo bem-sucedido')
+                    .setTitle('💰 Roubo bem-sucedido')
                     .setDescription(
-                        'Você roubou ✨ **' +
-                            fmt(amount) +
-                            '** de **' +
+                        'Você roubou **' +
                             target.username +
-                            '**.'
+                            '** e levou ✨ **' +
+                            fmt(taken.total) +
+                            '**.\n' +
+                            (parts.length ? 'Origem: ' + parts.join(' · ') + '.' : '')
                     )
                     .addFields(
                         {
@@ -98,7 +178,12 @@ async function run(thief, target, reply, botId) {
                         },
                         {
                             name: target.username,
-                            value: '✨ **' + fmt(eter.get(target.id)) + '**',
+                            value:
+                                'Carteira ✨ **' +
+                                fmt(eter.get(target.id)) +
+                                '**\nBanco ✨ **' +
+                                fmt(bank.get(target.id)) +
+                                '**',
                             inline: true
                         }
                     )
@@ -122,11 +207,15 @@ async function run(thief, target, reply, botId) {
         embeds: [
             new EmbedBuilder()
                 .setColor(0xef4444)
-                .setTitle('Roubo falhou')
+                .setTitle('🚫 Roubo falhou')
                 .setDescription(
                     fine > 0
-                        ? 'Você perdeu ✨ **' + fmt(fine) + '** (creditado ao bot).'
-                        : 'Você não tinha éter para perder.'
+                        ? 'Você foi pego tentando roubar **' +
+                              target.username +
+                              '** e perdeu ✨ **' +
+                              fmt(fine) +
+                              '** (creditado ao bot).'
+                        : 'Você foi pego, mas não tinha éter para perder.'
                 )
                 .addFields({
                     name: 'Sua carteira',
@@ -142,18 +231,24 @@ async function run(thief, target, reply, botId) {
 module.exports = {
     name: 'rob',
     aliases: ['roubar', 'steal'],
-    description: 'Tenta roubar éter da carteira de outro usuário',
+    description: 'Tenta roubar éter da carteira e do banco de outro usuário',
     category: 'economia',
     data: new SlashCommandBuilder()
         .setName('roubar')
-        .setDescription('Tenta roubar éter da carteira de alguém')
+        .setDescription('Tenta roubar éter da carteira e do banco de alguém')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Alvo do roubo').setRequired(true)
         ),
 
     async execute(message, args) {
         const target = await resolveTarget(message, args);
-        await run(message.author, target, (p) => message.reply(p), message.client.user?.id);
+        await run(
+            message.author,
+            target,
+            (p) => message.reply(p),
+            message.client.user?.id,
+            message.guild
+        );
     },
 
     async executeSlash(i) {
@@ -165,7 +260,8 @@ module.exports = {
                 typeof p === 'string'
                     ? i.reply({ content: p, flags: MessageFlags.Ephemeral })
                     : i.reply(p),
-            i.client.user?.id
+            i.client.user?.id,
+            i.guild
         );
     }
 };
