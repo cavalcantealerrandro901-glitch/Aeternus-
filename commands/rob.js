@@ -76,10 +76,10 @@ function protectedMessage(thief, target) {
     return [
         '🔐 **Escudo ativo**',
         '',
-        '<@' + thief.id + '> tentou roubar <@' + target.id + '>, mas não rolou.',
-        '<@' + target.id + '> está protegido pelo cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
+        '<@' + thief.id + '> tentou roubar <@' + target.id + '>.',
+        'O roubo **falhou**: <@' + target.id + '> tem o cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
         '',
-        'Carteira e banco dele ficam fora do alcance de qualquer roubo.',
+        'Carteira e banco de <@' + target.id + '> estão fora do alcance de qualquer roubo.',
         '',
         '💎 Quer a mesma imunidade? Fale com a equipe e garanta o cargo.'
     ].join('\n');
