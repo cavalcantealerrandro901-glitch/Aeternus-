@@ -77,9 +77,14 @@ function protectedMessage(thief, target) {
         '🔐 **Escudo ativo**',
         '',
         '<@' + thief.id + '> tentou roubar <@' + target.id + '>.',
-        'O roubo **falhou**: <@' + target.id + '> tem o cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
         '',
-        'Carteira e banco de <@' + target.id + '> estão fora do alcance de qualquer roubo.',
+        'O plano não deu certo. <@' +
+            target.id +
+            '> conta com o cargo <@&' +
+            ANTI_ROB_ROLE_ID +
+            '>, uma proteção que cobre **tudo o que ele guarda** — tanto o éter em mãos quanto o que está depositado no banco. Enquanto esse cargo estiver ativo, nenhum roubo consegue retirar sequer ✨ **1** éter dele.',
+        '',
+        'Carteira e banco de <@' + target.id + '> ficam fora do alcance de qualquer tentativa.',
         '',
         '💎 Quer a mesma imunidade? Fale com a equipe e garanta o cargo.'
     ].join('\n');
