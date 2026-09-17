@@ -45,12 +45,24 @@ function acceptRow(id, count) {
     );
 }
 
+function mention(u) {
+    if (!u) return '@usuário';
+    if (typeof u === 'string') {
+        const id = u.replace(/[<@!>]/g, '');
+        return '<@' + id + '>';
+    }
+    if (u.id) return '<@' + u.id + '>';
+    return String(u);
+}
+
 function buildInviteText(from, to, amount) {
+    const fromM = mention(from);
+    const toM = mention(to);
     return [
         '✦ **AETERNUS • TRANSFERÊNCIA**',
         '',
-        '💸 ' + from,
-        '└─ deseja enviar ✨ **' + fmt(amount) + '** éter para ' + to,
+        '💸 ' + fromM + ' → ' + toM,
+        '└─ ' + fromM + ' deseja enviar ✨ **' + fmt(amount) + '** éter para ' + toM,
         '',
         '✅ Os dois usuários precisam aceitar para concluir a transferência.',
         '',
@@ -72,10 +84,10 @@ function buildExpiredText(from, to, amount) {
     return [
         '✦ **AETERNUS • TRANSFERÊNCIA**',
         '',
-        '💸 ' + from,
-        '└─ desejava enviar ✨ **' + fmt(amount) + '** éter para ' + to,
+        '⏳ Solicitação expirada.',
+        mention(from) + ' → ' + mention(to) + ' · ✨ **' + fmt(amount) + '**',
         '',
-        '⏰ **Expirado** — o prazo de 8 minutos acabou e a transferência não foi concluída.',
+        'Nenhuma transferência foi feita.',
         '',
         '───────────────',
         '✧ Aeternus Economy'
@@ -83,20 +95,19 @@ function buildExpiredText(from, to, amount) {
 }
 
 function parseAmountArg(args) {
-    const candidates = (args || []).filter(
-        (a) => !a.startsWith('<@') && !/^\d{15,20}$/.test(a)
-    );
-    return candidates.pop() || null;
+    const list = (args || []).map((a) => String(a).trim()).filter(Boolean);
+    const filtered = list.filter((a) => !/^<@!?\d+>$/.test(a) && !/^@/.test(a));
+    return filtered[filtered.length - 1] || filtered[0] || '';
 }
 
 async function resolveTargets(message, args) {
-    const list = [...(message.mentions?.users?.values?.() || [])].filter(
-        (u) => !u.bot && u.id !== message.author.id
+    const fromMentions = [...(message.mentions?.users?.values?.() || [])].filter(
+        (u) => u && !u.bot && u.id !== message.author.id
     );
-    if (list.length) return list;
+    if (fromMentions.length) return fromMentions;
 
-    const raw = (args || []).find((a) => /\d{15,20}/.test(a));
-    if (raw) {
+    for (const raw of args || []) {
+        if (!/<@!?\d+>/.test(String(raw)) && !/^\d{16,20}$/.test(String(raw))) continue;
         const id = String(raw).replace(/[<@!>]/g, '');
         const u = await message.client.users.fetch(id).catch(() => null);
         if (u && !u.bot && u.id !== message.author.id) return [u];
@@ -120,15 +131,15 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
         const payload = {
             content:
                 '💸 ' +
-                from +
+                mention(from) +
                 ', saldo insuficiente para enviar ✨ **' +
                 fmt(amount) +
                 '** para ' +
-                to +
+                mention(to) +
                 '.\nCarteira: ✨ **' +
                 fmt(bal) +
                 '**.',
-            allowedMentions: { users: [from.id, to.id] }
+            allowedMentions: { parse: [], users: [String(from.id), String(to.id)] }
         };
         if (opts.replyToId) {
             payload.reply = { messageReference: opts.replyToId, failIfNotExists: false };
@@ -149,7 +160,7 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
     const sendPayload = {
         content: text,
         components: [acceptRow(id, 0)],
-        allowedMentions: { users: [from.id, to.id] }
+        allowedMentions: { parse: [], users: [String(from.id), String(to.id)] }
     };
     if (opts.replyToId) {
         sendPayload.reply = { messageReference: opts.replyToId, failIfNotExists: false };
@@ -184,12 +195,11 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
         try {
             const m = await channel.messages.fetch(p.messageId).catch(() => null);
             if (m) {
-                await m
-                    .edit({
-                        content: buildExpiredText('<@' + p.fromId + '>', '<@' + p.toId + '>', p.amount),
-                        components: []
-                    })
-                    .catch(() => {});
+                await m.edit({
+                    content: buildExpiredText(p.fromId, p.toId, p.amount),
+                    components: [],
+                    allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
+                });
             }
         } catch (_) {}
     }, TIMEOUT_MS);
@@ -218,7 +228,8 @@ async function finishTransfer(interaction, p) {
                     '───────────────',
                     '✧ Aeternus Economy'
                 ].join('\n'),
-                components: []
+                components: [],
+                allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
             })
             .catch(() => {});
         return interaction
@@ -253,7 +264,7 @@ async function finishTransfer(interaction, p) {
             content: [
                 '✦ **AETERNUS • TRANSFERÊNCIA**',
                 '',
-                '💸 <@' + p.fromId + '>',
+                '💸 <@' + p.fromId + '> → <@' + p.toId + '>',
                 '└─ enviou ✨ **' + fmt(amount) + '** éter para <@' + p.toId + '>',
                 '',
                 '✅ **Concluída** (2/2).',
@@ -261,20 +272,21 @@ async function finishTransfer(interaction, p) {
                 '───────────────',
                 '✧ Aeternus Economy'
             ].join('\n'),
-            components: []
+            components: [],
+            allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
         })
         .catch(() => {});
 
     const confPayload = {
         content: body,
         reply: { messageReference: p.messageId, failIfNotExists: false },
-        allowedMentions: { users: [p.fromId, p.toId] }
+        allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
     };
 
     await interaction.channel.send(confPayload).catch(() =>
         interaction.channel.send({
             content: body,
-            allowedMentions: { users: [p.fromId, p.toId] }
+            allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
         })
     );
 }
@@ -363,12 +375,14 @@ module.exports = {
 
         await i.reply({
             content:
-                '✦ Pedido de transferência para ' +
-                to.toString() +
+                '✦ Pedido de transferência: ' +
+                mention(i.user) +
+                ' → ' +
+                mention(to) +
                 ' — ✨ **' +
                 fmt(bet.amount) +
                 '** éter',
-            allowedMentions: { users: [to.id] }
+            allowedMentions: { parse: [], users: [String(i.user.id), String(to.id)] }
         });
         const cmdMsg = await i.fetchReply().catch(() => null);
 
@@ -393,8 +407,9 @@ module.exports = {
             pending.delete(id);
             await interaction
                 .update({
-                    content: buildExpiredText('<@' + p.fromId + '>', '<@' + p.toId + '>', p.amount),
-                    components: []
+                    content: buildExpiredText(p.fromId, p.toId, p.amount),
+                    components: [],
+                    allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
                 })
                 .catch(() => {});
             return;
@@ -419,11 +434,21 @@ module.exports = {
         const count = p.accepted.size;
 
         if (count < 2) {
-            await interaction.update({ components: [acceptRow(id, count)] });
+            await interaction.update({
+                content: buildInviteText(p.fromId, p.toId, p.amount),
+                components: [acceptRow(id, count)],
+                allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
+            });
             return;
         }
 
-        await interaction.update({ components: [acceptRow(id, 2)] }).catch(() => {});
+        await interaction
+            .update({
+                content: buildInviteText(p.fromId, p.toId, p.amount),
+                components: [acceptRow(id, 2)],
+                allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] }
+            })
+            .catch(() => {});
         await finishTransfer(interaction, p);
     }
 };
