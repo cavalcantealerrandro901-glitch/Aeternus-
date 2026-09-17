@@ -11,17 +11,6 @@ const { getPrefix } = require('../utils/settings');
 
 const DEFAULT_TIMEOUT_MS = 8 * 60 * 1000;
 
-/** Prazos permitidos no slash */
-const TIMEOUT_CHOICES = [
-    { name: '7 minutos', value: '7m' },
-    { name: '8 minutos (padrão)', value: '8m' },
-    { name: '1 hora', value: '1h' },
-    { name: '12 horas', value: '12h' },
-    { name: '1 dia', value: '1d' },
-    { name: '3 dias', value: '3d' },
-    { name: '5 dias', value: '5d' }
-];
-
 function parseTimeout(raw) {
     const s = String(raw || '').trim().toLowerCase();
     if (!s) return DEFAULT_TIMEOUT_MS;
@@ -33,7 +22,6 @@ function parseTimeout(raw) {
     if (u.startsWith('h')) ms = n * 60 * 60 * 1000;
     else if (u.startsWith('d')) ms = n * 24 * 60 * 60 * 1000;
     else ms = n * 60 * 1000;
-    // mín. 1 min · máx. 7 dias
     return Math.min(7 * 24 * 60 * 60 * 1000, Math.max(60 * 1000, ms));
 }
 
@@ -133,6 +121,68 @@ function buildExpiredText(from, to, amount) {
     ].join('\n');
 }
 
+function buildDoneText(fromId, toId, fromBal, toBal) {
+    return [
+        '✦ **AETERNUS • TRANSFERÊNCIA CONCLUÍDA**',
+        '',
+        '✅ Transferência concluída.',
+        '',
+        mention(toId) + ' agora possui ✨ **' + fmt(toBal) + '**',
+        rankLine(toId, mention(toId)),
+        '',
+        mention(fromId) + ' agora possui ✨ **' + fmt(fromBal) + '**',
+        rankLine(fromId, mention(fromId)),
+        '',
+        '───────────────',
+        '✧ Aeternus Economy'
+    ].join('\n');
+}
+
+function dmPendingText(from, amount, timeoutMs) {
+    return [
+        '✦ **Aeternus · Pedido de transferência**',
+        '',
+        '**' +
+            (from.username || 'Alguém') +
+            '** deseja enviar ✨ **' +
+            fmt(amount) +
+            '** éter para você.',
+        '',
+        'Abra o servidor e aceite o pedido no chat para concluir.',
+        'Prazo: **' + formatTimeout(timeoutMs || DEFAULT_TIMEOUT_MS) + '**.',
+        '',
+        '───────────────',
+        '✧ Aeternus Economy'
+    ].join('\n');
+}
+
+function dmReceivedText(from, amount, newBal) {
+    return [
+        '✦ **Aeternus · Você recebeu éter**',
+        '',
+        '**' +
+            (from.username || 'Alguém') +
+            '** enviou ✨ **' +
+            fmt(amount) +
+            '** éter para você.',
+        '',
+        'Sua carteira agora: ✨ **' + fmt(newBal) + '**',
+        '',
+        '───────────────',
+        '✧ Aeternus Economy'
+    ].join('\n');
+}
+
+async function sendDm(user, text) {
+    if (!user || user.bot) return false;
+    try {
+        await user.send(text);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
 function parseAmountArg(args) {
     const list = (args || []).map((a) => String(a).trim()).filter(Boolean);
     const filtered = list.filter((a) => !/^<@!?\d+>$/.test(a) && !/^@/.test(a));
@@ -164,6 +214,51 @@ async function resolveTargets(message, args) {
     return [];
 }
 
+async function executeImmediateTransfer(channel, from, to, amount, opts = {}) {
+    const bal = eter.get(from.id);
+    if (amount > bal) {
+        const payload = {
+            content:
+                '💸 ' +
+                mention(from) +
+                ', saldo insuficiente para enviar ✨ **' +
+                fmt(amount) +
+                '** para ' +
+                mention(to) +
+                '.\nCarteira: ✨ **' +
+                fmt(bal) +
+                '**.',
+            allowedMentions: { parse: [], users: [String(from.id), String(to.id)] }
+        };
+        if (opts.replyToId) {
+            payload.reply = { messageReference: opts.replyToId, failIfNotExists: false };
+        }
+        return channel.send(payload).catch(() => channel.send(payload));
+    }
+
+    eter.remove(from.id, amount, { reason: 'transferência auto', to: to.id });
+    eter.add(to.id, amount, { reason: 'transferência auto', from: from.id });
+
+    const fromBal = eter.get(from.id);
+    const toBal = eter.get(to.id);
+
+    const payload = {
+        content: buildDoneText(from.id, to.id, fromBal, toBal),
+        allowedMentions: { parse: [], users: [String(from.id), String(to.id)] }
+    };
+    if (opts.replyToId) {
+        payload.reply = { messageReference: opts.replyToId, failIfNotExists: false };
+    }
+    try {
+        await channel.send(payload);
+    } catch (_) {
+        delete payload.reply;
+        await channel.send(payload).catch(() => {});
+    }
+
+    await sendDm(to, dmReceivedText(from, amount, toBal));
+}
+
 async function createTransfer(channel, from, to, amount, opts = {}) {
     const bal = eter.get(from.id);
     if (amount > bal) {
@@ -184,6 +279,10 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
             payload.reply = { messageReference: opts.replyToId, failIfNotExists: false };
         }
         return channel.send(payload).catch(() => channel.send(payload));
+    }
+
+    if (opts.autoAccept) {
+        return executeImmediateTransfer(channel, from, to, amount, opts);
     }
 
     const id =
@@ -228,6 +327,8 @@ async function createTransfer(channel, from, to, amount, opts = {}) {
         done: false
     };
     pending.set(id, entry);
+
+    await sendDm(to, dmPendingText(from, amount, timeoutMs));
 
     setTimeout(async () => {
         const p = pending.get(id);
@@ -280,23 +381,8 @@ async function finishTransfer(interaction, p) {
     const fromBal = eter.get(p.fromId);
     const toBal = eter.get(p.toId);
 
-    const doneText = [
-        '✦ **AETERNUS • TRANSFERÊNCIA CONCLUÍDA**',
-        '',
-        '✅ Transferência concluída.',
-        '',
-        mention(p.toId) + ' agora possui ✨ **' + fmt(toBal) + '**',
-        rankLine(p.toId, mention(p.toId)),
-        '',
-        mention(p.fromId) + ' agora possui ✨ **' + fmt(fromBal) + '**',
-        rankLine(p.fromId, mention(p.fromId)),
-        '',
-        '───────────────',
-        '✧ Aeternus Economy'
-    ].join('\n');
-
     const replyPayload = {
-        content: doneText,
+        content: buildDoneText(p.fromId, p.toId, fromBal, toBal),
         allowedMentions: { parse: [], users: [String(p.fromId), String(p.toId)] },
         reply: {
             messageReference: interaction.message.id,
@@ -310,6 +396,17 @@ async function finishTransfer(interaction, p) {
         delete replyPayload.reply;
         await interaction.channel.send(replyPayload).catch(() => {});
     }
+
+    try {
+        const toUser = await interaction.client.users.fetch(p.toId).catch(() => null);
+        const fromUser = await interaction.client.users.fetch(p.fromId).catch(() => null);
+        if (toUser) {
+            await sendDm(
+                toUser,
+                dmReceivedText(fromUser || { username: 'Alguém' }, amount, toBal)
+            );
+        }
+    } catch (_) {}
 }
 
 module.exports = {
@@ -329,10 +426,16 @@ module.exports = {
                 .setDescription('Valor (ex: 1000, 1k, half, all)')
                 .setRequired(true)
         )
+        .addBooleanOption((o) =>
+            o
+                .setName('auto')
+                .setDescription('true = aceitar automaticamente · false = os dois precisam aceitar')
+                .setRequired(false)
+        )
         .addStringOption((o) =>
             o
                 .setName('prazo')
-                .setDescription('Tempo até cancelar se ninguém aceitar')
+                .setDescription('Tempo até cancelar (só se auto = false)')
                 .setRequired(false)
                 .addChoices(
                     { name: '7 minutos', value: '7m' },
@@ -387,6 +490,9 @@ module.exports = {
     async executeSlash(i) {
         const to = i.options.getUser('usuario', true);
         const amountRaw = i.options.getString('valor', true);
+        const auto = i.options.getBoolean('auto') === true;
+        const prazoRaw = i.options.getString('prazo') || '8m';
+        const timeoutMs = parseTimeout(prazoRaw);
 
         if (to.bot) {
             return i.reply({
@@ -418,17 +524,16 @@ module.exports = {
                 mention(to) +
                 ' — ✨ **' +
                 fmt(bet.amount) +
-                '** éter',
+                '** éter' +
+                (auto ? ' · **aceite automático**' : ''),
             allowedMentions: { parse: [], users: [String(i.user.id), String(to.id)] }
         });
         const cmdMsg = await i.fetchReply().catch(() => null);
 
-        const prazoRaw = i.options.getString('prazo') || '8m';
-        const timeoutMs = parseTimeout(prazoRaw);
-
         await createTransfer(i.channel, i.user, to, bet.amount, {
             replyToId: cmdMsg?.id || null,
-            timeoutMs
+            timeoutMs,
+            autoAccept: auto
         });
     },
 
