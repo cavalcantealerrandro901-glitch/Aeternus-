@@ -76,15 +76,13 @@ function protectedEmbed(thief, target) {
     const desc = [
         '<@' + thief.id + '> tentou roubar <@' + target.id + '>.',
         '',
-        'O plano não deu certo. <@' +
+        'O destino interveio. <@' +
             target.id +
-            '> conta com o cargo <@&' +
+            '> carrega o cargo <@&' +
             ANTI_ROB_ROLE_ID +
-            '>, uma proteção que cobre **tudo o que ele guarda** — tanto o éter em mãos quanto o que está depositado no banco. Enquanto esse cargo estiver ativo, nenhum roubo consegue retirar sequer ✨ **1** éter dele.',
+            '> — um véu discreto que envolve carteira e banco, impedindo que qualquer tentativa leve sequer ✨ **1** éter.',
         '',
-        'Carteira e banco de <@' + target.id + '> ficam fora do alcance de qualquer tentativa.',
-        '',
-        '💎 Quer a mesma imunidade? Fale com a equipe e garanta o cargo.'
+        '💎 Deseja o mesmo privilégio? A equipe reserva o cargo a quem procura verdadeira tranquilidade.'
     ].join('\n');
 
     return new EmbedBuilder()
@@ -103,7 +101,6 @@ async function run(thief, target, reply, botId, guild) {
     if (target.id === thief.id) return reply('Você não pode roubar a si mesmo.');
 
     if (await hasAntiRob(guild, target.id)) {
-        // Embed com menções visuais; o reply do comando marca quem usou
         return reply({
             embeds: [protectedEmbed(thief, target)],
             allowedMentions: {
