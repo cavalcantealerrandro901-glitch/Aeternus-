@@ -102,10 +102,11 @@ async function run(thief, target, reply, botId, guild) {
 
     if (await hasAntiRob(guild, target.id)) {
         return reply({
+            content: '<@' + thief.id + '>',
             embeds: [protectedEmbed(thief, target)],
             allowedMentions: {
                 parse: [],
-                users: [],
+                users: [String(thief.id)],
                 roles: [ANTI_ROB_ROLE_ID]
             }
         });
