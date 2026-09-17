@@ -72,10 +72,8 @@ function stealFromTarget(targetId, amount) {
     return { fromWallet, fromBank, total: fromWallet + fromBank };
 }
 
-function protectedMessage(thief, target) {
-    return [
-        '🔐 **Escudo ativo**',
-        '',
+function protectedEmbed(thief, target) {
+    const desc = [
         '<@' + thief.id + '> tentou roubar <@' + target.id + '>.',
         '',
         'O plano não deu certo. <@' +
@@ -88,6 +86,12 @@ function protectedMessage(thief, target) {
         '',
         '💎 Quer a mesma imunidade? Fale com a equipe e garanta o cargo.'
     ].join('\n');
+
+    return new EmbedBuilder()
+        .setColor(0x3b82f6)
+        .setTitle('🔐 Escudo ativo')
+        .setDescription(desc)
+        .setFooter({ text: 'Proteção anti-roubo' });
 }
 
 async function run(thief, target, reply, botId, guild) {
@@ -99,10 +103,12 @@ async function run(thief, target, reply, botId, guild) {
     if (target.id === thief.id) return reply('Você não pode roubar a si mesmo.');
 
     if (await hasAntiRob(guild, target.id)) {
+        // Embed com menções visuais; o reply do comando marca quem usou
         return reply({
-            content: protectedMessage(thief, target),
+            embeds: [protectedEmbed(thief, target)],
             allowedMentions: {
-                users: [String(thief.id), String(target.id)],
+                parse: [],
+                users: [],
                 roles: [ANTI_ROB_ROLE_ID]
             }
         });
