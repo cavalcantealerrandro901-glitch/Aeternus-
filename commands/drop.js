@@ -72,79 +72,132 @@ function buildListPayload(drop, page) {
     const lines = slice.map(function (pair, i) {
         const id = pair[0];
         const part = pair[1];
-        const n = p * LIST_PAGE + i + 1;
-        return n + '. <@' + id + '> · **' + (part.entries || 1) + '** entrada(s)';
+        const tickets = part && part.entries ? part.entries : 1;
+        return p * LIST_PAGE + i + 1 + '. <@' + id + '> · ' + tickets + ' entrada(s)';
     });
 
     return {
-        content: '**Participantes (' + entries.length + ')**\n' + lines.join('\n'),
+        content: '**Participantes** (' + entries.length + ')\n\n' + lines.join('\n'),
         components: [listNav(drop.id, p, totalPages)],
-        flags: MessageFlags.Ephemeral,
-        allowedMentions: { parse: [] }
+        flags: MessageFlags.Ephemeral
     };
 }
 
 function buildEmbed(drop, guild, authorTag) {
-    const endsUnix = Math.floor(drop.endsAt / 1000);
-    const total = drops.participantCount(drop);
-    const req = drops.getRequirements(guild.id, drop);
-    const reqLines = [];
-    if (req.minLevel > 0) reqLines.push('• Nível mínimo: **' + req.minLevel + '**');
-    if (req.requiredRoleIds && req.requiredRoleIds.length) {
-        const names = req.requiredRoleIds
-            .map((id) => guild.roles.cache.get(id))
-            .filter(Boolean)
-            .map((r) => String(r));
-        if (names.length) reqLines.push('• Cargo exigido: ' + names.join(', '));
+    const conf = getSettings(guild.id).drops || {};
+    const req = drop.requirements || conf.requirements || {};
+    const ends = drop.endsAt ? Math.floor(drop.endsAt / 1000) : null;
+    const count = Object.keys(drop.participants || {}).length;
+
+    const lines = [
+        '**Prêmio:** ' + (drop.prize?.label || '—'),
+        '**Ganhadores:** ' + (drop.winners || 1),
+        '**Participantes:** ' + count,
+        ends ? '**Encerra:** <t:' + ends + ':R> (<t:' + ends + ':f>)' : null
+    ].filter(Boolean);
+
+    // VIP / extras do painel (não alterar lógica)
+    const vipLines = [];
+    if (Array.isArray(conf.vipExtras) && conf.vipExtras.length) {
+        for (const v of conf.vipExtras) {
+            if (!v || !v.roleId) continue;
+            vipLines.push(
+                '<@&' + v.roleId + '> · +' + (v.entries || 1) + ' entrada(s)'
+            );
+        }
+    }
+    if (vipLines.length) {
+        lines.push('');
+        lines.push('**VIP / entradas extras**');
+        lines.push(...vipLines);
     }
 
-    const panelInfo = drops.formatDropPanelInfo(guild, guild.id);
-    const vipBlock = panelInfo.vipLines.length
-        ? '\n**VIP · entradas extras**\n' + panelInfo.vipLines.join('\n')
-        : '';
-    const blockedBlock = panelInfo.blocked.length
-        ? '\n**Não pode participar**\n' +
-          panelInfo.blocked.map((b) => '• ' + b).join('\n')
-        : '';
-    const bypassBlock = (panelInfo.bypass || []).length
-        ? '\n**Ignora requisitos**\n' +
-          panelInfo.bypass.map((b) => '• ' + b).join('\n')
-        : '';
+    if (req.blockedRoleId || (Array.isArray(req.blockedRoles) && req.blockedRoles.length)) {
+        const blocked = req.blockedRoleId
+            ? [req.blockedRoleId]
+            : req.blockedRoles;
+        lines.push('');
+        lines.push('**Não pode participar**');
+        lines.push(blocked.map((id) => '<@&' + id + '>').join(' · '));
+    }
+
+    if (req.bypassRoleId) {
+        lines.push('');
+        lines.push('**Ignora requisitos:** <@&' + req.bypassRoleId + '>');
+    }
 
     return new EmbedBuilder()
         .setColor(0xa78bfa)
-        .setTitle('🎁 DROP EM ANDAMENTO')
-        .setDescription(
-            [
-                '**Prêmio:** ' + (drop.prize && drop.prize.label ? drop.prize.label : '—'),
-                '**Vencedores:** ' + (drop.winners || 1),
-                '**Termina:** <t:' + endsUnix + ':R> (<t:' + endsUnix + ':f>)',
-                '',
-                'Clique em **Participar** para entrar ou **Sair** para desistir.',
-                reqLines.length ? '\n**Requisitos**\n' + reqLines.join('\n') : '',
-                vipBlock,
-                bypassBlock,
-                blockedBlock
-            ]
-                .filter((x) => x != null && x !== '')
-                .join('\n')
-        )
-        .setFooter({ text: 'Por ' + (authorTag || 'staff') + ' · ' + total + ' participante(s)' })
-        .setTimestamp(drop.endsAt);
+        .setTitle('🎁 Drop')
+        .setDescription(lines.join('\n'))
+        .setFooter({ text: 'Por ' + (authorTag || 'staff') })
+        .setTimestamp(drop.endsAt ? new Date(drop.endsAt) : undefined);
 }
 
 async function refreshDropMessage(interaction, drop) {
-    const guild = interaction.guild;
+    if (!drop) return;
     let authorTag = drop.createdByTag || 'staff';
     if (!drop.createdByTag && drop.createdBy) {
         const u = await interaction.client.users.fetch(drop.createdBy).catch(() => null);
         if (u) authorTag = u.tag;
     }
+    const guild = interaction.guild;
     const embed = buildEmbed(drop, guild, authorTag);
-    const count = drops.participantCount(drop);
-    await interaction.message
-        .edit({ embeds: [embed], components: [joinRow(drop.id, count)] })
-        .catch(() => {});
+    const count = Object.keys(drop.participants || {}).length;
+    try {
+        await interaction.message.edit({
+            embeds: [embed],
+            components: [joinRow(drop.id, count)]
+        });
+    } catch (_) {}
+}
+
+/** Máximo de drops criados num único comando */
+const MAX_BATCH = 10;
+
+/**
+ * Aceita vários drops de uma vez:
+ *   O.drop 5m 1 1000 eter | 10m 2 Nitro
+ *   O.drop 3x 5m 1 1000 eter
+ * Não altera requisitos/cargos do painel.
+ */
+function parseDropSpecs(args) {
+    const raw = (args || []).map((a) => String(a)).join(' ').trim();
+    if (!raw) return { ok: false, error: 'usage', specs: [] };
+
+    const parts = raw.split(/\s*[|;]\s*/).map((p) => p.trim()).filter(Boolean);
+    const specs = [];
+
+    for (const part of parts) {
+        let count = 1;
+        let rest = part;
+        const mx = part.match(/^(\d{1,2})\s*[xX×]\s+(.+)$/);
+        if (mx) {
+            count = Math.min(MAX_BATCH, Math.max(1, parseInt(mx[1], 10) || 1));
+            rest = mx[2].trim();
+        }
+
+        const tokens = rest.split(/\s+/).filter(Boolean);
+        if (tokens.length < 3) {
+            return { ok: false, error: 'usage', specs: [] };
+        }
+
+        const tempo = tokens[0];
+        const winners = Math.max(1, Math.min(20, parseInt(tokens[1], 10) || 0));
+        const premio = tokens.slice(2).join(' ').trim();
+        if (!winners || !premio) {
+            return { ok: false, error: 'winners', specs: [] };
+        }
+
+        for (let i = 0; i < count; i++) {
+            if (specs.length >= MAX_BATCH) break;
+            specs.push({ tempo: tempo, winners: winners, premio: premio });
+        }
+        if (specs.length >= MAX_BATCH) break;
+    }
+
+    if (!specs.length) return { ok: false, error: 'usage', specs: [] };
+    return { ok: true, specs: specs };
 }
 
 module.exports = {
@@ -172,6 +225,14 @@ module.exports = {
                 .setDescription('Prêmio (ex: 10000 eter | Nitro 1 mês)')
                 .setRequired(true)
         )
+        .addIntegerOption((o) =>
+            o
+                .setName('quantidade')
+                .setDescription('Quantos drops iguais criar neste chat (1–10)')
+                .setRequired(false)
+                .setMinValue(1)
+                .setMaxValue(10)
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
     async execute(message, args) {
@@ -179,28 +240,40 @@ module.exports = {
             return message.reply('❌ Precisa de **Gerenciar Servidor**.');
         }
         const prefix = message.guild?.id ? getPrefix(message.guild.id) : 'O.';
-        const tempo = args[0];
-        const winnersRaw = args[1];
-        const premio = args.slice(2).join(' ').trim();
+        const parsed = parseDropSpecs(args);
 
-        if (!tempo || !winnersRaw || !premio) {
+        if (!parsed.ok) {
             return message.reply(
-                'Uso: `' + prefix + 'drop <tempo> <ganhadores> <prêmio>`\n' +
-                    'Ex.: `' + prefix + 'drop 5m 1 10000 eter` · `' + prefix + 'drop 1h 3 Nitro 1 mês`'
+                'Uso: `' +
+                    prefix +
+                    'drop <tempo> <ganhadores> <prêmio>`\n' +
+                    'Vários de uma vez: `' +
+                    prefix +
+                    'drop 5m 1 1000 eter | 10m 2 Nitro`\n' +
+                    'Repetir: `' +
+                    prefix +
+                    'drop 3x 5m 1 1000 eter` (máx. ' +
+                    MAX_BATCH +
+                    ')'
             );
         }
 
-        const winners = Math.max(1, Math.min(20, parseInt(winnersRaw, 10) || 0));
-        if (!winners) {
-            return message.reply('❌ Quantidade de ganhadores inválida (1–20).');
+        let created = 0;
+        for (const spec of parsed.specs) {
+            await createDropMsg(message, {
+                premio: spec.premio,
+                tempo: spec.tempo,
+                winners: spec.winners,
+                isSlash: false,
+                silent: true
+            });
+            created++;
         }
 
-        return createDropMsg(message, {
-            premio,
-            tempo,
-            winners,
-            isSlash: false
-        });
+        if (created > 1) {
+            return message.reply('✅ **' + created + '** drops publicados neste chat.');
+        }
+        return null;
     },
 
     async executeSlash(i) {
@@ -211,71 +284,71 @@ module.exports = {
             });
         }
         await i.deferReply({ flags: MessageFlags.Ephemeral });
-        return createDropMsg(i, {
-            tempo: i.options.getString('tempo', true),
-            winners: Math.max(1, Math.min(20, i.options.getInteger('ganhadores', true) || 1)),
-            premio: i.options.getString('premio', true),
-            isSlash: true
-        });
+
+        const tempo = i.options.getString('tempo', true);
+        const winners = Math.max(1, Math.min(20, i.options.getInteger('ganhadores', true) || 1));
+        const premio = i.options.getString('premio', true);
+        const qtd = Math.min(MAX_BATCH, Math.max(1, i.options.getInteger('quantidade') || 1));
+
+        let created = 0;
+        for (let n = 0; n < qtd; n++) {
+            await createDropMsg(i, {
+                tempo: tempo,
+                winners: winners,
+                premio: premio,
+                isSlash: true,
+                silent: true
+            });
+            created++;
+        }
+
+        return i.editReply({
+            content:
+                created > 1
+                    ? '✅ **' + created + '** drops publicados neste chat.'
+                    : '✅ Drop publicado.'
+        }).catch(() => {});
     },
 
     async handleComponent(interaction) {
-        const parts = (interaction.customId || '').split(':');
+        if (!String(interaction.customId || '').startsWith('drop:')) return;
+
+        const parts = interaction.customId.split(':');
         const action = parts[1];
+        const dropId = parts[2];
 
         if (action === 'listnoop') {
             return interaction.deferUpdate().catch(() => {});
         }
 
-        // drop:list:dropId:page
         if (action === 'list') {
-            const dropId = parts[2];
             const page = parseInt(parts[3], 10) || 0;
             const drop = drops.getDrop(dropId);
-            if (!drop || drop.ended) {
-                return interaction
-                    .reply({
-                        content: 'Este drop já encerrou ou não existe mais.',
-                        flags: MessageFlags.Ephemeral
-                    })
-                    .catch(() => {});
+            if (!drop) {
+                return interaction.reply({
+                    content: 'Drop não encontrado.',
+                    flags: MessageFlags.Ephemeral
+                });
             }
-            const payload = buildListPayload(drop, page);
-            if (interaction.replied || interaction.deferred) {
-                return interaction.editReply(payload).catch(() => interaction.followUp(payload));
-            }
-            // se já é update de botão de paginação na mesma msg efêmera
-            if (interaction.message && interaction.message.flags?.has?.(MessageFlags.Ephemeral)) {
-                return interaction.update(payload).catch(() => interaction.reply(payload));
-            }
-            return interaction.reply(payload).catch(() => {});
-        }
-
-        const dropId = parts.slice(2).join(':');
-        if (!action || !dropId) {
-            return interaction
-                .reply({ content: 'Interação inválida.', flags: MessageFlags.Ephemeral })
-                .catch(() => {});
+            return interaction.reply(buildListPayload(drop, page));
         }
 
         const drop = drops.getDrop(dropId);
         if (!drop || drop.ended) {
-            return interaction
-                .reply({
-                    content: 'Este drop já encerrou ou não existe mais.',
-                    flags: MessageFlags.Ephemeral
-                })
-                .catch(() => {});
+            return interaction.reply({
+                content: 'Esse drop já encerrou ou não existe.',
+                flags: MessageFlags.Ephemeral
+            });
         }
 
         if (action === 'leave') {
-            const left = drops.leaveDrop(dropId, interaction.user.id);
-            if (!left) {
+            if (!drop.participants || !drop.participants[interaction.user.id]) {
                 return interaction.reply({
-                    content: 'Você não está neste drop.',
+                    content: 'Você não está nesse drop.',
                     flags: MessageFlags.Ephemeral
                 });
             }
+            drops.leaveDrop(dropId, interaction.user.id);
             const updated = drops.getDrop(dropId);
             await refreshDropMessage(interaction, updated);
             return interaction.reply({
@@ -285,27 +358,18 @@ module.exports = {
         }
 
         if (action === 'join') {
-            const member = interaction.member;
-            if (!member) {
-                return interaction.reply({
-                    content: 'Não foi possível verificar seu perfil.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-
             if (drop.participants && drop.participants[interaction.user.id]) {
                 return interaction.reply({
-                    content: 'Você já está participando. Use **Sair** para desistir.',
+                    content: 'Você já está no drop. Use **Sair** se quiser sair.',
                     flags: MessageFlags.Ephemeral
                 });
             }
 
-            const check = drops.checkRequirements(member, drop);
+            const member = interaction.member;
+            const check = drops.canJoin(member, drop);
             if (!check.ok) {
                 return interaction.reply({
-                    content:
-                        'Você não atende aos requisitos:\n• ' +
-                        (check.fails || []).join('\n• '),
+                    content: check.error || 'Você não pode participar.',
                     flags: MessageFlags.Ephemeral
                 });
             }
@@ -346,8 +410,9 @@ async function createDropMsg(ctx, opts) {
     const conf = getSettings(guild.id).drops || {};
     if (conf.enabled === false) {
         const msg = '❌ Drops desativados no painel.';
-        if (isSlash) return ctx.editReply({ content: msg });
-        return ctx.reply(msg);
+        if (isSlash && !opts.silent) return ctx.editReply({ content: msg });
+        if (!opts.silent) return ctx.reply(msg);
+        return null;
     }
 
     const prize = drops.parsePrize(premio);
@@ -391,8 +456,10 @@ async function createDropMsg(ctx, opts) {
     await msg.edit({ components: [joinRow(drop.id, 0)] }).catch(() => {});
     schedule(ctx.client, drop);
 
+    if (opts.silent) return drop;
+
     if (isSlash) {
         return ctx.editReply({ content: '✅ Drop publicado.' }).catch(() => {});
     }
-    return null;
+    return drop;
 }
