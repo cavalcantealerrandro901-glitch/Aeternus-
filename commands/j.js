@@ -66,16 +66,6 @@ function profileEmbed(user, profile) {
     const maxMana = player.maxManaFromLevel(st.level, profile.classId);
     const inv = Array.isArray(profile.inventory) ? profile.inventory : [];
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
-    const attrs = st.attrs || { forca: 0, defesa: 0, agilidade: 0, vida: 0 };
-
-    const attrFields = ATTR_META.map((a) => {
-        const v = Number(attrs[a.key] || 0);
-        return {
-            name: `${a.emoji} ${a.label}`,
-            value: `┌${attrBar(v)}┐\n**${v}**  ·  \`+\``,
-            inline: true
-        };
-    });
 
     const invLines = inv.length
         ? inv
@@ -101,52 +91,60 @@ function profileEmbed(user, profile) {
                 '',
                 `❤️ HP **${xp.maxHp(user.id)}** · 🔵 Mana **${maxMana}**`,
                 '',
-                `💠 **Pontos disponíveis:** **${Number(st.attrPoints || 0)}** — use **➕** abaixo`
+                `_Atributos: use o comando de atributos do servidor._`
             ].join('\n')
         )
-        .addFields(
-            ...attrFields,
-            {
-                name: '\u200b',
-                value: '\u200b',
-                inline: true
-            },
-            {
-                name: '🎫  Inventário',
-                value: invLines + '\n_Ver tudo: `O.inventario`_',
-                inline: false
-            }
-        )
+        .addFields({
+            name: '🎫  Inventário',
+            value: invLines + '\n_Ver tudo: `O.inventario`_',
+            inline: false
+        })
         .setThumbnail(photo)
         .setImage(cls.banner);
 }
 
-function attrButtons(ownerId) {
-    const rows = [];
-    for (let i = 0; i < ATTR_META.length; i += 2) {
-        const slice = ATTR_META.slice(i, i + 2);
-        rows.push(
-            new ActionRowBuilder().addComponents(
-                ...slice.map((a) =>
-                    new ButtonBuilder()
-                        .setCustomId(`j:attrplus:${a.key}:${ownerId}`)
-                        .setLabel(a.label)
-                        .setEmoji('➕')
-                        .setStyle(ButtonStyle.Secondary)
-                )
-            )
+function atributosPayload(user) {
+    const st = xp.get(user.id);
+    const attrs = st.attrs || { forca: 0, defesa: 0, agilidade: 0, vida: 0 };
+    const points = Number(st.attrPoints || 0);
+
+    const lines = [
+        '✦ **Atributos · ' + (user.username || 'Jogador') + '**',
+        '',
+        ...ATTR_META.map((a) => {
+            const v = Number(attrs[a.key] || 0);
+            return a.emoji + ' **' + a.label + ':** ' + v;
+        }),
+        '',
+        '💠 Pontos disponíveis: **' + points + '**',
+        '_Use ➕ ao lado do atributo para gastar 1 ponto._'
+    ];
+
+    const components = ATTR_META.map((a) => {
+        const v = Number(attrs[a.key] || 0);
+        return new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('j:attrinfo:' + a.key + ':' + user.id)
+                .setLabel((a.emoji + ' ' + a.label + ': ' + v).slice(0, 80))
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true),
+            new ButtonBuilder()
+                .setCustomId('j:attrplus:' + a.key + ':' + user.id)
+                .setLabel('➕')
+                .setStyle(ButtonStyle.Success)
+                .setDisabled(points <= 0)
         );
-    }
-    return rows;
+    });
+
+    return {
+        content: lines.join('\n'),
+        embeds: [],
+        components
+    };
 }
 
 function profilePayload(user, profile, viewerId) {
-    const embeds = [profileEmbed(user, profile)];
-    const components = [];
-    if (viewerId && String(viewerId) === String(user.id)) {
-        components.push(...attrButtons(user.id));
-    }
-    return { embeds, components };
+    return { embeds: [profileEmbed(user, profile)], components: [] };
 }
 
 async function beginCreate(interaction) {
@@ -286,6 +284,7 @@ module.exports = {
                     '`O.j perfil` — sua ficha',
                     '`O.j perfil @user` — ficha de outro',
                     '`O.j criar` — criar perfil (PV)',
+                    '`O.j atributos` — atributos e pontos',
                     '`O.inventario [categoria]` — itens'
                 ].join('\n')
             );
@@ -327,7 +326,14 @@ module.exports = {
             return message.reply(profilePayload(target, profile, message.author.id));
         }
 
-        return message.reply('Use `O.j perfil` ou `O.j criar`.');
+        if (sub === 'atributos' || sub === 'attrs' || sub === 'stats') {
+            if (!player.has(message.author.id)) {
+                return message.reply('Você ainda não tem perfil. Use `O.j criar`.');
+            }
+            return message.reply(atributosPayload(message.author));
+        }
+
+        return message.reply('Use `O.j perfil`, `O.j atributos` ou `O.j criar`.');
     },
 
     async handleComponent(interaction) {
@@ -335,6 +341,10 @@ module.exports = {
         if (!id.startsWith('j:')) return;
 
         if (id === 'j:start') return beginCreate(interaction);
+
+        if (id.startsWith('j:attrinfo:')) {
+            return interaction.deferUpdate().catch(() => {});
+        }
 
         if (id.startsWith('j:attrplus:')) {
             const parts = id.split(':');
@@ -354,19 +364,8 @@ module.exports = {
             if (!spent.ok) {
                 return interaction.reply({ content: spent.error, flags: 64 });
             }
-            const profile = player.get(ownerId);
-            if (!profile) {
-                return interaction.reply({ content: 'Perfil não encontrado.', flags: 64 });
-            }
-            await interaction.update(
-                profilePayload(interaction.user, profile, interaction.user.id)
-            );
-            return interaction
-                .followUp({
-                    content: `➕ **${meta.label}** agora em **${spent.value}** · pontos restantes: **${spent.attrPoints}**`,
-                    flags: 64
-                })
-                .catch(() => {});
+            await interaction.update(atributosPayload(interaction.user));
+            return;
         }
 
         if (id === 'j:class' && interaction.isStringSelectMenu()) {
@@ -514,14 +513,14 @@ async function finishProfile(user, data, channel, interaction, fromPhoto = false
             await interaction.update({
                 content: notice,
                 embeds: [emb],
-                components: attrButtons(user.id)
+                components: []
             });
         } else {
             await channel
                 .send({
                     content: notice,
                     embeds: [emb],
-                    components: attrButtons(user.id)
+                    components: []
                 })
                 .catch(() => {});
         }
