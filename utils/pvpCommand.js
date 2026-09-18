@@ -42,9 +42,23 @@ function loadFighter(userId, isBot) {
             specialCd: 0
         };
     }
-    const attrs = xp.getAttrs(userId);
-    const maxHp = xp.maxHp(userId);
-    let maxMana = xp.maxMana(userId);
+    const base = xp.getAttrs(userId);
+    const bonus =
+        typeof player.getEquipmentBonuses === 'function'
+            ? player.getEquipmentBonuses(userId)
+            : { forca: 0, defesa: 0, agilidade: 0, vida: 0, mana: 0 };
+    const attrs = {
+        forca: (base.forca || 0) + (bonus.forca || 0),
+        defesa: (base.defesa || 0) + (bonus.defesa || 0),
+        agilidade: (base.agilidade || 0) + (bonus.agilidade || 0),
+        vida: (base.vida || 0) + (bonus.vida || 0)
+    };
+    const maxHp = 50 + attrs.vida * 8;
+    let maxMana =
+        40 +
+        Math.floor(attrs.agilidade * 1.5) +
+        Math.floor(attrs.forca * 0.5) +
+        (bonus.mana || 0);
     const prof = player.get(userId);
     const classId = prof?.classId || 'guerreiro';
     const cls = player.getClass(classId);
