@@ -1,4 +1,5 @@
 const {
+    EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle
@@ -108,19 +109,37 @@ async function startFight(channel, challengerId, targetId, bet, vsBot) {
     const linkA = pvpArena.fightUrl(webFight.id, a.id);
     const linkB = pvpArena.fightUrl(webFight.id, b.id);
 
-    await channel.send({
-        content: [
-            '🎮 **Arena PVP aberta no painel!**',
-            '',
-            `**${a.name}** → ${linkA}`,
-            `**${b.name}** → ${linkB}`,
-            '',
-            '_Cada um abre o próprio link. A batalha roda no navegador — gráficos, botões e paisagem aleatória._',
-            bet > 0
-                ? `Aposta em jogo: **${Number(bet).toLocaleString('pt-BR')}** éter.`
-                : 'Sem aposta.'
-        ].join('\n')
-    });
+    const emb = new EmbedBuilder()
+        .setColor(0xa78bfa)
+        .setTitle('🎮 Arena PVP · Aeternus')
+        .setDescription(
+            [
+                `**${a.name}** ${a.emoji || '⚔️'}  vs  ${b.emoji || '⚔️'} **${b.name}**`,
+                '',
+                'A batalha acontece no **painel web** — gráficos 3D, skillbar e paisagem aleatória.',
+                'Cada lutador usa o **próprio botão** abaixo para entrar na arena.',
+                bet > 0
+                    ? `\n💰 Aposta: **${Number(bet).toLocaleString('pt-BR')}** éter.`
+                    : ''
+            ].join('\n')
+        )
+        .setFooter({ text: 'Aeternus Arena' })
+        .setTimestamp();
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel((a.name + ' — Entrar na arena').slice(0, 80))
+            .setURL(linkA)
+            .setEmoji('⚔️'),
+        new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel((b.name + ' — Entrar na arena').slice(0, 80))
+            .setURL(linkB)
+            .setEmoji('🗡️')
+    );
+
+    await channel.send({ embeds: [emb], components: [row] });
 
     return { webId: webFight.id };
 }
