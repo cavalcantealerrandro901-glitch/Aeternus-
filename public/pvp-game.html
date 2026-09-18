@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Aeternus · Arena PVP</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+:root{--accent:#a78bfa;--hp:#ef4444;--mana:#38bdf8;--panel:rgba(10,8,20,.72);--line:rgba(255,255,255,.12)}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
+body{font-family:Outfit,system-ui,sans-serif;color:#f8fafc;overflow:hidden;background:#05030a}
+#stage{position:fixed;inset:0;display:grid;grid-template-rows:auto 1fr auto}
+#sky{position:absolute;inset:0;background:linear-gradient(180deg,#0a0014,#3a0ca3 55%,#7209b7);z-index:0;transition:background 1.2s ease}
+canvas#world{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.ui{position:relative;z-index:5}
+header.ui{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 18px 0;gap:12px}
+.brand{font-family:Cinzel,serif;letter-spacing:.08em;font-size:.95rem;opacity:.9;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+.landscape-tag{font-size:.78rem;padding:6px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(10px)}
+.fighters{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:8px 14px;max-width:980px;width:100%;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px 14px;backdrop-filter:blur(14px);box-shadow:0 10px 40px rgba(0,0,0,.35);transition:transform .25s,box-shadow .25s,border-color .25s}
+.card.active{border-color:color-mix(in srgb,var(--accent) 70%,white);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 50%,transparent),0 12px 40px rgba(0,0,0,.45);transform:translateY(-2px)}
+.card-top{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.avatar{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.08);object-fit:cover;border:1px solid var(--line)}
+.avatar.emoji{display:grid;place-items:center;font-size:1.5rem}
+.name{font-weight:700;font-size:1rem;line-height:1.15}.cls{font-size:.78rem;opacity:.75}
+.bar-wrap{margin-top:6px}.bar-label{display:flex;justify-content:space-between;font-size:.72rem;opacity:.85;margin-bottom:3px}
+.bar{height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;border:1px solid rgba(255,255,255,.06)}
+.bar>i{display:block;height:100%;width:0%;border-radius:inherit;transition:width .45s cubic-bezier(.2,.8,.2,1)}
+.bar.hp>i{background:linear-gradient(90deg,#b91c1c,var(--hp),#fca5a5)}
+.bar.mana>i{background:linear-gradient(90deg,#0369a1,var(--mana),#bae6fd)}
+.arena-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:8px 16px;text-align:center}
+.round{font-family:Cinzel,serif;font-size:1.1rem;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 2px 16px rgba(0,0,0,.7)}
+.log{max-width:640px;width:100%;min-height:48px;padding:10px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(12px);font-size:.92rem;line-height:1.35}
+.vs{font-family:Cinzel,serif;font-size:2rem;opacity:.35;letter-spacing:.2em}
+footer.ui{padding:10px 14px 18px;max-width:720px;width:100%;margin:0 auto}
+.hint{text-align:center;font-size:.8rem;opacity:.7;margin-bottom:10px}
+.moves{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.move{appearance:none;border:0;border-radius:16px;padding:14px 12px;font-family:inherit;font-weight:700;font-size:.95rem;color:#fff;cursor:pointer;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));border:1px solid var(--line);backdrop-filter:blur(10px);transition:transform .12s,filter .12s,opacity .2s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.move:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.1)}
+.move:active:not(:disabled){transform:scale(.97)}
+.move:disabled{opacity:.4;cursor:not-allowed}
+.move .cost{font-size:.72rem;font-weight:500;opacity:.75}
+.move.special{grid-column:1/-1;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 55%,#000),rgba(255,255,255,.08))}
+.flash{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;background:#fff}
+.toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(0,0,0,.75);border:1px solid var(--line);padding:8px 14px;border-radius:999px;font-size:.85rem;z-index:20;opacity:0;transition:opacity .25s}
+.toast.show{opacity:1}
+@media(max-width:640px){.fighters{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="sky"></div>
+  <canvas id="world"></canvas>
+  <div class="flash" id="flash"></div>
+  <header class="ui"><div class="brand">✦ AETERNUS ARENA</div><div class="landscape-tag" id="landTag">—</div></header>
+  <div class="ui" style="display:flex;flex-direction:column;justify-content:space-between;min-height:0">
+    <div class="fighters">
+      <div class="card" id="cardA"><div class="card-top"><div class="avatar emoji" id="avA">⚔️</div><div><div class="name" id="nameA">—</div><div class="cls" id="clsA">—</div></div></div>
+        <div class="bar-wrap"><div class="bar-label"><span>HP</span><span id="hpA">0/0</span></div><div class="bar hp"><i id="hpBarA"></i></div></div>
+        <div class="bar-wrap"><div class="bar-label"><span>Mana</span><span id="mpA">0/0</span></div><div class="bar mana"><i id="mpBarA"></i></div></div></div>
+      <div class="card" id="cardB"><div class="card-top"><div class="avatar emoji" id="avB">⚔️</div><div><div class="name" id="nameB">—</div><div class="cls" id="clsB">—</div></div></div>
+        <div class="bar-wrap"><div class="bar-label"><span>HP</span><span id="hpB">0/0</span></div><div class="bar hp"><i id="hpBarB"></i></div></div>
+        <div class="bar-wrap"><div class="bar-label"><span>Mana</span><span id="mpB">0/0</span></div><div class="bar mana"><i id="mpBarB"></i></div></div></div>
+    </div>
+    <div class="arena-mid"><div class="vs">VS</div><div class="round" id="round">Rodada 1</div><div class="log" id="log">Carregando arena…</div></div>
+  </div>
+  <footer class="ui"><div class="hint" id="hint">Aguardando…</div><div class="moves" id="moves"></div></footer>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(()=>{
+const path=location.pathname.split('/').filter(Boolean);
+const fightId=path[path.length-1];
+const me=new URLSearchParams(location.search).get('as')||'';
+const el=id=>document.getElementById(id);
+const toast=msg=>{const t=el('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)};
+const canvas=el('world');const ctx=canvas.getContext('2d');
+let W=0,H=0,particles=[],hills=[],stars=[],landscape=null,anim=0;
+function resize(){W=canvas.width=innerWidth*devicePixelRatio;H=canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';buildWorld()}
+function buildWorld(){hills=[];for(let i=0;i<4;i++)hills.push({y:.55+i*.08,amp:30+i*18,freq:.003+i*.001,speed:.2+i*.08,alpha:.15+i*.12});stars=Array.from({length:80},()=>({x:Math.random(),y:Math.random()*.55,r:Math.random()*1.6+.4,tw:Math.random()*Math.PI*2}))}
+function draw(){anim+=.016;ctx.clearRect(0,0,W,H);for(const s of stars){const a=.35+Math.sin(anim*2+s.tw)*.25;ctx.fillStyle=`rgba(255,255,255,${a})`;ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r*devicePixelRatio,0,Math.PI*2);ctx.fill()}const ground=landscape?.ground||'#12001f';for(const h of hills){ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<=W;x+=8){const y=H*h.y+Math.sin(x*h.freq+anim*h.speed)*h.amp*devicePixelRatio+Math.sin(x*h.freq*2.1-anim*.3)*(h.amp*.35)*devicePixelRatio;ctx.lineTo(x,y)}ctx.lineTo(W,H);ctx.closePath();ctx.fillStyle=ground;ctx.globalAlpha=h.alpha;ctx.fill();ctx.globalAlpha=1}particles=particles.filter(p=>p.life>0);for(const p of particles){p.life-=.02;p.x+=p.vx;p.y+=p.vy;p.vy+=.05;ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;requestAnimationFrame(draw)}
+function burst(kind){const colors={attack:['#f8fafc','#a78bfa','#c4b5fd'],heavy:['#fb923c','#f97316','#fdba74'],special:['#f472b6','#e879f9','#38bdf8','#fbbf24'],defend:['#94a3b8','#cbd5e1']};const cols=colors[kind]||colors.attack;const cx=W/2,cy=H*.48;for(let i=0;i<36;i++){const ang=Math.random()*Math.PI*2;const sp=2+Math.random()*6;particles.push({x:cx,y:cy,vx:Math.cos(ang)*sp*devicePixelRatio,vy:Math.sin(ang)*sp*devicePixelRatio,r:(2+Math.random()*3)*devicePixelRatio,life:.8+Math.random()*.4,color:cols[i%cols.length]})}const flash=el('flash');flash.style.opacity='.35';flash.style.background=cols[0];setTimeout(()=>{flash.style.transition='opacity .35s';flash.style.opacity='0'},40)}
+function setSky(land){if(!land)return;landscape=land;el('sky').style.background=`linear-gradient(180deg,${land.sky[0]},${land.sky[1]} 55%,${land.sky[2]})`;document.documentElement.style.setProperty('--accent',land.accent||'#a78bfa');el('landTag').textContent=land.name||land.id}
+function fillFighter(side,f,turnId){if(!f)return;el('name'+side).textContent=f.name;el('cls'+side).textContent=(f.emoji||'')+' '+(f.className||f.classId);el('hp'+side).textContent=f.hp+'/'+f.maxHp;el('mp'+side).textContent=f.mana+'/'+f.maxMana;el('hpBar'+side).style.width=Math.max(0,(f.hp/Math.max(1,f.maxHp))*100)+'%';el('mpBar'+side).style.width=Math.max(0,(f.mana/Math.max(1,f.maxMana))*100)+'%';const av=el('av'+side);if(f.photo){av.className='avatar';av.style.backgroundImage=`url(${f.photo})`;av.style.backgroundSize='cover';av.textContent=''}else{av.className='avatar emoji';av.style.backgroundImage='';av.textContent=f.emoji||'⚔️'}el('card'+side).classList.toggle('active',String(f.id)===String(turnId)&&!window.__over)}
+function renderMoves(state){const box=el('moves');box.innerHTML='';const myTurn=me&&String(state.turn)===String(me)&&!state.over;el('hint').textContent=state.over?(state.winnerId===me?'🏆 Você venceu!':'Duelo encerrado'):myTurn?'Sua vez — escolha um movimento':'Aguardando o oponente…';(state.moves||[]).forEach(m=>{const b=document.createElement('button');b.className='move'+(m.key==='special'?' special':'');b.disabled=!myTurn||m.disabled||state.over;b.innerHTML=`<span>${m.emoji} ${m.label}</span><span class="cost">${m.cost?'Mana '+m.cost:'Livre'}</span>`;b.onclick=()=>doMove(m.key);box.appendChild(b)})}
+function render(state){if(!state)return;window.__over=state.over;if(state.landscape)setSky(state.landscape);fillFighter('A',state.a,state.turn);fillFighter('B',state.b,state.turn);el('round').textContent=state.over?'FIM':'Rodada '+state.round;el('log').textContent=(state.lastLog||'').replace(/\*\*/g,'');renderMoves(state)}
+async function load(){const r=await fetch('/api/pvp/'+fightId+(me?'?as='+encodeURIComponent(me):''));if(!r.ok){el('log').textContent='Arena não encontrada ou expirada.';return}render(await r.json())}
+async function doMove(kind){if(!me){toast('Abra o link que o bot enviou (com seu ID).');return}const r=await fetch('/api/pvp/'+fightId+'/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:me,move:kind})});const data=await r.json().catch(()=>({}));if(!r.ok||!data.ok){toast(data.error||'Falha no movimento');return}burst(kind);render(data.state)}
+setInterval(load,2000);resize();addEventListener('resize',resize);draw();load();
+})();
+</script>
+</body>
+</html>
