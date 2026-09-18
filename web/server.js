@@ -1,15 +1,15 @@
 const express = require('express');
-const cookieParser = require('cookie-parser');
 const path = require('path');
-const crypto = require('crypto');
-const { getSettings, setSettings, getPrefix, setPrefix, normalizePrefix } = require('../utils/settings');
+const cookieParser = require('cookie-parser');
+const { getSettings, setSettings, getPrefix } = require('../utils/settings');
+const pvpArena = require('../utils/pvpArena');
 
 const PORT = process.env.PORT || 10000;
 const CLIENT_ID = process.env.CLIENT_ID || '';
 const CLIENT_SECRET = process.env.CLIENT_SECRET || '';
 const REDIRECT_URI =
-    process.env.REDIRECT_URI ||
     process.env.OAUTH_REDIRECT_URI ||
+    process.env.REDIRECT_URI ||
     '';
 
 const sessions = new Map();
@@ -20,10 +20,6 @@ function sessionUser(req) {
     return sessions.get(sid) || null;
 }
 
-function makeSid() {
-    return crypto.randomBytes(24).toString('hex');
-}
-
 function setup(client) {
     const app = express();
     app.use(express.json({ limit: '2mb' }));
@@ -31,7 +27,7 @@ function setup(client) {
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, '..', 'public')));
 
-    console.log('[web] OAuth redirect:', REDIRECT_URI || '(não configurado)');
+    console.log('[web] OAuth redirect:', REDIRECT_URI || '(não definido)');
 
     app.get('/login', (req, res) => {
         if (!CLIENT_ID || !REDIRECT_URI) {
@@ -49,7 +45,7 @@ function setup(client) {
     app.get('/auth/discord/callback', async (req, res) => {
         try {
             const code = req.query.code;
-            if (!code) return res.status(400).send('Sem code');
+            if (!code) return res.redirect('/login');
             const body = new URLSearchParams({
                 client_id: CLIENT_ID,
                 client_secret: CLIENT_SECRET,
@@ -63,7 +59,7 @@ function setup(client) {
                 body
             });
             const token = await tokenRes.json();
-            if (!token.access_token) return res.status(400).send('Token inválido');
+            if (!token.access_token) return res.redirect('/login');
             const meRes = await fetch('https://discord.com/api/users/@me', {
                 headers: { Authorization: 'Bearer ' + token.access_token }
             });
@@ -72,13 +68,13 @@ function setup(client) {
                 headers: { Authorization: 'Bearer ' + token.access_token }
             });
             const guilds = await guildsRes.json();
-            const sid = makeSid();
+            const sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
             sessions.set(sid, { user: me, guilds: Array.isArray(guilds) ? guilds : [], access: token.access_token });
             res.cookie('sid', sid, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 864e5 });
             res.redirect('/dashboard');
         } catch (e) {
             console.error('[web] oauth', e.message);
-            res.status(500).send('Falha no login');
+            res.redirect('/login');
         }
     });
 
@@ -100,35 +96,25 @@ function setup(client) {
         if (!u) return res.status(401).json({ error: 'auth' });
         const guild = client.guilds.cache.get(req.params.id);
         if (!guild) return res.status(404).json({ error: 'not found' });
-        const settings = getSettings(guild.id);
-        const roles = guild.roles.cache
-            .filter((r) => r.id !== guild.id)
-            .map((r) => ({ id: r.id, name: r.name, color: r.color }))
-            .sort((a, b) => b.position - a.position);
-        const channels = guild.channels.cache
-            .filter((c) => c.isTextBased?.() || c.type === 0 || c.type === 5)
-            .map((c) => ({ id: c.id, name: c.name, type: c.type }));
-        res.json({ guild: { id: guild.id, name: guild.name }, settings, roles, channels });
+        const s = getSettings(guild.id);
+        res.json({
+            id: guild.id,
+            name: guild.name,
+            icon: guild.iconURL({ size: 128 }),
+            prefix: getPrefix(guild.id),
+            settings: s
+        });
     });
 
     app.post('/api/guild/:id/prefix', (req, res) => {
         if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
         const guild = client.guilds.cache.get(req.params.id);
         if (!guild) return res.status(404).json({ error: 'not found' });
-        const raw = req.body?.prefix;
-        if (raw == null || String(raw).trim() === '') {
-            return res.status(400).json({ error: 'Informe um prefixo' });
-        }
-        if (/\s/.test(String(raw).trim())) {
-            return res.status(400).json({ error: 'Não use espaços no prefixo' });
-        }
-        const cleaned = normalizePrefix(raw);
-        if (!cleaned || cleaned.length < 1) {
-            return res.status(400).json({ error: 'Prefixo inválido' });
-        }
+        const prefix = String(req.body?.prefix || '').slice(0, 8);
+        if (!prefix) return res.status(400).json({ error: 'prefix' });
         try {
-            setPrefix(guild.id, cleaned);
-            return res.json({ ok: true, prefix: getPrefix(guild.id) });
+            setSettings(guild.id, { prefix });
+            return res.json({ ok: true, prefix });
         } catch (e) {
             return res.status(500).json({ error: e.message });
         }
@@ -139,10 +125,10 @@ function setup(client) {
         const guild = client.guilds.cache.get(req.params.id);
         if (!guild) return res.status(404).json({ error: 'not found' });
         try {
-            const full = setSettings(guild.id, req.body || {});
-            res.json({ ok: true, settings: full });
+            const s = setSettings(guild.id, req.body || {});
+            return res.json({ ok: true, settings: s });
         } catch (e) {
-            res.status(500).json({ error: e.message });
+            return res.status(500).json({ error: e.message });
         }
     });
 
@@ -152,13 +138,11 @@ function setup(client) {
         if (!guild) return res.status(404).json({ error: 'not found' });
         const body = req.body || {};
         const extraEntries = Array.isArray(body.extraEntries)
-            ? body.extraEntries
-                  .filter((e) => e && e.roleId)
-                  .map((e) => ({
-                      roleId: String(e.roleId),
-                      entries: Math.max(0, Math.floor(Number(e.entries) || 0)),
-                      label: String(e.label || e.name || '').slice(0, 64)
-                  }))
+            ? body.extraEntries.map((e) => ({
+                  roleId: String(e.roleId || ''),
+                  entries: Math.max(0, Math.floor(Number(e.entries) || 0)),
+                  label: String(e.label || e.name || '').slice(0, 64)
+              }))
             : [];
         const requirements = {
             minLevel: Math.max(0, Math.floor(Number(body.minLevel) || 0)),
@@ -199,6 +183,40 @@ function setup(client) {
         } catch (e) {
             return res.status(500).json({ error: e.message });
         }
+    });
+
+    app.get('/pvp/:id', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'pvp-game.html'));
+    });
+
+    app.get('/api/pvp/:id', (req, res) => {
+        const fight = pvpArena.getArena(req.params.id);
+        if (!fight) return res.status(404).json({ error: 'not found' });
+        const as = req.query.as || sessionUser(req)?.user?.id || null;
+        return res.json(pvpArena.publicState(fight, as));
+    });
+
+    app.post('/api/pvp/:id/move', (req, res) => {
+        const fight = pvpArena.getArena(req.params.id);
+        if (!fight) return res.status(404).json({ ok: false, error: 'Arena não encontrada.' });
+        const body = req.body || {};
+        const session = sessionUser(req);
+        let playerId = body.playerId || null;
+        if (session?.user?.id) {
+            const sid = String(session.user.id);
+            if (sid === String(fight.a.id) || sid === String(fight.b.id)) {
+                playerId = sid;
+            }
+        }
+        if (!playerId) {
+            return res.status(400).json({ ok: false, error: 'Informe playerId.' });
+        }
+        if (String(playerId) !== String(fight.a.id) && String(playerId) !== String(fight.b.id)) {
+            return res.status(403).json({ ok: false, error: 'Você não está neste duelo.' });
+        }
+        const result = pvpArena.applyMove(req.params.id, playerId, body.move);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
     });
 
     app.get('/dashboard', (req, res) => {
