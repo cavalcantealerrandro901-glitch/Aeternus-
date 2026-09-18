@@ -33,6 +33,16 @@ const ESSENCE_BY_CLASS = {
 };
 
 const ITEMS = {
+    livro_agilidade: { id: 'livro_agilidade', name: 'Livro de Agilidade', emoji: '📗', category: 'consumivel', rarity: 'epico', effects: { agilidade: 1 }, consumable: true, bookAttr: 'agilidade' },
+    livro_forca: { id: 'livro_forca', name: 'Livro de Força', emoji: '📕', category: 'consumivel', rarity: 'epico', effects: { forca: 1 }, consumable: true, bookAttr: 'forca' },
+    livro_defesa: { id: 'livro_defesa', name: 'Livro de Defesa', emoji: '📘', category: 'consumivel', rarity: 'epico', effects: { defesa: 1 }, consumable: true, bookAttr: 'defesa' },
+    livro_vida: { id: 'livro_vida', name: 'Livro de Vida', emoji: '📙', category: 'consumivel', rarity: 'epico', effects: { vida: 1 }, consumable: true, bookAttr: 'vida' },
+    livro_classe_mago: { id: 'livro_classe_mago', name: 'Tomo de Mudança · Mago', emoji: '📜', category: 'especial', rarity: 'lendario', effects: {}, classChange: 'mago' },
+    livro_classe_arqueiro: { id: 'livro_classe_arqueiro', name: 'Tomo de Mudança · Arqueiro', emoji: '📜', category: 'especial', rarity: 'lendario', effects: {}, classChange: 'arqueiro' },
+    livro_classe_tanque: { id: 'livro_classe_tanque', name: 'Tomo de Mudança · Tanque', emoji: '📜', category: 'especial', rarity: 'lendario', effects: {}, classChange: 'tanque' },
+    livro_classe_healer: { id: 'livro_classe_healer', name: 'Tomo de Mudança · Healer', emoji: '📜', category: 'especial', rarity: 'lendario', effects: {}, classChange: 'healer' },
+    livro_classe_guerreiro: { id: 'livro_classe_guerreiro', name: 'Tomo de Mudança · Guerreiro', emoji: '📜', category: 'especial', rarity: 'lendario', effects: {}, classChange: 'guerreiro' },
+    livro_classe_assassino: { id: 'livro_classe_assassino', name: 'Tomo de Mudança · Assassino', emoji: '📜', category: 'especial', rarity: 'lendario', effects: {}, classChange: 'assassino' },
     cajado_arcano: { id: 'cajado_arcano', name: 'Cajado Arcano', emoji: '🪄', category: 'arma', rarity: 'comum', classId: 'mago', effects: { mana: 2, forca: 1 } },
     grimorio: { id: 'grimorio', name: 'Grimório Antigo', emoji: '📕', category: 'acessorio', rarity: 'comum', classId: 'mago', effects: { mana: 3 } },
     orbe_mana: { id: 'orbe_mana', name: 'Orbe de Mana', emoji: '🔮', category: 'acessorio', rarity: 'raro', classId: 'mago', effects: { mana: 5, forca: 1 } },
@@ -94,7 +104,7 @@ const TRADE_SHOP = [
     { id: 'buy_frag_comum', name: 'Fragmento Comum', emoji: '🔹', type: 'material', materialId: 'fragmento_comum', amount: 1, priceEter: 2500, mode: 'buy' },
     { id: 'buy_frag_raro', name: 'Fragmento Raro', emoji: '🔷', type: 'material', materialId: 'fragmento_raro', amount: 1, priceEter: 15000, mode: 'buy' },
     { id: 'buy_po', name: 'Pó de Nível', emoji: '🌫️', type: 'material', materialId: 'po_nivel', amount: 1, priceEter: 8000, mode: 'buy' },
-    { id: 'buy_nucleo', name: 'Núcleo Antigo', emoji: '💎', type: 'material', materialId: 'nucleo_antigo', amount: 1, priceEter: 75000, mode: 'buy' },
+    { id: 'buy_nucleo', name: 'Núcleo Antigo', emoji: '💎', type: 'item', materialId: 'nucleo_antigo', amount: 1, priceEter: 75000, mode: 'buy' },
     { id: 'buy_eter_frag', name: 'Fragmento de Éter Puro', emoji: '✨', type: 'material', materialId: 'fragmento_eter', amount: 1, priceEter: 200000, mode: 'buy' },
     { id: 'sell_frag_comum', name: 'Vender Fragmento Comum', emoji: '🔹', type: 'material', materialId: 'fragmento_comum', amount: 1, priceEter: 800, mode: 'sell' },
     { id: 'sell_frag_raro', name: 'Vender Fragmento Raro', emoji: '🔷', type: 'material', materialId: 'fragmento_raro', amount: 1, priceEter: 5000, mode: 'sell' },
@@ -127,6 +137,8 @@ function instantiateItem(itemId) {
         effects: def.effects ? { ...def.effects } : {},
         consumable: !!def.consumable,
         desc: def.desc || null,
+        classChange: def.classChange || null,
+        bookAttr: def.bookAttr || null,
         uid: def.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
         gotAt: Date.now()
     };
