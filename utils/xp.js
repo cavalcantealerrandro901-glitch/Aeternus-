@@ -79,106 +79,61 @@ function dailyMultiplier(level) {
 }
 
 function pointsForLevel(level) {
-    const lv = Math.max(1, Number(level) || 1);
-    return 2 + Math.floor(lv / 10);
+    return 1 + (Number(level || 0) % 5 === 0 ? 1 : 0);
 }
 
 function rollAttrGain(double = false) {
+    const n = double ? 2 : 1;
     const key = ATTR_KEYS[Math.floor(Math.random() * ATTR_KEYS.length)];
-    let amount = 1 + Math.floor(Math.random() * 3);
-    if (double) amount *= 2;
-    return { key, amount, label: ATTR_LABEL[key] };
+    return { key, amount: n };
 }
 
 function addXp(userId, amount) {
     const data = all();
-    const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR } };
+    const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
+    cur.xp = Number(cur.xp || 0) + Math.max(0, Number(amount) || 0);
+    const oldLevel = Number(cur.level || 0);
+    const newLevel = levelFromXp(cur.xp);
+    cur.level = newLevel;
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
     ensureAttrs(cur);
 
-    const before = levelFromXp(cur.xp);
-    cur.xp = Math.max(0, Number(cur.xp || 0) + Number(amount || 0));
-    const after = levelFromXp(cur.xp);
-    cur.level = after;
-
-    const gains = [];
-    const items = [];
-    const materialsGained = [];
-    let pointsGained = 0;
-    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
-
-    if (after > before) {
-        let playerUtil = null;
-        let craftUtil = null;
-        try {
-            playerUtil = require('./player');
-        } catch (_) {}
-        try {
-            craftUtil = require('./craft');
-        } catch (_) {}
-
-        const levelsGained = after - before;
-        for (let i = 0; i < levelsGained; i++) {
-            const lv = before + i + 1;
-            const pts = pointsForLevel(lv);
-            cur.attrPoints += pts;
-            pointsGained += pts;
-
-            if (playerUtil && Math.random() < 0.1) {
-                const profile = playerUtil.get(userId);
-                const classId = profile?.classId || 'guerreiro';
-                const item = playerUtil.rollClassItem(classId);
-                playerUtil.addItem(userId, item);
-                items.push(item);
-            }
-
-            if (craftUtil && playerUtil) {
-                const profile = playerUtil.get(userId);
-                const mats = craftUtil.onLevelUp(userId, profile?.classId, lv);
-                if (mats && Object.keys(mats).length) materialsGained.push({ level: lv, mats });
-            }
-        }
+    const leveled = [];
+    for (let lv = oldLevel + 1; lv <= newLevel; lv++) {
+        const pts = pointsForLevel(lv);
+        cur.attrPoints += pts;
+        leveled.push({ level: lv, points: pts });
     }
 
     data[userId] = cur;
     store.save('xp.json', data);
+    return { ...get(userId), leveled };
+}
 
-    return {
-        xp: cur.xp,
-        level: cur.level,
-        attrs: { ...cur.attrs },
-        attrPoints: cur.attrPoints,
-        leveled: after > before,
-        reward: 0,
-        attrGains: gains,
-        pointsGained,
-        items,
-        materialsGained,
-        oldLevel: before,
-        progress: progress(userId)
-    };
+function addAttrPoints(userId, amount) {
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!n) return get(userId);
+    const data = all();
+    const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + n;
+    ensureAttrs(cur);
+    data[userId] = cur;
+    store.save('xp.json', data);
+    return get(userId);
 }
 
 function spendAttrPoint(userId, attrKey) {
-    if (!ATTR_KEYS.includes(attrKey)) return { ok: false, error: 'Atributo inválido.' };
+    if (!ATTR_KEYS.includes(attrKey)) return null;
     const data = all();
-    const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR }, attrPoints: 0 };
+    const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
     ensureAttrs(cur);
-    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
-    if (cur.attrPoints < 1) {
-        return { ok: false, error: 'Você não tem pontos de atributo disponíveis.' };
-    }
-    cur.attrPoints -= 1;
-    cur.attrs[attrKey] = (cur.attrs[attrKey] || 0) + 1;
+    const pts = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
+    if (pts <= 0) return null;
+    cur.attrPoints = pts - 1;
+    cur.attrs[attrKey] = Math.max(0, Math.floor(Number(cur.attrs[attrKey] || 0))) + 1;
     data[userId] = cur;
     store.save('xp.json', data);
-    return {
-        ok: true,
-        attrKey,
-        label: ATTR_LABEL[attrKey],
-        value: cur.attrs[attrKey],
-        attrPoints: cur.attrPoints,
-        attrs: { ...cur.attrs }
-    };
+    return get(userId);
 }
 
 function getAttrs(userId) {
@@ -187,19 +142,12 @@ function getAttrs(userId) {
 
 function maxHp(userId) {
     const a = getAttrs(userId);
-    return 50 + a.vida * 8;
+    return 50 + (a.vida || 10) * 8;
 }
 
 function maxMana(userId) {
-    try {
-        const player = require('./player');
-        const profile = player.get(userId);
-        const level = get(userId).level;
-        return player.maxManaFromLevel(level, profile?.classId || 'guerreiro');
-    } catch {
-        const level = get(userId).level;
-        return 20 + level * 4;
-    }
+    const a = getAttrs(userId);
+    return 40 + Math.floor((a.agilidade || 5) * 1.5) + Math.floor((a.forca || 5) * 0.5);
 }
 
 function leaderboard(limit = 10) {
@@ -243,6 +191,7 @@ module.exports = {
     dailyMultiplier,
     addXp,
     spendAttrPoint,
+    addAttrPoints,
     pointsForLevel,
     maxHp,
     maxMana,
