@@ -48,92 +48,93 @@ function levelFromXp(totalXp) {
     let remain = Number(totalXp || 0);
     while (remain >= xpForLevel(level)) {
         remain -= xpForLevel(level);
-        level++;
-        if (level > 10000) break;
+        level += 1;
+        if (level > 9999) break;
     }
     return level;
 }
 
 function progress(userId) {
     const { xp, level, attrs, attrPoints } = get(userId);
-    let remain = Number(xp || 0);
-    for (let lv = 0; lv < level; lv++) remain -= xpForLevel(lv);
-    if (remain < 0) remain = 0;
+    let remain = xp;
+    for (let i = 0; i < level; i++) remain -= xpForLevel(i);
     const need = xpForLevel(level);
-    const pct = Math.min(100, Math.floor((remain / Math.max(1, need)) * 100));
     return {
-        totalXp: xp,
+        xp,
         level,
-        current: Math.floor(remain),
+        intoLevel: Math.max(0, remain),
         need,
-        pct,
-        toNext: Math.max(0, need - Math.floor(remain)),
-        mult: dailyMultiplier(level),
         attrs,
         attrPoints
     };
 }
 
-function dailyMultiplier(level) {
-    return 1 + Math.min(2, Number(level || 0) * 0.04);
-}
-
 function pointsForLevel(level) {
-    return 1 + (Number(level || 0) % 5 === 0 ? 1 : 0);
+    const lv = Math.max(0, Math.floor(Number(level) || 0));
+    if (lv <= 0) return 0;
+    if (lv <= 10) return 1;
+    if (lv <= 50) return 2;
+    if (lv <= 100) return 3;
+    return 4;
 }
 
-function rollAttrGain(double = false) {
-    const n = double ? 2 : 1;
-    const key = ATTR_KEYS[Math.floor(Math.random() * ATTR_KEYS.length)];
-    return { key, amount: n };
+function dailyMultiplier() {
+    return 1;
 }
 
 function addXp(userId, amount) {
     const data = all();
     const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
-    cur.xp = Number(cur.xp || 0) + Math.max(0, Number(amount) || 0);
-    const oldLevel = Number(cur.level || 0);
-    const newLevel = levelFromXp(cur.xp);
-    cur.level = newLevel;
-    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
     ensureAttrs(cur);
-
-    const leveled = [];
-    for (let lv = oldLevel + 1; lv <= newLevel; lv++) {
-        const pts = pointsForLevel(lv);
-        cur.attrPoints += pts;
-        leveled.push({ level: lv, points: pts });
+    const before = Number(cur.level || levelFromXp(cur.xp || 0));
+    cur.xp = Math.max(0, Number(cur.xp || 0) + Math.max(0, Number(amount) || 0));
+    cur.level = levelFromXp(cur.xp);
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
+    let gained = 0;
+    if (cur.level > before) {
+        for (let lv = before + 1; lv <= cur.level; lv++) {
+            const pts = pointsForLevel(lv);
+            cur.attrPoints += pts;
+            gained += pts;
+        }
     }
-
     data[userId] = cur;
     store.save('xp.json', data);
-    return { ...get(userId), leveled };
+    return {
+        leveled: cur.level > before,
+        from: before,
+        to: cur.level,
+        attrPointsGained: gained,
+        ...get(userId)
+    };
 }
 
-function addAttrPoints(userId, amount) {
-    const n = Math.max(0, Math.floor(Number(amount) || 0));
-    if (!n) return get(userId);
+function addAttrPoints(userId, n) {
     const data = all();
     const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
-    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + n;
     ensureAttrs(cur);
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + Math.max(0, Math.floor(Number(n) || 0));
     data[userId] = cur;
     store.save('xp.json', data);
     return get(userId);
 }
 
 function spendAttrPoint(userId, attrKey) {
-    if (!ATTR_KEYS.includes(attrKey)) return null;
+    if (!ATTR_KEYS.includes(attrKey)) {
+        return { ok: false, error: 'Atributo inválido.' };
+    }
     const data = all();
     const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
     ensureAttrs(cur);
     const pts = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
-    if (pts <= 0) return null;
+    if (pts <= 0) {
+        return { ok: false, error: 'Você não tem pontos de atributo disponíveis.' };
+    }
     cur.attrPoints = pts - 1;
     cur.attrs[attrKey] = Math.max(0, Math.floor(Number(cur.attrs[attrKey] || 0))) + 1;
     data[userId] = cur;
     store.save('xp.json', data);
-    return get(userId);
+    return { ok: true, data: get(userId) };
 }
 
 function getAttrs(userId) {
@@ -177,6 +178,11 @@ function rankOf(userId) {
         total: list.length,
         entry: idx >= 0 ? list[idx] : null
     };
+}
+
+function rollAttrGain() {
+    const k = ATTR_KEYS[Math.floor(Math.random() * ATTR_KEYS.length)];
+    return { key: k, label: ATTR_LABEL[k] || k, amount: 1 };
 }
 
 module.exports = {
