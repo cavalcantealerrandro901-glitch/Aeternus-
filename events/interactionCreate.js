@@ -1,57 +1,9 @@
 const cmdLock = require('../utils/cmdLock');
 const autoRepair = require('../utils/autoRepair');
-const musicManager = require('../utils/musicManager');
-const { Collection, PermissionFlagsBits } = require('discord.js');
+const musicManager = require('../utils/music');
 
-function isUnknownInteraction(err) {
-    const code = err?.code ?? err?.rawError?.code;
-    return code === 10062 || /unknown interaction/i.test(String(err?.message || ''));
-}
-
-async function bridgeSlashToPrefix(interaction, cmd, client) {
-    const raw = interaction.options?.getString?.('args') || '';
-    const args = raw.trim() ? raw.trim().split(/\s+/) : [];
-
-    const mentionUsers = new Collection();
-    for (const a of args) {
-        const m = a.match(/^<@!?(\d+)>$/);
-        if (m) {
-            const u = await client.users.fetch(m[1]).catch(() => null);
-            if (u) mentionUsers.set(u.id, u);
-        }
-    }
-
-    let replied = false;
-    const fakeMessage = {
-        author: interaction.user,
-        member: interaction.member,
-        guild: interaction.guild,
-        channel: interaction.channel,
-        client,
-        content: raw,
-        mentions: {
-            users: mentionUsers,
-            members: interaction.guild?.members?.cache || new Collection()
-        },
-        reply: async (payload) => {
-            if (typeof payload === 'string') payload = { content: payload };
-            if (!interaction.replied && !interaction.deferred) {
-                replied = true;
-                return interaction.reply(payload);
-            }
-            if (interaction.deferred && !interaction.replied) {
-                replied = true;
-                return interaction.editReply(payload);
-            }
-            return interaction.followUp(payload);
-        }
-    };
-
-    await cmd.execute(fakeMessage, args, client);
-
-    if (!replied && !interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: '✅', flags: 64 }).catch(() => {});
-    }
+function isUnknownInteraction(e) {
+    return e?.code === 10062 || e?.code === 40060;
 }
 
 module.exports = {
@@ -59,62 +11,58 @@ module.exports = {
     async execute(interaction, client) {
         try {
             if (interaction.isModalSubmit()) {
-                const parts = (interaction.customId || '').split(':');
+                const id = interaction.customId || '';
+                const parts = id.split(':');
                 const cmd = client.commands.get(parts[0]);
                 if (cmd?.handleModal) {
                     await cmd.handleModal(interaction, client);
-                    return;
                 }
+                return;
             }
 
             if (interaction.isChatInputCommand()) {
-                if (
-                    interaction.guild &&
-                    cmdLock.isLocked(interaction.guild.id, interaction.channelId)
-                ) {
-                    if (
-                        !interaction.member?.permissions?.has?.(
-                            PermissionFlagsBits.ManageChannels
-                        )
-                    ) {
-                        const hint = cmdLock.redirectHint(interaction.guild.id);
-                        return interaction
-                            .reply({
+                const name = interaction.commandName;
+                const cmd = client.slash.get(name) || client.commands.get(name);
+                if (!cmd) return;
+
+                if (interaction.guild && cmdLock.isLocked) {
+                    const locked = cmdLock.isLocked(interaction.guild.id, interaction.channelId);
+                    if (locked) {
+                        try {
+                            await interaction.reply({
                                 content:
-                                    `🔒 ${interaction.user}, os **meus comandos** estão bloqueados neste chat.\n` +
-                                    hint,
-                                flags: 64
-                            })
-                            .catch(() => {});
+                                    `${interaction.user} meus comandos estão bloqueados nesse chat. Vá para o canal de comandos e os utilize lá. 😊`,
+                                ephemeral: true
+                            });
+                        } catch (_) {}
+                        return;
                     }
                 }
 
-                const name = interaction.commandName;
-                const cmd = client.slash.get(name) || client.commands.get(name);
-
-                if (!cmd) {
-                    return interaction
-                        .reply({
-                            content:
-                                '❌ Este slash não existe mais. Aguarde a sincronização.',
-                            flags: 64
-                        })
-                        .catch(() => {});
+                try {
+                    if (typeof cmd.executeSlash === 'function') {
+                        await cmd.executeSlash(interaction, client);
+                    } else if (typeof cmd.execute === 'function') {
+                        await cmd.execute(interaction, [], client);
+                    }
+                } catch (e) {
+                    if (isUnknownInteraction(e)) return;
+                    await autoRepair.handleCommandError({
+                        cmdName: name,
+                        error: e,
+                        context: `slash · ${interaction.guild?.name || '?'}`,
+                        interaction
+                    });
+                    try {
+                        const msg = { content: '❌ Erro ao executar o comando.', ephemeral: true };
+                        if (interaction.replied || interaction.deferred) {
+                            await interaction.followUp(msg).catch(() => {});
+                        } else {
+                            await interaction.reply(msg).catch(() => {});
+                        }
+                    } catch (_) {}
                 }
-
-                if (typeof cmd.executeSlash === 'function') {
-                    await cmd.executeSlash(interaction, client);
-                    return;
-                }
-
-                if (typeof cmd.execute === 'function') {
-                    await bridgeSlashToPrefix(interaction, cmd, client);
-                    return;
-                }
-
-                return interaction
-                    .reply({ content: 'Indisponível.', flags: 64 })
-                    .catch(() => {});
+                return;
             }
 
             if (interaction.isButton() || interaction.isStringSelectMenu()) {
@@ -136,6 +84,10 @@ module.exports = {
                     cmd = client.commands.get('blackjack') || client.commands.get('bj');
                 }
 
+                if (!cmd && root === 'inv') {
+                    cmd = client.commands.get('inventario');
+                }
+
                 if (!cmd?.handleComponent) return;
 
                 if (
@@ -149,7 +101,6 @@ module.exports = {
                 await cmd.handleComponent(interaction, client);
             }
         } catch (e) {
-            // 10062 = interação já expirou / já respondida — não spammar DM
             if (isUnknownInteraction(e)) {
                 console.warn(
                     '[interaction] 10062 ignorado ·',
