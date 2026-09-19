@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Aeternus · Arena 3D</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root{--accent:#c4b5fd;--hp:#f43f5e;--mana:#38bdf8;--gold:#fbbf24;--panel:rgba(8,6,18,.78);--line:rgba(255,255,255,.14);--depth:900px}
+*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%;overflow:hidden}
+body{font-family:Rajdhani,system-ui,sans-serif;color:#f1f5f9;background:#02010a;-webkit-font-smoothing:antialiased}
+#stage{position:fixed;inset:0;perspective:var(--depth);perspective-origin:50% 42%;overflow:hidden}
+#sky{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,#2a1650 0%,#0a0618 45%,#02010a 100%);transition:background 1.4s ease;z-index:0}
+#sky::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 20% 30%,rgba(167,139,250,.15),transparent 35%),radial-gradient(circle at 80% 20%,rgba(56,189,248,.12),transparent 30%);pointer-events:none}
+canvas#world{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.ground{position:absolute;left:50%;bottom:8%;width:160vmax;height:90vmax;transform:translateX(-50%) rotateX(72deg);transform-origin:center top;background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.55) 100%),repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 2px,transparent 2px 48px),repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 2px,transparent 2px 48px);background-color:#1a1230;border-radius:50%;box-shadow:0 -40px 120px rgba(124,58,237,.25);z-index:2;opacity:.85;transition:background-color 1.2s ease}
+.vignette{position:absolute;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.55) 100%)}
+.flash{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;background:#fff;mix-blend-mode:screen}
+.hud{position:relative;z-index:10;height:100%;display:flex;flex-direction:column}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;gap:12px}
+.brand{font-family:Cinzel,serif;font-weight:800;letter-spacing:.18em;font-size:.82rem;text-transform:uppercase;background:linear-gradient(90deg,#e9d5ff,#67e8f9,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
+.log{flex:1;text-align:center;font-size:.9rem;opacity:.9;max-width:50%;margin:0 auto;text-shadow:0 2px 10px #000}
+.battlefield{flex:1;display:flex;align-items:flex-end;justify-content:center;gap:8vw;padding:0 4vw 18vh;position:relative}
+.fighter{width:min(280px,42vw);transform-style:preserve-3d;transform:translateZ(0) rotateY(-6deg);transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .3s;position:relative}
+.fighter.right{transform:translateZ(0) rotateY(6deg)}
+.fighter.active{transform:translateZ(40px) translateY(-8px) rotateY(0) scale(1.04);filter:drop-shadow(0 0 28px color-mix(in srgb,var(--accent) 55%,transparent))}
+.fighter.right.active{transform:translateZ(40px) translateY(-8px) rotateY(0) scale(1.04)}
+.portrait-frame{position:relative;width:100%;aspect-ratio:1;border-radius:18px;padding:3px;background:linear-gradient(145deg,rgba(255,255,255,.35),rgba(255,255,255,.05));box-shadow:0 20px 50px rgba(0,0,0,.55);transform:translateZ(30px)}
+.portrait-inner{position:relative;width:100%;height:100%;border-radius:15px;overflow:hidden;background:#120c24;display:flex;align-items:center;justify-content:center}
+.portrait-inner img{width:100%;height:100%;object-fit:cover}
+.portrait-emoji{font-size:4.5rem;filter:drop-shadow(0 8px 16px rgba(0,0,0,.5))}
+.portrait-glow{position:absolute;inset:auto 10% -20%;height:40%;background:radial-gradient(ellipse,var(--accent),transparent 70%);opacity:.45;pointer-events:none}
+.class-badge{position:absolute;left:8px;bottom:8px;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.55);border:1px solid var(--line);font-size:.72rem;backdrop-filter:blur(8px)}
+.fighter-info{margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;backdrop-filter:blur(18px);box-shadow:0 12px 40px rgba(0,0,0,.45);transform:translateZ(20px)}
+.flvl{font-size:.78rem;opacity:.85;margin-top:2px;letter-spacing:.04em}
+.fattrs{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:.72rem;line-height:1.25}
+.fattrs span{display:flex;justify-content:space-between;gap:6px;opacity:.92}
+.fattrs b{font-weight:700;color:var(--accent)}
+.ficha-tag{font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-bottom:4px}
+.fname{font-family:Cinzel,serif;font-weight:700;font-size:1rem;letter-spacing:.04em}
+.bar-row{margin-top:6px}.bar-meta{display:flex;justify-content:space-between;font-size:.7rem;opacity:.85;margin-bottom:2px}
+.bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;border:1px solid rgba(255,255,255,.06)}
+.bar i{display:block;height:100%;width:0;transition:width .35s ease}
+.bar.hp i{background:linear-gradient(90deg,#fb7185,var(--hp))}
+.bar.mana i{background:linear-gradient(90deg,#7dd3fc,var(--mana))}
+.center-hud{position:absolute;top:18%;left:50%;transform:translateX(-50%);text-align:center;z-index:12;pointer-events:none}
+.vs{font-family:Cinzel,serif;font-size:1.4rem;letter-spacing:.3em;opacity:.7}
+.skillbar{position:relative;z-index:15;padding:12px 16px 22px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.75));backdrop-filter:blur(12px)}
+.hint{text-align:center;font-size:.9rem;margin-bottom:10px;opacity:.9}
+.skills{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:720px;margin:0 auto}
+.skill{appearance:none;border:1px solid var(--line);background:rgba(12,8,28,.85);color:#f8fafc;border-radius:14px;padding:12px 8px;cursor:pointer;font-family:inherit;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.2s;min-height:88px}
+.skill:hover:not(:disabled){border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,58,237,.35)}
+.skill:disabled{opacity:.4;cursor:not-allowed}
+.skill.special{border-color:rgba(251,191,36,.45);background:linear-gradient(180deg,rgba(251,191,36,.12),rgba(12,8,28,.9))}
+.skill .ico{font-size:1.4rem}.skill .cost{font-size:.72rem;opacity:.75}
+.toast{position:fixed;left:50%;bottom:28%;transform:translateX(-50%) translateY(12px);background:rgba(0,0,0,.8);border:1px solid var(--line);padding:10px 18px;border-radius:12px;opacity:0;transition:.25s;z-index:50;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.dmg-float{position:fixed;z-index:40;font-family:Cinzel,serif;font-weight:800;font-size:1.6rem;color:#fecdd3;text-shadow:0 2px 12px #000;animation:rise .95s ease forwards;pointer-events:none}
+@keyframes rise{0%{opacity:0;transform:translateY(10px) scale(.9)}20%{opacity:1}100%{opacity:0;transform:translateY(-48px) scale(1.1)}}
+@media(max-width:640px){.skills{grid-template-columns:1fr 1fr}.fighter{width:min(160px,44vw)}.portrait-emoji{font-size:3rem}.center-hud{top:12%}.battlefield{gap:12px;padding-bottom:2vh}.fattrs{font-size:.65rem}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="sky"></div>
+  <canvas id="world"></canvas>
+  <div class="ground" id="ground"></div>
+  <div class="vignette"></div>
+  <div class="flash" id="flash"></div>
+  <div class="hud">
+    <div class="topbar">
+      <div class="brand">Aeternus Arena</div>
+      <div class="log" id="log">Carregando arena…</div>
+      <div></div>
+    </div>
+    <div class="center-hud"><div class="vs">VS</div></div>
+    <div class="battlefield">
+      <div class="fighter" id="cardA">
+        <div class="portrait-frame"><div class="portrait-inner" id="avA"><span class="portrait-emoji" id="emojiA">⚔️</span><div class="portrait-glow"></div><div class="class-badge" id="clsA">—</div></div></div>
+        <div class="fighter-info">
+          <div class="ficha-tag">✦ Ficha do aventureiro</div>
+          <div class="fname" id="nameA">—</div>
+          <div class="flvl" id="lvlA">Nível —</div>
+          <div class="bar-row"><div class="bar-meta"><span>❤️ HP</span><span id="hpA">0/0</span></div><div class="bar hp"><i id="hpBarA"></i></div></div>
+          <div class="bar-row"><div class="bar-meta"><span>🔷 MANA</span><span id="mpA">0/0</span></div><div class="bar mana"><i id="mpBarA"></i></div></div>
+          <div class="fattrs" id="attrsA"></div>
+        </div>
+      </div>
+      <div class="fighter right" id="cardB">
+        <div class="portrait-frame"><div class="portrait-inner" id="avB"><span class="portrait-emoji" id="emojiB">⚔️</span><div class="portrait-glow"></div><div class="class-badge" id="clsB">—</div></div></div>
+        <div class="fighter-info">
+          <div class="ficha-tag">✦ Ficha do aventureiro</div>
+          <div class="fname" id="nameB">—</div>
+          <div class="flvl" id="lvlB">Nível —</div>
+          <div class="bar-row"><div class="bar-meta"><span>❤️ HP</span><span id="hpB">0/0</span></div><div class="bar hp"><i id="hpBarB"></i></div></div>
+          <div class="bar-row"><div class="bar-meta"><span>🔷 MANA</span><span id="mpB">0/0</span></div><div class="bar mana"><i id="mpBarB"></i></div></div>
+          <div class="fattrs" id="attrsB"></div>
+        </div>
+      </div>
+    </div>
+    <div class="skillbar">
+      <div class="hint" id="hint">Aguardando…</div>
+      <div class="skills" id="moves"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(()=>{
+const path=location.pathname.split('/').filter(Boolean);
+const fightId=path[path.length-1];
+const me=new URLSearchParams(location.search).get('as')||'';
+const el=id=>document.getElementById(id);
+const toast=msg=>{const t=el('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)};
+const canvas=el('world');const ctx=canvas.getContext('2d');
+let W=0,H=0,particles=[],stars=[],mist=[],landscape=null,anim=0;
+function resize(){W=canvas.width=innerWidth*devicePixelRatio;H=canvas.height=innerHeight*devicePixelRatio;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';stars=Array.from({length:120},()=>({x:Math.random(),y:Math.random()*.6,r:Math.random()*1.8+.3,tw:Math.random()*Math.PI*2,s:.5+Math.random()}));mist=Array.from({length:18},()=>({x:Math.random(),y:.55+Math.random()*.3,w:.15+Math.random()*.25,a:.04+Math.random()*.06,sp:.01+Math.random()*.02}))}
+function draw(){anim+=.016;ctx.clearRect(0,0,W,H);for(const s of stars){const a=.25+Math.sin(anim*s.s+s.tw)*.3;ctx.fillStyle=`rgba(255,255,255,${Math.max(0,a)})`;ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r*devicePixelRatio,0,Math.PI*2);ctx.fill()}for(const m of mist){m.x+=m.sp*.002;if(m.x>1.2)m.x=-.2;const grd=ctx.createRadialGradient(m.x*W,m.y*H,0,m.x*W,m.y*H,m.w*W);grd.addColorStop(0,`rgba(180,160,255,${m.a})`);grd.addColorStop(1,'transparent');ctx.fillStyle=grd;ctx.fillRect(m.x*W-m.w*W,m.y*H-m.w*W*.3,m.w*W*2,m.w*W*.6)}particles=particles.filter(p=>p.life>0);for(const p of particles){p.life-=.018;p.x+=p.vx;p.y+=p.vy;p.vy+=.04;ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;requestAnimationFrame(draw)}
+function burst(kind){const colors={attack:['#e9d5ff','#a78bfa','#f8fafc'],heavy:['#fb923c','#f97316','#fdba74'],special:['#fbbf24','#f472b6','#67e8f9','#c4b5fd'],defend:['#94a3b8','#cbd5e1','#e2e8f0']};const cols=colors[kind]||colors.attack;const cx=W/2,cy=H*.42;for(let i=0;i<48;i++){const ang=Math.random()*Math.PI*2;const sp=2.5+Math.random()*7;particles.push({x:cx,y:cy,vx:Math.cos(ang)*sp*devicePixelRatio,vy:Math.sin(ang)*sp*devicePixelRatio-1,r:(2+Math.random()*3.5)*devicePixelRatio,life:.85+Math.random()*.4,color:cols[i%cols.length]})}const flash=el('flash');flash.style.transition='none';flash.style.opacity='.4';flash.style.background=cols[0];requestAnimationFrame(()=>{flash.style.transition='opacity .4s ease';flash.style.opacity='0'})}
+function floatDmg(text){const n=document.createElement('div');n.className='dmg-float';n.textContent=text;n.style.left=(48+Math.random()*4)+'%';n.style.top=(40+Math.random()*8)+'%';document.body.appendChild(n);setTimeout(()=>n.remove(),950)}
+function fillFighter(side,f,turnId){
+  if(!f)return;
+  el('name'+side).textContent=f.name||'—';
+  el('cls'+side).textContent=(f.emoji||'⚔️')+' '+(f.className||f.classId||'');
+  const lvl=el('lvl'+side);
+  if(lvl) lvl.textContent='Nível '+(f.level!=null?f.level:'—')+' · '+(f.className||f.classId||'');
+  el('hp'+side).textContent=f.hp+' / '+f.maxHp;
+  el('mp'+side).textContent=f.mana+' / '+f.maxMana;
+  el('hpBar'+side).style.width=Math.max(0,(f.hp/Math.max(1,f.maxHp))*100)+'%';
+  el('mpBar'+side).style.width=Math.max(0,(f.mana/Math.max(1,f.maxMana))*100)+'%';
+  const box=el('av'+side);const em=el('emoji'+side);let img=box.querySelector('img');
+  if(f.photo){
+    if(!img){img=document.createElement('img');img.alt=f.name;box.insertBefore(img,box.firstChild)}
+    img.src=f.photo;if(em)em.style.display='none';
+  }else{
+    if(img)img.remove();if(em){em.style.display='';em.textContent=f.emoji||'⚔️'}
+  }
+  const attrsBox=el('attrs'+side);
+  if(attrsBox){
+    const a=f.attrs||{};
+    const rows=[
+      ['💪 FOR',a.forca],
+      ['⚡ AGI',a.agilidade],
+      ['🛡️ CON',a.constituicao],
+      ['🧠 INT',a.inteligencia],
+      ['✨ ESP',a.espirito],
+      ['🍀 SOR',a.sorte]
+    ];
+    attrsBox.innerHTML=rows.map(([lab,v])=>'<span><i>'+lab+'</i><b>'+(v!=null?v:'—')+'</b></span>').join('');
+  }
+  el('card'+side).classList.toggle('active',String(f.id)===String(turnId)&&!window.__over);
+}
+function renderMoves(state){const box=el('moves');box.innerHTML='';const myTurn=me&&String(state.turn)===String(me)&&!state.over;el('hint').textContent=state.over?(String(state.winnerId)===String(me)?'🏆 Vitória!':'Duelo encerrado'):myTurn?'▶ Sua vez — escolha a habilidade':'⏳ Aguardando oponente…';(state.moves||[]).forEach(m=>{const b=document.createElement('button');b.className='skill'+(m.key==='special'?' special':'');b.disabled=!myTurn||m.disabled||state.over;b.innerHTML='<span class="ico">'+m.emoji+'</span><span>'+m.label+'</span><span class="cost">'+(m.cost?'⚡ '+m.cost+' mana':'Livre')+'</span>';b.onclick=()=>doMove(m.key);box.appendChild(b)})}
+function render(state){if(!state)return;window.__over=!!state.over;el('log').textContent=state.lastLog||'Arena pronta';fillFighter('A',state.a,state.turn);fillFighter('B',state.b,state.turn);renderMoves(state);if(state.landscape&&state.landscape!==landscape){landscape=state.landscape;const g=el('ground');const sky=el('sky');if(state.landscape.ground)g.style.backgroundColor=state.landscape.ground;if(state.landscape.sky)sky.style.background=state.landscape.sky}}
+async function load(){try{const r=await fetch('/api/pvp/'+fightId+(me?'?as='+encodeURIComponent(me):''));if(!r.ok){el('log').textContent='Arena não encontrada ou expirada.';return}render(await r.json())}catch(_){el('log').textContent='Falha ao conectar na arena.'}}
+async function doMove(kind){if(!me){toast('Abra o link que o bot enviou para você.');return}const r=await fetch('/api/pvp/'+fightId+'/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:me,move:kind})});const data=await r.json().catch(()=>({}));if(!r.ok||!data.ok){toast(data.error||'Falha no movimento');return}burst(kind);if(data.state&&data.state.lastDamage)floatDmg('-'+data.state.lastDamage);render(data.state)}
+addEventListener('resize',resize);resize();draw();load();setInterval(load,2500);
+})();
+</script>
+</body>
+</html>
