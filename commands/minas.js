@@ -146,7 +146,6 @@ function panelEmbed(game, extra, reveal) {
     const curM = multAt(opened, bombs);
     const nextM = opened < safeTotal ? multAt(opened + 1, bombs) : curM;
     const nextPay = potentialAt(game.amount, opened + 1, bombs);
-    const cashNow = potentialAt(game.amount, opened, bombs);
 
     const apostado = game.fun ? 'diversão' : fmt(game.amount) + ' éter';
     const proxLine = game.fun
@@ -179,7 +178,7 @@ function panelEmbed(game, extra, reveal) {
         })
         .setTimestamp();
 
-    if (extra) emb.addFields({ name: '\u200b', value: extra.slice(0, 1024) });
+    if (extra) emb.addFields({ name: '\u200b', value: String(extra).slice(0, 1024) });
     return emb;
 }
 
@@ -200,12 +199,9 @@ function panelPayload(game, extra, reveal) {
     if (game.dead || game.cashed) {
         embeds.push(resultEmbed(game, extra));
     }
-    if (game.cashed && !game.fun && files.some((f) => f.name === 'mines-win.jpg')) {
-        // ok
-    }
     return {
         embeds,
-        components: fullComponents(game, { reveal: !!reveal }),
+        components: fullComponents(game, !!reveal, potentialAt),
         files
     };
 }
@@ -243,11 +239,13 @@ function touch(game, client) {
                     const main = await ch.messages.fetch(game.messageId).catch(() => null);
                     if (main) {
                         const payload = endPayload(game);
-                        await main.edit({
-                            content: main.content || undefined,
-                            embeds: payload.embeds,
-                            components: payload.components
-                        }).catch(() => {});
+                        await main
+                            .edit({
+                                content: main.content || undefined,
+                                embeds: payload.embeds,
+                                components: payload.components
+                            })
+                            .catch(() => {});
                     }
                 }
             }
@@ -422,10 +420,17 @@ module.exports = {
             })
             .catch(() => null);
 
-        if (sent) {
-            game.messageId = sent.id;
-            game.channelId = message.channel.id;
+        if (!sent) {
+            // Devolve a aposta se a mensagem falhou
+            if (!fun && amount > 0) {
+                eter.add(message.author.id, amount, { reason: 'mines send fail refund' });
+            }
+            games.delete(game.id);
+            return message.reply('❌ Não consegui enviar o tabuleiro. Tente de novo.').catch(() => {});
         }
+
+        game.messageId = sent.id;
+        game.channelId = message.channel.id;
         await minesCash.syncCashMessage(message.client, game).catch(() => {});
         touch(game, message.client);
     },
@@ -465,7 +470,6 @@ module.exports = {
         }
 
         if (action === 'again') {
-            // Carrega config do jogo antigo (aposta, bombas, modo diversão)
             let amount = Math.max(0, Math.floor(Number(game.amount) || 0));
             const fun = !!game.fun;
             const bombCount = Math.min(
@@ -496,7 +500,6 @@ module.exports = {
             games.delete(gameId);
             clearTimer(game);
 
-            // Desativa botões do jogo antigo (mantém o resultado visível)
             await safeUpdate(interaction, {
                 content: interaction.message.content || startContent(game.userId),
                 embeds: interaction.message.embeds,
@@ -521,7 +524,6 @@ module.exports = {
                 components: payload.components,
                 files: payload.files || []
             };
-            // Responde / “carrega” a mensagem do jogo anterior
             if (prevMessageId) {
                 sendOpts.reply = {
                     messageReference: prevMessageId,
@@ -531,10 +533,16 @@ module.exports = {
 
             const sent = await interaction.channel.send(sendOpts).catch(() => null);
 
-            if (sent) {
-                ng.messageId = sent.id;
-                ng.channelId = prevChannelId;
+            if (!sent) {
+                if (!fun && amount > 0) {
+                    eter.add(game.userId, amount, { reason: 'mines again fail refund' });
+                }
+                games.delete(ng.id);
+                return;
             }
+
+            ng.messageId = sent.id;
+            ng.channelId = prevChannelId;
             await minesCash.syncCashMessage(client, ng).catch(() => {});
             touch(ng, client);
             return;
