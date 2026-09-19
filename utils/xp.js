@@ -1,26 +1,56 @@
 const store = require('./store');
 
-const ATTR_KEYS = ['forca', 'defesa', 'agilidade', 'vida'];
+const ATTR_KEYS = [
+    'forca',
+    'agilidade',
+    'constituicao',
+    'inteligencia',
+    'espirito',
+    'sorte'
+];
+
 const ATTR_LABEL = {
     forca: 'Força',
-    defesa: 'Defesa',
     agilidade: 'Agilidade',
+    constituicao: 'Constituição',
+    inteligencia: 'Inteligência',
+    espirito: 'Espírito',
+    sorte: 'Sorte',
+    // legado
+    defesa: 'Defesa',
     vida: 'Vida'
 };
 
 const BASE_ATTR = {
-    forca: 5,
-    defesa: 5,
-    agilidade: 5,
-    vida: 10
+    forca: 10,
+    agilidade: 10,
+    constituicao: 10,
+    inteligencia: 10,
+    espirito: 10,
+    sorte: 10
 };
 
 function all() {
     return store.load('xp.json', {});
 }
 
+function migrateAttrs(raw) {
+    const a = raw && typeof raw === 'object' ? { ...raw } : {};
+    if (a.constituicao == null) {
+        const fromVida = Number(a.vida);
+        const fromDef = Number(a.defesa);
+        if (Number.isFinite(fromVida) || Number.isFinite(fromDef)) {
+            a.constituicao = Math.max(
+                BASE_ATTR.constituicao,
+                Math.floor(Math.max(fromVida || 0, fromDef || 0))
+            );
+        }
+    }
+    return a;
+}
+
 function ensureAttrs(d) {
-    const a = d.attrs && typeof d.attrs === 'object' ? { ...d.attrs } : {};
+    const a = migrateAttrs(d.attrs);
     for (const k of ATTR_KEYS) {
         a[k] = Math.max(0, Math.floor(Number(a[k] ?? BASE_ATTR[k]) || BASE_ATTR[k]));
     }
@@ -113,14 +143,18 @@ function addAttrPoints(userId, n) {
     const data = all();
     const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
     ensureAttrs(cur);
-    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + Math.max(0, Math.floor(Number(n) || 0));
+    cur.attrPoints =
+        Math.max(0, Math.floor(Number(cur.attrPoints || 0))) +
+        Math.max(0, Math.floor(Number(n) || 0));
     data[userId] = cur;
     store.save('xp.json', data);
     return get(userId);
 }
 
 function spendAttrPoint(userId, attrKey) {
-    if (!ATTR_KEYS.includes(attrKey)) {
+    let key = attrKey;
+    if (key === 'defesa' || key === 'vida') key = 'constituicao';
+    if (!ATTR_KEYS.includes(key)) {
         return { ok: false, error: 'Atributo inválido.' };
     }
     const data = all();
@@ -131,24 +165,56 @@ function spendAttrPoint(userId, attrKey) {
         return { ok: false, error: 'Você não tem pontos de atributo disponíveis.' };
     }
     cur.attrPoints = pts - 1;
-    cur.attrs[attrKey] = Math.max(0, Math.floor(Number(cur.attrs[attrKey] || 0))) + 1;
+    cur.attrs[key] = Math.max(0, Math.floor(Number(cur.attrs[key] || 0))) + 1;
     data[userId] = cur;
     store.save('xp.json', data);
     return { ok: true, data: get(userId) };
 }
 
+function redistribuirAttrs(userId) {
+    const data = all();
+    const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
+    ensureAttrs(cur);
+    let refund = 0;
+    for (const k of ATTR_KEYS) {
+        const base = BASE_ATTR[k];
+        const v = Math.max(0, Math.floor(Number(cur.attrs[k] || base)));
+        if (v > base) {
+            refund += v - base;
+            cur.attrs[k] = base;
+        } else {
+            cur.attrs[k] = base;
+        }
+    }
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + refund;
+    data[userId] = cur;
+    store.save('xp.json', data);
+    return { ok: true, refund, data: get(userId) };
+}
+
 function getAttrs(userId) {
-    return get(userId).attrs;
+    const a = get(userId).attrs;
+    return {
+        ...a,
+        defesa: a.constituicao,
+        vida: a.constituicao
+    };
 }
 
 function maxHp(userId) {
     const a = getAttrs(userId);
-    return 50 + (a.vida || 10) * 8;
+    const con = a.constituicao || a.vida || 10;
+    return 50 + con * 40 + Math.floor((a.forca || 0) * 2);
 }
 
 function maxMana(userId) {
     const a = getAttrs(userId);
-    return 40 + Math.floor((a.agilidade || 5) * 1.5) + Math.floor((a.forca || 5) * 0.5);
+    return (
+        40 +
+        Math.floor((a.inteligencia || 10) * 12) +
+        Math.floor((a.espirito || 10) * 10) +
+        Math.floor((a.agilidade || 10) * 2)
+    );
 }
 
 function leaderboard(limit = 10) {
@@ -197,6 +263,7 @@ module.exports = {
     dailyMultiplier,
     addXp,
     spendAttrPoint,
+    redistribuirAttrs,
     addAttrPoints,
     pointsForLevel,
     maxHp,
