@@ -106,14 +106,23 @@ function againRow(game) {
 
 /**
  * 4 tabuleiro + 1 controles (ativo)
- * OU 4 tabuleiro + 1 again (encerrado) — frase de vitória/perda no embed
+ * OU 4 tabuleiro + 1 again (encerrado)
  */
-function fullComponents(game, reveal = false, potentialFn = null) {
+function fullComponents(game, revealOrOpts = false, potentialFn = null) {
+    // Aceita boolean OU { reveal, potentialFn }
+    let reveal = false;
+    let potFn = potentialFn;
+    if (revealOrOpts && typeof revealOrOpts === 'object' && !Array.isArray(revealOrOpts)) {
+        reveal = !!revealOrOpts.reveal;
+        if (typeof revealOrOpts.potentialFn === 'function') potFn = revealOrOpts.potentialFn;
+    } else {
+        reveal = !!revealOrOpts;
+    }
     const ended = !!(game.dead || game.cashed || reveal);
     if (ended) {
         return [...boardRows(game, true), againRow(game)];
     }
-    return [...boardRows(game, false), controlsRow(game, potentialFn)];
+    return [...boardRows(game, false), controlsRow(game, potFn)];
 }
 
 module.exports = {
