@@ -1,5 +1,6 @@
 const store = require('./store');
 const itemsCatalog = require('./items');
+const crypto = require('crypto');
 
 const CLASSES = {
     mago: {
@@ -140,7 +141,13 @@ function addItem(userId, item) {
     const data = all();
     if (!data[userId]) return null;
     if (!Array.isArray(data[userId].inventory)) data[userId].inventory = [];
-    data[userId].inventory.push({ ...item, gotAt: item.gotAt || Date.now() });
+    const entry = {
+        ...item,
+        uid: item.uid || crypto.randomBytes(6).toString('hex'),
+        gotAt: item.gotAt || Date.now()
+    };
+    if (!entry.category) entry.category = itemCategory(entry);
+    data[userId].inventory.push(entry);
     data[userId].updatedAt = Date.now();
     save(data);
     return data[userId];
@@ -339,12 +346,23 @@ function useItem(userId, index1) {
             const allXp = store.load('xp.json', {});
             const cur = allXp[userId] || { xp: 0, level: 0, attrs: {} };
             if (!cur.attrs) cur.attrs = {};
-            for (const k of ['forca', 'defesa', 'agilidade', 'vida']) {
+            for (const k of [
+                'forca',
+                'agilidade',
+                'constituicao',
+                'inteligencia',
+                'espirito',
+                'sorte',
+                'defesa',
+                'vida'
+            ]) {
                 if (typeof effects[k] === 'number' && effects[k] > 0) {
-                    cur.attrs[k] =
-                        Math.max(0, Math.floor(Number(cur.attrs[k] || 0))) +
+                    let key = k;
+                    if (k === 'defesa' || k === 'vida') key = 'constituicao';
+                    cur.attrs[key] =
+                        Math.max(0, Math.floor(Number(cur.attrs[key] || 0))) +
                         Math.floor(effects[k]);
-                    result.messages.push(`+${Math.floor(effects[k])} **${k}**`);
+                    result.messages.push(`+${Math.floor(effects[k])} **${key}**`);
                 }
             }
             allXp[userId] = cur;
@@ -362,13 +380,38 @@ function useItem(userId, index1) {
 
 function getEquipmentBonuses(userId) {
     const eq = getEquipped(userId);
-    const bonus = { forca: 0, defesa: 0, agilidade: 0, vida: 0, mana: 0 };
+    const bonus = {
+        forca: 0,
+        agilidade: 0,
+        constituicao: 0,
+        inteligencia: 0,
+        espirito: 0,
+        sorte: 0,
+        defesa: 0,
+        vida: 0,
+        mana: 0
+    };
+    const mapKey = (k) => {
+        if (k === 'defesa' || k === 'vida') return 'constituicao';
+        return k;
+    };
     for (const slot of ['arma', 'armadura', 'acessorio']) {
         const it = eq[slot];
         if (!it?.effects || typeof it.effects !== 'object') continue;
-        for (const [k, v] of Object.entries(it.effects)) {
-            if (typeof v === 'number' && bonus[k] !== undefined) bonus[k] += v;
+        for (const [k0, v] of Object.entries(it.effects)) {
+            if (typeof v !== 'number') continue;
+            const k = mapKey(k0);
+            if (bonus[k] !== undefined) bonus[k] += v;
+            if (k0 === 'defesa' || k0 === 'vida') {
+                bonus.defesa += v;
+                bonus.vida += v;
+            }
+            if (k0 === 'mana') bonus.mana += v;
         }
+    }
+    if (bonus.constituicao) {
+        bonus.defesa = Math.max(bonus.defesa, bonus.constituicao);
+        bonus.vida = Math.max(bonus.vida, bonus.constituicao);
     }
     return bonus;
 }
