@@ -154,8 +154,7 @@ async function startFight(channel, challengerId, targetId, bet, vsBot) {
             [
                 `**${a.name}** ${a.emoji || '⚔️'}  vs  ${b.emoji || '⚔️'} **${b.name}**`,
                 '',
-                'A batalha acontece no **painel web** — gráficos 3D, skillbar e paisagem aleatória.',
-                'Cada lutador usa o **próprio botão** abaixo para entrar na arena.',
+                'A batalha acontece no **painel web**.',
                 bet > 0
                     ? `\n💰 Aposta: **${Number(bet).toLocaleString('pt-BR')}** éter.`
                     : ''
@@ -178,21 +177,55 @@ async function startFight(channel, challengerId, targetId, bet, vsBot) {
     );
 
     await channel.send({ embeds: [emb], components: [row] });
-
     return { webId: webFight.id };
 }
 
 module.exports = {
     name: 'pvp',
-    aliases: ['duelo', 'desafiar', 'luta'],
-    description: 'PVP — arena web no painel',
+    aliases: ['duelo', 'desafiar', 'luta', 'rpg', 'arena'],
+    description: 'RPG / PVP — hub web, salas, chat e duelos',
+    loadFighter,
 
     async execute(message, args) {
+        const rpgHub = require('./rpgHub');
         const target =
             message.mentions.users.first() ||
-            (args[0] && (await message.client.users.fetch(args[0]).catch(() => null)));
+            (args[0] && !/^[a-f0-9]{6}$/i.test(args[0])
+                ? await message.client.users.fetch(args[0]).catch(() => null)
+                : null);
 
-        if (!target) return message.reply('Uso: `O.pvp @usuário|@bot [aposta]`');
+        if (!target) {
+            const codeArg = args[0] && /^[a-f0-9]{6}$/i.test(args[0]) ? args[0] : null;
+            const hub = codeArg
+                ? rpgHub.roomUrl(codeArg, message.author.id)
+                : rpgHub.hubUrl(message.author.id);
+            const emb = new EmbedBuilder()
+                .setColor(0xa78bfa)
+                .setTitle('🎮 Aeternus RPG')
+                .setDescription(
+                    [
+                        'Mundo RPG no painel: **salas**, **chat**, **personagem** e **duelos**.',
+                        '',
+                        codeArg
+                            ? 'Entrar na sala **' + codeArg + '**:'
+                            : 'Abra o hub, crie uma sala e convide amigos.',
+                        '',
+                        '• `O.pvp @user` — desafiar no Discord',
+                        '• `O.rpg <código>` — entrar numa sala',
+                        '• Perfil: `O.j atributos` · Inventário: `O.inventario`'
+                    ].join('\n')
+                )
+                .setFooter({ text: 'Aeternus RPG Hub' });
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setStyle(ButtonStyle.Link)
+                    .setLabel(codeArg ? 'Entrar na sala' : 'Abrir RPG Hub')
+                    .setURL(hub)
+                    .setEmoji('⚔️')
+            );
+            return message.reply({ embeds: [emb], components: [row] });
+        }
+
         if (target.id === message.author.id)
             return message.reply('Não pode duelar consigo mesmo.');
 
@@ -207,7 +240,7 @@ module.exports = {
 
         const betRaw = args.find((a) => !/^<@!?\d+>$/.test(a) && a !== target.id);
         let bet = 0;
-        if (betRaw) {
+        if (betRaw && !/^[a-f0-9]{6}$/i.test(betRaw)) {
             const amount = parseAmount(betRaw, eter.get(message.author.id));
             if (!Number.isFinite(amount) || amount < 0)
                 return message.reply('Aposta inválida.');
@@ -270,7 +303,7 @@ module.exports = {
 
         await message.channel.send({
             content: [
-                `⚔️ **${myName}** desafiou **${theirName}** (${target}) para um PVP no painel!`,
+                `⚔️ **${myName}** desafiou **${theirName}** (${target})!`,
                 betLine,
                 '',
                 `${target}, clique em **Aceitar** (60s).`
@@ -322,7 +355,7 @@ module.exports = {
             lastFight.set(key, Date.now());
 
             await interaction.update({
-                content: `⚔️ ${interaction.user} **aceitou**! Abrindo a arena no painel…`,
+                content: `⚔️ ${interaction.user} **aceitou**! Abrindo a arena…`,
                 components: []
             });
 
