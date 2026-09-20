@@ -2,8 +2,6 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { getSettings, setSettings, getPrefix } = require('../utils/settings');
-const pvpArena = require('../utils/pvpArena');
-const rpgHub = require('../utils/rpgHub');
 const player = require('../utils/player');
 const xp = require('../utils/xp');
 const { registerAvatarRoutes } = require('../utils/avatarApi');
@@ -104,205 +102,7 @@ function startWeb(client) {
         res.json({ ok: true });
     });
 
-    app.get('/pvp/:id', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'pvp-game.html'));
-    });
-
-    app.get('/api/pvp/:id', (req, res) => {
-        const fight = pvpArena.getArena(req.params.id);
-        if (!fight) return res.status(404).json({ error: 'not found' });
-        const as = req.query.as || null;
-        return res.json(pvpArena.publicState(fight, as));
-    });
-
-    app.post('/api/pvp/:id/move', (req, res) => {
-        const fight = pvpArena.getArena(req.params.id);
-        if (!fight) return res.status(404).json({ error: 'not found' });
-        const body = req.body || {};
-        const playerId = body.playerId;
-        if (!playerId) return res.status(400).json({ error: 'playerId' });
-        const result = pvpArena.applyMove(req.params.id, playerId, body.move);
-        if (!result.ok) return res.status(400).json(result);
-        return res.json(result);
-    });
-
-    app.get('/rpg', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'rpg.html'));
-    });
-
-    app.post('/api/rpg/create', (req, res) => {
-        try {
-            const body = req.body || {};
-            const userId = String(body.userId || '').trim();
-            if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
-            let name = String(body.name || 'Aventureiro').slice(0, 32);
-            let classId = 'guerreiro';
-            let className = 'Guerreiro';
-            let emoji = '⚔️';
-            let photo = null;
-            let level = 0;
-            try {
-                const prof = player.get(userId);
-                if (prof) {
-                    name = prof.name || name;
-                    classId = prof.classId || classId;
-                    const cls = player.getClass(classId);
-                    className = cls?.name || className;
-                    emoji = cls?.emoji || emoji;
-                    photo = prof.photoUrl || null;
-                }
-                level = Number(xp.get(userId).level || 0);
-            } catch (_) {}
-            const room = rpgHub.createRoom({
-                id: userId,
-                name,
-                level,
-                classId,
-                className,
-                emoji,
-                photo
-            });
-            return res.json({ ok: true, code: room.code, room: rpgHub.publicRoom(room, userId) });
-        } catch (e) {
-            return res.status(500).json({ error: e.message || 'erro' });
-        }
-    });
-
-    app.post('/api/rpg/join', (req, res) => {
-        try {
-            const body = req.body || {};
-            const userId = String(body.userId || '').trim();
-            const code = String(body.code || '').trim();
-            if (!userId || !code) return res.status(400).json({ error: 'code e userId obrigatórios' });
-            let name = String(body.name || 'Aventureiro').slice(0, 32);
-            let classId = 'guerreiro';
-            let className = 'Guerreiro';
-            let emoji = '⚔️';
-            let photo = null;
-            let level = 0;
-            try {
-                const prof = player.get(userId);
-                if (prof) {
-                    name = prof.name || name;
-                    classId = prof.classId || classId;
-                    const cls = player.getClass(classId);
-                    className = cls?.name || className;
-                    emoji = cls?.emoji || emoji;
-                    photo = prof.photoUrl || null;
-                }
-                level = Number(xp.get(userId).level || 0);
-            } catch (_) {}
-            const result = rpgHub.joinRoom(code, {
-                id: userId,
-                name,
-                level,
-                classId,
-                className,
-                emoji,
-                photo
-            });
-            if (!result.ok) return res.status(400).json({ error: result.error });
-            return res.json({ ok: true, room: rpgHub.publicRoom(result.room, userId) });
-        } catch (e) {
-            return res.status(500).json({ error: e.message || 'erro' });
-        }
-    });
-
-    app.get('/api/rpg/room/:code', (req, res) => {
-        const room = rpgHub.getRoom(req.params.code);
-        if (!room) return res.status(404).json({ error: 'Sala não encontrada' });
-        const as = req.query.as || null;
-        return res.json(rpgHub.publicRoom(room, as));
-    });
-
-    app.post('/api/rpg/chat', (req, res) => {
-        const body = req.body || {};
-        const result = rpgHub.chat(body.code, body.userId, body.text);
-        if (!result.ok) return res.status(400).json({ error: result.error });
-        return res.json({ ok: true, room: rpgHub.publicRoom(result.room, body.userId) });
-    });
-
-    app.post('/api/rpg/profile', (req, res) => {
-        const body = req.body || {};
-        const result = rpgHub.updateMemberProfile(body.code, body.userId, { name: body.name });
-        if (!result.ok) return res.status(400).json({ error: result.error });
-        return res.json({ ok: true, room: rpgHub.publicRoom(result.room, body.userId) });
-    });
-
-    app.post('/api/rpg/leave', (req, res) => {
-        const body = req.body || {};
-        rpgHub.leaveRoom(body.code, body.userId);
-        return res.json({ ok: true });
-    });
-
-    app.post('/api/rpg/duel', (req, res) => {
-        try {
-            const body = req.body || {};
-            const pvpCommand = require('../utils/pvpCommand');
-            const lf =
-                typeof pvpCommand.loadFighter === 'function'
-                    ? pvpCommand.loadFighter
-                    : (userId) => {
-                          const prof = player.get(userId);
-                          const st = xp.get(userId);
-                          const attrs = xp.getAttrs(userId);
-                          const cls = player.getClass(prof?.classId || 'guerreiro');
-                          const con = attrs.constituicao || 10;
-                          const maxHp = 50 + con * 40 + Math.floor((attrs.forca || 0) * 2);
-                          const maxMana =
-                              40 +
-                              Math.floor((attrs.inteligencia || 10) * 12) +
-                              Math.floor((attrs.espirito || 10) * 10) +
-                              Math.floor((attrs.agilidade || 10) * 2);
-                          return {
-                              id: userId,
-                              isBot: false,
-                              name: prof?.name || 'Jogador',
-                              level: st.level || 0,
-                              classId: prof?.classId || 'guerreiro',
-                              className: cls?.name || 'Guerreiro',
-                              emoji: cls?.emoji || '⚔️',
-                              photo:
-                                  (typeof player.getBattlePhoto === 'function'
-                                      ? player.getBattlePhoto(userId)
-                                      : null) ||
-                                  prof?.photoUrl ||
-                                  null,
-                              battleAvatar:
-                                  (typeof player.getBattleAvatar === 'function'
-                                      ? player.getBattleAvatar(userId)
-                                      : null) ||
-                                  prof?.battleAvatar ||
-                                  null,
-                              attrs: { ...attrs, defesa: con, vida: con },
-                              hp: maxHp,
-                              maxHp,
-                              mana: maxMana,
-                              maxMana,
-                              defending: false,
-                              specialCd: 0
-                          };
-                      };
-            const result = rpgHub.startDuel({
-                code: body.code,
-                aId: body.aId,
-                bId: body.bId,
-                bet: body.bet || 0,
-                loadFighter: lf
-            });
-            if (!result.ok) return res.status(400).json({ error: result.error });
-            return res.json({
-                ok: true,
-                room: rpgHub.publicRoom(result.room, body.aId),
-                fightId: result.fightId,
-                urlA: result.urlA,
-                urlB: result.urlB
-            });
-        } catch (e) {
-            return res.status(500).json({ error: e.message || 'erro no duelo' });
-        }
-    });
-
+    // Avatar (criar / transformar imagem) — arena removida
     app.get('/avatar', (req, res) => {
         res.sendFile(path.join(__dirname, '..', 'public', 'avatar.html'));
     });
@@ -318,7 +118,6 @@ function startWeb(client) {
         }
     });
 
-    // Upload + geração img2img (Pollinations)
     registerAvatarRoutes(app);
 
     app.post('/api/avatar/save', (req, res) => {
@@ -327,7 +126,9 @@ function startWeb(client) {
             const userId = String(body.userId || '').trim();
             if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
             if (!player.has(userId)) {
-                return res.status(400).json({ error: 'Crie o personagem no bot primeiro (O.j criar).' });
+                return res
+                    .status(400)
+                    .json({ error: 'Crie o personagem no bot primeiro (O.j criar).' });
             }
             const saved = player.setBattleAvatar(userId, body.avatar || {});
             if (!saved) return res.status(400).json({ error: 'Falha ao salvar' });
