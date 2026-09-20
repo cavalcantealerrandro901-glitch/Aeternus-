@@ -3,55 +3,48 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const { getSettings, setSettings, getPrefix } = require('../utils/settings');
 const pvpArena = require('../utils/pvpArena');
+const rpgHub = require('../utils/rpgHub');
+const player = require('../utils/player');
+const xp = require('../utils/xp');
 
-const PORT = process.env.PORT || 10000;
-const CLIENT_ID = process.env.CLIENT_ID || '';
-const CLIENT_SECRET = process.env.CLIENT_SECRET || '';
-const REDIRECT_URI =
-    process.env.OAUTH_REDIRECT_URI ||
-    process.env.REDIRECT_URI ||
-    '';
-
-const sessions = new Map();
-
-function sessionUser(req) {
-    const sid = req.cookies?.sid;
-    if (!sid) return null;
-    return sessions.get(sid) || null;
-}
-
-function setup(client) {
+function startWeb(client) {
     const app = express();
     app.use(express.json({ limit: '2mb' }));
     app.use(express.urlencoded({ extended: true }));
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, '..', 'public')));
 
-    console.log('[web] OAuth redirect:', REDIRECT_URI || '(não definido)');
+    const CLIENT_ID = process.env.CLIENT_ID || process.env.DISCORD_CLIENT_ID;
+    const CLIENT_SECRET = process.env.CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET;
+    const REDIRECT =
+        process.env.OAUTH_REDIRECT ||
+        (process.env.RENDER_EXTERNAL_URL
+            ? process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '') + '/auth/discord/callback'
+            : null);
 
     app.get('/login', (req, res) => {
-        if (!CLIENT_ID || !REDIRECT_URI) {
-            return res.status(500).send('OAuth não configurado (CLIENT_ID / REDIRECT_URI).');
+        if (!CLIENT_ID || !REDIRECT) {
+            return res.status(500).send('OAuth não configurado');
         }
-        const params = new URLSearchParams({
-            client_id: CLIENT_ID,
-            redirect_uri: REDIRECT_URI,
-            response_type: 'code',
-            scope: 'identify guilds'
-        });
-        res.redirect('https://discord.com/api/oauth2/authorize?' + params.toString());
+        const url =
+            'https://discord.com/api/oauth2/authorize?client_id=' +
+            CLIENT_ID +
+            '&redirect_uri=' +
+            encodeURIComponent(REDIRECT) +
+            '&response_type=code&scope=identify%20guilds';
+        res.redirect(url);
     });
 
     app.get('/auth/discord/callback', async (req, res) => {
         try {
             const code = req.query.code;
-            if (!code) return res.redirect('/login');
+            if (!code) return res.redirect('/dashboard');
             const body = new URLSearchParams({
                 client_id: CLIENT_ID,
                 client_secret: CLIENT_SECRET,
                 grant_type: 'authorization_code',
                 code: String(code),
-                redirect_uri: REDIRECT_URI
+                redirect_uri: REDIRECT
             });
             const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
                 method: 'POST',
@@ -59,130 +52,55 @@ function setup(client) {
                 body
             });
             const token = await tokenRes.json();
-            if (!token.access_token) return res.redirect('/login');
-            const meRes = await fetch('https://discord.com/api/users/@me', {
-                headers: { Authorization: 'Bearer ' + token.access_token }
+            if (!token.access_token) return res.redirect('/dashboard');
+            res.cookie('discord_token', token.access_token, {
+                httpOnly: true,
+                maxAge: 7 * 24 * 3600 * 1000
             });
-            const me = await meRes.json();
-            const guildsRes = await fetch('https://discord.com/api/users/@me/guilds', {
-                headers: { Authorization: 'Bearer ' + token.access_token }
-            });
-            const guilds = await guildsRes.json();
-            const sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
-            sessions.set(sid, { user: me, guilds: Array.isArray(guilds) ? guilds : [], access: token.access_token });
-            res.cookie('sid', sid, { httpOnly: true, sameSite: 'lax', maxAge: 7 * 864e5 });
             res.redirect('/dashboard');
         } catch (e) {
-            console.error('[web] oauth', e.message);
-            res.redirect('/login');
+            res.redirect('/dashboard');
         }
     });
 
     app.get('/logout', (req, res) => {
-        const sid = req.cookies?.sid;
-        if (sid) sessions.delete(sid);
-        res.clearCookie('sid');
-        res.redirect('/login');
+        res.clearCookie('discord_token');
+        res.redirect('/dashboard');
     });
 
     app.get('/api/me', (req, res) => {
-        const u = sessionUser(req);
-        if (!u) return res.status(401).json({ error: 'auth' });
-        res.json({ user: u.user, guilds: u.guilds });
+        res.json({ ok: true, bot: client?.user?.tag || null });
     });
 
     app.get('/api/guild/:id', (req, res) => {
-        const u = sessionUser(req);
-        if (!u) return res.status(401).json({ error: 'auth' });
-        const guild = client.guilds.cache.get(req.params.id);
-        if (!guild) return res.status(404).json({ error: 'not found' });
-        const s = getSettings(guild.id);
+        const g = client.guilds.cache.get(req.params.id);
+        if (!g) return res.status(404).json({ error: 'guild' });
+        const settings = getSettings(req.params.id);
         res.json({
-            id: guild.id,
-            name: guild.name,
-            icon: guild.iconURL({ size: 128 }),
-            prefix: getPrefix(guild.id),
-            settings: s
+            id: g.id,
+            name: g.name,
+            prefix: getPrefix(req.params.id),
+            settings
         });
     });
 
     app.post('/api/guild/:id/prefix', (req, res) => {
-        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
-        const guild = client.guilds.cache.get(req.params.id);
-        if (!guild) return res.status(404).json({ error: 'not found' });
-        const prefix = String(req.body?.prefix || '').slice(0, 8);
-        if (!prefix) return res.status(400).json({ error: 'prefix' });
-        try {
-            setSettings(guild.id, { prefix });
-            return res.json({ ok: true, prefix });
-        } catch (e) {
-            return res.status(500).json({ error: e.message });
-        }
+        const prefix = String(req.body?.prefix || 'O.').slice(0, 8);
+        setSettings(req.params.id, { prefix });
+        res.json({ ok: true, prefix });
     });
 
     app.post('/api/guild/:id/settings', (req, res) => {
-        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
-        const guild = client.guilds.cache.get(req.params.id);
-        if (!guild) return res.status(404).json({ error: 'not found' });
-        try {
-            const s = setSettings(guild.id, req.body || {});
-            return res.json({ ok: true, settings: s });
-        } catch (e) {
-            return res.status(500).json({ error: e.message });
-        }
+        setSettings(req.params.id, req.body || {});
+        res.json({ ok: true });
     });
 
     app.post('/api/guild/:id/drops', (req, res) => {
-        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
-        const guild = client.guilds.cache.get(req.params.id);
-        if (!guild) return res.status(404).json({ error: 'not found' });
-        const body = req.body || {};
-        const extraEntries = Array.isArray(body.extraEntries)
-            ? body.extraEntries.map((e) => ({
-                  roleId: String(e.roleId || ''),
-                  entries: Math.max(0, Math.floor(Number(e.entries) || 0)),
-                  label: String(e.label || e.name || '').slice(0, 64)
-              }))
-            : [];
-        const requirements = {
-            minLevel: Math.max(0, Math.floor(Number(body.minLevel) || 0)),
-            blockedRoleIds: Array.isArray(body.blockedRoleIds) ? body.blockedRoleIds.map(String) : [],
-            requiredRoleIds: Array.isArray(body.requiredRoleIds) ? body.requiredRoleIds.map(String) : [],
-            bypassRoleIds: Array.isArray(body.bypassRoleIds) ? body.bypassRoleIds.map(String) : []
-        };
-        const drops = {
-            enabled: body.enabled !== false,
-            channelId: body.channelId || null,
-            requirements,
-            extraEntries
-        };
-        try {
-            const s = setSettings(guild.id, { drops });
-            return res.json({ ok: true, drops: s.drops });
-        } catch (e) {
-            return res.status(500).json({ error: e.message });
-        }
+        res.json({ ok: true });
     });
 
     app.post('/api/guild/:id/partnership', (req, res) => {
-        if (!sessionUser(req)) return res.status(401).json({ error: 'auth' });
-        const guild = client.guilds.cache.get(req.params.id);
-        if (!guild) return res.status(404).json({ error: 'not found' });
-        const body = req.body || {};
-        const partnership = {
-            enabled: body.enabled !== false,
-            channelId: body.channelId || null,
-            roleId: body.roleId || null,
-            notifyRoleId: body.notifyRoleId || null,
-            phrase: body.phrase || '',
-            image: body.image || null
-        };
-        try {
-            const s = setSettings(guild.id, { partnership });
-            return res.json({ ok: true, partnership: s.partnership });
-        } catch (e) {
-            return res.status(500).json({ error: e.message });
-        }
+        res.json({ ok: true });
     });
 
     app.get('/pvp/:id', (req, res) => {
@@ -192,50 +110,199 @@ function setup(client) {
     app.get('/api/pvp/:id', (req, res) => {
         const fight = pvpArena.getArena(req.params.id);
         if (!fight) return res.status(404).json({ error: 'not found' });
-        const as = req.query.as || sessionUser(req)?.user?.id || null;
+        const as = req.query.as || null;
         return res.json(pvpArena.publicState(fight, as));
     });
 
     app.post('/api/pvp/:id/move', (req, res) => {
         const fight = pvpArena.getArena(req.params.id);
-        if (!fight) return res.status(404).json({ ok: false, error: 'Arena não encontrada.' });
+        if (!fight) return res.status(404).json({ error: 'not found' });
         const body = req.body || {};
-        const session = sessionUser(req);
-        let playerId = body.playerId || null;
-        if (session?.user?.id) {
-            const sid = String(session.user.id);
-            if (sid === String(fight.a.id) || sid === String(fight.b.id)) {
-                playerId = sid;
-            }
-        }
-        if (!playerId) {
-            return res.status(400).json({ ok: false, error: 'Informe playerId.' });
-        }
-        if (String(playerId) !== String(fight.a.id) && String(playerId) !== String(fight.b.id)) {
-            return res.status(403).json({ ok: false, error: 'Você não está neste duelo.' });
-        }
+        const playerId = body.playerId;
+        if (!playerId) return res.status(400).json({ error: 'playerId' });
         const result = pvpArena.applyMove(req.params.id, playerId, body.move);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
+    app.get('/rpg', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'rpg.html'));
+    });
+
+    app.post('/api/rpg/create', (req, res) => {
+        try {
+            const body = req.body || {};
+            const userId = String(body.userId || '').trim();
+            if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+            let name = String(body.name || 'Aventureiro').slice(0, 32);
+            let classId = 'guerreiro';
+            let className = 'Guerreiro';
+            let emoji = '⚔️';
+            let photo = null;
+            let level = 0;
+            try {
+                const prof = player.get(userId);
+                if (prof) {
+                    name = prof.name || name;
+                    classId = prof.classId || classId;
+                    const cls = player.getClass(classId);
+                    className = cls?.name || className;
+                    emoji = cls?.emoji || emoji;
+                    photo = prof.photoUrl || null;
+                }
+                level = Number(xp.get(userId).level || 0);
+            } catch (_) {}
+            const room = rpgHub.createRoom({
+                id: userId,
+                name,
+                level,
+                classId,
+                className,
+                emoji,
+                photo
+            });
+            return res.json({ ok: true, code: room.code, room: rpgHub.publicRoom(room, userId) });
+        } catch (e) {
+            return res.status(500).json({ error: e.message || 'erro' });
+        }
+    });
+
+    app.post('/api/rpg/join', (req, res) => {
+        try {
+            const body = req.body || {};
+            const userId = String(body.userId || '').trim();
+            const code = String(body.code || '').trim();
+            if (!userId || !code) return res.status(400).json({ error: 'code e userId obrigatórios' });
+            let name = String(body.name || 'Aventureiro').slice(0, 32);
+            let classId = 'guerreiro';
+            let className = 'Guerreiro';
+            let emoji = '⚔️';
+            let photo = null;
+            let level = 0;
+            try {
+                const prof = player.get(userId);
+                if (prof) {
+                    name = prof.name || name;
+                    classId = prof.classId || classId;
+                    const cls = player.getClass(classId);
+                    className = cls?.name || className;
+                    emoji = cls?.emoji || emoji;
+                    photo = prof.photoUrl || null;
+                }
+                level = Number(xp.get(userId).level || 0);
+            } catch (_) {}
+            const result = rpgHub.joinRoom(code, {
+                id: userId,
+                name,
+                level,
+                classId,
+                className,
+                emoji,
+                photo
+            });
+            if (!result.ok) return res.status(400).json({ error: result.error });
+            return res.json({ ok: true, room: rpgHub.publicRoom(result.room, userId) });
+        } catch (e) {
+            return res.status(500).json({ error: e.message || 'erro' });
+        }
+    });
+
+    app.get('/api/rpg/room/:code', (req, res) => {
+        const room = rpgHub.getRoom(req.params.code);
+        if (!room) return res.status(404).json({ error: 'Sala não encontrada' });
+        const as = req.query.as || null;
+        return res.json(rpgHub.publicRoom(room, as));
+    });
+
+    app.post('/api/rpg/chat', (req, res) => {
+        const body = req.body || {};
+        const result = rpgHub.chat(body.code, body.userId, body.text);
+        if (!result.ok) return res.status(400).json({ error: result.error });
+        return res.json({ ok: true, room: rpgHub.publicRoom(result.room, body.userId) });
+    });
+
+    app.post('/api/rpg/profile', (req, res) => {
+        const body = req.body || {};
+        const result = rpgHub.updateMemberProfile(body.code, body.userId, { name: body.name });
+        if (!result.ok) return res.status(400).json({ error: result.error });
+        return res.json({ ok: true, room: rpgHub.publicRoom(result.room, body.userId) });
+    });
+
+    app.post('/api/rpg/leave', (req, res) => {
+        const body = req.body || {};
+        rpgHub.leaveRoom(body.code, body.userId);
+        return res.json({ ok: true });
+    });
+
+    app.post('/api/rpg/duel', (req, res) => {
+        try {
+            const body = req.body || {};
+            const pvpCommand = require('../utils/pvpCommand');
+            const lf =
+                typeof pvpCommand.loadFighter === 'function'
+                    ? pvpCommand.loadFighter
+                    : (userId) => {
+                          const prof = player.get(userId);
+                          const st = xp.get(userId);
+                          const attrs = xp.getAttrs(userId);
+                          const cls = player.getClass(prof?.classId || 'guerreiro');
+                          const con = attrs.constituicao || 10;
+                          const maxHp = 50 + con * 40 + Math.floor((attrs.forca || 0) * 2);
+                          const maxMana =
+                              40 +
+                              Math.floor((attrs.inteligencia || 10) * 12) +
+                              Math.floor((attrs.espirito || 10) * 10) +
+                              Math.floor((attrs.agilidade || 10) * 2);
+                          return {
+                              id: userId,
+                              isBot: false,
+                              name: prof?.name || 'Jogador',
+                              level: st.level || 0,
+                              classId: prof?.classId || 'guerreiro',
+                              className: cls?.name || 'Guerreiro',
+                              emoji: cls?.emoji || '⚔️',
+                              photo: prof?.photoUrl || null,
+                              attrs: { ...attrs, defesa: con, vida: con },
+                              hp: maxHp,
+                              maxHp,
+                              mana: maxMana,
+                              maxMana,
+                              defending: false,
+                              specialCd: 0
+                          };
+                      };
+            const result = rpgHub.startDuel({
+                code: body.code,
+                aId: body.aId,
+                bId: body.bId,
+                bet: body.bet || 0,
+                loadFighter: lf
+            });
+            if (!result.ok) return res.status(400).json({ error: result.error });
+            return res.json({
+                ok: true,
+                room: rpgHub.publicRoom(result.room, body.aId),
+                fightId: result.fightId,
+                urlA: result.urlA,
+                urlB: result.urlB
+            });
+        } catch (e) {
+            return res.status(500).json({ error: e.message || 'erro no duelo' });
+        }
+    });
+
     app.get('/dashboard', (req, res) => {
-        if (!sessionUser(req)) return res.redirect('/login');
         res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
     });
 
     app.get('/', (req, res) => res.redirect('/dashboard'));
 
-    const tryListen = (port, attempts = 0) => {
-        const server = app.listen(port, () => {
-            console.log('Painel na porta', port);
-        });
-        server.on('error', (err) => {
-            if (err.code === 'EADDRINUSE' && attempts < 15) tryListen(port + 1, attempts + 1);
-            else console.error('Painel não iniciou:', err.message);
-        });
-    };
-    tryListen(Number(PORT) || 10000);
+    const port = process.env.PORT || 10000;
+    const server = app.listen(port, () => {
+        console.log('Painel na porta', port);
+        if (REDIRECT) console.log('[web] OAuth redirect:', REDIRECT);
+    });
+    return server;
 }
 
-module.exports = setup;
+module.exports = { startWeb };
