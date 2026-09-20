@@ -142,20 +142,30 @@ function getBattleAvatar(userId) {
     return (p && p.battleAvatar) || null;
 }
 
+/** Avatar 3D/realista gerado por descrição (imagem + prompt). */
 function setBattleAvatar(userId, avatar) {
     if (!get(userId)) return null;
+    const imageUrl = String(avatar.imageUrl || avatar.url || '').trim().slice(0, 500);
+    const description = String(avatar.description || avatar.prompt || '').trim().slice(0, 500);
+    if (!imageUrl) return null;
     const clean = {
-        skin: Math.max(0, Math.min(5, Number(avatar.skin) || 0)),
-        hair: Math.max(0, Math.min(8, Number(avatar.hair) || 0)),
-        hairColor: String(avatar.hairColor || '#3b2f2f').slice(0, 16),
-        eyes: Math.max(0, Math.min(5, Number(avatar.eyes) || 0)),
-        outfit: Math.max(0, Math.min(6, Number(avatar.outfit) || 0)),
-        accessory: Math.max(0, Math.min(7, Number(avatar.accessory) || 0)),
-        weapon: Math.max(0, Math.min(6, Number(avatar.weapon) || 0)),
-        bg: Math.max(0, Math.min(5, Number(avatar.bg) || 0)),
+        type: 'ai3d',
+        description,
+        imageUrl,
         updatedAt: Date.now()
     };
-    return update(userId, { battleAvatar: clean });
+    return update(userId, {
+        battleAvatar: clean,
+        battlePhotoUrl: imageUrl
+    });
+}
+
+function getBattlePhoto(userId) {
+    const p = get(userId);
+    if (!p) return null;
+    if (p.battleAvatar && p.battleAvatar.imageUrl) return p.battleAvatar.imageUrl;
+    if (p.battlePhotoUrl) return p.battlePhotoUrl;
+    return p.photoUrl || null;
 }
 
 function addItem(userId, item) {
@@ -472,5 +482,6 @@ module.exports = {
     equipSlotFor,
     ensureEquipped,
     getBattleAvatar,
-    setBattleAvatar
+    setBattleAvatar,
+    getBattlePhoto
 };
