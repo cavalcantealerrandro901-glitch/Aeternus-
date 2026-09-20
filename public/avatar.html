@@ -3,128 +3,120 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>Aeternus · Avatar 3D</title>
+<title>Aeternus · Criar Avatar</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet"/>
 <style>
 :root{--bg:#06050c;--panel:rgba(12,8,24,.92);--line:rgba(255,255,255,.12);--a:#c4b5fd;--ok:#34d399;--muted:#94a3b8}
 *{box-sizing:border-box;margin:0;padding:0}
 body{min-height:100vh;font-family:Rajdhani,system-ui,sans-serif;color:#f1f5f9;background:radial-gradient(ellipse at 50% 0%,#1a1040 0%,var(--bg) 55%)}
-.app{max-width:880px;margin:0 auto;padding:18px;display:grid;gap:14px}
+.app{max-width:960px;margin:0 auto;padding:18px;display:grid;gap:14px}
 .brand{font-family:Cinzel,serif;letter-spacing:.14em;font-size:1.15rem;background:linear-gradient(90deg,#e9d5ff,#67e8f9,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent}
-.muted{color:var(--muted);font-size:.9rem;line-height:1.4}
-.grid{display:grid;grid-template-columns:1fr 1.1fr;gap:14px}
-@media(max-width:740px){.grid{grid-template-columns:1fr}}
+.muted{color:var(--muted);font-size:.9rem;line-height:1.45}
+.grid{display:grid;grid-template-columns:1fr 1.15fr;gap:14px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;backdrop-filter:blur(12px)}
 .card h2{font-family:Cinzel,serif;font-size:.95rem;margin-bottom:10px}
 label{display:block;font-size:.8rem;opacity:.8;margin:10px 0 4px}
 input,textarea,select{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:12px;color:#fff;padding:10px 12px;font-family:inherit;font-size:.95rem}
-textarea{min-height:120px;resize:vertical}
+textarea{min-height:72px;resize:vertical}
 .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.btn{appearance:none;border:1px solid var(--line);background:rgba(124,58,237,.35);color:#fff;border-radius:12px;padding:11px 16px;font-family:inherit;font-weight:700;cursor:pointer}
-.btn:hover{border-color:var(--a)}
+.btn{appearance:none;border:1px solid var(--line);background:rgba(124,58,237,.35);color:#fff;border-radius:12px;padding:11px 16px;font-family:inherit;font-weight:700;cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--a);transform:translateY(-1px)}
 .btn.ok{background:linear-gradient(90deg,#7c3aed,#2563eb);border:none}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.preview{aspect-ratio:1;border-radius:20px;overflow:hidden;border:2px solid var(--line);background:linear-gradient(145deg,#1e1b4b,#0f172a);display:flex;align-items:center;justify-content:center;box-shadow:0 20px 50px rgba(0,0,0,.45)}
-.preview img{width:100%;height:100%;object-fit:cover}
-.preview .ph{opacity:.5;text-align:center;padding:20px}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn.ghost{background:transparent}
+.drop{border:2px dashed rgba(167,139,250,.35);border-radius:16px;padding:22px;text-align:center;background:rgba(0,0,0,.25);cursor:pointer;transition:.2s;position:relative}
+.drop:hover,.drop.drag{border-color:#a78bfa;background:rgba(124,58,237,.12)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop .ico{font-size:2rem;margin-bottom:6px}
+.preview-wrap{position:relative;aspect-ratio:3/4;max-width:320px;margin:0 auto;border-radius:20px;overflow:hidden;border:2px solid var(--line);background:linear-gradient(145deg,#1e1b4b,#0f172a);box-shadow:0 20px 50px rgba(0,0,0,.45),0 0 40px rgba(124,58,237,.25)}
+.preview-wrap img.base{width:100%;height:100%;object-fit:cover;display:block;transition:transform .15s,filter .2s}
+.preview-wrap canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.preview-wrap .ph{position:absolute;inset:0;display:grid;place-items:center;opacity:.5;padding:20px;text-align:center;font-size:.9rem}
+.expr-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;justify-content:center}
+.expr-btn{padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:#fff;font-size:.75rem;font-weight:700;cursor:pointer}
+.expr-btn.on{background:rgba(124,58,237,.55);border-color:#a78bfa}
 .tips{font-size:.8rem;opacity:.75;margin-top:8px;line-height:1.35}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);border:1px solid var(--line);padding:10px 16px;border-radius:12px;opacity:0;transition:.25s;z-index:20;max-width:90%}
 #toast.show{opacity:1}
 .spin{width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#a78bfa;border-radius:50%;animation:s .8s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
+.steps{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.step{font-size:.72rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);opacity:.7}
+.step.on{opacity:1;background:rgba(124,58,237,.3);border-color:#a78bfa}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="brand">✦ AVATAR 3D · AETERNUS</div>
-  <p class="muted">Descreva como quer seu personagem. O sistema gera um avatar <b>3D quase real</b> para a arena — não é foto sua, é o personagem que você imaginar.</p>
+  <div class="brand">✦ AVATAR DE BATALHA · AETERNUS</div>
+  <p class="muted">Envie uma <b>imagem</b>. O sistema transforma em avatar e aplica <b>expressões</b>. Na arena use <b>Face Live</b>.</p>
+  <div class="steps"><span class="step on" id="s1">1. Imagem</span><span class="step" id="s2">2. Transformar</span><span class="step" id="s3">3. Expressões</span><span class="step" id="s4">4. Salvar</span></div>
   <div class="grid">
     <div class="card">
-      <h2>Pré-visualização</h2>
-      <div class="preview" id="preview"><div class="ph">Sua criação aparece aqui</div></div>
-      <p class="tips" id="status"></p>
+      <h2>Pré-visualização + expressões</h2>
+      <div class="preview-wrap" id="preview"><div class="ph" id="ph">Sua imagem aparece aqui</div><canvas id="faceCanvas"></canvas></div>
+      <div class="expr-row" id="exprRow">
+        <button type="button" class="expr-btn on" data-e="idle">Idle</button>
+        <button type="button" class="expr-btn" data-e="attack">Ataque</button>
+        <button type="button" class="expr-btn" data-e="heavy">Pesado</button>
+        <button type="button" class="expr-btn" data-e="special">Especial</button>
+        <button type="button" class="expr-btn" data-e="defend">Defesa</button>
+        <button type="button" class="expr-btn" data-e="hurt">Dano</button>
+        <button type="button" class="expr-btn" data-e="win">Vitória</button>
+      </div>
+      <p class="tips" id="status">Envie uma imagem ou cole a URL.</p>
     </div>
     <div class="card">
-      <h2>Descreva seu avatar</h2>
-      <label>ID do Discord</label>
-      <input id="userId" type="text" placeholder="Seu user ID do Discord"/>
-      <label>Descrição (quanto mais detalhe, melhor)</label>
-      <textarea id="desc" placeholder="Ex: guerreiro élfico alto, cabelo prateado longo, armadura dourada com runas azuis, olhar determinado, estilo 3D cinematográfico realista..."></textarea>
+      <h2>Imagem de origem</h2>
+      <div class="drop" id="drop"><input type="file" id="file" accept="image/*"/><div class="ico">🖼️</div><div>Arraste ou clique</div><div class="tips" style="margin-top:6px">PNG / JPG / WEBP · máx ~4 MB</div></div>
+      <label>Ou cole a URL</label><input id="imgUrl" type="url" placeholder="https://…"/>
+      <label>ID do Discord</label><input id="userId" type="text" placeholder="Seu user ID"/>
+      <label>Detalhes (opcional)</label><textarea id="desc" placeholder="armadura dourada, cabelo prateado…"></textarea>
       <label>Estilo</label>
       <select id="style">
-        <option value="3d_cinematic">3D cinematográfico (recomendado)</option>
-        <option value="3d_game">3D de jogo AAA</option>
-        <option value="realistic">Quase real / hiper-realista</option>
+        <option value="3d_cinematic">3D cinematográfico</option>
+        <option value="3d_game">3D jogo AAA</option>
+        <option value="realistic">Hiper-realista</option>
         <option value="anime_3d">Anime 3D</option>
-        <option value="fantasy">Fantasia épica</option>
+        <option value="fantasy">Fantasia</option>
+        <option value="keep">Manter original</option>
       </select>
       <div class="row">
-        <button class="btn" id="btnGen">Gerar avatar 3D</button>
-        <button class="btn ok" id="btnSave" disabled>Salvar na arena</button>
+        <button class="btn" id="btnGen" type="button">Transformar</button>
+        <button class="btn ok" id="btnSave" type="button" disabled>Salvar</button>
+        <button class="btn ghost" id="btnKeep" type="button" disabled>Usar original</button>
       </div>
-      <p class="tips">Inclua aparência, cabelo, roupa, arma e expressão. Precisa de perfil: <code>O.j criar</code>.</p>
+      <p class="tips">Perfil: <code>O.j criar</code> · depois <code>O.avatar</code></p>
     </div>
   </div>
 </div>
 <div id="toast"></div>
 <script>
+(()=>{
 const qs=new URLSearchParams(location.search);
-let currentUrl='', currentDesc='';
-if(qs.get('as')) document.getElementById('userId').value=qs.get('as');
-const toast=(t)=>{const n=document.getElementById('toast');n.textContent=t;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2800);};
-const preview=document.getElementById('preview');
-const statusEl=document.getElementById('status');
-const btnGen=document.getElementById('btnGen');
-const btnSave=document.getElementById('btnSave');
-btnGen.onclick=async()=>{
-  const desc=document.getElementById('desc').value.trim();
-  const style=document.getElementById('style').value;
-  if(desc.length<8) return toast('Descreva melhor o avatar (mín. 8 caracteres).');
-  btnGen.disabled=true; btnSave.disabled=true;
-  preview.innerHTML='<div class="spin"></div>';
-  statusEl.textContent='Gerando avatar 3D… aguarde alguns segundos.';
-  try{
-    const r=await fetch('/api/avatar/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:desc,style})});
-    const data=await r.json();
-    if(!r.ok) throw new Error(data.error||'Falha na geração');
-    currentUrl=data.imageUrl; currentDesc=desc;
-    const img=new Image();
-    img.onload=()=>{preview.innerHTML='';preview.appendChild(img);statusEl.textContent='Pronto. Se gostar, salve para usar na arena.';btnSave.disabled=false;};
-    img.onerror=()=>{preview.innerHTML='<div class="ph">Não carregou. Tente gerar de novo.</div>';statusEl.textContent='';};
-    img.src=currentUrl+(currentUrl.includes('?')?'&':'?')+'t='+Date.now();
-    img.alt='Avatar 3D';
-  }catch(e){preview.innerHTML='<div class="ph">Erro na geração</div>';statusEl.textContent=e.message||'Erro';toast(e.message||'Erro');}
-  btnGen.disabled=false;
-};
-btnSave.onclick=async()=>{
-  const userId=document.getElementById('userId').value.trim();
-  if(!userId) return toast('Informe o ID do Discord');
-  if(!currentUrl) return toast('Gere um avatar antes de salvar');
-  btnSave.disabled=true;
-  try{
-    const r=await fetch('/api/avatar/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,avatar:{imageUrl:currentUrl,description:currentDesc}})});
-    const data=await r.json();
-    if(!r.ok) throw new Error(data.error||'Falha ao salvar');
-    toast('Avatar 3D salvo! Entrará nos próximos duelos.');
-    statusEl.textContent='Salvo no seu perfil de combate.';
-  }catch(e){toast(e.message||'Erro');btnSave.disabled=false;}
-};
-(async()=>{
-  const userId=document.getElementById('userId').value.trim();
-  if(!userId) return;
-  try{
-    const r=await fetch('/api/avatar/'+encodeURIComponent(userId));
-    if(!r.ok) return;
-    const data=await r.json();
-    const av=data.avatar;
-    if(av&&av.imageUrl){
-      currentUrl=av.imageUrl; currentDesc=av.description||'';
-      if(currentDesc) document.getElementById('desc').value=currentDesc;
-      const img=document.createElement('img'); img.src=currentUrl; img.alt='Avatar atual';
-      preview.innerHTML=''; preview.appendChild(img);
-      btnSave.disabled=false; statusEl.textContent='Avatar atual carregado.';
-    }
-  }catch(_){}
+let currentUrl='',sourceUrl='',sourceDataUrl='',currentDesc='';
+const el=id=>document.getElementById(id);
+const toast=t=>{const n=el('toast');n.textContent=t;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2800)};
+const setStep=n=>{for(let i=1;i<=4;i++)el('s'+i).classList.toggle('on',i<=n)};
+if(qs.get('as'))el('userId').value=qs.get('as');
+const EXPR={idle:{mouth:.06,brow:0,tilt:0},attack:{mouth:.35,brow:-.4,tilt:-.06},heavy:{mouth:.55,brow:-.55,tilt:-.1},special:{mouth:.7,brow:-.7,tilt:.08},defend:{mouth:.12,brow:.25,tilt:.04},hurt:{mouth:.45,brow:.55,tilt:.12},win:{mouth:.55,brow:-.2,tilt:-.03}};
+let face={expr:'idle',mouth:.06,brow:0,tilt:0,blink:0};
+function setExpr(name){face.expr=name;const t=EXPR[name]||EXPR.idle;face.mouth=t.mouth;face.brow=t.brow;face.tilt=t.tilt;document.querySelectorAll('.expr-btn').forEach(b=>b.classList.toggle('on',b.dataset.e===name))}
+function drawFace(){const wrap=el('preview'),c=el('faceCanvas'),w=wrap.clientWidth||280,h=wrap.clientHeight||360;if(c.width!==w||c.height!==h){c.width=w;c.height=h}const g=c.getContext('2d');g.clearRect(0,0,w,h);const t=performance.now()/1000;if(face.expr==='idle'&&Math.random()<.004)face.blink=1;if(face.blink>0)face.blink=Math.max(0,face.blink-.12);const breath=Math.sin(t*1.6)*.015,mouth=Math.min(1,Math.max(0,face.mouth+(face.expr==='idle'?breath*2:0))),eyeOpen=1-face.blink,img=wrap.querySelector('img.base');if(img){img.style.transform=`rotate(${(face.tilt+breath)*12}deg) scale(${1+breath*.4})`;if(face.expr==='hurt')img.style.filter='brightness(0.85) saturate(0.9) hue-rotate(-10deg)';else if(face.expr==='special')img.style.filter='brightness(1.12) saturate(1.15)';else if(face.expr==='attack'||face.expr==='heavy')img.style.filter='brightness(1.06)';else img.style.filter=''}if(!img){requestAnimationFrame(drawFace);return}const cx=w*.5,faceY=h*.42,eyeY=faceY-h*.06,eyeSpread=w*.14,eyeW=w*.07,eyeH=h*.028*eyeOpen;g.save();g.translate(cx,faceY);g.rotate(face.tilt*.5);g.fillStyle=`rgba(15,15,30,${.3+(1-eyeOpen)*.4})`;g.beginPath();g.ellipse(-eyeSpread,eyeY-faceY,eyeW,Math.max(.5,eyeH),0,0,Math.PI*2);g.fill();g.beginPath();g.ellipse(eyeSpread,eyeY-faceY,eyeW,Math.max(.5,eyeH),0,0,Math.PI*2);g.fill();g.strokeStyle=`rgba(0,0,0,${.22+Math.abs(face.brow)*.3})`;g.lineWidth=Math.max(2,w*.012);g.lineCap='round';const browY=eyeY-faceY-h*.04+face.brow*h*.02;g.beginPath();g.moveTo(-eyeSpread-eyeW,browY+face.brow*4);g.lineTo(-eyeSpread+eyeW,browY-face.brow*2);g.stroke();g.beginPath();g.moveTo(eyeSpread+eyeW,browY+face.brow*4);g.lineTo(eyeSpread-eyeW,browY-face.brow*2);g.stroke();const mouthY=h*.1,mouthW=w*(.08+mouth*.1),mouthH=h*(.01+mouth*.06);g.fillStyle=`rgba(80,20,30,${.22+mouth*.45})`;g.beginPath();g.ellipse(0,mouthY,mouthW,mouthH,0,0,Math.PI*2);g.fill();g.restore();requestAnimationFrame(drawFace)}
+requestAnimationFrame(drawFace);
+document.querySelectorAll('.expr-btn').forEach(b=>b.onclick=()=>{setExpr(b.dataset.e);setStep(3)});
+function showImage(url){const wrap=el('preview'),ph=el('ph');let img=wrap.querySelector('img.base');if(!img){img=document.createElement('img');img.className='base';img.alt='Avatar';wrap.insertBefore(img,ph)}ph.style.display='none';img.onload=()=>{el('status').textContent='Imagem carregada. Teste expressões ou transforme.'};img.onerror=()=>{el('status').textContent='Não carregou.';toast('URL inválida')};img.src=url;currentUrl=url;el('btnSave').disabled=false;el('btnKeep').disabled=false;setStep(2)}
+const drop=el('drop'),fileInput=el('file');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(f)readFile(f)});
+fileInput.onchange=()=>{const f=fileInput.files&&fileInput.files[0];if(f)readFile(f)};
+function readFile(f){if(!f.type.startsWith('image/'))return toast('Precisa ser imagem');if(f.size>4.5*1024*1024)return toast('Muito grande');const r=new FileReader();r.onload=()=>{sourceDataUrl=r.result;sourceUrl='';showImage(sourceDataUrl);setStep(1)};r.readAsDataURL(f)}
+el('imgUrl').addEventListener('change',()=>{const u=el('imgUrl').value.trim();if(!u)return;sourceUrl=u;sourceDataUrl='';showImage(u)});
+el('btnGen').onclick=async()=>{const style=el('style').value,desc=el('desc').value.trim(),urlInput=el('imgUrl').value.trim();let imageRef=sourceUrl||urlInput||'';if(!imageRef&&sourceDataUrl){el('btnGen').disabled=true;el('status').textContent='Enviando…';try{const up=await fetch('/api/avatar/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:el('userId').value.trim()||'anon',dataUrl:sourceDataUrl})});const upData=await up.json();if(!up.ok)throw new Error(upData.error||'Falha upload');imageRef=upData.imageUrl;sourceUrl=imageRef}catch(e){el('btnGen').disabled=false;toast(e.message);el('status').textContent=e.message;return}}if(!imageRef&&!sourceDataUrl)return toast('Envie uma imagem');if(style==='keep'){showImage(imageRef||sourceDataUrl);currentDesc=desc||'original';el('status').textContent='Original com expressões.';setStep(3);el('btnGen').disabled=false;return}el('btnGen').disabled=true;el('btnSave').disabled=true;const wrap=el('preview'),ph=el('ph');ph.style.display='grid';ph.innerHTML='<div class="spin"></div>';const old=wrap.querySelector('img.base');if(old)old.style.opacity='0.25';el('status').textContent='Transformando…';try{const r=await fetch('/api/avatar/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:desc,style,imageUrl:imageRef||undefined})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Falha');currentUrl=data.imageUrl;currentDesc=desc||data.prompt||'';showImage(currentUrl+(currentUrl.includes('?')?'&':'?')+'t='+Date.now());el('status').textContent='Pronto. Teste e salve.';setStep(3);setExpr('idle')}catch(e){ph.style.display='none';if(old)old.style.opacity='1';el('status').textContent=e.message;toast(e.message)}el('btnGen').disabled=false;el('btnSave').disabled=!currentUrl};
+el('btnKeep').onclick=()=>{const u=sourceUrl||sourceDataUrl||el('imgUrl').value.trim();if(!u)return toast('Sem imagem');currentUrl=u;currentDesc=el('desc').value.trim()||'original';showImage(u);setStep(3)};
+el('btnSave').onclick=async()=>{const userId=el('userId').value.trim();if(!userId)return toast('Informe o ID');if(!currentUrl)return toast('Gere ou escolha avatar');let saveUrl=currentUrl;if(saveUrl.startsWith('data:')){el('btnSave').disabled=true;try{const up=await fetch('/api/avatar/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,dataUrl:saveUrl})});const upData=await up.json();if(!up.ok)throw new Error(upData.error||'Falha');saveUrl=upData.imageUrl;currentUrl=saveUrl}catch(e){toast(e.message);el('btnSave').disabled=false;return}}el('btnSave').disabled=true;try{const r=await fetch('/api/avatar/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,avatar:{imageUrl:saveUrl,description:currentDesc,sourceUrl:sourceUrl||undefined}})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Falha');toast('Salvo!');el('status').textContent='Salvo no combate.';setStep(4)}catch(e){toast(e.message);el('btnSave').disabled=false}};
+(async()=>{const userId=el('userId').value.trim();if(!userId)return;try{const r=await fetch('/api/avatar/'+encodeURIComponent(userId));if(!r.ok)return;const data=await r.json();const av=data.avatar;if(av&&av.imageUrl){currentUrl=av.imageUrl;currentDesc=av.description||'';if(currentDesc)el('desc').value=currentDesc;showImage(currentUrl);el('status').textContent='Avatar atual.';setStep(4)}}catch(_){}})();
 })();
 </script>
 </body>
