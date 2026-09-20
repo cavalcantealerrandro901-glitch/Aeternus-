@@ -1,1 +1,15 @@
-RESTORED_VIA_NEXT
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Aeternus Arena</title></head>
+<body style="margin:0;background:#05040c;color:#fff;font-family:system-ui;display:grid;place-items:center;height:100vh">
+<div id="st">Carregando arena…</div>
+<script>
+(async()=>{
+  try{
+    const a=await(await fetch('/pvp.part1.b64')).text();
+    const b=await(await fetch('/pvp.part2.b64')).text();
+    const html=decodeURIComponent(escape(atob(a+b)));
+    document.open();document.write(html);document.close();
+  }catch(e){document.getElementById('st').textContent='Falha ao carregar arena: '+e.message}
+})();
+</script>
+</body></html>
