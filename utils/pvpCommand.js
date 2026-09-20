@@ -47,6 +47,7 @@ function loadFighter(userId, isBot) {
             className: cls?.name || 'Guerreiro',
             emoji: cls?.emoji || '⚔️',
             photo: null,
+            battleAvatar: null,
             attrs,
             hp: maxHp,
             maxHp,
@@ -95,6 +96,12 @@ function loadFighter(userId, isBot) {
         className: cls?.name || classId,
         emoji: cls?.emoji || '⚔️',
         photo: prof?.photoUrl || null,
+        battleAvatar:
+            (typeof player.getBattleAvatar === 'function'
+                ? player.getBattleAvatar(userId)
+                : null) ||
+            prof?.battleAvatar ||
+            null,
         attrs,
         hp: maxHp,
         maxHp,
@@ -199,6 +206,8 @@ module.exports = {
             const hub = codeArg
                 ? rpgHub.roomUrl(codeArg, message.author.id)
                 : rpgHub.hubUrl(message.author.id);
+            const avatarUrl =
+                rpgHub.panelBase() + '/avatar?as=' + encodeURIComponent(message.author.id);
             const emb = new EmbedBuilder()
                 .setColor(0xa78bfa)
                 .setTitle('🎮 Aeternus RPG')
@@ -212,6 +221,7 @@ module.exports = {
                         '',
                         '• `O.pvp @user` — desafiar no Discord',
                         '• `O.rpg <código>` — entrar numa sala',
+                        '• `O.avatar` — criar avatar de batalha',
                         '• Perfil: `O.j atributos` · Inventário: `O.inventario`'
                     ].join('\n')
                 )
@@ -221,7 +231,12 @@ module.exports = {
                     .setStyle(ButtonStyle.Link)
                     .setLabel(codeArg ? 'Entrar na sala' : 'Abrir RPG Hub')
                     .setURL(hub)
-                    .setEmoji('⚔️')
+                    .setEmoji('⚔️'),
+                new ButtonBuilder()
+                    .setStyle(ButtonStyle.Link)
+                    .setLabel('Criar avatar')
+                    .setURL(avatarUrl)
+                    .setEmoji('🎭')
             );
             return message.reply({ embeds: [emb], components: [row] });
         }
