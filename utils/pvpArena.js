@@ -3,19 +3,13 @@ const crypto = require('crypto');
 /** @type {Map<string, any>} */
 const arenas = new Map();
 
-const LANDSCAPES = [
-    { id: 'ruins', ground: '#1a1230', sky: 'radial-gradient(ellipse at 50% 0%,#2a1650 0%,#0a0618 45%,#02010a 100%)' },
-    { id: 'ember', ground: '#2a1210', sky: 'radial-gradient(ellipse at 50% 0%,#4a1810 0%,#1a0808 50%,#080204 100%)' },
-    { id: 'frost', ground: '#0f1a28', sky: 'radial-gradient(ellipse at 50% 0%,#1a3a5c 0%,#0a1528 45%,#030810 100%)' },
-    { id: 'grove', ground: '#102418', sky: 'radial-gradient(ellipse at 50% 0%,#1a4030 0%,#0a2018 50%,#04100c 100%)' },
-    { id: 'void', ground: '#14101c', sky: 'radial-gradient(ellipse at 50% 0%,#2a1040 0%,#10081a 50%,#050208 100%)' }
-];
+const LANDSCAPES = ['floresta', 'vulcao', 'gelo', 'deserto', 'ruinas', 'abismo'];
 
 const CLASS_MOVES = {
     mago: {
         attack: { label: 'Projétil Arcano', emoji: '🔮' },
-        heavy: { label: 'Explosão Mística', emoji: '💥' },
-        defend: { label: 'Barreira Mágica', emoji: '🛡️' },
+        heavy: { label: 'Explosão', emoji: '💥' },
+        defend: { label: 'Barreira', emoji: '🔷' },
         special: { label: 'Tempestade Elemental', emoji: '⛈️' }
     },
     arqueiro: {
@@ -32,14 +26,14 @@ const CLASS_MOVES = {
     },
     healer: {
         attack: { label: 'Orbe Sagrado', emoji: '✨' },
-        heavy: { label: 'Julgamento', emoji: '✝️' },
+        heavy: { label: 'Punição', emoji: '✝️' },
         defend: { label: 'Bênção', emoji: '🙏' },
         special: { label: 'Cura Total', emoji: '💚' }
     },
     guerreiro: {
         attack: { label: 'Corte', emoji: '⚔️' },
-        heavy: { label: 'Golpe Pesado', emoji: '🗡️' },
-        defend: { label: 'Postura', emoji: '🛡️' },
+        heavy: { label: 'Golpe Pesado', emoji: '🪓' },
+        defend: { label: 'Guarda', emoji: '🛡️' },
         special: { label: 'Fúria', emoji: '🔥' }
     },
     assassino: {
@@ -55,47 +49,39 @@ const MANA_COST = {
     mago: { attack: 8, heavy: 22, defend: 10, special: 100 }
 };
 
-function costsFor(classId) {
-    return MANA_COST[classId] || MANA_COST.default;
-}
-
-function movesFor(classId) {
-    return CLASS_MOVES[classId] || CLASS_MOVES.guerreiro;
+function newId() {
+    return crypto.randomBytes(6).toString('hex');
 }
 
 function pickLandscape() {
     return LANDSCAPES[Math.floor(Math.random() * LANDSCAPES.length)];
 }
 
-function newId() {
-    return crypto.randomBytes(6).toString('hex');
+function movesFor(classId) {
+    return CLASS_MOVES[classId] || CLASS_MOVES.guerreiro;
+}
+
+function costsFor(classId) {
+    return MANA_COST[classId] || MANA_COST.default;
 }
 
 function publicFighter(f) {
     if (!f) return null;
-    const attrs = f.attrs || {};
     return {
         id: f.id,
         name: f.name,
-        level: Number(f.level || 0),
+        level: f.level || 0,
         classId: f.classId,
-        className: f.className || f.classId,
-        emoji: f.emoji || '⚔️',
+        className: f.className,
+        emoji: f.emoji,
         photo: f.photo || null,
+        battleAvatar: f.battleAvatar || null,
         hp: f.hp,
         maxHp: f.maxHp,
         mana: f.mana,
         maxMana: f.maxMana,
         defending: !!f.defending,
         specialCd: f.specialCd || 0,
-        attrs: {
-            forca: Number(attrs.forca || 0),
-            agilidade: Number(attrs.agilidade || 0),
-            constituicao: Number(attrs.constituicao || attrs.vida || attrs.defesa || 0),
-            inteligencia: Number(attrs.inteligencia || 0),
-            espirito: Number(attrs.espirito || 0),
-            sorte: Number(attrs.sorte || 0)
-        },
         isBot: !!f.isBot
     };
 }
@@ -180,14 +166,15 @@ function getArena(id) {
 }
 
 function applyMove(fightId, playerId, kind) {
-    const fight = arenas.get(fightId);
-    if (!fight) return { ok: false, error: 'Arena não encontrada ou expirou.' };
-    if (fight.over) return { ok: false, error: 'Duelo já encerrou.' };
-    if (String(fight.turn) !== String(playerId))
-        return { ok: false, error: 'Não é o seu turno.' };
+    const fight = getArena(fightId);
+    if (!fight) return { ok: false, error: 'Arena não encontrada.' };
+    if (fight.over) return { ok: false, error: 'Batalha já terminou.' };
+    if (String(fight.turn) !== String(playerId)) {
+        return { ok: false, error: 'Não é a sua vez.' };
+    }
 
     const actor = fight.turn === fight.a.id ? fight.a : fight.b;
-    const target = fight.turn === fight.a.id ? fight.b : fight.a;
+    const target = actor === fight.a ? fight.b : fight.a;
     const moves = movesFor(actor.classId);
     const costs = costsFor(actor.classId);
     const moveKey = String(kind || '');
@@ -210,95 +197,64 @@ function applyMove(fightId, playerId, kind) {
         fight.lastDamage = 0;
         fight.lastLog =
             moves.defend.emoji + ' **' + actor.name + '** se prepara — defesa elevada!';
+    } else if (moveKey === 'special' && actor.classId === 'healer') {
+        const heal = Math.floor(20 + (actor.attrs.espirito || 5) * 4);
+        actor.hp = Math.min(actor.maxHp, actor.hp + heal);
+        actor.specialCd = 3;
+        fight.lastDamage = -heal;
+        fight.lastLog =
+            moves.special.emoji +
+            ' **' +
+            actor.name +
+            '** recupera **' +
+            heal +
+            '** de HP!';
     } else {
-        let dmg = calcDamage(actor, target, moveKey);
-        if (moveKey === 'special') {
-            actor.specialCd = 3;
-            if (actor.classId === 'healer') {
-                const heal = Math.floor(dmg * 0.55);
-                actor.hp = Math.min(actor.maxHp, actor.hp + heal);
-                fight.lastLog =
-                    moves.special.emoji +
-                    ' **' +
-                    actor.name +
-                    '** cura **' +
-                    heal +
-                    '** e fere **' +
-                    target.name +
-                    '** em **' +
-                    dmg +
-                    '**!';
-            } else {
-                fight.lastLog =
-                    moves.special.emoji +
-                    ' **' +
-                    actor.name +
-                    '** usa especial em **' +
-                    target.name +
-                    '** — **' +
-                    dmg +
-                    '** de dano!';
-            }
-        } else if (moveKey === 'heavy') {
-            fight.lastLog =
-                moves.heavy.emoji +
-                ' **' +
-                actor.name +
-                '** acerta pesado em **' +
-                target.name +
-                '** (**' +
-                dmg +
-                '**)!';
-        } else {
-            fight.lastLog =
-                moves.attack.emoji +
-                ' **' +
-                actor.name +
-                '** ataca **' +
-                target.name +
-                '** (**' +
-                dmg +
-                '**)!';
-        }
+        const dmg = calcDamage(actor, target, moveKey);
         target.hp = Math.max(0, target.hp - dmg);
         fight.lastDamage = dmg;
-        target.defending = false;
+        const m = moves[moveKey];
+        fight.lastLog =
+            m.emoji +
+            ' **' +
+            actor.name +
+            '** usou **' +
+            m.label +
+            '** em **' +
+            target.name +
+            '** — **' +
+            dmg +
+            '** de dano!';
+        if (moveKey === 'special') actor.specialCd = 3;
     }
 
-    if (actor.specialCd > 0 && moveKey !== 'special') actor.specialCd -= 1;
+    if (actor.specialCd > 0 && moveKey !== 'special') {
+        actor.specialCd = Math.max(0, actor.specialCd - 1);
+    }
 
     if (target.hp <= 0) {
         fight.over = true;
         fight.winnerId = actor.id;
-        fight.lastLog += '\n🏆 **' + actor.name + '** venceu o duelo!';
-    } else {
-        fight.turn = target.id;
+        fight.lastLog += '\n🏆 **' + actor.name + '** venceu!';
+        return { ok: true, state: publicState(fight, playerId) };
     }
 
+    fight.turn = target.id;
     return { ok: true, state: publicState(fight, playerId) };
 }
 
-function panelBaseUrl() {
-    return String(process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '').replace(
-        /\/$/,
-        ''
-    );
-}
-
-function fightUrl(fightId, playerId) {
-    const base = panelBaseUrl() || 'https://aeternus-8hlu.onrender.com';
-    return base + '/pvp/' + fightId + '?as=' + encodeURIComponent(playerId);
+function fightUrl(id, as) {
+    const base =
+        String(process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '')
+            .replace(/\/$/, '') || 'https://aeternus-8hlu.onrender.com';
+    return base + '/pvp/' + id + (as ? '?as=' + encodeURIComponent(as) : '');
 }
 
 module.exports = {
-    arenas,
     createArena,
     getArena,
     applyMove,
     publicState,
-    publicFighter,
-    panelBaseUrl,
     fightUrl,
-    LANDSCAPES,
-    CLASS_MOVES
+    arenas
 };
