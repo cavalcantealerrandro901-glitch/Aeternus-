@@ -16,7 +16,6 @@ const ATTR_LABEL = {
     inteligencia: 'Inteligência',
     espirito: 'Espírito',
     sorte: 'Sorte',
-    // legado
     defesa: 'Defesa',
     vida: 'Vida'
 };
@@ -152,6 +151,11 @@ function addAttrPoints(userId, n) {
 }
 
 function spendAttrPoint(userId, attrKey) {
+    return spendAttrPoints(userId, attrKey, 1);
+}
+
+/** Gasta `amount` pontos (ou todos se amount >= pts) em um único atributo. */
+function spendAttrPoints(userId, attrKey, amount) {
     let key = attrKey;
     if (key === 'defesa' || key === 'vida') key = 'constituicao';
     if (!ATTR_KEYS.includes(key)) {
@@ -164,11 +168,14 @@ function spendAttrPoint(userId, attrKey) {
     if (pts <= 0) {
         return { ok: false, error: 'Você não tem pontos de atributo disponíveis.' };
     }
-    cur.attrPoints = pts - 1;
-    cur.attrs[key] = Math.max(0, Math.floor(Number(cur.attrs[key] || 0))) + 1;
+    let n = Math.floor(Number(amount) || 0);
+    if (n <= 0) n = 1;
+    if (n > pts) n = pts;
+    cur.attrPoints = pts - n;
+    cur.attrs[key] = Math.max(0, Math.floor(Number(cur.attrs[key] || 0))) + n;
     data[userId] = cur;
     store.save('xp.json', data);
-    return { ok: true, data: get(userId) };
+    return { ok: true, spent: n, key, data: get(userId) };
 }
 
 function redistribuirAttrs(userId) {
@@ -263,6 +270,7 @@ module.exports = {
     dailyMultiplier,
     addXp,
     spendAttrPoint,
+    spendAttrPoints,
     redistribuirAttrs,
     addAttrPoints,
     pointsForLevel,
