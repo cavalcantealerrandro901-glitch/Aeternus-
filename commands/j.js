@@ -135,7 +135,7 @@ function atributosPayload(user) {
             ].join('\n')
         )
         .setFooter({
-            text: 'Use [ + ] para 1 ponto · Depositar = todos em um atributo · Redistribuir'
+            text: 'Use [ + ] para 1 ponto · Depositar = atributo + quantidade · Redistribuir'
         });
 
     const components = [];
@@ -373,9 +373,6 @@ module.exports = {
                 return interaction.reply({ content: msg, flags: eph });
             }
             const payload = atributosPayload(interaction.user);
-            if (!payload.content && !(payload.embeds && payload.embeds.length)) {
-                payload.content = '✅ Ponto aplicado. Use `O.j atributos` para ver a ficha.';
-            }
             if (payload.content === null) delete payload.content;
             try {
                 await interaction.update(payload);
@@ -395,18 +392,17 @@ module.exports = {
 
         if (id.startsWith('j:attrdist:')) {
             const ownerId = id.split(':')[2];
-            const eph = MessageFlags.Ephemeral;
             if (String(interaction.user.id) !== String(ownerId)) {
                 return interaction.reply({
                     content: 'Só o dono do perfil pode usar estes botões.',
-                    flags: eph
+                    flags: MessageFlags.Ephemeral
                 });
             }
             const pts = Number(xp.get(ownerId).attrPoints || 0);
             if (pts <= 0) {
                 return interaction.reply({
                     content: 'Você não tem pontos para distribuir. Suba de nível para ganhar mais.',
-                    flags: eph
+                    flags: MessageFlags.Ephemeral
                 });
             }
             const rows = [];
@@ -415,7 +411,7 @@ module.exports = {
                 for (const a of ATTR_META.slice(i, i + 2)) {
                     row.addComponents(
                         new ButtonBuilder()
-                            .setCustomId('j:attrall:' + a.key + ':' + ownerId)
+                            .setCustomId('j:attrpick:' + a.key + ':' + ownerId)
                             .setLabel((a.emoji + ' ' + a.label).slice(0, 80))
                             .setStyle(ButtonStyle.Primary)
                     );
@@ -426,87 +422,140 @@ module.exports = {
                 new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
                         .setCustomId('j:attrcancel:' + ownerId)
-                        .setLabel('Cancelar')
+                        .setLabel('Voltar à ficha')
                         .setStyle(ButtonStyle.Secondary)
                 )
             );
-            return interaction.reply({
+            return interaction.update({
                 content:
-                    '⚖️ **Depositar pontos**\n' +
-                    'Você tem **' +
+                    '⚖️ **Depositar pontos** · **' +
                     pts +
-                    '** ponto(s).\n' +
-                    'Escolha **um único atributo** — todos os pontos serão colocados nele.',
-                components: rows,
-                flags: eph
+                    '** disponível(is)\nEscolha **um atributo**:',
+                embeds: [],
+                components: rows
             });
         }
 
-        if (id.startsWith('j:attrall:')) {
+        if (id.startsWith('j:attrpick:')) {
             const parts = id.split(':');
             let attrKey = String(parts[2] || '').toLowerCase();
             const ownerId = parts[3];
-            const eph = MessageFlags.Ephemeral;
             if (attrKey === 'vida' || attrKey === 'defesa') attrKey = 'constituicao';
             const meta = ATTR_META.find((a) => a.key === attrKey);
             if (!meta) {
-                return interaction.reply({ content: 'Atributo inválido.', flags: eph });
+                return interaction.reply({
+                    content: 'Atributo inválido.',
+                    flags: MessageFlags.Ephemeral
+                });
             }
             if (String(interaction.user.id) !== String(ownerId)) {
                 return interaction.reply({
                     content: 'Só o dono do perfil pode usar estes botões.',
-                    flags: eph
+                    flags: MessageFlags.Ephemeral
                 });
             }
             const pts = Number(xp.get(ownerId).attrPoints || 0);
             if (pts <= 0) {
-                return interaction
-                    .update({ content: 'Você não tem pontos disponíveis.', components: [] })
-                    .catch(() =>
-                        interaction.reply({
-                            content: 'Você não tem pontos disponíveis.',
-                            flags: eph
-                        })
-                    );
+                return interaction.update(atributosPayload(interaction.user));
+            }
+            const opts = [];
+            for (const n of [1, 2, 3, 5, 10]) {
+                if (n <= pts) opts.push(n);
+            }
+            const half = Math.floor(pts / 2);
+            if (half >= 1 && !opts.includes(half)) opts.push(half);
+            if (!opts.includes(pts)) opts.push(pts);
+            opts.sort((a, b) => a - b);
+
+            const rows = [];
+            let row = new ActionRowBuilder();
+            for (let i = 0; i < opts.length; i++) {
+                const n = opts[i];
+                const label =
+                    n === pts
+                        ? 'Tudo (' + n + ')'
+                        : n === half && half !== pts
+                          ? 'Metade (' + n + ')'
+                          : String(n);
+                row.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('j:attrqty:' + attrKey + ':' + ownerId + ':' + n)
+                        .setLabel(label.slice(0, 80))
+                        .setStyle(n === pts ? ButtonStyle.Success : ButtonStyle.Primary)
+                );
+                if (row.components.length >= 5 || i === opts.length - 1) {
+                    rows.push(row);
+                    row = new ActionRowBuilder();
+                }
+            }
+            rows.push(
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('j:attrdist:' + ownerId)
+                        .setLabel('Trocar atributo')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId('j:attrcancel:' + ownerId)
+                        .setLabel('Voltar à ficha')
+                        .setStyle(ButtonStyle.Secondary)
+                )
+            );
+            return interaction.update({
+                content:
+                    '⚖️ **' +
+                    meta.emoji +
+                    ' ' +
+                    meta.label +
+                    '**\nVocê tem **' +
+                    pts +
+                    '** ponto(s).\nEscolha **quantos** depositar neste atributo:',
+                embeds: [],
+                components: rows
+            });
+        }
+
+        if (id.startsWith('j:attrqty:')) {
+            const parts = id.split(':');
+            let attrKey = String(parts[2] || '').toLowerCase();
+            const ownerId = parts[3];
+            const amount = Math.floor(Number(parts[4]) || 0);
+            if (attrKey === 'vida' || attrKey === 'defesa') attrKey = 'constituicao';
+            const meta = ATTR_META.find((a) => a.key === attrKey);
+            if (!meta) {
+                return interaction.reply({
+                    content: 'Atributo inválido.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            if (String(interaction.user.id) !== String(ownerId)) {
+                return interaction.reply({
+                    content: 'Só o dono do perfil pode usar estes botões.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            if (amount <= 0) {
+                return interaction.reply({
+                    content: 'Quantidade inválida.',
+                    flags: MessageFlags.Ephemeral
+                });
             }
             const spent = xp.spendAttrPoints
-                ? xp.spendAttrPoints(ownerId, attrKey, pts)
-                : xp.spendAttrPoint(ownerId, attrKey);
+                ? xp.spendAttrPoints(ownerId, attrKey, amount)
+                : null;
             if (!spent || !spent.ok) {
                 const msg = String((spent && spent.error) || 'Falha ao depositar.').trim();
-                return interaction
-                    .update({ content: msg, components: [] })
-                    .catch(() => interaction.reply({ content: msg, flags: eph }));
+                return interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
             }
-            const n = spent.spent || pts;
-            try {
-                await interaction.update({
-                    content:
-                        '✅ Depositou **' +
-                        n +
-                        '** ponto(s) em **' +
-                        meta.emoji +
-                        ' ' +
-                        meta.label +
-                        '**. Abra de novo `O.j atributos` para ver a ficha.',
-                    components: []
-                });
-            } catch (_) {
-                await interaction
-                    .reply({
-                        content:
-                            '✅ Depositou **' +
-                            n +
-                            '** ponto(s) em **' +
-                            meta.emoji +
-                            ' ' +
-                            meta.label +
-                            '**.',
-                        flags: eph
-                    })
-                    .catch(() => {});
-            }
-            return;
+            const payload = atributosPayload(interaction.user);
+            payload.content =
+                '✅ Depositou **' +
+                spent.spent +
+                '** ponto(s) em **' +
+                meta.emoji +
+                ' ' +
+                meta.label +
+                '**.';
+            return interaction.update(payload);
         }
 
         if (id.startsWith('j:attrcancel:')) {
@@ -517,9 +566,7 @@ module.exports = {
                     flags: MessageFlags.Ephemeral
                 });
             }
-            return interaction
-                .update({ content: '❌ Depósito cancelado.', components: [] })
-                .catch(() => {});
+            return interaction.update(atributosPayload(interaction.user));
         }
 
         if (id.startsWith('j:attrredis:')) {
