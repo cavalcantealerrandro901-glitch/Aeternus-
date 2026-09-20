@@ -11,8 +11,8 @@ function baseUrl() {
 
 module.exports = {
     name: 'avatar',
-    aliases: ['avatar-batalha', 'criaravatar', 'battleavatar'],
-    description: 'Criar avatar de batalha para a arena',
+    aliases: ['avatar-batalha', 'criaravatar', 'battleavatar', 'avatar3d'],
+    description: 'Criar avatar de batalha a partir de uma imagem',
 
     async execute(message) {
         const url = baseUrl() + '/avatar?as=' + encodeURIComponent(message.author.id);
@@ -21,18 +21,18 @@ module.exports = {
             .setTitle('🎭 Avatar de Batalha')
             .setDescription(
                 [
-                    'Crie o **avatar estilizado** que aparece nas lutas da arena.',
-                    'Não usa foto real — só personagem montado por você.',
+                    'Envie uma **imagem** e o sistema transforma em **avatar de batalha**.',
+                    'As **expressões** (ataque, dano, vitória…) são aplicadas na arena.',
+                    'Opcional: **Face Live** com webcam em tempo real.',
                     '',
-                    'É preciso ter perfil: `O.j criar`',
-                    'Depois de salvar, o avatar entra nos próximos duelos.'
+                    'Precisa de perfil: `O.j criar`'
                 ].join('\n')
             )
             .setFooter({ text: 'Aeternus Arena' });
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setStyle(ButtonStyle.Link)
-                .setLabel('Abrir criador de avatar')
+                .setLabel('Criar avatar')
                 .setURL(url)
                 .setEmoji('🎭')
         );
