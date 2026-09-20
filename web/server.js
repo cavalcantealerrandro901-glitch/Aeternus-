@@ -262,6 +262,12 @@ function startWeb(client) {
                               className: cls?.name || 'Guerreiro',
                               emoji: cls?.emoji || '⚔️',
                               photo: prof?.photoUrl || null,
+                              battleAvatar:
+                                  (typeof player.getBattleAvatar === 'function'
+                                      ? player.getBattleAvatar(userId)
+                                      : null) ||
+                                  prof?.battleAvatar ||
+                                  null,
                               attrs: { ...attrs, defesa: con, vida: con },
                               hp: maxHp,
                               maxHp,
@@ -291,6 +297,37 @@ function startWeb(client) {
         }
     });
 
+    app.get('/avatar', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'avatar.html'));
+    });
+
+    app.get('/api/avatar/:userId', (req, res) => {
+        try {
+            const av = player.getBattleAvatar
+                ? player.getBattleAvatar(req.params.userId)
+                : (player.get(req.params.userId) || {}).battleAvatar || null;
+            return res.json({ ok: true, avatar: av });
+        } catch (e) {
+            return res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/avatar/save', (req, res) => {
+        try {
+            const body = req.body || {};
+            const userId = String(body.userId || '').trim();
+            if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+            if (!player.has(userId)) {
+                return res.status(400).json({ error: 'Crie o personagem no bot primeiro (O.j criar).' });
+            }
+            const saved = player.setBattleAvatar(userId, body.avatar || {});
+            if (!saved) return res.status(400).json({ error: 'Falha ao salvar' });
+            return res.json({ ok: true, avatar: saved.battleAvatar });
+        } catch (e) {
+            return res.status(500).json({ error: e.message || 'erro' });
+        }
+    });
+
     app.get('/dashboard', (req, res) => {
         res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
     });
@@ -305,6 +342,5 @@ function startWeb(client) {
     return server;
 }
 
-// index.js usa: const startWeb = require('./web/server'); startWeb(client);
 module.exports = startWeb;
 module.exports.startWeb = startWeb;
