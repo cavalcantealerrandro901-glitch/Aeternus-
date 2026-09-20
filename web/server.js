@@ -305,4 +305,6 @@ function startWeb(client) {
     return server;
 }
 
-module.exports = { startWeb };
+// index.js usa: const startWeb = require('./web/server'); startWeb(client);
+module.exports = startWeb;
+module.exports.startWeb = startWeb;
