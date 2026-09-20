@@ -1,0 +1,69 @@
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const classes = require('../utils/classes');
+
+module.exports = {
+    name: 'classeadmin',
+    aliases: ['criarclasse', 'classadmin'],
+    description: 'Admin: cria classes novas com descrição, poderes e desvantagens',
+    async execute(message, args) {
+        if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+            return message.reply('Apenas administradores.');
+        }
+        const sub = (args[0] || '').toLowerCase();
+        if (sub === 'lista' || sub === 'list') {
+            const list = classes.listClasses();
+            const embed = new EmbedBuilder()
+                .setColor(0xc9a227)
+                .setTitle('📜 Classes Aeternus')
+                .setDescription(
+                    list
+                        .map(
+                            (c) =>
+                                `${c.emoji} **${c.name}** (\`${c.id}\`)${c.custom ? ' · custom' : ''}\n${c.desc}`
+                        )
+                        .join('\n\n')
+                        .slice(0, 4000)
+                );
+            return message.reply({ embeds: [embed] });
+        }
+
+        if (sub === 'criar' || sub === 'create') {
+            const raw = args.slice(1).join(' ');
+            const parts = raw.split('|').map((s) => s.trim());
+            if (parts.length < 5) {
+                return message.reply(
+                    'Uso:\n`O.classeadmin criar id|Nome|emoji|tipo|descrição|poder1|poder2|desv1|desv2`\n' +
+                        'Tipos: melee, magic, ranged, support, tank'
+                );
+            }
+            try {
+                const cls = classes.createClass({
+                    id: parts[0],
+                    name: parts[1],
+                    emoji: parts[2],
+                    type: parts[3],
+                    desc: parts[4],
+                    powers: parts.slice(5, 7),
+                    disadvantages: parts.slice(7, 9)
+                });
+                return message.reply(
+                    `✅ Classe criada: ${cls.emoji} **${cls.name}** (\`${cls.id}\`)\n${cls.desc}`
+                );
+            } catch (e) {
+                return message.reply('❌ ' + e.message);
+            }
+        }
+
+        if (sub === 'remover' || sub === 'delete') {
+            const id = args[1];
+            if (!classes.deleteCustomClass(id)) {
+                return message.reply('Classe custom não encontrada (não remove classes base).');
+            }
+            return message.reply(`Removida classe custom \`${id}\`.`);
+        }
+
+        return message.reply(
+            'Subcomandos: `lista` · `criar id|Nome|emoji|tipo|desc|poderes|desvantagens` · `remover <id>`'
+        );
+    }
+};
