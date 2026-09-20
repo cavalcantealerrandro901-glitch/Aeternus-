@@ -137,6 +137,27 @@ function update(userId, patch) {
     return data[userId];
 }
 
+function getBattleAvatar(userId) {
+    const p = get(userId);
+    return (p && p.battleAvatar) || null;
+}
+
+function setBattleAvatar(userId, avatar) {
+    if (!get(userId)) return null;
+    const clean = {
+        skin: Math.max(0, Math.min(5, Number(avatar.skin) || 0)),
+        hair: Math.max(0, Math.min(8, Number(avatar.hair) || 0)),
+        hairColor: String(avatar.hairColor || '#3b2f2f').slice(0, 16),
+        eyes: Math.max(0, Math.min(5, Number(avatar.eyes) || 0)),
+        outfit: Math.max(0, Math.min(6, Number(avatar.outfit) || 0)),
+        accessory: Math.max(0, Math.min(7, Number(avatar.accessory) || 0)),
+        weapon: Math.max(0, Math.min(6, Number(avatar.weapon) || 0)),
+        bg: Math.max(0, Math.min(5, Number(avatar.bg) || 0)),
+        updatedAt: Date.now()
+    };
+    return update(userId, { battleAvatar: clean });
+}
+
 function addItem(userId, item) {
     const data = all();
     if (!data[userId]) return null;
@@ -449,5 +470,7 @@ module.exports = {
     useItem,
     getEquipmentBonuses,
     equipSlotFor,
-    ensureEquipped
+    ensureEquipped,
+    getBattleAvatar,
+    setBattleAvatar
 };
