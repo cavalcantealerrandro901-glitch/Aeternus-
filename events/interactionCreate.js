@@ -104,6 +104,7 @@ module.exports = {
                 if (!cmd && id.startsWith('loja:')) cmd = client.commands.get('loja');
                 if (!cmd && parts[0] === 'habilidades') cmd = client.commands.get('habilidades');
                 if (!cmd && parts[0] === 'passivas') cmd = client.commands.get('passivas');
+                if (!cmd && parts[0] === 'classe') cmd = client.commands.get('classe');
                 if (parts[0] === 'act' && parts[1] === 'devolver' && parts[2]) {
                     cmd = client.commands.get(parts[2]);
                 }
