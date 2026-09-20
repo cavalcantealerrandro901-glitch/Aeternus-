@@ -6,10 +6,11 @@ const pvpArena = require('../utils/pvpArena');
 const rpgHub = require('../utils/rpgHub');
 const player = require('../utils/player');
 const xp = require('../utils/xp');
+const { registerAvatarRoutes } = require('../utils/avatarApi');
 
 function startWeb(client) {
     const app = express();
-    app.use(express.json({ limit: '2mb' }));
+    app.use(express.json({ limit: '6mb' }));
     app.use(express.urlencoded({ extended: true }));
     app.use(cookieParser());
     app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -261,7 +262,12 @@ function startWeb(client) {
                               classId: prof?.classId || 'guerreiro',
                               className: cls?.name || 'Guerreiro',
                               emoji: cls?.emoji || '⚔️',
-                              photo: prof?.photoUrl || null,
+                              photo:
+                                  (typeof player.getBattlePhoto === 'function'
+                                      ? player.getBattlePhoto(userId)
+                                      : null) ||
+                                  prof?.photoUrl ||
+                                  null,
                               battleAvatar:
                                   (typeof player.getBattleAvatar === 'function'
                                       ? player.getBattleAvatar(userId)
@@ -311,6 +317,9 @@ function startWeb(client) {
             return res.status(500).json({ error: e.message });
         }
     });
+
+    // Upload + geração img2img (Pollinations)
+    registerAvatarRoutes(app);
 
     app.post('/api/avatar/save', (req, res) => {
         try {
