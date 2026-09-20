@@ -3,135 +3,129 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>Aeternus · Avatar de Batalha</title>
+<title>Aeternus · Avatar 3D</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet"/>
 <style>
-:root{--bg:#07060f;--panel:rgba(14,10,28,.92);--line:rgba(255,255,255,.12);--a:#c4b5fd;--ok:#34d399;--muted:#94a3b8}
+:root{--bg:#06050c;--panel:rgba(12,8,24,.92);--line:rgba(255,255,255,.12);--a:#c4b5fd;--ok:#34d399;--muted:#94a3b8}
 *{box-sizing:border-box;margin:0;padding:0}
-body{min-height:100vh;font-family:Rajdhani,system-ui,sans-serif;color:#f1f5f9;background:radial-gradient(ellipse at 50% 0%,#1e1438 0%,var(--bg) 55%)}
-.app{max-width:920px;margin:0 auto;padding:16px;display:grid;gap:14px}
-.brand{font-family:Cinzel,serif;letter-spacing:.12em;font-size:1.1rem;background:linear-gradient(90deg,#e9d5ff,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent}
-.grid{display:grid;grid-template-columns:280px 1fr;gap:14px}
-@media(max-width:720px){.grid{grid-template-columns:1fr}}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;backdrop-filter:blur(12px)}
+body{min-height:100vh;font-family:Rajdhani,system-ui,sans-serif;color:#f1f5f9;background:radial-gradient(ellipse at 50% 0%,#1a1040 0%,var(--bg) 55%)}
+.app{max-width:880px;margin:0 auto;padding:18px;display:grid;gap:14px}
+.brand{font-family:Cinzel,serif;letter-spacing:.14em;font-size:1.15rem;background:linear-gradient(90deg,#e9d5ff,#67e8f9,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent}
+.muted{color:var(--muted);font-size:.9rem;line-height:1.4}
+.grid{display:grid;grid-template-columns:1fr 1.1fr;gap:14px}
+@media(max-width:740px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;backdrop-filter:blur(12px)}
 .card h2{font-family:Cinzel,serif;font-size:.95rem;margin-bottom:10px}
-.preview-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
-#stage{width:220px;height:220px;border-radius:24px;overflow:hidden;border:2px solid var(--line);box-shadow:0 16px 40px rgba(0,0,0,.45)}
-#stage svg{width:100%;height:100%;display:block}
-.muted{color:var(--muted);font-size:.85rem}
 label{display:block;font-size:.8rem;opacity:.8;margin:10px 0 4px}
-select,input[type=text]{width:100%;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:10px;color:#fff;padding:8px 10px;font-family:inherit}
+input,textarea,select{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--line);border-radius:12px;color:#fff;padding:10px 12px;font-family:inherit;font-size:.95rem}
+textarea{min-height:120px;resize:vertical}
 .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.btn{appearance:none;border:1px solid var(--line);background:rgba(124,58,237,.3);color:#fff;border-radius:10px;padding:10px 14px;font-family:inherit;font-weight:700;cursor:pointer}
-.btn.ok{background:rgba(52,211,153,.25);border-color:rgba(52,211,153,.45)}
+.btn{appearance:none;border:1px solid var(--line);background:rgba(124,58,237,.35);color:#fff;border-radius:12px;padding:11px 16px;font-family:inherit;font-weight:700;cursor:pointer}
 .btn:hover{border-color:var(--a)}
-#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:1px solid var(--line);padding:10px 16px;border-radius:12px;opacity:0;transition:.25s;z-index:20}
+.btn.ok{background:linear-gradient(90deg,#7c3aed,#2563eb);border:none}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.preview{aspect-ratio:1;border-radius:20px;overflow:hidden;border:2px solid var(--line);background:linear-gradient(145deg,#1e1b4b,#0f172a);display:flex;align-items:center;justify-content:center;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.preview img{width:100%;height:100%;object-fit:cover}
+.preview .ph{opacity:.5;text-align:center;padding:20px}
+.tips{font-size:.8rem;opacity:.75;margin-top:8px;line-height:1.35}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);border:1px solid var(--line);padding:10px 16px;border-radius:12px;opacity:0;transition:.25s;z-index:20;max-width:90%}
 #toast.show{opacity:1}
-.swatches{display:flex;flex-wrap:wrap;gap:6px}
-.swatch{width:28px;height:28px;border-radius:8px;border:2px solid transparent;cursor:pointer}
-.swatch.on{border-color:#fff;box-shadow:0 0 0 2px var(--a)}
+.spin{width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#a78bfa;border-radius:50%;animation:s .8s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="brand">✦ AVATAR DE BATALHA</div>
-  <p class="muted">Monte o personagem da arena. Não usa foto real — só avatar estilizado.</p>
+  <div class="brand">✦ AVATAR 3D · AETERNUS</div>
+  <p class="muted">Descreva como quer seu personagem. O sistema gera um avatar <b>3D quase real</b> para a arena — não é foto sua, é o personagem que você imaginar.</p>
   <div class="grid">
-    <div class="card preview-wrap">
+    <div class="card">
       <h2>Pré-visualização</h2>
-      <div id="stage"></div>
-      <p class="muted" id="userHint">Informe seu ID Discord para salvar.</p>
+      <div class="preview" id="preview"><div class="ph">Sua criação aparece aqui</div></div>
+      <p class="tips" id="status"></p>
     </div>
     <div class="card">
-      <h2>Personalizar</h2>
+      <h2>Descreva seu avatar</h2>
       <label>ID do Discord</label>
-      <input type="text" id="userId" placeholder="Seu user ID"/>
-      <label>Tom de pele</label><select id="skin"></select>
-      <label>Cabelo</label><select id="hair"></select>
-      <label>Cor do cabelo</label><div class="swatches" id="hairColors"></div>
-      <label>Olhos</label><select id="eyes"></select>
-      <label>Traje</label><select id="outfit"></select>
-      <label>Acessório</label><select id="accessory"></select>
-      <label>Arma</label><select id="weapon"></select>
-      <label>Fundo</label><select id="bg"></select>
+      <input id="userId" type="text" placeholder="Seu user ID do Discord"/>
+      <label>Descrição (quanto mais detalhe, melhor)</label>
+      <textarea id="desc" placeholder="Ex: guerreiro élfico alto, cabelo prateado longo, armadura dourada com runas azuis, olhar determinado, estilo 3D cinematográfico realista..."></textarea>
+      <label>Estilo</label>
+      <select id="style">
+        <option value="3d_cinematic">3D cinematográfico (recomendado)</option>
+        <option value="3d_game">3D de jogo AAA</option>
+        <option value="realistic">Quase real / hiper-realista</option>
+        <option value="anime_3d">Anime 3D</option>
+        <option value="fantasy">Fantasia épica</option>
+      </select>
       <div class="row">
-        <button class="btn ok" id="btnSave">Salvar avatar</button>
-        <button class="btn" id="btnRandom">Aleatório</button>
-        <button class="btn" id="btnArena" onclick="location.href='/rpg'">RPG Hub</button>
+        <button class="btn" id="btnGen">Gerar avatar 3D</button>
+        <button class="btn ok" id="btnSave" disabled>Salvar na arena</button>
       </div>
+      <p class="tips">Inclua aparência, cabelo, roupa, arma e expressão. Precisa de perfil: <code>O.j criar</code>.</p>
     </div>
   </div>
 </div>
 <div id="toast"></div>
 <script>
-const SKINS=['#f5d0b0','#e0a070','#c68642','#8d5524','#5c3317','#f3e5d0'];
-const HAIR_COLORS=['#1a1a1a','#3b2f2f','#6b3a2a','#c4a35a','#d4d4d8','#7c3aed','#e11d48','#0ea5e9'];
-const HAIR_STYLES=['Curto','Espigado','Longo','Coque','Raspado','Trança','Mago','Samurai','Moicano'];
-const EYES=['Neutro','Determinado','Suave','Feroz','Místico','Cansado'];
-const OUTFITS=['Guerreiro','Mago','Arqueiro','Tanque','Assassino','Clérigo','Mercenário'];
-const ACCESSORIES=['Nenhum','Bandana','Elmo','Capuz','Coroa','Máscara','Óculos','Lenço'];
-const WEAPONS=['Nenhuma','Espada','Cajado','Arco','Machado','Adagas','Martelo'];
-const BGS=['Roxo','Floresta','Vulcão','Gelo','Deserto','Noite'];
-const state={skin:0,hair:0,hairColor:HAIR_COLORS[0],eyes:0,outfit:0,accessory:0,weapon:1,bg:0};
 const qs=new URLSearchParams(location.search);
-if(qs.get('as')){document.getElementById('userId').value=qs.get('as');document.getElementById('userHint').textContent='ID detectado pelo bot.';}
-function fillSelect(id,arr){document.getElementById(id).innerHTML=arr.map((n,i)=>'<option value="'+i+'">'+n+'</option>').join('');}
-fillSelect('skin',SKINS.map((_,i)=>'Tom '+(i+1)));
-fillSelect('hair',HAIR_STYLES);fillSelect('eyes',EYES);fillSelect('outfit',OUTFITS);
-fillSelect('accessory',ACCESSORIES);fillSelect('weapon',WEAPONS);fillSelect('bg',BGS);
-const hc=document.getElementById('hairColors');
-HAIR_COLORS.forEach((c,i)=>{const b=document.createElement('button');b.type='button';b.className='swatch'+(i===0?' on':'');b.style.background=c;
-b.onclick=()=>{state.hairColor=c;hc.querySelectorAll('.swatch').forEach(x=>x.classList.remove('on'));b.classList.add('on');draw();};hc.appendChild(b);});
-['skin','hair','eyes','outfit','accessory','weapon','bg'].forEach(k=>{document.getElementById(k).onchange=e=>{state[k]=Number(e.target.value);draw();};});
-function bgGrad(i){return[['#1e1b4b','#312e81'],['#0a1a12','#14532d'],['#1a0808','#7f1d1d'],['#0c1929','#1e3a5f'],['#1c1408','#78350f'],['#0a0a12','#1e1b2e']][i]||['#1e1b4b','#312e81'];}
-function hairPath(style,color){
-if(style===4)return '';
-if(style===2)return `<path d="M58 75 Q55 30 100 28 Q145 30 142 75 Q140 100 130 120 Q120 90 100 88 Q80 90 70 120 Q60 100 58 75" fill="${color}"/>`;
-if(style===6)return `<path d="M55 80 Q50 25 100 22 Q150 25 145 80 Q148 50 100 48 Q52 50 55 80" fill="${color}"/>`;
-if(style===8)return `<path d="M90 30 L100 10 L110 30 L108 55 L92 55 Z" fill="${color}"/><ellipse cx="100" cy="58" rx="36" ry="18" fill="${color}"/>`;
-return `<ellipse cx="100" cy="55" rx="40" ry="26" fill="${color}"/>`;}
-function outfitSvg(i){const c=['#64748b','#7c3aed','#15803d','#1d4ed8','#334155','#f8fafc','#a16207'][i]||'#64748b';
-return `<path d="M55 140 Q60 125 100 122 Q140 125 145 140 L150 200 L50 200 Z" fill="${c}"/><path d="M55 140 L40 165 L55 160" fill="${c}"/><path d="M145 140 L160 165 L145 160" fill="${c}"/>`;}
-function accessorySvg(i){
-if(i===0)return '';
-if(i===1)return `<path d="M60 70 Q100 55 140 70 L138 78 Q100 68 62 78 Z" fill="#b91c1c"/>`;
-if(i===2)return `<path d="M55 72 L60 50 L140 50 L145 72 Z" fill="#94a3b8"/>`;
-if(i===3)return `<path d="M50 75 Q55 40 100 38 Q145 40 150 75 Q140 90 100 88 Q60 90 50 75" fill="#1e1b4b"/>`;
-if(i===4)return `<path d="M70 48 L80 38 L90 48 L100 32 L110 48 L120 38 L130 48 L125 55 L75 55 Z" fill="#fbbf24"/>`;
-if(i===5)return `<rect x="62" y="80" width="76" height="28" rx="10" fill="#111"/>`;
-return '';}
-function weaponSvg(i){
-if(i===0)return '';
-if(i===1)return `<g transform="translate(150,90) rotate(25)"><rect x="0" y="0" width="8" height="70" fill="#94a3b8"/><path d="M-6 0 L4 -28 L14 0 Z" fill="#e2e8f0"/></g>`;
-if(i===2)return `<g transform="translate(40,70) rotate(-20)"><rect x="0" y="0" width="6" height="90" fill="#a16207"/><circle cx="3" cy="0" r="12" fill="#7c3aed"/></g>`;
-return '';}
-function draw(){
-const skin=SKINS[state.skin]||SKINS[0];const [g0,g1]=bgGrad(state.bg);
-document.getElementById('stage').innerHTML=`<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${g0}"/><stop offset="100%" stop-color="${g1}"/></linearGradient></defs>
-<rect width="200" height="200" fill="url(#bg)"/>${outfitSvg(state.outfit)}
-<rect x="88" y="118" width="24" height="22" fill="${skin}"/>
-<ellipse cx="100" cy="88" rx="42" ry="48" fill="${skin}"/>${hairPath(state.hair,state.hairColor)}
-<circle cx="82" cy="88" r="5" fill="#1e293b"/><circle cx="118" cy="88" r="5" fill="#1e293b"/>
-<path d="M88 110 Q100 118 112 110" stroke="#5c3317" stroke-width="2.5" fill="none"/>
-${accessorySvg(state.accessory)}${weaponSvg(state.weapon)}</svg>`;}
-function toast(t){const n=document.getElementById('toast');n.textContent=t;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2200);}
-document.getElementById('btnRandom').onclick=()=>{
-state.skin=Math.floor(Math.random()*SKINS.length);state.hair=Math.floor(Math.random()*HAIR_STYLES.length);
-state.hairColor=HAIR_COLORS[Math.floor(Math.random()*HAIR_COLORS.length)];state.eyes=Math.floor(Math.random()*EYES.length);
-state.outfit=Math.floor(Math.random()*OUTFITS.length);state.accessory=Math.floor(Math.random()*ACCESSORIES.length);
-state.weapon=Math.floor(Math.random()*WEAPONS.length);state.bg=Math.floor(Math.random()*BGS.length);
-['skin','hair','eyes','outfit','accessory','weapon','bg'].forEach(k=>{document.getElementById(k).value=String(state[k]);});
-document.querySelectorAll('#hairColors .swatch').forEach((b,i)=>b.classList.toggle('on',HAIR_COLORS[i]===state.hairColor));draw();};
-document.getElementById('btnSave').onclick=async()=>{
-const userId=document.getElementById('userId').value.trim();if(!userId)return toast('Informe o ID do Discord');
-try{const r=await fetch('/api/avatar/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,avatar:state})});
-const data=await r.json();if(!r.ok)throw new Error(data.error||'Falha');toast('Avatar de batalha salvo!');}catch(e){toast(e.message||'Erro');}};
-async function loadExisting(){const userId=document.getElementById('userId').value.trim();if(!userId)return;
-try{const r=await fetch('/api/avatar/'+encodeURIComponent(userId));if(!r.ok)return;const data=await r.json();
-if(data.avatar){Object.assign(state,data.avatar);['skin','hair','eyes','outfit','accessory','weapon','bg'].forEach(k=>{if(state[k]!=null)document.getElementById(k).value=String(state[k]);});
-document.querySelectorAll('#hairColors .swatch').forEach((b,i)=>b.classList.toggle('on',HAIR_COLORS[i]===state.hairColor));draw();}}catch(_){}}
-document.getElementById('userId').addEventListener('change',loadExisting);draw();loadExisting();
+let currentUrl='', currentDesc='';
+if(qs.get('as')) document.getElementById('userId').value=qs.get('as');
+const toast=(t)=>{const n=document.getElementById('toast');n.textContent=t;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2800);};
+const preview=document.getElementById('preview');
+const statusEl=document.getElementById('status');
+const btnGen=document.getElementById('btnGen');
+const btnSave=document.getElementById('btnSave');
+btnGen.onclick=async()=>{
+  const desc=document.getElementById('desc').value.trim();
+  const style=document.getElementById('style').value;
+  if(desc.length<8) return toast('Descreva melhor o avatar (mín. 8 caracteres).');
+  btnGen.disabled=true; btnSave.disabled=true;
+  preview.innerHTML='<div class="spin"></div>';
+  statusEl.textContent='Gerando avatar 3D… aguarde alguns segundos.';
+  try{
+    const r=await fetch('/api/avatar/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:desc,style})});
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Falha na geração');
+    currentUrl=data.imageUrl; currentDesc=desc;
+    const img=new Image();
+    img.onload=()=>{preview.innerHTML='';preview.appendChild(img);statusEl.textContent='Pronto. Se gostar, salve para usar na arena.';btnSave.disabled=false;};
+    img.onerror=()=>{preview.innerHTML='<div class="ph">Não carregou. Tente gerar de novo.</div>';statusEl.textContent='';};
+    img.src=currentUrl+(currentUrl.includes('?')?'&':'?')+'t='+Date.now();
+    img.alt='Avatar 3D';
+  }catch(e){preview.innerHTML='<div class="ph">Erro na geração</div>';statusEl.textContent=e.message||'Erro';toast(e.message||'Erro');}
+  btnGen.disabled=false;
+};
+btnSave.onclick=async()=>{
+  const userId=document.getElementById('userId').value.trim();
+  if(!userId) return toast('Informe o ID do Discord');
+  if(!currentUrl) return toast('Gere um avatar antes de salvar');
+  btnSave.disabled=true;
+  try{
+    const r=await fetch('/api/avatar/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId,avatar:{imageUrl:currentUrl,description:currentDesc}})});
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Falha ao salvar');
+    toast('Avatar 3D salvo! Entrará nos próximos duelos.');
+    statusEl.textContent='Salvo no seu perfil de combate.';
+  }catch(e){toast(e.message||'Erro');btnSave.disabled=false;}
+};
+(async()=>{
+  const userId=document.getElementById('userId').value.trim();
+  if(!userId) return;
+  try{
+    const r=await fetch('/api/avatar/'+encodeURIComponent(userId));
+    if(!r.ok) return;
+    const data=await r.json();
+    const av=data.avatar;
+    if(av&&av.imageUrl){
+      currentUrl=av.imageUrl; currentDesc=av.description||'';
+      if(currentDesc) document.getElementById('desc').value=currentDesc;
+      const img=document.createElement('img'); img.src=currentUrl; img.alt='Avatar atual';
+      preview.innerHTML=''; preview.appendChild(img);
+      btnSave.disabled=false; statusEl.textContent='Avatar atual carregado.';
+    }
+  }catch(_){}
+})();
 </script>
 </body>
 </html>
