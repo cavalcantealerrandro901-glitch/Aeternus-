@@ -7,14 +7,17 @@ const {
   PermissionFlagsBits 
 } = require('discord.js');
 
+// Define o link do seu painel web (pode ser definido via variável de ambiente no .env)
+const WEB_PANEL_URL = process.env.WEB_PANEL_URL || 'https://seu-painel-web.com';
+
 module.exports = {
   name: 'painel',
   aliases: ['suport', 'suporte', 'suport painel', 'painel suport'],
-  description: 'Acessa o gerenciador do servidor',
+  description: 'Acessa o gerenciador do servidor e painel web',
 
   data: new SlashCommandBuilder()
     .setName('painel')
-    .setDescription('Acessa o gerenciador do servidor')
+    .setDescription('Acessa o gerenciador do servidor e painel web')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async executeSlash(interaction) {
@@ -107,26 +110,28 @@ async function renderHome(context, isSlash) {
       await i.update({ embeds: [confirmEmbed], components: [confirmRow] });
 
     } else if (i.customId === 'confirm_yes') {
-      // Embed de Boas-Vindas ao Sistema de Confirmações
+      // Embed de Boas-Vindas com redirecionamento ao Painel Web
       const welcomeEmbed = new EmbedBuilder()
-        .setTitle('✨ Sistema de Confirmações')
+        .setTitle('✨ Sistema de Confirmações & Painel Web')
         .setDescription(
-          `Seja muito bem-vindo ao nosso sistema de confirmações no servidor **${guild.name}**!\n\n` +
-          'A partir daqui, você pode prosseguir com as etapas de verificação e definições do painel.'
+          `Seja muito bem-vindo ao nosso sistema no servidor **${guild.name}**!\n\n` +
+          'Clique no botão abaixo para abrir diretamente o nosso **Painel Web** no seu navegador.'
         )
         .setColor('#22c55e')
-        .setFooter({ text: 'Aeternus • Sistema de Confirmação', iconURL: guild.iconURL({ dynamic: true }) || null })
+        .setFooter({ text: 'Aeternus • Redirecionamento Web', iconURL: guild.iconURL({ dynamic: true }) || null })
         .setTimestamp();
 
-      const welcomeRow = new ActionRowBuilder().addComponents(
+      // Botão de Link direto (ButtonStyle.Link abre a URL ao ser clicado)
+      const webRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId('next_system_step')
-          .setLabel('Avançar')
-          .setEmoji('▶️')
-          .setStyle(ButtonStyle.Primary)
+          .setLabel('Acessar Painel Web')
+          .setEmoji('🌐')
+          .setStyle(ButtonStyle.Link)
+          .setURL(WEB_PANEL_URL)
       );
 
-      await i.update({ embeds: [welcomeEmbed], components: [welcomeRow] });
+      await i.update({ embeds: [welcomeEmbed], components: [webRow] });
+      collector.stop();
 
     } else if (i.customId === 'confirm_no') {
       await i.update({ 
@@ -135,12 +140,6 @@ async function renderHome(context, isSlash) {
         components: [] 
       });
       collector.stop();
-
-    } else if (i.customId === 'next_system_step') {
-      await i.reply({ 
-        content: '📌 **Redirecionando...**', 
-        ephemeral: true 
-      });
     }
   });
 }
