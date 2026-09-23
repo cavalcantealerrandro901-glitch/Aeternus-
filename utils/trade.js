@@ -110,6 +110,26 @@ function listOpenFor(userId) {
     return out;
 }
 
+function summarizeSide(userId, side) {
+    const inv = player.getInventory(userId) || [];
+    const items = (side.itemIndexes || []).map((idx) => {
+        const it = inv[idx - 1];
+        if (!it) return { index: idx, name: '?', emoji: '📦' };
+        return {
+            index: idx,
+            name: it.name || it.id || 'item',
+            emoji: it.emoji || '📦'
+        };
+    });
+    return {
+        eter: side.eter || 0,
+        intensity: side.intensity || 0,
+        items,
+        itemsText: items.map((x) => `${x.emoji} #${x.index} ${x.name}`).join('\n') || '_nada_',
+        confirmed: !!side.confirmed
+    };
+}
+
 function publicSession(s, asUserId) {
     if (!s) return null;
     const as = asUserId ? String(asUserId) : null;
@@ -120,7 +140,6 @@ function publicSession(s, asUserId) {
         status: s.status,
         expiresAt: s.expiresAt,
         a: {
-            ...trade.summarizeSide ? null : null,
             eter: s.a.eter,
             intensity: s.a.intensity,
             itemIndexes: s.a.itemIndexes,
@@ -287,28 +306,6 @@ function executeTrade(s) {
         saveDisk();
         return { ok: false, error: e.message || 'Falha ao executar troca.' };
     }
-}
-
-function summarizeSide(userId, side) {
-    const inv = player.getInventory(userId) || [];
-    const items = (side.itemIndexes || [])
-        .map((idx) => {
-            const it = inv[idx - 1];
-            if (!it) return { index: idx, name: '?', emoji: '📦' };
-            return {
-                index: idx,
-                name: it.name || it.id || 'item',
-                emoji: it.emoji || '📦'
-            };
-        });
-    return {
-        eter: side.eter || 0,
-        intensity: side.intensity || 0,
-        items,
-        itemsText:
-            items.map((x) => `${x.emoji} #${x.index} ${x.name}`).join('\n') || '_nada_',
-        confirmed: !!side.confirmed
-    };
 }
 
 function bagFor(userId) {
