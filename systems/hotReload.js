@@ -1,16 +1,7 @@
 /**
- * Hot-reload de comandos e sistemas.
+ * Hot-reload global para TODOS os arquivos .js do projeto.
  *
- * Observa pastas commands/ e systems/ e recarrega arquivos .js alterados
- * sem reiniciar o bot.
- *
- * ENV:
- *   HOT_RELOAD=off  → desliga o watcher
- *   HOT_RELOAD=on   → liga (padrão em não-produção)
- *
- * Comandos: recarregamento seguro (cache + collections).
- * Sistemas: tenta limpar intervalos/timeouts capturados no setup;
- *           se o módulo exportar destroy/cleanup/stop, também é chamado.
+ * Mapeia e observa recursivamente toda a raiz do projeto (exceto node_modules, .git e data).
  */
 const fs = require('fs');
 const path = require('path');
@@ -21,6 +12,9 @@ const {
     SYSTEMS_DIR
 } = require('../bot/loaders');
 
+const ROOT_DIR = path.join(__dirname, '..');
+const IGNORED_DIRS = new Set(['node_modules', '.git', 'data', 'public', '.cache', '.npm']);
+
 const DEBOUNCE_MS = 400;
 const watches = [];
 const pending = new Map(); // path -> timeout
@@ -29,7 +23,6 @@ function isEnabled() {
     const v = String(process.env.HOT_RELOAD || '').toLowerCase();
     if (v === 'off' || v === '0' || v === 'false' || v === 'no') return false;
     if (v === 'on' || v === '1' || v === 'true' || v === 'yes') return true;
-    // padrão: ligado fora de produção explícita
     return process.env.NODE_ENV !== 'production';
 }
 
@@ -42,53 +35,77 @@ function debounce(key, fn) {
     pending.set(key, t);
 }
 
-function onCommandsChange(client, filename) {
+function handleFileChange(client, dir, filename) {
     if (!filename || !filename.endsWith('.js')) return;
-    const full = path.join(COMMANDS_DIR, filename);
-    if (!fs.existsSync(full)) return;
+    if (filename === 'hotReload.js') return;
 
-    debounce('cmd:' + filename, () => {
-        const r = loadCommandFile(client, filename, { quiet: true });
-        if (r.ok) {
-            console.log(`🔄 [hotReload] comando recarregado: ${r.name}${r.slash ? ' (/' + r.slash + ')' : ''}`);
-        } else {
-            console.warn(`🔄 [hotReload] falha comando ${filename}: ${r.error}`);
+    const fullPath = path.join(dir, filename);
+    if (!fs.existsSync(fullPath)) return;
+
+    const relativePath = path.relative(ROOT_DIR, fullPath);
+
+    debounce('file:' + fullPath, () => {
+        // Se o arquivo modificado for um comando
+        if (fullPath.startsWith(COMMANDS_DIR)) {
+            const relativeCmd = path.relative(COMMANDS_DIR, fullPath);
+            const r = loadCommandFile(client, relativeCmd, { quiet: true });
+            if (r.ok) {
+                console.log(`🔄 [hotReload] comando recarregado: ${r.name}${r.slash ? ' (/' + r.slash + ')' : ''}`);
+            } else {
+                console.warn(`🔄 [hotReload] falha no comando ${relativeCmd}: ${r.error}`);
+            }
+            return;
+        }
+
+        // Se o arquivo modificado for um sistema
+        if (fullPath.startsWith(SYSTEMS_DIR)) {
+            const relativeSys = path.relative(SYSTEMS_DIR, fullPath);
+            const r = loadSystemFile(client, relativeSys, { quiet: true });
+            if (r.ok) {
+                console.log(`🔄 [hotReload] sistema recarregado: ${r.name}`);
+            } else {
+                console.warn(`🔄 [hotReload] falha no sistema ${relativeSys}: ${r.error}`);
+            }
+            return;
+        }
+
+        // Para qualquer outro arquivo .js (utils, panels, index.js, etc.)
+        try {
+            const resolved = require.resolve(fullPath);
+            delete require.cache[resolved];
+            console.log(`🔄 [hotReload] arquivo recarregado: ${relativePath}`);
+        } catch (err) {
+            console.warn(`🔄 [hotReload] falha ao limpar cache de ${relativePath}: ${err.message}`);
         }
     });
 }
 
-function onSystemsChange(client, filename) {
-    if (!filename || !filename.endsWith('.js')) return;
-    if (filename === 'hotReload.js') return; // evita auto-reload instável
-    const full = path.join(SYSTEMS_DIR, filename);
-    if (!fs.existsSync(full)) return;
+function watchRecursive(client, dir) {
+    if (!fs.existsSync(dir)) return;
 
-    debounce('sys:' + filename, () => {
-        const r = loadSystemFile(client, filename, { quiet: true });
-        if (r.ok) {
-            console.log(`🔄 [hotReload] sistema recarregado: ${r.name}`);
-        } else {
-            console.warn(`🔄 [hotReload] falha sistema ${filename}: ${r.error}`);
-        }
-    });
-}
+    const baseName = path.basename(dir);
+    if (IGNORED_DIRS.has(baseName)) return;
 
-function watchDir(dir, handler) {
-    if (!fs.existsSync(dir)) return null;
     try {
-        const w = fs.watch(dir, { persistent: false }, (eventType, filename) => {
-            if (!filename) return;
-            // 'rename' também dispara em create/delete; só recarregamos se existir
-            handler(String(filename));
+        const watcher = fs.watch(dir, { persistent: false }, (eventType, filename) => {
+            if (filename) handleFileChange(client, dir, String(filename));
         });
-        w.on('error', (err) => {
-            console.warn('[hotReload] watch error:', err.message);
+
+        watcher.on('error', (err) => {
+            console.warn(`[hotReload] erro ao observar ${dir}:`, err.message);
         });
-        watches.push(w);
-        return w;
+
+        watches.push(watcher);
+
+        // Varre subpastas
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (entry.isDirectory() && !IGNORED_DIRS.has(entry.name)) {
+                watchRecursive(client, path.join(dir, entry.name));
+            }
+        }
     } catch (e) {
-        console.warn('[hotReload] não foi possível observar', dir, e.message);
-        return null;
+        console.warn(`[hotReload] erro ao varrer pasta ${dir}:`, e.message);
     }
 }
 
@@ -98,7 +115,6 @@ function setup(client) {
         return;
     }
 
-    // expõe helpers no client para uso manual / comando admin
     client.hotReload = {
         reloadCommand: (name) => require('../bot/loaders').reloadCommand(client, name),
         reloadSystem: (name) => require('../bot/loaders').reloadSystem(client, name),
@@ -114,17 +130,13 @@ function setup(client) {
         }
     };
 
-    watchDir(COMMANDS_DIR, (f) => onCommandsChange(client, f));
-    watchDir(SYSTEMS_DIR, (f) => onSystemsChange(client, f));
-
-    console.log('[hotReload] ativo · observando commands/ e systems/');
+    watchRecursive(client, ROOT_DIR);
+    console.log('[hotReload] ativo · observando TODOS os arquivos .js do projeto!');
 }
 
 function destroy() {
     for (const w of watches) {
-        try {
-            w.close();
-        } catch (_) {}
+        try { w.close(); } catch (_) {}
     }
     watches.length = 0;
     for (const t of pending.values()) clearTimeout(t);
