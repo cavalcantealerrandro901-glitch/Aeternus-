@@ -48,14 +48,22 @@ async function loginWithRetry(client, token, attempts = 8) {
 }
 
 async function main() {
-    await connect();
+    // 1) Mongo
+    const mongoOk = await connect();
+
+    // 2) carrega tudo do Mongo → memória
     await store.hydrate();
+
+    // 3) sobe data/*.json locais que ainda não estão no Mongo (migração one-shot)
+    if (mongoOk) {
+        await store.migrateLocalToMongo();
+    }
 
     const token = getToken();
     if (!token) {
         console.error(
             '❌ Token do Discord não encontrado.\n' +
-                'No .env ou no Render use uma destas variáveis:\n' +
+                'No .env ou no host use uma destas variáveis:\n' +
                 '  TOKEN\n  DISCORD_TOKEN\n  BOT_TOKEN'
         );
         process.exit(1);
@@ -85,7 +93,6 @@ async function main() {
     client.slash = new Collection();
     client.prefixDefault = 'O.';
 
-    // erros de shard antes do ready não devem derrubar o processo sozinhos
     client.on('error', (err) => {
         console.warn('[client] error:', err?.message || err);
     });
@@ -96,11 +103,15 @@ async function main() {
     loadCommands(client);
     loadEvents(client);
     loadSystems(client);
-    startWeb(client);
+
+    // painel web (usa as mesmas settings/guilds do store → Mongo)
+    const web = startWeb;
+    if (typeof web === 'function') web(client);
+    else if (web && typeof web.startWeb === 'function') web.startWeb(client);
 
     const backup = require('./utils/backup');
     const shutdown = async (sig) => {
-        console.log(`\n${sig} — salvando backup final…`);
+        console.log(`\n${sig} — flush Mongo + backup final…`);
         try {
             await store.flush();
             await backup.createBackup('shutdown');
@@ -110,7 +121,17 @@ async function main() {
     process.once('SIGINT', () => shutdown('SIGINT'));
     process.once('SIGTERM', () => shutdown('SIGTERM'));
 
+    // flush periódico extra (segurança em hosts que matam o processo)
+    setInterval(() => {
+        store.flush().catch(() => {});
+    }, 60_000).unref?.();
+
     await loginWithRetry(client, token);
+
+    const st = store.stats();
+    console.log(
+        `📦 Store pronto · keys=${st.keys} · mongo=${st.mongo} · localFiles=${st.localFiles}`
+    );
 }
 
 main().catch((e) => {
@@ -118,7 +139,6 @@ main().catch((e) => {
     process.exit(1);
 });
 
-// unhandledRejection / uncaughtException são capturados pelo systems/autoRepair
 process.on('unhandledRejection', (err) => {
     try {
         const ar = require('./utils/autoRepair');
