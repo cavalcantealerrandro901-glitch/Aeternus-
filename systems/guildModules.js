@@ -3,7 +3,6 @@
  */
 const { EmbedBuilder, ChannelType } = require('discord.js');
 const { getSettings, setSettings } = require('../utils/settings');
-const { ATTR_LABEL } = require('../utils/xp');
 const { parseCountMessage } = require('../utils/countParse');
 
 const stickyCount = new Map();
@@ -50,21 +49,23 @@ function countKey(channelId) {
 }
 
 /**
- * Estado ao vivo da contagem.
- * @param {string} channelId
- * @param {number} [settingsCurrent] valor de fallback das settings
- * @param {{ force?: boolean }} [opts] force=true sobrescreve o runtime com settingsCurrent
+ * Estado ao vivo da contagem no canal.
+ * force=true sobrescreve o valor em memória.
  */
 function getCountState(channelId, settingsCurrent, opts) {
     const key = countKey(channelId);
     const force = !!(opts && opts.force);
     if (!key) {
-        return { current: Math.max(0, Math.floor(Number(settingsCurrent) || 0)), lastUser: null };
+        return {
+            current: Math.max(0, Math.floor(Number(settingsCurrent) || 0)),
+            lastUser: null
+        };
     }
     if (force || !countRuntime.has(key)) {
+        const prev = countRuntime.get(key);
         countRuntime.set(key, {
             current: Math.max(0, Math.floor(Number(settingsCurrent) || 0)),
-            lastUser: force ? null : countRuntime.get(key)?.lastUser ?? null
+            lastUser: force ? null : prev?.lastUser ?? null
         });
     }
     return countRuntime.get(key);
@@ -72,13 +73,16 @@ function getCountState(channelId, settingsCurrent, opts) {
 
 function persistCount(guildId, ct, state) {
     const key = countKey(ct.channelId);
+    const current = Math.max(0, Math.floor(Number(state.current) || 0));
+    state.current = current;
     if (key) countRuntime.set(key, state);
+
     try {
         setSettings(guildId, {
             counting: {
                 enabled: ct.enabled !== false,
                 channelId: String(ct.channelId),
-                current: Math.max(0, Math.floor(Number(state.current) || 0)),
+                current,
                 allowSameUser: !!ct.allowSameUser
             }
         });
@@ -88,33 +92,30 @@ function persistCount(guildId, ct, state) {
 }
 
 /**
- * Define o próximo número esperado da contagem.
- * Ex: setCountingNumber(guildId, 50) → current=49, próximo=50
+ * Define o número ATUAL da contagem (último válido).
+ * Ex: setCountingNumber(guildId, 100) → atual=100, próximo=101
  */
 function setCountingNumber(guildId, n, opts) {
     const resetLastUser = !opts || opts.resetLastUser !== false;
     const s = getSettings(guildId);
     const ct = s.counting || {};
 
-    if (ct.enabled === false) {
-        return { ok: false, error: 'Contagem desativada neste servidor. Ative no painel.' };
-    }
     if (!ct.channelId) {
         return { ok: false, error: 'Nenhum canal de contagem configurado no painel.' };
     }
 
-    const next = Math.max(1, Math.floor(Number(n)));
-    if (!Number.isFinite(next) || next < 1) {
-        return { ok: false, error: 'Número inválido. Use um inteiro >= 1.' };
+    // se estava desligada, liga automaticamente ao alterar o número
+    const wasDisabled = ct.enabled === false;
+
+    const current = Math.max(0, Math.floor(Number(n)));
+    if (!Number.isFinite(current) || current < 0) {
+        return { ok: false, error: 'Número inválido. Use um inteiro ≥ 0.' };
     }
-    if (next > 1_000_000_000) {
+    if (current > 1_000_000_000) {
         return { ok: false, error: 'Número muito grande.' };
     }
 
-    const current = next - 1;
     const key = countKey(ct.channelId);
-
-    // força o runtime a usar o novo valor (corrige dessync)
     const state = {
         current,
         lastUser: resetLastUser ? null : getCountState(key, current)?.lastUser ?? null
@@ -131,46 +132,90 @@ function setCountingNumber(guildId, n, opts) {
         state
     );
 
-    // confirma leitura pós-save
     const saved = getSettings(guildId).counting || {};
     const live = countRuntime.get(key);
+    const liveCurrent = live?.current ?? current;
 
     return {
         ok: true,
-        current: live?.current ?? current,
-        next: (live?.current ?? current) + 1,
+        current: liveCurrent,
+        next: liveCurrent + 1,
         channelId: String(ct.channelId),
-        persisted: Number(saved.current) === current
+        enabled: true,
+        wasDisabled,
+        persisted: Number(saved.current) === liveCurrent
     };
 }
 
-/** Status ao vivo (runtime + settings) para o comando / painel */
+/** Status ao vivo (runtime tem prioridade sobre settings) */
 function getCountingStatus(guildId) {
     const s = getSettings(guildId);
     const ct = s.counting || {};
+    const settingsCurrent = Math.max(0, Math.floor(Number(ct.current) || 0));
+
     if (!ct.channelId) {
         return {
-            enabled: !!ct.enabled,
+            enabled: ct.enabled === true,
             channelId: null,
-            current: Number(ct.current) || 0,
-            next: (Number(ct.current) || 0) + 1,
+            current: settingsCurrent,
+            next: settingsCurrent + 1,
             allowSameUser: !!ct.allowSameUser,
             live: false
         };
     }
+
     const key = countKey(ct.channelId);
     let state = countRuntime.get(key);
     if (!state) {
-        state = getCountState(key, ct.current);
+        state = getCountState(key, settingsCurrent);
     }
+
+    const current = Math.max(0, Math.floor(Number(state.current) || 0));
     return {
         enabled: ct.enabled !== false,
         channelId: String(ct.channelId),
-        current: Math.max(0, Math.floor(Number(state.current) || 0)),
-        next: Math.max(0, Math.floor(Number(state.current) || 0)) + 1,
+        current,
+        next: current + 1,
         allowSameUser: !!ct.allowSameUser,
-        live: true
+        live: countRuntime.has(key)
     };
+}
+
+/** Carrega o runtime a partir das settings de todos os guilds conhecidos */
+function hydrateCountingRuntime(client) {
+    try {
+        const store = require('../utils/store');
+        const all = store.load('guilds.json', {});
+        let n = 0;
+        for (const [guildId, g] of Object.entries(all || {})) {
+            const ct = g?.counting;
+            if (!ct?.channelId) continue;
+            const key = countKey(ct.channelId);
+            if (countRuntime.has(key)) continue;
+            countRuntime.set(key, {
+                current: Math.max(0, Math.floor(Number(ct.current) || 0)),
+                lastUser: null
+            });
+            n++;
+        }
+        if (client?.guilds?.cache) {
+            for (const guild of client.guilds.cache.values()) {
+                const ct = getSettings(guild.id).counting;
+                if (!ct?.channelId) continue;
+                const key = countKey(ct.channelId);
+                if (!countRuntime.has(key)) {
+                    countRuntime.set(key, {
+                        current: Math.max(0, Math.floor(Number(ct.current) || 0)),
+                        lastUser: null
+                    });
+                    n++;
+                }
+            }
+        }
+        if (n) console.log(`[counting] runtime hidratado · ${n} canal(is)`);
+    } catch (e) {
+        console.warn('[counting] hydrate:', e.message);
+    }
 }
 
 async function failCounting(message, ct, state, expected, reason) {
@@ -193,6 +238,12 @@ async function failCounting(message, ct, state, expected, reason) {
 }
 
 function setup(client) {
+    hydrateCountingRuntime(client);
+
+    const onReady = () => hydrateCountingRuntime(client);
+    if (client.isReady?.()) onReady();
+    else client.once('clientReady', onReady);
+
     client.on('guildMemberAdd', async (member) => {
         if (member.user.bot) return;
         const s = getSettings(member.guild.id);
@@ -268,6 +319,7 @@ function setup(client) {
     client.on('messageCreate', async (message) => {
         if (!message.guild || message.author.bot) return;
         const s = getSettings(message.guild.id);
+
         try {
             if (s.mentionGuard?.enabled) {
                 const max = s.mentionGuard.maxMentions ?? 5;
@@ -287,35 +339,41 @@ function setup(client) {
 
         try {
             const ct = s.counting;
-            if (ct?.enabled && ct.channelId && String(ct.channelId) === String(message.channel.id)) {
-                const num = parseCountMessage(message.content);
-                if (num !== null) {
-                    const state = getCountState(message.channel.id, ct.current);
-                    const expected = state.current + 1;
-                    if (!ct.allowSameUser && state.lastUser === message.author.id) {
-                        await failCounting(
-                            message,
-                            ct,
-                            state,
-                            expected,
-                            'Mesma pessoa não conta duas vezes.'
-                        );
-                        return;
+            if (ct?.enabled !== false && ct?.channelId && String(ct.channelId) === String(message.channel.id)) {
+                // só processa se explicitamente habilitada (enabled true) OU se enabled não for false e canal setado
+                // exige enabled === true para não contar em canais só “configurados”
+                if (ct.enabled === true) {
+                    const num = parseCountMessage(message.content);
+                    if (num !== null) {
+                        const state = getCountState(message.channel.id, ct.current);
+                        const expected = state.current + 1;
+
+                        if (!ct.allowSameUser && state.lastUser === message.author.id) {
+                            await failCounting(
+                                message,
+                                ct,
+                                state,
+                                expected,
+                                'Mesma pessoa não conta duas vezes.'
+                            );
+                            return;
+                        }
+                        if (num !== expected) {
+                            await failCounting(
+                                message,
+                                ct,
+                                state,
+                                expected,
+                                'Você enviou **' + num + '**.'
+                            );
+                            return;
+                        }
+
+                        state.current = expected;
+                        state.lastUser = message.author.id;
+                        persistCount(message.guild.id, ct, state);
+                        await message.react('✅').catch(() => {});
                     }
-                    if (num !== expected) {
-                        await failCounting(
-                            message,
-                            ct,
-                            state,
-                            expected,
-                            'Você enviou **' + num + '**.'
-                        );
-                        return;
-                    }
-                    state.current = expected;
-                    state.lastUser = message.author.id;
-                    persistCount(message.guild.id, ct, state);
-                    await message.react('✅').catch(() => {});
                 }
             }
         } catch (e) {
@@ -324,7 +382,7 @@ function setup(client) {
 
         try {
             const st = s.sticky;
-            if (st?.enabled && st.channelId === message.channel.id && st.content) {
+            if (st?.enabled && String(st.channelId) === String(message.channel.id) && st.content) {
                 const every = Math.max(2, Number(st.every) || 8);
                 const n = (stickyCount.get(message.channel.id) || 0) + 1;
                 stickyCount.set(message.channel.id, n);
@@ -342,7 +400,7 @@ function setup(client) {
 
         try {
             const rx = s.autoReact;
-            if (rx?.enabled && rx.channelId === message.channel.id) {
+            if (rx?.enabled && String(rx.channelId) === String(message.channel.id)) {
                 for (const e of (Array.isArray(rx.emojis) ? rx.emojis : ['👍']).slice(0, 5)) {
                     await message.react(e).catch(() => {});
                 }
@@ -351,7 +409,11 @@ function setup(client) {
 
         try {
             const at = s.autoThread;
-            if (at?.enabled && at.channelId === message.channel.id && message.channel.isTextBased()) {
+            if (
+                at?.enabled &&
+                String(at.channelId) === String(message.channel.id) &&
+                message.channel.isTextBased()
+            ) {
                 await message
                     .startThread({
                         name: fmt(at.nameFormat || 'Discussão · {user}', {
@@ -369,7 +431,7 @@ function setup(client) {
             if (
                 ap?.enabled &&
                 Array.isArray(ap.channelIds) &&
-                ap.channelIds.includes(message.channel.id) &&
+                ap.channelIds.map(String).includes(String(message.channel.id)) &&
                 message.channel.type === ChannelType.GuildAnnouncement
             ) {
                 await message.crosspost().catch(() => {});
@@ -407,7 +469,9 @@ function setup(client) {
             if (already) {
                 await already
                     .edit({
-                        embeds: [EmbedBuilder.from(already.embeds[0]).setTitle(emoji + ' ' + reaction.count)]
+                        embeds: [
+                            EmbedBuilder.from(already.embeds[0]).setTitle(emoji + ' ' + reaction.count)
+                        ]
                     })
                     .catch(() => {});
                 return;
@@ -573,5 +637,6 @@ module.exports = {
     updateMemberCounter,
     setCountingNumber,
     getCountState,
-    getCountingStatus
+    getCountingStatus,
+    hydrateCountingRuntime
 };
