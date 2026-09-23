@@ -7,17 +7,17 @@ const {
   PermissionFlagsBits 
 } = require('discord.js');
 
-// Define o link do seu painel web (pode ser definido via variável de ambiente no .env)
-const WEB_PANEL_URL = process.env.WEB_PANEL_URL || 'https://seu-painel-web.com';
+// URL do Painel hospedado no GitHub
+const GITHUB_PANEL_URL = process.env.GITHUB_URL || 'https://github.com/';
 
 module.exports = {
   name: 'painel',
   aliases: ['suport', 'suporte', 'suport painel', 'painel suport'],
-  description: 'Acessa o gerenciador do servidor e painel web',
+  description: 'Acessa o gerenciador do servidor e o Painel GitHub',
 
   data: new SlashCommandBuilder()
     .setName('painel')
-    .setDescription('Acessa o gerenciador do servidor e painel web')
+    .setDescription('Acessa o gerenciador do servidor e o Painel GitHub')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async executeSlash(interaction) {
@@ -89,7 +89,7 @@ async function renderHome(context, isSlash) {
         .setTitle('⚠️ Confirmação do Gerenciador')
         .setDescription(
           `Você está prestes a entrar no modo de edição do servidor **${guild.name}**.\n\n` +
-          'Deseja confirmar o acesso e carregar todos os controles de sistema?'
+          'Deseja confirmar o acesso e abrir o painel?'
         )
         .setColor('#eab308')
         .setTimestamp();
@@ -110,27 +110,25 @@ async function renderHome(context, isSlash) {
       await i.update({ embeds: [confirmEmbed], components: [confirmRow] });
 
     } else if (i.customId === 'confirm_yes') {
-      // Embed de Boas-Vindas com redirecionamento ao Painel Web
       const welcomeEmbed = new EmbedBuilder()
-        .setTitle('✨ Sistema de Confirmações & Painel Web')
+        .setTitle('✨ Sistema de Confirmações & Painel GitHub')
         .setDescription(
           `Seja muito bem-vindo ao nosso sistema no servidor **${guild.name}**!\n\n` +
-          'Clique no botão abaixo para abrir diretamente o nosso **Painel Web** no seu navegador.'
+          'Clique no botão abaixo para acessar o **Painel no GitHub**.'
         )
         .setColor('#22c55e')
-        .setFooter({ text: 'Aeternus • Redirecionamento Web', iconURL: guild.iconURL({ dynamic: true }) || null })
+        .setFooter({ text: 'Aeternus • Redirecionamento', iconURL: guild.iconURL({ dynamic: true }) || null })
         .setTimestamp();
 
-      // Botão de Link direto (ButtonStyle.Link abre a URL ao ser clicado)
-      const webRow = new ActionRowBuilder().addComponents(
+      const gitButtonRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setLabel('Acessar Painel Web')
-          .setEmoji('🌐')
+          .setLabel('Acessar Painel GitHub')
+          .setEmoji('🐙')
           .setStyle(ButtonStyle.Link)
-          .setURL(WEB_PANEL_URL)
+          .setURL(GITHUB_PANEL_URL)
       );
 
-      await i.update({ embeds: [welcomeEmbed], components: [webRow] });
+      await i.update({ embeds: [welcomeEmbed], components: [gitButtonRow] });
       collector.stop();
 
     } else if (i.customId === 'confirm_no') {
