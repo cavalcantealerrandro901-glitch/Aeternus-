@@ -1,4 +1,4 @@
-const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, ChannelType } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const { setCountingNumber, getCountingStatus } = require('../systems/guildModules');
 
 function buildStatusEmbed(st) {
@@ -8,7 +8,7 @@ function buildStatusEmbed(st) {
         .setDescription(
             [
                 st.channelId ? `**Canal:** <#${st.channelId}>` : '**Canal:** _não configurado_',
-                `**Atual (último válido):** \\`${st.current ?? 0}\\``,
+                `**Atual (último válido):** \`${st.current ?? 0}\``,
                 `**Próximo esperado:** **${st.next ?? 1}**`,
                 st.enabled === false ? '\n⚠️ Contagem desativada no painel.' : '',
                 '',
@@ -26,7 +26,7 @@ function buildUpdateEmbed({ admin, before, current, next, channelId, wasDisabled
         .setDescription(
             [
                 `**Administrador:** ${admin}`,
-                `**Antes:** \\`${before}\\` → **Agora:** \\`${current}\\``,
+                `**Antes:** \`${before}\` → **Agora:** \`${current}\``,
                 `**Próximo no canal:** **${next}**`,
                 channelId ? `**Canal:** <#${channelId}>` : null,
                 wasDisabled ? '\n✅ Contagem **reativada** automaticamente.' : null,
@@ -65,7 +65,7 @@ async function announceInCountChannel(guild, res, adminTag) {
 function parseTarget(args) {
     if (!args?.length) return { mode: 'status' };
     const a0 = String(args[0]).toLowerCase();
-    if (a0 === 'reset' || a0 === 'zerar' || a0 === '0') {
+    if (a0 === 'reset' || a0 === 'zerar') {
         return { mode: 'set', value: 0 };
     }
     const n = parseInt(a0, 10);
