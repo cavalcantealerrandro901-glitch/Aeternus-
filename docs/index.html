@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aeternus • Painel Principal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background-color: #0b0f19;
+      color: #ffffff;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    /* --- BACKGROUND COM ANIMAÇÃO DE MOVIMENTO --- */
+    .bg-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      overflow: hidden;
+    }
+
+    .bg-image {
+      width: 110%;
+      height: 110%;
+      object-fit: cover;
+      background-image: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop');
+      background-size: cover;
+      background-position: center;
+      animation: moveBackground 20s infinite alternate ease-in-out;
+      filter: brightness(0.4) contrast(1.1);
+    }
+
+    @keyframes moveBackground {
+      0% {
+        transform: scale(1) translate(0, 0);
+      }
+      50% {
+        transform: scale(1.1) translate(-15px, -10px);
+      }
+      100% {
+        transform: scale(1.05) translate(15px, 10px);
+      }
+    }
+
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, rgba(15, 23, 42, 0.4) 0%, rgba(11, 15, 25, 0.85) 100%);
+      z-index: -1;
+    }
+
+    /* --- CABEÇALHO & MENU (NAVBAR) --- */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+      width: 100%;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #a855f7;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Botão do Menu (=) no canto superior direito */
+    .menu-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      font-size: 1.5rem;
+      font-weight: bold;
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .menu-btn:hover {
+      background: rgba(168, 85, 247, 0.3);
+      border-color: #a855f7;
+    }
+
+    /* Painel Lateral do Menu (Drawer) */
+    .menu-drawer {
+      position: fixed;
+      top: 0;
+      right: -320px;
+      width: 300px;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(15px);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 100;
+      transition: right 0.4s ease;
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      overflow-y: auto;
+    }
+
+    .menu-drawer.open {
+      right: 0;
+    }
+
+    .menu-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 1rem;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .menu-links {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .menu-links a {
+      color: #cbd5e1;
+      text-decoration: none;
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      transition: background 0.2s, color 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .menu-links a:hover {
+      background: rgba(168, 85, 247, 0.2);
+      color: #a855f7;
+    }
+
+    /* --- CONTEÚDO PRINCIPAL (HERO) --- */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 2rem 1.5rem;
+    }
+
+    .hero-title {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #ffffff 30%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 10px 30px rgba(168, 85, 247, 0.3);
+    }
+
+    .hero-subtitle {
+      font-size: 1.1rem;
+      color: #94a3b8;
+      max-width: 600px;
+      margin-bottom: 2.5rem;
+      line-height: 1.6;
+    }
+
+    /* --- BOTÕES PRINCIPAIS --- */
+    .buttons-container {
+      display: flex;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      padding: 0.9rem 2rem;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      cursor: pointer;
+    }
+
+    .btn-support {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      backdrop-filter: blur(10px);
+    }
+
+    .btn-support:hover {
+      background: rgba(255, 255, 255, 0.18);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-add {
+      background: linear-gradient(135deg, #7c3aed, #9333ea);
+      border: none;
+      color: #ffffff;
+      box-shadow: 0 8px 25px rgba(124, 58, 237, 0.4);
+    }
+
+    .btn-add:hover {
+      background: linear-gradient(135deg, #6d28d9, #7e22ce);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px rgba(124, 58, 237, 0.6);
+    }
+
+    /* --- RODAPÉ --- */
+    footer {
+      padding: 1.5rem;
+      text-align: center;
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Fundo Animado -->
+  <div class="bg-container">
+    <div class="bg-image"></div>
+    <div class="overlay"></div>
+  </div>
+
+  <!-- Cabeçalho -->
+  <header>
+    <div class="logo">
+      <span>👑</span> Aeternus
+    </div>
+    <!-- Botão de Menu (=) -->
+    <button class="menu-btn" onclick="toggleMenu()">=</button>
+  </header>
+
+  <!-- Painel Lateral de Navegação -->
+  <div class="menu-drawer" id="menuDrawer">
+    <div class="menu-header">
+      <span style="font-weight: 700; color: #a855f7;">Sistemas</span>
+      <button class="close-btn" onclick="toggleMenu()">✕</button>
+    </div>
+    <div class="menu-links">
+      <a href="#">📚 Wiki</a>
+      <a href="#">🌐 Idioma</a>
+      <a href="#">🎨 Tema</a>
+      <a href="#">🎁 Daily</a>
+      <a href="#">👤 Perfil</a>
+      <a href="#">🤖 Comandos</a>
+      <a href="#">💬 Suporte</a>
+      <a href="#">⚙️ Configurações</a>
+    </div>
+  </div>
+
+  <!-- Conteúdo Central -->
+  <main>
+    <h1 class="hero-title">Aeternus Manager</h1>
+    <p class="hero-subtitle">Gerencie módulos, preferências e automações do seu servidor Discord com facilidade e alto desempenho.</p>
+
+    <!-- Botões Requisitados -->
+    <div class="buttons-container">
+      <a href="https://discord.gg/" target="_blank" class="btn btn-support">
+        💬 Servidor de Suporte
+      </a>
+      <a href="https://discord.com/oauth2/authorize" target="_blank" class="btn btn-add">
+        ➕ Adicionar
+      </a>
+    </div>
+  </main>
+
+  <footer>
+    Aeternus • Todos os direitos reservados
+  </footer>
+
+  <script>
+    function toggleMenu() {
+      const drawer = document.getElementById('menuDrawer');
+      drawer.classList.toggle('open');
+    }
+  </script>
+
+</body>
+</html>
