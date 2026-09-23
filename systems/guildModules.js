@@ -8,6 +8,7 @@ const { parseCountMessage } = require('../utils/countParse');
 
 const stickyCount = new Map();
 const stickyMsgId = new Map();
+/** channelId(string) -> { current, lastUser } */
 const countRuntime = new Map();
 const antinukeHits = new Map();
 
@@ -44,28 +45,132 @@ function antinukeCheck(guildId, action, max, windowSec) {
     return st.n > (max || 3);
 }
 
-function getCountState(channelId, settingsCurrent) {
-    if (!countRuntime.has(channelId)) {
-        countRuntime.set(channelId, {
+function countKey(channelId) {
+    return String(channelId || '');
+}
+
+/**
+ * Estado ao vivo da contagem.
+ * @param {string} channelId
+ * @param {number} [settingsCurrent] valor de fallback das settings
+ * @param {{ force?: boolean }} [opts] force=true sobrescreve o runtime com settingsCurrent
+ */
+function getCountState(channelId, settingsCurrent, opts) {
+    const key = countKey(channelId);
+    const force = !!(opts && opts.force);
+    if (!key) {
+        return { current: Math.max(0, Math.floor(Number(settingsCurrent) || 0)), lastUser: null };
+    }
+    if (force || !countRuntime.has(key)) {
+        countRuntime.set(key, {
             current: Math.max(0, Math.floor(Number(settingsCurrent) || 0)),
-            lastUser: null
+            lastUser: force ? null : countRuntime.get(key)?.lastUser ?? null
         });
     }
-    return countRuntime.get(channelId);
+    return countRuntime.get(key);
 }
 
 function persistCount(guildId, ct, state) {
-    countRuntime.set(String(ct.channelId), state);
+    const key = countKey(ct.channelId);
+    if (key) countRuntime.set(key, state);
     try {
         setSettings(guildId, {
             counting: {
                 enabled: ct.enabled !== false,
-                channelId: ct.channelId,
-                current: state.current,
+                channelId: String(ct.channelId),
+                current: Math.max(0, Math.floor(Number(state.current) || 0)),
                 allowSameUser: !!ct.allowSameUser
             }
         });
-    } catch (_) {}
+    } catch (e) {
+        console.error('[counting] persistCount:', e.message);
+    }
+}
+
+/**
+ * Define o próximo número esperado da contagem.
+ * Ex: setCountingNumber(guildId, 50) → current=49, próximo=50
+ */
+function setCountingNumber(guildId, n, opts) {
+    const resetLastUser = !opts || opts.resetLastUser !== false;
+    const s = getSettings(guildId);
+    const ct = s.counting || {};
+
+    if (ct.enabled === false) {
+        return { ok: false, error: 'Contagem desativada neste servidor. Ative no painel.' };
+    }
+    if (!ct.channelId) {
+        return { ok: false, error: 'Nenhum canal de contagem configurado no painel.' };
+    }
+
+    const next = Math.max(1, Math.floor(Number(n)));
+    if (!Number.isFinite(next) || next < 1) {
+        return { ok: false, error: 'Número inválido. Use um inteiro >= 1.' };
+    }
+    if (next > 1_000_000_000) {
+        return { ok: false, error: 'Número muito grande.' };
+    }
+
+    const current = next - 1;
+    const key = countKey(ct.channelId);
+
+    // força o runtime a usar o novo valor (corrige dessync)
+    const state = {
+        current,
+        lastUser: resetLastUser ? null : getCountState(key, current)?.lastUser ?? null
+    };
+    countRuntime.set(key, state);
+
+    persistCount(
+        guildId,
+        {
+            enabled: true,
+            channelId: String(ct.channelId),
+            allowSameUser: !!ct.allowSameUser
+        },
+        state
+    );
+
+    // confirma leitura pós-save
+    const saved = getSettings(guildId).counting || {};
+    const live = countRuntime.get(key);
+
+    return {
+        ok: true,
+        current: live?.current ?? current,
+        next: (live?.current ?? current) + 1,
+        channelId: String(ct.channelId),
+        persisted: Number(saved.current) === current
+    };
+}
+
+/** Status ao vivo (runtime + settings) para o comando / painel */
+function getCountingStatus(guildId) {
+    const s = getSettings(guildId);
+    const ct = s.counting || {};
+    if (!ct.channelId) {
+        return {
+            enabled: !!ct.enabled,
+            channelId: null,
+            current: Number(ct.current) || 0,
+            next: (Number(ct.current) || 0) + 1,
+            allowSameUser: !!ct.allowSameUser,
+            live: false
+        };
+    }
+    const key = countKey(ct.channelId);
+    let state = countRuntime.get(key);
+    if (!state) {
+        state = getCountState(key, ct.current);
+    }
+    return {
+        enabled: ct.enabled !== false,
+        channelId: String(ct.channelId),
+        current: Math.max(0, Math.floor(Number(state.current) || 0)),
+        next: Math.max(0, Math.floor(Number(state.current) || 0)) + 1,
+        allowSameUser: !!ct.allowSameUser,
+        live: true
+    };
 }
 
 async function failCounting(message, ct, state, expected, reason) {
@@ -182,7 +287,7 @@ function setup(client) {
 
         try {
             const ct = s.counting;
-            if (ct?.enabled && String(ct.channelId) === String(message.channel.id)) {
+            if (ct?.enabled && ct.channelId && String(ct.channelId) === String(message.channel.id)) {
                 const num = parseCountMessage(message.content);
                 if (num !== null) {
                     const state = getCountState(message.channel.id, ct.current);
@@ -462,34 +567,11 @@ async function announceLevel(message, res) {
     }
 }
 
-function setCountingNumber(guildId, n, opts) {
-    const resetLastUser = !opts || opts.resetLastUser !== false;
-    const s = getSettings(guildId);
-    const ct = s.counting;
-    if (!ct || ct.enabled === false) {
-        return { ok: false, error: 'Contagem desativada neste servidor. Ative no painel.' };
-    }
-    if (!ct.channelId) {
-        return { ok: false, error: 'Nenhum canal de contagem configurado no painel.' };
-    }
-    const next = Math.max(1, Math.floor(Number(n)));
-    if (!Number.isFinite(next) || next < 1) {
-        return { ok: false, error: 'Número inválido. Use um inteiro >= 1.' };
-    }
-    if (next > 1_000_000_000) {
-        return { ok: false, error: 'Número muito grande.' };
-    }
-    const current = next - 1;
-    const state = getCountState(String(ct.channelId), current);
-    state.current = current;
-    if (resetLastUser) state.lastUser = null;
-    persistCount(guildId, Object.assign({}, ct, { enabled: true }), state);
-    return {
-        ok: true,
-        current: state.current,
-        next: next,
-        channelId: String(ct.channelId)
-    };
-}
-
-module.exports = { setup, announceLevel, updateMemberCounter, setCountingNumber, getCountState };
+module.exports = {
+    setup,
+    announceLevel,
+    updateMemberCounter,
+    setCountingNumber,
+    getCountState,
+    getCountingStatus
+};

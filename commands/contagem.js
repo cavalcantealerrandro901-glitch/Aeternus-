@@ -1,15 +1,18 @@
 const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
-const { getSettings } = require('../utils/settings');
-const { setCountingNumber } = require('../systems/guildModules');
+const {
+    setCountingNumber,
+    getCountingStatus
+} = require('../systems/guildModules');
 
-function buildStatusEmbed(ct) {
+function buildStatusEmbed(st) {
     return new EmbedBuilder()
         .setColor(0x38bdf8)
         .setTitle('🔢 Contagem')
         .setDescription(
-            `Canal: <#${ct.channelId}>\n` +
-                `Atual: **${ct.current ?? 0}**\n` +
-                `Próximo: **${(ct.current ?? 0) + 1}**`
+            (st.channelId ? `Canal: <#${st.channelId}>\n` : 'Canal: _não configurado_\n') +
+                `Atual (último válido): **${st.current ?? 0}**\n` +
+                `Próximo esperado: **${st.next ?? 1}**` +
+                (st.enabled === false ? '\n\n⚠️ Contagem desativada no painel.' : '')
         );
 }
 
@@ -20,23 +23,27 @@ function buildUpdateEmbed({ admin, before, next, channelId }) {
         .setTitle('🔢 Contagem atualizada')
         .setDescription(
             `**Administrador:** ${admin}\n` +
-                `**Antes:** \`${before}\`\n` +
-                `**Depois:** \`${after}\`\n` +
-                `**Próximo a usar:** **${next}**` +
-                (channelId ? `\n**Canal:** <#${channelId}>` : '')
+                `**Antes:** \`${before}\` → **Depois:** \`${after}\`\n` +
+                `**Próximo número a enviar no canal:** **${next}**` +
+                (channelId ? `\n**Canal:** <#${channelId}>` : '') +
+                `\n\n_Quem digitar **${next}** no canal de contagem continua a sequência._`
         )
         .setTimestamp();
 }
 
 module.exports = {
     name: 'contagem',
-    aliases: ['counting', 'setcount'],
-    description: 'Definir número da contagem',
+    aliases: ['counting', 'setcount', 'contador'],
+    description: 'Ver ou definir o número da contagem',
     data: new SlashCommandBuilder()
         .setName('alterar-contador')
-        .setDescription('Alterar o número da contagem')
+        .setDescription('Ver ou alterar o número da contagem')
         .addIntegerOption((o) =>
-            o.setName('numero').setDescription('Próximo número esperado').setRequired(false)
+            o
+                .setName('numero')
+                .setDescription('Próximo número esperado no canal (ex: 100)')
+                .setRequired(false)
+                .setMinValue(1)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
@@ -47,56 +54,88 @@ module.exports = {
         ) {
             return message.reply('❌ Sem permissão.');
         }
-        const s = getSettings(message.guild.id);
-        const ct = s.counting;
+
+        const st = getCountingStatus(message.guild.id);
+
         if (!args[0]) {
-            if (!ct?.enabled || !ct.channelId) {
-                return message.reply('Contagem desativada. Ative no painel.');
+            if (!st.channelId) {
+                return message.reply('Contagem sem canal. Configure no painel.');
             }
-            return message.reply({ embeds: [buildStatusEmbed(ct)] });
+            return message.reply({ embeds: [buildStatusEmbed(st)] });
         }
+
         const n = parseInt(args[0], 10);
-        if (Number.isNaN(n) || n < 1) return message.reply('❌ Número inválido. Use um inteiro ≥ 1.');
-        const before = Number(ct?.current ?? 0) || 0;
+        if (Number.isNaN(n) || n < 1) {
+            return message.reply(
+                '❌ Número inválido. Use um inteiro ≥ 1.\n' +
+                    '_O valor é o **próximo** número que deve ser enviado no canal._'
+            );
+        }
+
+        const before = Number(st.current ?? 0) || 0;
         const res = setCountingNumber(message.guild.id, n);
-        if (!res?.ok) return message.reply(`❌ ${res?.error || 'Falha ao atualizar.'}`);
+
+        if (!res?.ok) {
+            return message.reply(`❌ ${res?.error || 'Falha ao atualizar.'}`);
+        }
+
+        // re-lê ao vivo para confirmar
+        const afterSt = getCountingStatus(message.guild.id);
         const admin = message.member?.displayName || message.author.username;
+
         await message.reply({
             embeds: [
                 buildUpdateEmbed({
                     admin: `${message.author} (\`${admin}\`)`,
                     before,
-                    next: res.next,
-                    channelId: res.channelId
+                    next: afterSt.next || res.next,
+                    channelId: res.channelId || afterSt.channelId
                 })
             ]
         });
     },
 
     async executeSlash(i) {
-        const s = getSettings(i.guild.id);
-        const ct = s.counting;
+        const st = getCountingStatus(i.guild.id);
         const n = i.options.getInteger('numero');
+
         if (n == null) {
-            if (!ct?.enabled || !ct.channelId) {
-                return i.reply({ content: 'Contagem desativada. Ative no painel.', ephemeral: true });
+            if (!st.channelId) {
+                return i.reply({
+                    content: 'Contagem sem canal. Configure no painel.',
+                    ephemeral: true
+                });
             }
-            return i.reply({ embeds: [buildStatusEmbed(ct)], ephemeral: true });
+            return i.reply({ embeds: [buildStatusEmbed(st)], ephemeral: true });
         }
-        if (n < 1) return i.reply({ content: '❌ Número inválido. Use um inteiro ≥ 1.', ephemeral: true });
-        const before = Number(ct?.current ?? 0) || 0;
+
+        if (n < 1) {
+            return i.reply({
+                content: '❌ Número inválido. Use um inteiro ≥ 1.',
+                ephemeral: true
+            });
+        }
+
+        const before = Number(st.current ?? 0) || 0;
         const res = setCountingNumber(i.guild.id, n);
+
         if (!res?.ok) {
-            return i.reply({ content: `❌ ${res?.error || 'Falha ao atualizar.'}`, ephemeral: true });
+            return i.reply({
+                content: `❌ ${res?.error || 'Falha ao atualizar.'}`,
+                ephemeral: true
+            });
         }
+
+        const afterSt = getCountingStatus(i.guild.id);
         const admin = i.member?.displayName || i.user.username;
+
         await i.reply({
             embeds: [
                 buildUpdateEmbed({
                     admin: `${i.user} (\`${admin}\`)`,
                     before,
-                    next: res.next,
-                    channelId: res.channelId
+                    next: afterSt.next || res.next,
+                    channelId: res.channelId || afterSt.channelId
                 })
             ]
         });
