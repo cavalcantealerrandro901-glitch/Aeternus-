@@ -43,7 +43,6 @@ async function renderHome(context, isSlash) {
   const guild = context.guild;
   const author = isSlash ? context.user : context.author;
 
-  // Texto formatado para ocupar pelo menos 7 linhas no Discord
   const textoDescricao = [
     '👑 **Central de Suporte e Controle do Servidor**',
     'Seja bem-vindo ao sistema principal de gerenciamento do Aeternus.',
@@ -62,7 +61,6 @@ async function renderHome(context, isSlash) {
     .setFooter({ text: `Solicitado por ${author.tag}`, iconURL: author.displayAvatarURL() })
     .setTimestamp();
 
-  // Botão que leva direto para a etapa de confirmação
   const rowButton = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('go_to_confirm')
@@ -84,7 +82,6 @@ async function renderHome(context, isSlash) {
     }
 
     if (i.customId === 'go_to_confirm') {
-      // Tela de Confirmação
       const confirmEmbed = new EmbedBuilder()
         .setTitle('⚠️ Confirmação do Gerenciador')
         .setDescription(
@@ -108,13 +105,29 @@ async function renderHome(context, isSlash) {
       );
 
       await i.update({ embeds: [confirmEmbed], components: [confirmRow] });
+
     } else if (i.customId === 'confirm_yes') {
-      await i.update({ 
-        content: '✅ **Acesso confirmado com sucesso!** (Próxima etapa do painel...)', 
-        embeds: [], 
-        components: [] 
-      });
-      collector.stop();
+      // Embed de Boas-Vindas ao Sistema de Confirmações
+      const welcomeEmbed = new EmbedBuilder()
+        .setTitle('✨ Sistema de Confirmações')
+        .setDescription(
+          `Seja muito bem-vindo ao nosso sistema de confirmações no servidor **${guild.name}**!\n\n` +
+          'A partir daqui, você pode prosseguir com as etapas de verificação e definições do painel.'
+        )
+        .setColor('#22c55e')
+        .setFooter({ text: 'Aeternus • Sistema de Confirmação', iconURL: guild.iconURL({ dynamic: true }) || null })
+        .setTimestamp();
+
+      const welcomeRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('next_system_step')
+          .setLabel('Avançar')
+          .setEmoji('▶️')
+          .setStyle(ButtonStyle.Primary)
+      );
+
+      await i.update({ embeds: [welcomeEmbed], components: [welcomeRow] });
+
     } else if (i.customId === 'confirm_no') {
       await i.update({ 
         content: '❌ **Ação cancelada.**', 
@@ -122,6 +135,12 @@ async function renderHome(context, isSlash) {
         components: [] 
       });
       collector.stop();
+
+    } else if (i.customId === 'next_system_step') {
+      await i.reply({ 
+        content: '📌 **Redirecionando...**', 
+        ephemeral: true 
+      });
     }
   });
 }
