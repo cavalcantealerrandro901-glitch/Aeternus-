@@ -150,6 +150,36 @@ function addAttrPoints(userId, n) {
     return get(userId);
 }
 
+/** Define pontos de atributo (intensidade) disponíveis. */
+function setAttrPoints(userId, n) {
+    const data = all();
+    const cur = data[userId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
+    ensureAttrs(cur);
+    cur.attrPoints = Math.max(0, Math.floor(Number(n) || 0));
+    data[userId] = cur;
+    store.save('xp.json', data);
+    return get(userId);
+}
+
+/** Transfere intensidade (pontos de atributo) de fromId → toId. */
+function transferAttrPoints(fromId, toId, amount) {
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (n <= 0) return { ok: true, transferred: 0 };
+    const data = all();
+    const from = data[fromId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
+    const to = data[toId] || { xp: 0, level: 0, attrPoints: 0, attrs: { ...BASE_ATTR } };
+    ensureAttrs(from);
+    ensureAttrs(to);
+    const have = Math.max(0, Math.floor(Number(from.attrPoints || 0)));
+    if (have < n) return { ok: false, error: 'Pontos de atributo insuficientes.' };
+    from.attrPoints = have - n;
+    to.attrPoints = Math.max(0, Math.floor(Number(to.attrPoints || 0))) + n;
+    data[fromId] = from;
+    data[toId] = to;
+    store.save('xp.json', data);
+    return { ok: true, transferred: n };
+}
+
 function spendAttrPoint(userId, attrKey) {
     return spendAttrPoints(userId, attrKey, 1);
 }
@@ -273,6 +303,8 @@ module.exports = {
     spendAttrPoints,
     redistribuirAttrs,
     addAttrPoints,
+    setAttrPoints,
+    transferAttrPoints,
     pointsForLevel,
     maxHp,
     maxMana,
