@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Troca · Aeternus</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: rgba(15, 23, 42, 0.88);
+      --line: rgba(34, 211, 238, 0.28);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --cyan: #22d3ee;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --bad: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(700px 400px at 10% -10%, rgba(34,211,238,.25), transparent 55%),
+        radial-gradient(600px 380px at 100% 0%, rgba(167,139,250,.18), transparent 50%),
+        var(--bg);
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; }
+    h1 { margin: 0 0 6px; font-size: 1.6rem; }
+    .sub { color: var(--muted); margin-bottom: 20px; font-size: .95rem; }
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 16px; padding: 16px 18px; margin-bottom: 14px;
+      backdrop-filter: blur(8px);
+    }
+    .grid { display: grid; gap: 14px; }
+    @media (min-width: 800px) { .grid.two { grid-template-columns: 1fr 1fr; } }
+    label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
+    input, select {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--line); background: #0f172a; color: var(--text);
+    }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+    .row > div { flex: 1; min-width: 120px; }
+    button {
+      border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer;
+      font-weight: 600; color: #0f172a; background: var(--cyan);
+    }
+    button.secondary { background: #334155; color: var(--text); }
+    button.danger { background: var(--bad); color: #1f0a0a; }
+    button.ok { background: var(--ok); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .items { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .item {
+      border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+      background: #0f172a; cursor: pointer; font-size: .85rem;
+      user-select: none;
+    }
+    .item.on { outline: 2px solid var(--cyan); background: rgba(34,211,238,.12); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; background: #1e293b; color: var(--muted); }
+    .okpill { background: rgba(52,211,153,.15); color: var(--ok); }
+    .wait { background: rgba(251,191,36,.12); color: var(--warn); }
+    .msg { min-height: 1.2em; color: var(--muted); margin-top: 8px; }
+    .msg.err { color: var(--bad); }
+    .msg.ok { color: var(--ok); }
+    .side-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    a { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🔄 Troca entre jogadores</h1>
+    <p class="sub">Monte éter, itens e <strong>intensidade</strong> (pontos de atributo) com calma. Os dois precisam confirmar.</p>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>ID da troca</label>
+          <input id="tradeId" placeholder="ex: M8K2AB3C" />
+        </div>
+        <div>
+          <label>Seu Discord ID</label>
+          <input id="userId" placeholder="seu user id" />
+        </div>
+        <div style="flex:0">
+          <label>&nbsp;</label>
+          <button id="btnLoad" type="button">Carregar</button>
+        </div>
+      </div>
+      <div class="msg" id="status">Cole o ID da troca (vem no Discord) e seu ID de usuário.</div>
+    </div>
+
+    <div class="grid two" id="board" style="display:none">
+      <div class="card" id="youCard">
+        <div class="side-title">
+          <strong>Sua oferta</strong>
+          <span class="pill" id="youPill">—</span>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div>
+            <label>Éter ✨</label>
+            <input id="eter" type="number" min="0" value="0" />
+          </div>
+          <div>
+            <label>Intensidade ⚡</label>
+            <input id="intensity" type="number" min="0" value="0" />
+          </div>
+        </div>
+        <p class="sub" style="margin:10px 0 4px">Inventário (clique para marcar)</p>
+        <div class="items" id="inv"></div>
+        <div class="row" style="margin-top:14px">
+          <button id="btnSave" type="button" class="secondary">Salvar oferta</button>
+          <button id="btnConfirm" type="button" class="ok">Confirmar</button>
+          <button id="btnCancel" type="button" class="danger">Cancelar troca</button>
+        </div>
+        <div class="msg" id="bagInfo"></div>
+      </div>
+
+      <div class="card">
+        <div class="side-title">
+          <strong>Outro lado</strong>
+          <span class="pill" id="otherPill">—</span>
+        </div>
+        <div id="otherOffer" style="margin-top:12px;color:var(--muted)">—</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const el = (id) => document.getElementById(id);
+    let selected = new Set();
+    let current = null;
+
+    el('tradeId').value = (qs.get('id') || '').toUpperCase();
+    el('userId').value = localStorage.getItem('aeternus_uid') || '';
+
+    function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
+
+    function setMsg(text, kind) {
+      const m = el('status');
+      m.textContent = text || '';
+      m.className = 'msg' + (kind ? ' ' + kind : '');
+    }
+
+    function renderInv(bag, indexes) {
+      selected = new Set((indexes || []).map(Number));
+      const box = el('inv');
+      box.innerHTML = '';
+      (bag.inventory || []).forEach((it) => {
+        const d = document.createElement('div');
+        d.className = 'item' + (selected.has(it.index) ? ' on' : '');
+        d.textContent = `${it.emoji} #${it.index} ${it.name}`;
+        d.onclick = () => {
+          if (selected.has(it.index)) selected.delete(it.index);
+          else selected.add(it.index);
+          d.classList.toggle('on');
+        };
+        box.appendChild(d);
+      });
+      el('bagInfo').textContent =
+        `Saldo: ✨ ${fmt(bag.eter)} · ⚡ ${fmt(bag.intensity)} ponto(s) de intensidade`;
+    }
+
+    function sideHtml(summary) {
+      if (!summary) return '—';
+      const items = (summary.items || [])
+        .map((x) => `${x.emoji} #${x.index} ${x.name}`)
+        .join('<br>') || '<em>nada</em>';
+      return `✨ <b>${fmt(summary.eter)}</b><br>⚡ <b>${fmt(summary.intensity)}</b><br>${items}`;
+    }
+
+    function applyTrade(t, bag) {
+      current = t;
+      el('board').style.display = 'grid';
+      const you = t.you;
+      const mine = you === 'a' ? t.a : t.b;
+      const other = you === 'a' ? t.b : t.a;
+
+      el('eter').value = mine.eter || 0;
+      el('intensity').value = mine.intensity || 0;
+      el('youPill').textContent = mine.confirmed ? 'Confirmado' : 'Aguardando';
+      el('youPill').className = 'pill ' + (mine.confirmed ? 'okpill' : 'wait');
+      el('otherPill').textContent = other.confirmed ? 'Confirmado' : 'Aguardando';
+      el('otherPill').className = 'pill ' + (other.confirmed ? 'okpill' : 'wait');
+      el('otherOffer').innerHTML = sideHtml(other.summary);
+
+      if (bag) renderInv(bag, mine.itemIndexes || []);
+    }
+
+    async function loadAll() {
+      const id = el('tradeId').value.trim().toUpperCase();
+      const userId = el('userId').value.trim();
+      if (!id || !userId) return setMsg('Informe ID da troca e seu Discord ID.', 'err');
+      localStorage.setItem('aeternus_uid', userId);
+      setMsg('Carregando…');
+
+      const tr = await fetch(`/api/trade/${encodeURIComponent(id)}?as=${encodeURIComponent(userId)}`).then(r => r.json());
+      if (!tr.ok) return setMsg(tr.error || 'Falha', 'err');
+
+      const bag = await fetch(`/api/trade/${encodeURIComponent(id)}/bag?userId=${encodeURIComponent(userId)}`).then(r => r.json());
+      if (!bag.ok) return setMsg(bag.error || 'Sem acesso a esta troca', 'err');
+
+      applyTrade(tr.trade, bag.bag);
+      setMsg('Troca carregada. Ajuste a oferta e salve.', 'ok');
+    }
+
+    el('btnLoad').onclick = loadAll;
+
+    el('btnSave').onclick = async () => {
+      const id = el('tradeId').value.trim().toUpperCase();
+      const userId = el('userId').value.trim();
+      const body = {
+        userId,
+        eter: Number(el('eter').value || 0),
+        intensity: Number(el('intensity').value || 0),
+        itemIndexes: [...selected]
+      };
+      const res = await fetch(`/api/trade/${encodeURIComponent(id)}/offer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(r => r.json());
+      if (!res.ok) return setMsg(res.error || 'Erro ao salvar', 'err');
+      const bag = await fetch(`/api/trade/${encodeURIComponent(id)}/bag?userId=${encodeURIComponent(userId)}`).then(r => r.json());
+      applyTrade(res.trade, bag.ok ? bag.bag : null);
+      setMsg('Oferta salva. Confirmações foram resetadas.', 'ok');
+    };
+
+    el('btnConfirm').onclick = async () => {
+      const id = el('tradeId').value.trim().toUpperCase();
+      const userId = el('userId').value.trim();
+      const res = await fetch(`/api/trade/${encodeURIComponent(id)}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      }).then(r => r.json());
+      if (!res.ok) return setMsg(res.error || 'Erro', 'err');
+      if (res.executed) {
+        el('board').style.display = 'none';
+        return setMsg('✅ Troca concluída! Éter, itens e intensidade transferidos.', 'ok');
+      }
+      applyTrade(res.trade, null);
+      setMsg('Confirmação registrada. Aguarde o outro jogador.', 'ok');
+    };
+
+    el('btnCancel').onclick = async () => {
+      const id = el('tradeId').value.trim().toUpperCase();
+      const userId = el('userId').value.trim();
+      if (!confirm('Cancelar esta troca?')) return;
+      const res = await fetch(`/api/trade/${encodeURIComponent(id)}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      }).then(r => r.json());
+      if (!res.ok) return setMsg(res.error || 'Erro', 'err');
+      el('board').style.display = 'none';
+      setMsg('Troca cancelada.', 'ok');
+    };
+
+    if (el('tradeId').value && el('userId').value) loadAll();
+  </script>
+</body>
+</html>

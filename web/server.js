@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const { getSettings, setSettings, getPrefix } = require('../utils/settings');
 const player = require('../utils/player');
 const xp = require('../utils/xp');
+const trade = require('../utils/trade');
 const { registerAvatarRoutes } = require('../utils/avatarApi');
 
 function startWeb(client) {
@@ -181,6 +182,64 @@ function startWeb(client) {
         } catch (e) {
             return res.status(500).json({ error: e.message || 'erro' });
         }
+    });
+
+    // ── Troca entre jogadores (painel) ─────────────────────────────────────
+    app.get('/troca', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'troca.html'));
+    });
+
+    app.get('/api/trade/:id', (req, res) => {
+        const s = trade.getTrade(req.params.id);
+        if (!s) return res.status(404).json({ ok: false, error: 'Troca não encontrada ou expirada' });
+        const as = String(req.query.as || '').trim() || null;
+        return res.json({ ok: true, trade: trade.publicSession(s, as) });
+    });
+
+    app.get('/api/trade/:id/bag', (req, res) => {
+        const s = trade.getTrade(req.params.id);
+        if (!s) return res.status(404).json({ ok: false, error: 'Troca não encontrada' });
+        const userId = String(req.query.userId || '').trim();
+        if (!trade.sideOf(s, userId)) {
+            return res.status(403).json({ ok: false, error: 'Sem permissão' });
+        }
+        return res.json({ ok: true, bag: trade.bagFor(userId) });
+    });
+
+    app.post('/api/trade/:id/offer', (req, res) => {
+        const body = req.body || {};
+        const userId = String(body.userId || '').trim();
+        const result = trade.setOffer(req.params.id, userId, {
+            eter: body.eter,
+            intensity: body.intensity,
+            itemIndexes: body.itemIndexes
+        });
+        if (!result.ok) return res.status(400).json(result);
+        return res.json({
+            ok: true,
+            trade: trade.publicSession(result.session, userId)
+        });
+    });
+
+    app.post('/api/trade/:id/confirm', (req, res) => {
+        const userId = String((req.body || {}).userId || '').trim();
+        const result = trade.toggleConfirm(req.params.id, userId);
+        if (!result.ok) return res.status(400).json(result);
+        if (result.executed) {
+            return res.json({ ok: true, executed: true, message: 'Troca concluída!' });
+        }
+        return res.json({
+            ok: true,
+            executed: false,
+            trade: trade.publicSession(result.session, userId)
+        });
+    });
+
+    app.post('/api/trade/:id/cancel', (req, res) => {
+        const userId = String((req.body || {}).userId || '').trim();
+        const result = trade.cancelTrade(req.params.id, userId);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json({ ok: true });
     });
 
     app.get('/dashboard', (req, res) => {

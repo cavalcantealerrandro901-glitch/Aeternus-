@@ -1,7 +1,6 @@
 /**
  * Trocas entre jogadores (P2P).
  * Ofertas: éter, itens do inventário, intensidade (pontos de atributo).
- * Sessões em memória + espelho leve no store (sobrevive restart curto).
  */
 const player = require('./player');
 const eter = require('./eter');
@@ -36,21 +35,11 @@ function saveDisk() {
 loadDisk();
 
 function uid() {
-    return (
-        Date.now().toString(36) +
-        Math.random().toString(36).slice(2, 8)
-    ).toUpperCase();
+    return (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)).toUpperCase();
 }
 
 function emptySide() {
-    return {
-        eter: 0,
-        /** índices 1-based do inventário no momento da oferta */
-        itemIndexes: [],
-        /** pontos de atributo (intensidade) */
-        intensity: 0,
-        confirmed: false
-    };
+    return { eter: 0, itemIndexes: [], intensity: 0, confirmed: false };
 }
 
 function createTrade(aId, bId) {
@@ -60,7 +49,6 @@ function createTrade(aId, bId) {
     if (!player.has(aId)) return { ok: false, error: 'Você precisa de personagem (`O.j criar`).' };
     if (!player.has(bId)) return { ok: false, error: 'O outro jogador ainda não tem personagem.' };
 
-    // cancela sessões abertas antigas entre o mesmo par
     for (const [id, s] of sessions) {
         if (s.status !== 'open') continue;
         const pair = new Set([s.aId, s.bId]);
@@ -122,6 +110,34 @@ function listOpenFor(userId) {
     return out;
 }
 
+function publicSession(s, asUserId) {
+    if (!s) return null;
+    const as = asUserId ? String(asUserId) : null;
+    return {
+        id: s.id,
+        aId: s.aId,
+        bId: s.bId,
+        status: s.status,
+        expiresAt: s.expiresAt,
+        a: {
+            ...trade.summarizeSide ? null : null,
+            eter: s.a.eter,
+            intensity: s.a.intensity,
+            itemIndexes: s.a.itemIndexes,
+            confirmed: s.a.confirmed,
+            summary: summarizeSide(s.aId, s.a)
+        },
+        b: {
+            eter: s.b.eter,
+            intensity: s.b.intensity,
+            itemIndexes: s.b.itemIndexes,
+            confirmed: s.b.confirmed,
+            summary: summarizeSide(s.bId, s.b)
+        },
+        you: as ? sideOf(s, as) : null
+    };
+}
+
 function setOffer(tradeId, userId, patch) {
     const s = getTrade(tradeId);
     if (!s || s.status !== 'open') return { ok: false, error: 'Troca não encontrada ou expirada.' };
@@ -134,12 +150,10 @@ function setOffer(tradeId, userId, patch) {
         ? patch.itemIndexes.map((n) => Math.floor(Number(n))).filter((n) => n >= 1)
         : s[side].itemIndexes;
 
-    // valida saldo
     if (eter.get(userId) < eterAmt) {
         return { ok: false, error: `Éter insuficiente (tem ${eter.get(userId)}).` };
     }
-    const st = xp.get(userId);
-    const pts = Number(st.attrPoints || 0);
+    const pts = Number(xp.get(userId).attrPoints || 0);
     if (pts < intensity) {
         return { ok: false, error: `Intensidade insuficiente (pontos: ${pts}).` };
     }
@@ -155,7 +169,6 @@ function setOffer(tradeId, userId, patch) {
     s[side].eter = eterAmt;
     s[side].intensity = intensity;
     s[side].itemIndexes = unique;
-    // mudar oferta reseta confirmações dos dois
     s.a.confirmed = false;
     s.b.confirmed = false;
     s.expiresAt = Date.now() + TTL_MS;
@@ -173,9 +186,7 @@ function toggleConfirm(tradeId, userId) {
     s.expiresAt = Date.now() + TTL_MS;
     saveDisk();
 
-    if (s.a.confirmed && s.b.confirmed) {
-        return executeTrade(s);
-    }
+    if (s.a.confirmed && s.b.confirmed) return executeTrade(s);
     return { ok: true, session: s, executed: false };
 }
 
@@ -204,7 +215,6 @@ function snapshotItems(userId, indexes) {
 function executeTrade(s) {
     if (!s || s.status !== 'open') return { ok: false, error: 'Troca inválida.' };
 
-    // revalida tudo no momento da execução
     for (const [uid, side] of [
         [s.aId, s.a],
         [s.bId, s.b]
@@ -213,14 +223,14 @@ function executeTrade(s) {
             s.a.confirmed = false;
             s.b.confirmed = false;
             saveDisk();
-            return { ok: false, error: `<@${uid}> não tem éter suficiente.` };
+            return { ok: false, error: `Jogador ${uid} sem éter suficiente.` };
         }
         const pts = Number(xp.get(uid).attrPoints || 0);
         if (pts < side.intensity) {
             s.a.confirmed = false;
             s.b.confirmed = false;
             saveDisk();
-            return { ok: false, error: `<@${uid}> não tem intensidade suficiente.` };
+            return { ok: false, error: `Jogador ${uid} sem intensidade suficiente.` };
         }
         const snap = snapshotItems(uid, side.itemIndexes);
         if (!snap.ok) {
@@ -229,10 +239,8 @@ function executeTrade(s) {
             saveDisk();
             return snap;
         }
-        side._snap = snap.items;
     }
 
-    // remove itens do maior índice → menor (não desloca)
     function takeItems(userId, indexes) {
         const sorted = [...indexes].sort((a, b) => b - a);
         const taken = [];
@@ -248,7 +256,6 @@ function executeTrade(s) {
         const fromA = takeItems(s.aId, s.a.itemIndexes);
         const fromB = takeItems(s.bId, s.b.itemIndexes);
 
-        // éter
         if (s.a.eter > 0) {
             eter.remove(s.aId, s.a.eter, { reason: 'troca', to: s.bId });
             eter.add(s.bId, s.a.eter, { reason: 'troca', from: s.aId });
@@ -258,30 +265,15 @@ function executeTrade(s) {
             eter.add(s.aId, s.b.eter, { reason: 'troca', from: s.bId });
         }
 
-        // intensidade (attrPoints)
-        if (s.a.intensity > 0 || s.b.intensity > 0) {
-            const da = xp.get(s.aId);
-            const db = xp.get(s.bId);
-            da.attrPoints = Math.max(0, Number(da.attrPoints || 0) - s.a.intensity + s.b.intensity);
-            db.attrPoints = Math.max(0, Number(db.attrPoints || 0) - s.b.intensity + s.a.intensity);
-            // persist via spend/add helpers if exist
-            if (typeof xp.setAttrPoints === 'function') {
-                xp.setAttrPoints(s.aId, da.attrPoints);
-                xp.setAttrPoints(s.bId, db.attrPoints);
-            } else {
-                const all = xp.all ? xp.all() : null;
-                if (all) {
-                    if (!all[s.aId]) all[s.aId] = da;
-                    else all[s.aId].attrPoints = da.attrPoints;
-                    if (!all[s.bId]) all[s.bId] = db;
-                    else all[s.bId].attrPoints = db.attrPoints;
-                    if (typeof xp.save === 'function') xp.save(all);
-                    else store.save('xp.json', all);
-                }
-            }
+        if (s.a.intensity > 0) {
+            const r = xp.transferAttrPoints(s.aId, s.bId, s.a.intensity);
+            if (!r.ok) throw new Error(r.error || 'Falha intensidade A→B');
+        }
+        if (s.b.intensity > 0) {
+            const r = xp.transferAttrPoints(s.bId, s.aId, s.b.intensity);
+            if (!r.ok) throw new Error(r.error || 'Falha intensidade B→A');
         }
 
-        // entrega itens
         for (const it of fromA) player.addItem(s.bId, it);
         for (const it of fromB) player.addItem(s.aId, it);
 
@@ -302,17 +294,35 @@ function summarizeSide(userId, side) {
     const items = (side.itemIndexes || [])
         .map((idx) => {
             const it = inv[idx - 1];
-            if (!it) return `#${idx} (?)`;
-            const name = it.name || it.id || 'item';
-            const emoji = it.emoji || '📦';
-            return `${emoji} #${idx} ${name}`;
-        })
-        .join('\n');
+            if (!it) return { index: idx, name: '?', emoji: '📦' };
+            return {
+                index: idx,
+                name: it.name || it.id || 'item',
+                emoji: it.emoji || '📦'
+            };
+        });
     return {
         eter: side.eter || 0,
         intensity: side.intensity || 0,
-        itemsText: items || '_nada_',
+        items,
+        itemsText:
+            items.map((x) => `${x.emoji} #${x.index} ${x.name}`).join('\n') || '_nada_',
         confirmed: !!side.confirmed
+    };
+}
+
+function bagFor(userId) {
+    const inv = player.getInventory(userId) || [];
+    return {
+        eter: eter.get(userId),
+        intensity: Number(xp.get(userId).attrPoints || 0),
+        inventory: inv.map((it, i) => ({
+            index: i + 1,
+            id: it.id || null,
+            name: it.name || it.id || 'item',
+            emoji: it.emoji || '📦',
+            rarity: it.rarity || null
+        }))
     };
 }
 
@@ -326,5 +336,7 @@ module.exports = {
     sideOf,
     partnerId,
     summarizeSide,
+    publicSession,
+    bagFor,
     TTL_MS
 };
