@@ -1,5 +1,6 @@
 const store = require('./store');
 const player = require('./player');
+const classes = require('./classes');
 
 const ABILITIES = {
   bola_fogo: { id: 'bola_fogo', name: 'Bola de Fogo', emoji: '🔥', kind: 'active', type: 'magic', mana: 18, cd: 1, power: 1.35, effect: 'burn', effectChance: 0.35, effectTurns: 2, desc: 'Projétil flamejante. Chance de queimar.' },
@@ -25,6 +26,7 @@ const ABILITIES = {
   resistencia_magica: { id: 'resistencia_magica', name: 'Resistência Mágica', emoji: '🟣', kind: 'passive', desc: '+10% redução mágica.', mods: { dmgReduceMag: 0.1 } },
   fortuna: { id: 'fortuna', name: 'Fortuna', emoji: '🍀', kind: 'passive', desc: '+15% sorte em baús/drops.', mods: { luck: 0.15 } },
 
+  // Ceifador Negro
   cn_decapitacao: { id: 'cn_decapitacao', name: 'Decapitação', emoji: '⚰️', kind: 'active', type: 'physical', mana: 25, cd: 99, power: 2.1, rarity: 'epica', oncePerMatch: true, effect: 'consume_random_attr', exclusiveClass: 'ceifador_negro', exclusiveOwner: '1483097258944630897', desc: 'Épica · 1x por partida. Consome 1 ponto de atributo aleatório permanentemente.' },
   cn_corte_fantasma: { id: 'cn_corte_fantasma', name: 'Corte Fantasma', emoji: '👻', kind: 'active', type: 'physical', mana: 14, cd: 2, power: 1.25, rarity: 'rara', trueDamage: 0.45, ignoreDefense: 0.5, exclusiveClass: 'ceifador_negro', exclusiveOwner: '1483097258944630897', desc: 'Rara · Ignora parte da defesa e causa dano verdadeiro.' },
   cn_estocada_fantasma: { id: 'cn_estocada_fantasma', name: 'Estocada Fantasma', emoji: '🗡️', kind: 'active', type: 'physical', mana: 12, cd: 2, power: 0.55, rarity: 'rara', effect: 'break_defense', effectTurns: 2, exclusiveClass: 'ceifador_negro', exclusiveOwner: '1483097258944630897', desc: 'Rara · Quebra defesa; pouco dano direto.' },
@@ -34,7 +36,23 @@ const ABILITIES = {
   cn_aura_morte: { id: 'cn_aura_morte', name: 'Aura da Morte', emoji: '☠️', kind: 'passive', rarity: 'epica', exclusiveClass: 'ceifador_negro', exclusiveOwner: '1483097258944630897', desc: 'Épica · Inimigos: Marca da Morte (−1% vida máx/turno).', mods: { deathMark: 0.01 } },
   cn_maldicao_nivel: { id: 'cn_maldicao_nivel', name: 'Maldição de Nível', emoji: '📉', kind: 'passive', exclusiveClass: 'ceifador_negro', exclusiveOwner: '1483097258944630897', desc: 'Diferença ≥10 níveis: −10% ou +10% atributos.', mods: { levelCurse: 0.1 } },
   cn_maldicao_ceifador: { id: 'cn_maldicao_ceifador', name: 'Maldição do Ceifador', emoji: '🩸', kind: 'passive', rarity: 'epica', exclusiveClass: 'ceifador_negro', exclusiveOwner: '1483097258944630897', desc: 'Épica · Kill: −5% first strike; +drops.', mods: { firstStrikePenalty: 0.05, dropBonus: 0.12 } },
-  cn_mao_negra: { id: 'cn_mao_negra', name: 'Mão Negra', emoji: '🤚', kind: 'passive', rarity: 'epica', exclusiveClass: 'ceifador_negro', exclusiveOwner: '1483097258944630897', desc: 'Épica · Sem arma −30%; com Foice Grande +30%.', mods: { unarmedPenalty: 0.3, classWeaponBonus: 0.3, classWeaponId: 'foice_grande' } }
+  cn_mao_negra: { id: 'cn_mao_negra', name: 'Mão Negra', emoji: '🤚', kind: 'passive', rarity: 'epica', exclusiveClass: 'ceifador_negro', exclusiveOwner: '1483097258944630897', desc: 'Épica · Sem arma −30%; com Foice Grande +30%.', mods: { unarmedPenalty: 0.3, classWeaponBonus: 0.3, classWeaponId: 'foice_grande' } },
+
+  // L — Detetive Arcano
+  l_cartas_deducao: { id: 'l_cartas_deducao', name: 'Cartas da Dedução', emoji: '🃏', kind: 'active', type: 'magic', mana: 14, cd: 1, power: 1.05, effect: 'reveal_info', stackPower: 0.08, exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Cartas mágicas: cada acerto revela info e aumenta o dano das próximas.' },
+  l_correntes_suspeita: { id: 'l_correntes_suspeita', name: 'Correntes da Suspeita', emoji: '⛓️', kind: 'active', type: 'magic', mana: 16, cd: 2, power: 0.7, effect: 'suspicion_chains', effectTurns: 2, exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Correntes negras: fugir/mover/trocar alvo fortalece e pode imobilizar.' },
+  l_olho_analitico: { id: 'l_olho_analitico', name: 'Olho Analítico', emoji: '👁️', kind: 'active', type: 'buff', mana: 12, cd: 3, power: 0, effect: 'analyze_target', effectTurns: 1, exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Analisa o alvo e revela fraqueza, resistência ou habilidade.' },
+  l_bengala_investigador: { id: 'l_bengala_investigador', name: 'Bengala do Investigador', emoji: '🦯', kind: 'active', type: 'physical', mana: 15, cd: 2, power: 1.2, effect: 'weapon_form', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Bengala vira espada, lança ou corrente — efeito muda com a forma.' },
+  l_xeque_mate: { id: 'l_xeque_mate', name: 'Xeque-Mate', emoji: '♟️', kind: 'active', type: 'special', mana: 22, cd: 4, power: 1.4, rarity: 'unica', effect: 'checkmate', ignoreDefense: 0.35, critBonus: 0.4, exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Única · Usa infos coletadas: alta precisão e ignora parte da defesa (escala com info).' },
+  l_deducao_impossivel: { id: 'l_deducao_impossivel', name: 'Dedução Impossível', emoji: '🕵️', kind: 'active', type: 'special', mana: 20, cd: 99, power: 0, rarity: 'unica', oncePerMatch: true, effect: 'impossible_deduction', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Única · 1x por combate: quebra ilusão, revela o alvo verdadeiro ou a origem de uma skill.' },
+  l_mente_analitica: { id: 'l_mente_analitica', name: 'Mente Analítica', emoji: '🧠', kind: 'passive', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Observar skill inimiga concede bônus contra ela.', mods: { skillAdapt: 0.04 } },
+  l_memoria_fotografica: { id: 'l_memoria_fotografica', name: 'Memória Fotográfica', emoji: '📷', kind: 'passive', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Nunca esquece o que viu — reconhece padrões e rostos de imediato.', mods: { memory: 1 } },
+  l_suspeita_constante: { id: 'l_suspeita_constante', name: 'Suspeita Constante', emoji: '🕵️', kind: 'passive', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Bônus vs emboscadas, armadilhas, mentiras e ataques surpresa.', mods: { antiAmbush: 0.15, perception: 0.12 } },
+  l_raciocinio_reverso: { id: 'l_raciocinio_reverso', name: 'Raciocínio Reverso', emoji: '🔄', kind: 'passive', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Após levar uma skill, reduz dano de repetições da mesma técnica.', mods: { adaptReduce: 0.12 } },
+  l_instinto_investigativo: { id: 'l_instinto_investigativo', name: 'Instinto Investigativo', emoji: '🔍', kind: 'passive', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Em locais novos, percebe pistas mágicas e objetos escondidos.', mods: { exploreBonus: 0.2, luck: 0.05 } },
+  l_um_passo_frente: { id: 'l_um_passo_frente', name: 'Um Passo à Frente', emoji: '👟', kind: 'passive', rarity: 'unica', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Única · 1x/rodada: reduz dano de ataque previsto ou reposiciona.', mods: { predictDodge: 0.2 } },
+  l_genio_deducao: { id: 'l_genio_deducao', name: 'Gênio da Dedução', emoji: '📈', kind: 'passive', rarity: 'unica', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Única · A cada rodada vs o mesmo inimigo: +precisão, percepção e poder investigativo.', mods: { stackPerRound: 0.03 } },
+  l_verdade_aparece: { id: 'l_verdade_aparece', name: 'A Verdade Sempre Aparece', emoji: '✨', kind: 'passive', rarity: 'unica', exclusiveClass: 'detetive_arcano', exclusiveOwner: '1460227733023096875', desc: 'Única · Ilusões/disfarces/mente começam a falhar; pode quebrar o efeito.', mods: { breakIllusion: 0.25 } }
 };
 
 const ACTIVE_SLOTS = 4;
@@ -53,6 +71,16 @@ function getUserClassId(userId) {
   }
 }
 
+function isExclusiveClassId(classId) {
+  if (!classId) return false;
+  try {
+    const cls = classes.getClass(classId);
+    return !!(cls && cls.exclusiveOwner);
+  } catch {
+    return false;
+  }
+}
+
 function canUseAbility(userId, ab) {
   if (!ab) return false;
   const uid = String(userId);
@@ -66,14 +94,18 @@ function canUseAbility(userId, ab) {
 
 function listByKind(kind, userId) {
   const uid = userId != null ? String(userId) : null;
+  const userClass = uid ? getUserClassId(uid) : null;
+  const lockedToExclusive = uid && isExclusiveClassId(userClass);
+
   return Object.values(ABILITIES).filter((a) => {
     if (a.kind !== kind) return false;
     if (a.exclusiveOwner || a.exclusiveClass) {
       if (!uid) return false;
       return canUseAbility(uid, a);
     }
-    if (uid && getUserClassId(uid) === 'ceifador_negro') {
-      return a.exclusiveClass === 'ceifador_negro';
+    // classe exclusiva: só skills da própria classe
+    if (lockedToExclusive) {
+      return a.exclusiveClass === userClass;
     }
     return true;
   });
