@@ -111,6 +111,28 @@ function startWeb(client) {
         return res.json(result);
     });
 
+    app.post('/api/arena/:id/chat', (req, res) => {
+        const body = req.body || {};
+        const result = arenaEngine.addChat(req.params.id, {
+            userId: body.userId,
+            name: body.name,
+            text: body.text,
+            spectator: body.spectator
+        });
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
+    });
+
+    app.post('/api/arena/:id/react', (req, res) => {
+        const body = req.body || {};
+        const result = arenaEngine.addReaction(req.params.id, {
+            userId: body.userId,
+            emoji: body.emoji
+        });
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
+    });
+
     app.post('/api/arena/create', (req, res) => {
         const body = req.body || {};
         const teamA = Array.isArray(body.teamA) ? body.teamA : [body.aId].filter(Boolean);
@@ -184,7 +206,6 @@ function startWeb(client) {
         }
     });
 
-    // ── Troca entre jogadores (painel) ─────────────────────────────────────
     app.get('/troca', (req, res) => {
         res.sendFile(path.join(__dirname, '..', 'public', 'troca.html'));
     });
@@ -215,10 +236,7 @@ function startWeb(client) {
             itemIndexes: body.itemIndexes
         });
         if (!result.ok) return res.status(400).json(result);
-        return res.json({
-            ok: true,
-            trade: trade.publicSession(result.session, userId)
-        });
+        return res.json({ ok: true, trade: trade.publicSession(result.session, userId) });
     });
 
     app.post('/api/trade/:id/confirm', (req, res) => {
@@ -228,11 +246,7 @@ function startWeb(client) {
         if (result.executed) {
             return res.json({ ok: true, executed: true, message: 'Troca concluída!' });
         }
-        return res.json({
-            ok: true,
-            executed: false,
-            trade: trade.publicSession(result.session, userId)
-        });
+        return res.json({ ok: true, executed: false, trade: trade.publicSession(result.session, userId) });
     });
 
     app.post('/api/trade/:id/cancel', (req, res) => {
