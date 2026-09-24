@@ -89,14 +89,6 @@ const DEFAULT = {
         notifyRoleId: null,
         phrase: '🤝 **Nova parceria!**\nRepresentante: {rep}\nServidor: **{server}**\nConvite: {invite}',
         image: null
-    },
-    boom: {
-        enabled: true,
-        channelId: null,
-        notifyRoleId: null,
-        staffRoleId: null,
-        message: '🚀 **Boom de convites!**\nEntre no servidor: {invite}\nChamado por: {user}',
-        cooldownMs: 7200000
     }
 };
 
@@ -113,7 +105,7 @@ const MERGE_KEYS = [
     'logs', 'welcome', 'leave', 'automod', 'tickets', 'economy', 'xp',
     'suggestions', 'reports', 'levels', 'starboard', 'autorole', 'verification',
     'antinuke', 'shop', 'birthday', 'counting', 'sticky', 'autoPublish',
-    'memberCounter', 'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub', 'drops', 'partnership', 'boom'
+    'memberCounter', 'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub', 'drops', 'partnership'
 ];
 
 function getSettings(guildId) {
