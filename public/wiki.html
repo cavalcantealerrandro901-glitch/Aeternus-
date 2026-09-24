@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aeternus · Wiki Oficial</title>
+  <meta name="description" content="Documentação oficial do Aeternus: economia, RPG, arena, música, moderação e painel." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070a12;
+      --panel: #0d1220;
+      --panel-2: #111827;
+      --border: rgba(148, 163, 184, 0.14);
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #a78bfa;
+      --accent-2: #22d3ee;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --side-w: 280px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.65;
+    }
+    a { color: var(--accent-2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code, .cmd {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.86em;
+      background: rgba(167, 139, 250, 0.12);
+      border: 1px solid rgba(167, 139, 250, 0.25);
+      color: #ddd6fe;
+      padding: 0.12rem 0.4rem;
+      border-radius: 0.35rem;
+    }
+
+    .top {
+      position: sticky; top: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; padding: 0.85rem 1.25rem;
+      background: rgba(7, 10, 18, 0.88);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(14px);
+    }
+    .brand {
+      display: flex; align-items: center; gap: 0.65rem;
+      font-weight: 800; letter-spacing: -0.02em;
+    }
+    .brand span {
+      background: linear-gradient(120deg, #c4b5fd, #67e8f9);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .badge {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+      color: #c4b5fd; border: 1px solid rgba(167,139,250,.4);
+      background: rgba(124,58,237,.15); padding: 0.2rem 0.5rem; border-radius: 999px;
+    }
+    .top-nav { display: flex; gap: 0.9rem; align-items: center; flex-wrap: wrap; }
+    .top-nav a { color: var(--muted); font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+    .top-nav a:hover { color: #fff; }
+
+    .layout { display: grid; grid-template-columns: var(--side-w) 1fr; min-height: calc(100vh - 58px); }
+    .side {
+      position: sticky; top: 58px; height: calc(100vh - 58px);
+      overflow: auto; border-right: 1px solid var(--border);
+      background: var(--panel); padding: 1.1rem 0.9rem 2rem;
+    }
+    .side h4 {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #64748b; margin: 1rem 0.55rem 0.45rem;
+    }
+    .side a {
+      display: block; color: var(--muted); text-decoration: none;
+      padding: 0.42rem 0.55rem; border-radius: 0.45rem; font-size: 0.9rem; font-weight: 500;
+    }
+    .side a:hover, .side a.active { background: rgba(167,139,250,.12); color: #e9d5ff; }
+    .search {
+      width: 100%; margin-bottom: 0.6rem;
+      background: var(--panel-2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 0.55rem; padding: 0.55rem 0.7rem; font-size: 0.9rem;
+    }
+
+    .main { padding: 2rem clamp(1rem, 3vw, 2.5rem) 4rem; max-width: 920px; }
+    .hero {
+      border: 1px solid var(--border); background:
+        radial-gradient(circle at 10% 0%, rgba(167,139,250,.18), transparent 45%),
+        radial-gradient(circle at 90% 20%, rgba(34,211,238,.12), transparent 40%),
+        var(--panel);
+      border-radius: 1rem; padding: 1.6rem 1.5rem 1.4rem; margin-bottom: 1.75rem;
+    }
+    .hero h1 { font-size: clamp(1.6rem, 3vw, 2.15rem); letter-spacing: -0.03em; margin-bottom: 0.45rem; }
+    .hero p { color: var(--muted); max-width: 62ch; }
+
+    section.block { margin-bottom: 2.4rem; scroll-margin-top: 80px; }
+    section.block h2 {
+      font-size: 1.25rem; letter-spacing: -0.02em;
+      border-bottom: 1px solid var(--border); padding-bottom: 0.55rem; margin-bottom: 0.9rem;
+    }
+    section.block h3 { font-size: 1.02rem; margin: 1.15rem 0 0.4rem; color: #f8fafc; }
+    section.block p, section.block li { color: #cbd5e1; }
+    section.block ul, section.block ol { padding-left: 1.2rem; margin: 0.4rem 0 0.7rem; }
+    section.block li { margin: 0.28rem 0; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.75rem; margin: 0.9rem 0; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 0.8rem; padding: 0.95rem 1rem;
+    }
+    .card strong { display: block; margin-bottom: 0.25rem; color: #f1f5f9; }
+    .card span { color: var(--muted); font-size: 0.9rem; }
+
+    table { width: 100%; border-collapse: collapse; margin: 0.7rem 0 1rem; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: #94a3b8; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    td:first-child { white-space: nowrap; }
+
+    .note {
+      border-left: 3px solid var(--accent);
+      background: rgba(167,139,250,.08);
+      padding: 0.7rem 0.9rem; border-radius: 0 0.5rem 0.5rem 0;
+      color: #d1d5db; margin: 0.8rem 0;
+    }
+    .warn {
+      border-left-color: var(--warn);
+      background: rgba(251,191,36,.08);
+    }
+
+    footer {
+      margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border);
+      color: #64748b; font-size: 0.85rem;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .side { position: relative; top: 0; height: auto; max-height: 42vh; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">Ae<span>ternus</span> <span class="badge">WIKI OFICIAL</span></div>
+    <nav class="top-nav">
+      <a href="/dashboard">Painel</a>
+      <a href="/wiki">Wiki</a>
+      <a href="/arena">Arena</a>
+      <a href="/login">Entrar</a>
+    </nav>
+  </header>
+
+  <div class="layout">
+    <aside class="side">
+      <input class="search" id="q" type="search" placeholder="Buscar na wiki…" autocomplete="off" />
+      <h4>Início</h4>
+      <a href="#introducao">Introdução</a>
+      <a href="#prefixo">Prefixo e slash</a>
+      <a href="#inicio-rapido">Início rápido</a>
+      <h4>Sistemas</h4>
+      <a href="#economia">Economia</a>
+      <a href="#rpg">RPG e classes</a>
+      <a href="#arena">Arena e combate</a>
+      <a href="#masmorra">Masmorra</a>
+      <a href="#musica">Música</a>
+      <a href="#moderacao">Moderação</a>
+      <a href="#utilitarios">Utilitários</a>
+      <h4>Painel</h4>
+      <a href="#painel">Painel web</a>
+      <a href="#parcerias">Parcerias</a>
+      <a href="#drops">Drops</a>
+      <h4>Referência</h4>
+      <a href="#comandos">Índice de comandos</a>
+      <a href="#faq">FAQ</a>
+    </aside>
+
+    <main class="main">
+      <div class="hero">
+        <h1>Wiki oficial do Aeternus</h1>
+        <p>
+          Documentação de referência do bot: economia, progressão, combate, música,
+          moderação e configuração pelo painel. O prefixo padrão é <code>O.</code>;
+          também há comandos slash equivalentes quando registrados.
+        </p>
+      </div>
+
+      <section class="block" id="introducao">
+        <h2>Introdução</h2>
+        <p>
+          O Aeternus é um bot multipropósito para Discord. Reúne economia com moedas e
+          recompensas, sistema de personagem (classes, habilidades, equipamentos),
+          combates em arena e masmorra, música via Lavalink, ferramentas de moderação
+          e um painel web para ajustar o servidor sem depender só de comandos no chat.
+        </p>
+        <div class="grid">
+          <div class="card"><strong>Economia</strong><span>Saldo, banco, daily, trabalho, cassino e loja.</span></div>
+          <div class="card"><strong>RPG</strong><span>Personagem, classes, passivas, inventário e craft.</span></div>
+          <div class="card"><strong>Combate</strong><span>Arena PvP e masmorras com interface web.</span></div>
+          <div class="card"><strong>Servidor</strong><span>Automod, logs, parcerias, drops e painel.</span></div>
+        </div>
+      </section>
+
+      <section class="block" id="prefixo">
+        <h2>Prefixo e comandos slash</h2>
+        <ul>
+          <li>Prefixo padrão: <code>O.</code> (exemplo: <code>O.ajuda</code>, <code>O.saldo</code>).</li>
+          <li>O prefixo pode ser alterado no painel ou por configuração do servidor.</li>
+          <li>Parte dos comandos também existe em versão slash (<code>/diario</code>, <code>/jogador</code>, etc.).</li>
+          <li>Em caso de dúvida, use <code>O.ajuda</code> no servidor.</li>
+        </ul>
+      </section>
+
+      <section class="block" id="inicio-rapido">
+        <h2>Início rápido</h2>
+        <ol>
+          <li>Crie o personagem com <code>O.j criar</code> (ou o fluxo indicado pelo bot).</li>
+          <li>Escolha ou consulte a classe em <code>O.classe</code> e <code>O.habilidades</code>.</li>
+          <li>Ganhe recursos com <code>O.daily</code>, <code>O.work</code> e atividades do servidor.</li>
+          <li>Veja o perfil com <code>O.j perfil</code> e o inventário com <code>O.inventario</code>.</li>
+          <li>Para combate, use <code>O.arena</code> ou <code>O.masmorra</code> conforme disponível no servidor.</li>
+        </ol>
+        <div class="note">
+          Administradores devem configurar canal de boas-vindas, automod, drops e parcerias pelo painel em <a href="/dashboard">/dashboard</a>.
+        </div>
+      </section>
+
+      <section class="block" id="economia">
+        <h2>Economia</h2>
+        <p>
+          A economia usa saldo em carteira e, quando aplicável, depósito em banco.
+          Valores de daily e regras de roubo/trabalho podem variar por servidor.
+        </p>
+        <table>
+          <thead><tr><th>Comando</th><th>Função</th></tr></thead>
+          <tbody>
+            <tr><td><code>O.saldo</code></td><td>Consulta o saldo atual.</td></tr>
+            <tr><td><code>O.banco</code></td><td>Visualiza o banco.</td></tr>
+            <tr><td><code>O.depositar</code> / <code>O.sacar</code></td><td>Move valores entre carteira e banco.</td></tr>
+            <tr><td><code>O.daily</code></td><td>Recompensa diária (com sequência quando houver).</td></tr>
+            <tr><td><code>O.work</code> / <code>O.trabalhar</code></td><td>Trabalho com cooldown.</td></tr>
+            <tr><td><code>O.pay</code></td><td>Transfere valor a outro usuário.</td></tr>
+            <tr><td><code>O.rob</code></td><td>Tentativa de roubo (se habilitado no servidor).</td></tr>
+            <tr><td><code>O.loja</code></td><td>Loja de itens e benefícios.</td></tr>
+            <tr><td><code>O.troca</code></td><td>Troca entre jogadores pelo painel.</td></tr>
+          </tbody>
+        </table>
+        <h3>Cassino e jogos</h3>
+        <p>Disponíveis conforme o servidor: blackjack, slots, minas, roleta, cara ou coroa, dados e quiz. Sempre confira apostas e regras antes de confirmar.</p>
+      </section>
+
+      <section class="block" id="rpg">
+        <h2>RPG e classes</h2>
+        <p>
+          Cada jogador possui personagem com atributos (força, agilidade, defesa, vida),
+          classe, habilidades ativas, passivas e equipamentos. Classes exclusivas só aparecem
+          e só podem ser usadas pelo dono definido no sistema.
+        </p>
+        <table>
+          <thead><tr><th>Comando</th><th>Função</th></tr></thead>
+          <tbody>
+            <tr><td><code>O.j</code> / <code>O.jogador</code></td><td>Hub do personagem (criar, perfil, status).</td></tr>
+            <tr><td><code>O.classe</code></td><td>Lista e seleção de classes disponíveis para você.</td></tr>
+            <tr><td><code>O.habilidades</code></td><td>Habilidades da sua classe (com poder quando exibido).</td></tr>
+            <tr><td><code>O.passivas</code></td><td>Passivas ativas no personagem.</td></tr>
+            <tr><td><code>O.inventario</code></td><td>Itens, equipamentos e materiais.</td></tr>
+            <tr><td><code>O.craft</code> / <code>O.minerar</code></td><td>Produção e coleta de recursos.</td></tr>
+          </tbody>
+        </table>
+        <div class="note">
+          No perfil (<code>O.j perfil</code>), os atributos devem coincidir com os usados na arena.
+          O dano das habilidades é indicado ao lado de cada habilidade quando a informação estiver disponível.
+        </div>
+      </section>
+
+      <section class="block" id="arena">
+        <h2>Arena e combate</h2>
+        <p>
+          A arena permite duelos com interface web responsiva (computador e celular).
+          Os cartões dos combatentes ficam lado a lado; cada jogador vê apenas as
+          próprias habilidades. Há chat para jogadores e espectadores e reações com emoji.
+        </p>
+        <ul>
+          <li>Abertura pelo comando de arena no Discord ou link gerado pelo bot.</li>
+          <li>Estado da partida sincronizado pela API do painel.</li>
+          <li>Use habilidades no momento do seu turno; observe custo, cooldown e efeito.</li>
+        </ul>
+        <p>Página da arena: <a href="/arena">/arena</a> (requer ID de partida válido).</p>
+      </section>
+
+      <section class="block" id="masmorra">
+        <h2>Masmorra</h2>
+        <p>
+          Modo cooperativo ou progressão por andares contra inimigos controlados pelo sistema.
+          Comandos relacionados: <code>O.masmorra</code>. A interface web segue o mesmo padrão da arena.
+        </p>
+      </section>
+
+      <section class="block" id="musica">
+        <h2>Música</h2>
+        <p>
+          Reprodução em canais de voz com fila, controle de volume e pausa.
+          Depende do nó Lavalink configurado no ambiente do bot.
+        </p>
+        <table>
+          <thead><tr><th>Comando</th><th>Função</th></tr></thead>
+          <tbody>
+            <tr><td><code>O.tocar</code></td><td>Toca uma faixa ou pesquisa.</td></tr>
+            <tr><td><code>O.fila</code></td><td>Mostra a fila atual.</td></tr>
+            <tr><td><code>O.pular</code></td><td>Pula a faixa atual.</td></tr>
+            <tr><td><code>O.pausar</code> / <code>O.retomar</code></td><td>Pausa e retoma.</td></tr>
+            <tr><td><code>O.parar</code></td><td>Para e limpa a fila.</td></tr>
+            <tr><td><code>O.volume</code></td><td>Ajusta o volume.</td></tr>
+            <tr><td><code>O.tocando</code></td><td>Mostra o que está tocando.</td></tr>
+          </tbody>
+        </table>
+        <div class="note warn">
+          É necessário que o bot e o usuário estejam no mesmo canal de voz, com permissões de conectar e falar.
+        </div>
+      </section>
+
+      <section class="block" id="moderacao">
+        <h2>Moderação</h2>
+        <p>Comandos de staff exigem permissões adequadas no Discord.</p>
+        <table>
+          <thead><tr><th>Comando</th><th>Função</th></tr></thead>
+          <tbody>
+            <tr><td><code>O.ban</code> / <code>O.kick</code></td><td>Banimento e expulsão.</td></tr>
+            <tr><td><code>O.mute</code> / <code>O.unmute</code></td><td>Silenciar e remover silêncio.</td></tr>
+            <tr><td><code>O.warn</code> / <code>O.warns</code></td><td>Advertências.</td></tr>
+            <tr><td><code>O.lock</code> / <code>O.unlock</code></td><td>Trancar e destrancar canal.</td></tr>
+            <tr><td><code>O.limpar</code></td><td>Limpa mensagens em lote.</td></tr>
+            <tr><td><code>O.slowmode</code></td><td>Modo lento do canal.</td></tr>
+          </tbody>
+        </table>
+        <p>O automod (anti-spam, anti-convite, etc.) é configurado no painel do servidor.</p>
+      </section>
+
+      <section class="block" id="utilitarios">
+        <h2>Utilitários</h2>
+        <ul>
+          <li><code>O.ping</code> — latência.</li>
+          <li><code>O.avatar</code>, <code>O.userinfo</code>, <code>O.serverinfo</code> — informações.</li>
+          <li><code>O.afk</code> — status ausente.</li>
+          <li><code>O.lembrete</code> — lembretes.</li>
+          <li><code>O.calc</code> — calculadora.</li>
+          <li><code>O.embed</code> — montagem de embeds.</li>
+          <li><code>O.xp</code>, <code>O.rank</code>, <code>O.ranking</code>, <code>O.topxp</code> — progressão por chat.</li>
+          <li><code>O.invites</code> — estatística de convites.</li>
+          <li><code>O.painel</code> — link do painel web.</li>
+        </ul>
+      </section>
+
+      <section class="block" id="painel">
+        <h2>Painel web</h2>
+        <p>
+          O painel permite autenticar com Discord e gerenciar servidores em que o bot está presente.
+          Principiais principais: prefixo, entrada/saída, automod, drops, parcerias e economia.
+        </p>
+        <ul>
+          <li>Acesso: <a href="/dashboard">/dashboard</a></li>
+          <li>Login: <a href="/login">/login</a></li>
+          <li>Wiki: <a href="/wiki">/wiki</a> (esta página)</li>
+          <li>Arena: <a href="/arena">/arena</a></li>
+          <li>Troca: <a href="/troca">/troca</a></li>
+        </ul>
+      </section>
+
+      <section class="block" id="parcerias">
+        <h2>Parcerias</h2>
+        <p>
+          Sistema para anunciar parcerias no canal configurado, com cargo de representante
+          e cargo de notificação. Template e imagem são definidos no painel.
+          Comando relacionado: <code>O.fazer-parceria</code>.
+        </p>
+      </section>
+
+      <section class="block" id="drops">
+        <h2>Drops</h2>
+        <p>
+          Eventos de sorteio ou distribuição com requisitos (nível, mensagens, cargos, economia).
+          Canal padrão, entradas extras e cargos bloqueados ou com bypass são definidos no painel.
+          Comando: <code>O.drop</code>.
+        </p>
+      </section>
+
+      <section class="block" id="comandos">
+        <h2>Índice de comandos (resumo)</h2>
+        <p>Lista não exaustiva; o servidor pode desativar módulos ou exigir permissões.</p>
+        <div class="grid">
+          <div class="card"><strong>Economia</strong><span>saldo, banco, daily, work, pay, rob, loja, troca, depositar, sacar</span></div>
+          <div class="card"><strong>RPG</strong><span>j, classe, habilidades, passivas, inventario, craft, minerar, arena, masmorra</span></div>
+          <div class="card"><strong>Jogos</strong><span>blackjack, slots, minas, roleta, cara, ppt, dado, quiz, emojibet</span></div>
+          <div class="card"><strong>Música</strong><span>tocar, fila, pular, pausar, retomar, parar, volume, tocando</span></div>
+          <div class="card"><strong>Moderação</strong><span>ban, kick, mute, warn, lock, limpar, slowmode</span></div>
+          <div class="card"><strong>Servidor</strong><span>ajuda, painel, drop, fazer-parceria, invites, ranking, verificar</span></div>
+        </div>
+      </section>
+
+      <section class="block" id="faq">
+        <h2>Perguntas frequentes</h2>
+        <h3>O comando não responde</h3>
+        <p>Verifique prefixo, permissões do bot no canal e se o módulo está ativo. Em slash, confira se o comando foi sincronizado.</p>
+        <h3>Não vejo minha classe exclusiva</h3>
+        <p>Classes exclusivas só listam e só funcionam para o usuário dono. Outros membros não as selecionam.</p>
+        <h3>Música não inicia</h3>
+        <p>Confirme canal de voz, permissões e disponibilidade do Lavalink. Se o nó estiver offline, a fila não inicia.</p>
+        <h3>Arena com atributos diferentes do perfil</h3>
+        <p>Atualize o perfil e reinicie a partida. O combate deve usar a mesma base de atributos do personagem.</p>
+        <h3>Onde configurar o servidor</h3>
+        <p>No painel web, após entrar com Discord e selecionar o servidor.</p>
+      </section>
+
+      <footer>
+        Aeternus · Wiki oficial · Documentação alinhada ao painel e aos comandos do bot.
+        Conteúdo sujeito a atualização conforme novas versões.
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    const q = document.getElementById('q');
+    const blocks = [...document.querySelectorAll('section.block')];
+    const links = [...document.querySelectorAll('.side a')];
+
+    q.addEventListener('input', () => {
+      const term = q.value.trim().toLowerCase();
+      blocks.forEach((sec) => {
+        const hit = !term || sec.innerText.toLowerCase().includes(term);
+        sec.style.display = hit ? '' : 'none';
+      });
+    });
+
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        const id = e.target.id;
+        links.forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+      });
+    }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+    blocks.forEach((b) => obs.observe(b));
+  </script>
+</body>
+</html>
