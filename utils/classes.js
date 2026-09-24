@@ -130,14 +130,14 @@ const BASE_CLASSES = {
         uniquePassives: ['Aura da Morte', 'Maldição do Ceifador', 'Mão Negra'],
         passives: ['Aura da Morte', 'Maldição de Nível', 'Maldição do Ceifador', 'Mão Negra'],
         powers: ['Decapitação', 'Corte Fantasma', 'Estocada Fantasma', 'Manto Negro', 'Véu da Morte', 'Dado da Morte'],
-        disadvantages: ['Maldição do Ceifador', 'Dependência da Foice'],
+        disadvantages: [],
         abilityIds: {
             active: ['cn_decapitacao', 'cn_corte_fantasma', 'cn_estocada_fantasma', 'cn_manto_negro', 'cn_veu_morte', 'cn_dado_morte'],
             passive: ['cn_aura_morte', 'cn_maldicao_nivel', 'cn_maldicao_ceifador', 'cn_mao_negra']
         },
         classGear: { weapon: 'foice_grande', armor: 'manto_negro_armadura', accessory: 'dado_da_morte' },
-        bonus: { forca: 5, defesa: 2, agilidade: 4, vida: 2 },
-        manaMult: 0.95,
+        bonus: { forca: 250, defesa: 200, agilidade: 230, vida: 220 },
+        manaMult: 1.2,
         color: 0x0f0f0f,
         basicAttack: { id: 'corte_ceifador', name: 'Corte do Ceifador', emoji: '🖤', type: 'physical', power: 1.15, mana: 0 }
     },
@@ -155,7 +155,7 @@ const BASE_CLASSES = {
         uniquePassives: ['Um Passo à Frente', 'Gênio da Dedução', 'A Verdade Sempre Aparece'],
         passives: ['Mente Analítica', 'Memória Fotográfica', 'Suspeita Constante', 'Raciocínio Reverso', 'Instinto Investigativo'],
         powers: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador', 'Xeque-Mate', 'Dedução Impossível'],
-        disadvantages: ['Corpo frágil', 'Depende de informação acumulada'],
+        disadvantages: [],
         abilityIds: {
             active: ['l_cartas_deducao', 'l_correntes_suspeita', 'l_olho_analitico', 'l_bengala_investigador', 'l_xeque_mate', 'l_deducao_impossivel'],
             passive: ['l_mente_analitica', 'l_memoria_fotografica', 'l_suspeita_constante', 'l_raciocinio_reverso', 'l_instinto_investigativo', 'l_um_passo_frente', 'l_genio_deducao', 'l_verdade_aparece']
@@ -166,8 +166,8 @@ const BASE_CLASSES = {
             accessory: 'caderno_deducoes',
             extra: 'lentes_analiticas'
         },
-        bonus: { forca: 2, defesa: 2, agilidade: 4, vida: 2 },
-        manaMult: 1.2,
+        bonus: { forca: 200, defesa: 200, agilidade: 240, vida: 210 },
+        manaMult: 1.35,
         color: 0x1e3a5f,
         basicAttack: { id: 'apontar_pista', name: 'Apontar a Pista', emoji: '🔍', type: 'magic', power: 0.95, mana: 2 }
     }
