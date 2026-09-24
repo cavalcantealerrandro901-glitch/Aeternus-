@@ -130,16 +130,16 @@ const BASE_CLASSES = {
         uniquePassives: ['Aura da Morte', 'Maldição do Ceifador', 'Mão Negra'],
         passives: ['Aura da Morte', 'Maldição de Nível', 'Maldição do Ceifador', 'Mão Negra'],
         powers: ['Decapitação', 'Corte Fantasma', 'Estocada Fantasma', 'Manto Negro', 'Véu da Morte', 'Dado da Morte'],
-        disadvantages: ['Maldição do Ceifador (leve)'],
+        disadvantages: ['Maldição do Ceifador', 'Dependência da Foice'],
         abilityIds: {
             active: ['cn_decapitacao', 'cn_corte_fantasma', 'cn_estocada_fantasma', 'cn_manto_negro', 'cn_veu_morte', 'cn_dado_morte'],
             passive: ['cn_aura_morte', 'cn_maldicao_nivel', 'cn_maldicao_ceifador', 'cn_mao_negra']
         },
         classGear: { weapon: 'foice_grande', armor: 'manto_negro_armadura', accessory: 'dado_da_morte' },
-        bonus: { forca: 12, defesa: 6, agilidade: 10, vida: 8 },
-        manaMult: 1.15,
+        bonus: { forca: 5, defesa: 2, agilidade: 4, vida: 2 },
+        manaMult: 0.95,
         color: 0x0f0f0f,
-        basicAttack: { id: 'corte_ceifador', name: 'Corte do Ceifador', emoji: '🖤', type: 'physical', power: 1.55, mana: 0 }
+        basicAttack: { id: 'corte_ceifador', name: 'Corte do Ceifador', emoji: '🖤', type: 'physical', power: 1.15, mana: 0 }
     },
     detetive_arcano: {
         id: 'detetive_arcano',
@@ -155,7 +155,7 @@ const BASE_CLASSES = {
         uniquePassives: ['Um Passo à Frente', 'Gênio da Dedução', 'A Verdade Sempre Aparece'],
         passives: ['Mente Analítica', 'Memória Fotográfica', 'Suspeita Constante', 'Raciocínio Reverso', 'Instinto Investigativo'],
         powers: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador', 'Xeque-Mate', 'Dedução Impossível'],
-        disadvantages: ['Precisa acumular informação para maximizar o poder'],
+        disadvantages: ['Corpo frágil', 'Depende de informação acumulada'],
         abilityIds: {
             active: ['l_cartas_deducao', 'l_correntes_suspeita', 'l_olho_analitico', 'l_bengala_investigador', 'l_xeque_mate', 'l_deducao_impossivel'],
             passive: ['l_mente_analitica', 'l_memoria_fotografica', 'l_suspeita_constante', 'l_raciocinio_reverso', 'l_instinto_investigativo', 'l_um_passo_frente', 'l_genio_deducao', 'l_verdade_aparece']
@@ -166,10 +166,10 @@ const BASE_CLASSES = {
             accessory: 'caderno_deducoes',
             extra: 'lentes_analiticas'
         },
-        bonus: { forca: 5, defesa: 5, agilidade: 9, vida: 6 },
-        manaMult: 1.55,
+        bonus: { forca: 2, defesa: 2, agilidade: 4, vida: 2 },
+        manaMult: 1.2,
         color: 0x1e3a5f,
-        basicAttack: { id: 'apontar_pista', name: 'Apontar a Pista', emoji: '🔍', type: 'magic', power: 1.25, mana: 0 }
+        basicAttack: { id: 'apontar_pista', name: 'Apontar a Pista', emoji: '🔍', type: 'magic', power: 0.95, mana: 2 }
     }
 };
 
