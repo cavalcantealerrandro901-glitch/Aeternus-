@@ -1,5 +1,5 @@
 /**
- * Classes exclusivas no boot + itens de classe (balanceados).
+ * Classes exclusivas no boot + itens de classe (stats 500–1000).
  */
 const classes = require('../utils/classes');
 const player = require('../utils/player');
@@ -14,27 +14,27 @@ const EXCLUSIVES = [
                 name: 'Foice Grande',
                 emoji: '🪓',
                 category: 'arma',
-                rarity: 'rara',
+                rarity: 'mitica',
                 classId: 'ceifador_negro',
-                effects: { forca: 4, agilidade: 2 }
+                effects: { forca: 900, agilidade: 650, dano: 850 }
             },
             {
                 id: 'manto_negro_armadura',
                 name: 'Manto Negro',
                 emoji: '🧥',
                 category: 'armadura',
-                rarity: 'incomum',
+                rarity: 'lendaria',
                 classId: 'ceifador_negro',
-                effects: { defesa: 3, agilidade: 1, vida: 2 }
+                effects: { defesa: 800, agilidade: 500, vida: 750 }
             },
             {
                 id: 'dado_da_morte',
                 name: 'Dado da Morte',
                 emoji: '🎲',
                 category: 'acessorio',
-                rarity: 'epica',
+                rarity: 'mitica',
                 classId: 'ceifador_negro',
-                effects: { sorte: 3, forca: 2 }
+                effects: { sorte: 700, forca: 600, critico: 550 }
             }
         ]
     },
@@ -47,36 +47,36 @@ const EXCLUSIVES = [
                 name: 'Bengala do Investigador',
                 emoji: '🦯',
                 category: 'arma',
-                rarity: 'rara',
+                rarity: 'mitica',
                 classId: 'detetive_arcano',
-                effects: { inteligencia: 4, agilidade: 2, forca: 1 }
+                effects: { inteligencia: 950, agilidade: 700, forca: 500, dano: 800 }
             },
             {
                 id: 'capa_detetive_arcano',
                 name: 'Capa do Detetive Arcano',
                 emoji: '🧥',
                 category: 'armadura',
-                rarity: 'incomum',
+                rarity: 'lendaria',
                 classId: 'detetive_arcano',
-                effects: { defesa: 2, inteligencia: 2, sorte: 1 }
+                effects: { defesa: 750, inteligencia: 650, sorte: 550, vida: 600 }
             },
             {
                 id: 'caderno_deducoes',
                 name: 'Caderno de Deduções',
                 emoji: '📓',
                 category: 'acessorio',
-                rarity: 'epica',
+                rarity: 'mitica',
                 classId: 'detetive_arcano',
-                effects: { inteligencia: 4, sorte: 2 }
+                effects: { inteligencia: 1000, sorte: 700, precisao: 800 }
             },
             {
                 id: 'lentes_analiticas',
                 name: 'Lentes Analíticas',
                 emoji: '🔎',
                 category: 'acessorio',
-                rarity: 'rara',
+                rarity: 'lendaria',
                 classId: 'detetive_arcano',
-                effects: { inteligencia: 2, precisao: 2 }
+                effects: { inteligencia: 850, precisao: 900, agilidade: 500 }
             }
         ]
     }
@@ -84,11 +84,33 @@ const EXCLUSIVES = [
 
 function grantGear(userId, gearList) {
     const inv = player.getInventory(userId) || [];
-    const have = new Set(inv.map((x) => x.id).filter(Boolean));
+    const byId = new Map();
+    for (const it of inv) {
+        if (it && it.id) byId.set(String(it.id), it);
+    }
     for (const g of gearList) {
-        if (have.has(g.id)) continue;
+        const existing = byId.get(String(g.id));
+        if (existing) {
+            // atualiza stats do item já existente
+            Object.assign(existing, {
+                name: g.name,
+                emoji: g.emoji,
+                category: g.category,
+                rarity: g.rarity,
+                classId: g.classId,
+                effects: { ...(g.effects || {}) }
+            });
+            continue;
+        }
         player.addItem(userId, { ...g });
     }
+    // persiste inventário se houve upgrade in-place
+    try {
+        const data = player.all();
+        if (data[userId] && Array.isArray(data[userId].inventory)) {
+            player.save(data);
+        }
+    } catch (_) {}
 }
 
 function setup() {
