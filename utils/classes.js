@@ -140,6 +140,36 @@ const BASE_CLASSES = {
         manaMult: 0.95,
         color: 0x0f0f0f,
         basicAttack: { id: 'corte_ceifador', name: 'Corte do Ceifador', emoji: '🖤', type: 'physical', power: 1.12, mana: 0 }
+    },
+    detetive_arcano: {
+        id: 'detetive_arcano',
+        name: 'L — O Detetive Arcano',
+        emoji: '🕵️',
+        type: 'magic',
+        rarity: 'unica',
+        rarityName: 'Única',
+        exclusiveOwner: '1460227733023096875',
+        desc: 'Mente afiada e magia investigativa. Só um portador enxerga o tabuleiro completo.',
+        uniqueAbilities: ['Xeque-Mate', 'Dedução Impossível'],
+        activeAbilities: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador'],
+        uniquePassives: ['Um Passo à Frente', 'Gênio da Dedução', 'A Verdade Sempre Aparece'],
+        passives: ['Mente Analítica', 'Memória Fotográfica', 'Suspeita Constante', 'Raciocínio Reverso', 'Instinto Investigativo'],
+        powers: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador', 'Xeque-Mate', 'Dedução Impossível'],
+        disadvantages: ['Corpo frágil', 'Depende de informação acumulada'],
+        abilityIds: {
+            active: ['l_cartas_deducao', 'l_correntes_suspeita', 'l_olho_analitico', 'l_bengala_investigador', 'l_xeque_mate', 'l_deducao_impossivel'],
+            passive: ['l_mente_analitica', 'l_memoria_fotografica', 'l_suspeita_constante', 'l_raciocinio_reverso', 'l_instinto_investigativo', 'l_um_passo_frente', 'l_genio_deducao', 'l_verdade_aparece']
+        },
+        classGear: {
+            weapon: 'bengala_investigador',
+            armor: 'capa_detetive_arcano',
+            accessory: 'caderno_deducoes',
+            extra: 'lentes_analiticas'
+        },
+        bonus: { forca: 1, defesa: 1, agilidade: 2, vida: 1 },
+        manaMult: 1.35,
+        color: 0x1e3a5f,
+        basicAttack: { id: 'apontar_pista', name: 'Apontar a Pista', emoji: '🔍', type: 'magic', power: 0.85, mana: 2 }
     }
 };
 
