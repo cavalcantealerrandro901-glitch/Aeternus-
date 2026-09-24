@@ -95,6 +95,10 @@ function startWeb(client) {
         res.sendFile(path.join(__dirname, '..', 'public', 'arena.html'));
     });
 
+    app.get('/wiki', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'wiki.html'));
+    });
+
     app.get('/api/arena/:id', (req, res) => {
         const match = arenaEngine.getMatch(req.params.id);
         if (!match) return res.status(404).json({ error: 'Arena não encontrada' });
