@@ -30,7 +30,7 @@ module.exports = {
 
 function panel(userId) {
     const loadout = abilities.loadLoadout(userId);
-    const passives = abilities.listByKind('passive');
+    const passives = abilities.listByKind('passive', userId);
     const { passive } = abilities.getEquippedAbilities(userId);
     const lines = passive.map((a, i) =>
         a ? `**${i + 1}.** ${a.emoji} **${a.name}** — ${a.desc}` : `**${i + 1}.** _(vazio)_`
@@ -38,8 +38,8 @@ function panel(userId) {
     const embed = new EmbedBuilder()
         .setColor(0x7c3aed)
         .setTitle('✨ Passivas (5 slots)')
-        .setDescription(lines.join('\n'))
-        .setFooter({ text: 'Aparecem ao lado do avatar na arena' });
+        .setDescription(lines.join('\n') || '_Nenhuma_')
+        .setFooter({ text: 'Classe exclusiva: só vê as passivas permitidas' });
 
     const rows = [0, 1, 2, 3, 4].map((slot) =>
         new ActionRowBuilder().addComponents(
@@ -48,8 +48,8 @@ function panel(userId) {
                 .setPlaceholder(`Passiva ${slot + 1}`)
                 .addOptions([
                     { label: 'Remover', value: 'none', emoji: '❌' },
-                    ...passives.map((a) => ({
-                        label: a.name,
+                    ...passives.slice(0, 24).map((a) => ({
+                        label: a.name.slice(0, 100),
                         value: a.id,
                         description: (a.desc || '').slice(0, 50),
                         default: loadout.passive[slot] === a.id

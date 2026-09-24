@@ -62,7 +62,7 @@ function buildEmbed(userId) {
 
 function buildRows(userId) {
     const loadout = abilities.loadLoadout(userId);
-    const actives = abilities.listByKind('active');
+    const actives = abilities.listByKind('active', userId);
     return [0, 1, 2, 3].map((slot) =>
         new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
