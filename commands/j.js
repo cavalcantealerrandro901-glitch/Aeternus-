@@ -64,7 +64,7 @@ function abilityDmgLabel(a) {
     const power = Number(a.power);
     if (Number.isFinite(power) && power > 0) {
         const dmg = Math.round(power * 100);
-        return ' · 💥 `' + dmg + '`;
+        return ' · 💥 `' + dmg + '`';
     }
     if (a.effect === 'heal' || a.type === 'heal') return ' · 💚 cura';
     if (a.type === 'buff' || a.kind === 'passive') return ' · ✨ buff';
