@@ -1,5 +1,5 @@
 /**
- * Classes exclusivas no boot + itens de classe.
+ * Classes exclusivas no boot + itens de classe (buffados).
  */
 const classes = require('../utils/classes');
 const player = require('../utils/player');
@@ -14,27 +14,27 @@ const EXCLUSIVES = [
                 name: 'Foice Grande',
                 emoji: '🪓',
                 category: 'arma',
-                rarity: 'comum',
+                rarity: 'lendaria',
                 classId: 'ceifador_negro',
-                effects: { forca: 3, agilidade: 1 }
+                effects: { forca: 12, agilidade: 6, crit: 8 }
             },
             {
                 id: 'manto_negro_armadura',
                 name: 'Manto Negro',
                 emoji: '🧥',
                 category: 'armadura',
-                rarity: 'incomum',
+                rarity: 'epica',
                 classId: 'ceifador_negro',
-                effects: { defesa: 2, agilidade: 2 }
+                effects: { defesa: 10, agilidade: 5, vida: 6 }
             },
             {
                 id: 'dado_da_morte',
                 name: 'Dado da Morte',
                 emoji: '🎲',
                 category: 'acessorio',
-                rarity: 'epico',
+                rarity: 'mitica',
                 classId: 'ceifador_negro',
-                effects: { sorte: 3, forca: 1 }
+                effects: { sorte: 10, forca: 6, agilidade: 4 }
             }
         ]
     },
@@ -47,36 +47,36 @@ const EXCLUSIVES = [
                 name: 'Bengala do Investigador',
                 emoji: '🦯',
                 category: 'arma',
-                rarity: 'rara',
+                rarity: 'lendaria',
                 classId: 'detetive_arcano',
-                effects: { inteligencia: 3, agilidade: 2, forca: 1 }
+                effects: { inteligencia: 12, agilidade: 7, forca: 5, precisao: 8 }
             },
             {
                 id: 'capa_detetive_arcano',
                 name: 'Capa do Detetive Arcano',
                 emoji: '🧥',
                 category: 'armadura',
-                rarity: 'incomum',
+                rarity: 'epica',
                 classId: 'detetive_arcano',
-                effects: { defesa: 2, inteligencia: 2, sorte: 1 }
+                effects: { defesa: 8, inteligencia: 6, sorte: 5, vida: 5 }
             },
             {
                 id: 'caderno_deducoes',
                 name: 'Caderno de Deduções',
                 emoji: '📓',
                 category: 'acessorio',
-                rarity: 'epico',
+                rarity: 'mitica',
                 classId: 'detetive_arcano',
-                effects: { inteligencia: 4, sorte: 2 }
+                effects: { inteligencia: 14, sorte: 8, precisao: 6 }
             },
             {
                 id: 'lentes_analiticas',
                 name: 'Lentes Analíticas',
                 emoji: '🔎',
                 category: 'acessorio',
-                rarity: 'rara',
+                rarity: 'lendaria',
                 classId: 'detetive_arcano',
-                effects: { inteligencia: 2, precisao: 2, sorte: 1 }
+                effects: { inteligencia: 8, precisao: 10, sorte: 5, agilidade: 3 }
             }
         ]
     }
@@ -86,7 +86,12 @@ function grantGear(userId, gearList) {
     const inv = player.getInventory(userId) || [];
     const have = new Set(inv.map((x) => x.id).filter(Boolean));
     for (const g of gearList) {
-        if (have.has(g.id)) continue;
+        if (have.has(g.id)) {
+            try {
+                player.updateItem(userId, g.id, { ...g });
+            } catch (_) {}
+            continue;
+        }
         player.addItem(userId, { ...g });
     }
 }
@@ -100,7 +105,7 @@ function setup() {
             if (player.has(owner)) {
                 player.update(owner, { classId, class: classId });
                 grantGear(owner, ex.gear || []);
-                console.log(`[exclusiveClass] ${classId} → ${owner}`);
+                console.log(`[exclusiveClass] ${classId} → ${owner} (gear buff)`);
             } else {
                 console.log(`[exclusiveClass] dono ${owner} ainda sem perfil (${classId})`);
             }
