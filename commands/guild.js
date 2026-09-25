@@ -23,7 +23,8 @@ function roleLabel(role) {
 }
 
 function guildEmbed(g) {
-    const members = (g.members || [])
+    const members = (Array.isArray(g.members) ? g.members : [])
+        .filter((m) => m && m.id)
         .slice()
         .sort((a, b) => {
             const o = { owner: 0, officer: 1, member: 2 };
@@ -474,11 +475,16 @@ module.exports = {
         }
 
         if (sub === 'ranking' || sub === 'rank' || sub === 'top') {
-            const top = guilds.ranking(10);
+            const top = (guilds.ranking(10) || []).filter((g) => g && typeof g === 'object');
             if (!top.length) return message.reply('Nenhuma guilda ainda.');
             const lines = top.map((g, i) => {
                 const medal = ['🥇', '🥈', '🥉'][i] || `**${i + 1}.**`;
-                return `${medal} **[${g.tag}] ${g.name}** — Nv.${g.level} · ✨ ${fmt(g.bank)} · ${g.members.length} membros`;
+                const tag = g.tag || '???';
+                const name = g.name || 'Sem nome';
+                const lv = g.level || 1;
+                const bank = g.bank || 0;
+                const members = Array.isArray(g.members) ? g.members.length : 0;
+                return `${medal} **[${tag}] ${name}** — Nv.${lv} · ✨ ${fmt(bank)} · ${members} membros`;
             });
             return message.reply({
                 embeds: [

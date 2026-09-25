@@ -340,12 +340,13 @@ function guildLevelNeed(level) {
 
 function ranking(limit = 10) {
     return list()
+        .filter((g) => g && g.name)
         .slice()
         .sort((a, b) => {
             if ((b.level || 1) !== (a.level || 1)) return (b.level || 1) - (a.level || 1);
             return (b.bank || 0) - (a.bank || 0);
         })
-        .slice(0, limit);
+        .slice(0, Math.max(1, Number(limit) || 10));
 }
 
 module.exports = {
