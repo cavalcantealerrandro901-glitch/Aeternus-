@@ -1,141 +1,88 @@
 const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
-const { resolveBet } = require('../utils/parseAmount');
+const { parseAmount, looksLikeAmount } = require('../utils/parseAmount');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-function nowBr() {
-    const d = new Date();
-    const parts = new Intl.DateTimeFormat('pt-BR', {
-        timeZone: 'America/Sao_Paulo',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    }).formatToParts(d);
-    const get = (t) => parts.find((p) => p.type === t)?.value || '';
-    return `${get('day')}/${get('month')}/${get('year')} às ${get('hour')}:${get('minute')}`;
+function pickAmount(args) {
+    const raw = args.find((a) => !a.startsWith('<@') && looksLikeAmount(a));
+    return raw || null;
 }
 
-function receiptEmbed(target, amount, balance, modUser) {
-    const targetTag = target.username ? `@${target.username}` : `<@${target.id}>`;
-    const modTag = modUser?.username ? `@${modUser.username}` : '@Staff';
-
-    return new EmbedBuilder()
-        .setColor(0x22c55e)
-        .setAuthor({
-            name: '🔮 AETERNUS ECONOMIA',
-            iconURL: modUser?.displayAvatarURL?.({ size: 64 }) || undefined
-        })
-        .setTitle('✨ Éter Adicionado com Sucesso!')
-        .setDescription(
-            [
-                `👤 **Usuário:** ${targetTag}`,
-                `💰 **Quantia:** + ${fmt(amount)} Éter`,
-                `👮 **Autorizado por:** ${modTag}`,
-                '',
-                `🏦 **Novo Saldo Total:** ${fmt(balance)} Éter`
-            ].join('\n')
-        )
-        .setThumbnail(target.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: nowBr() })
-        .setTimestamp();
-}
-
-async function run(modMember, modUser, targets, amountRaw, reply) {
+async function run(modMember, targets, amountRaw, reply) {
     if (!modMember?.permissions?.has(PermissionFlagsBits.Administrator)) {
-        return reply({
-            content: '❌ Apenas **administradores** podem adicionar éter.',
-            flags: 64
-        });
+        return reply('❌ Só administradores.');
     }
-    if (!targets?.length) {
-        return reply({ content: '❌ Mencione pelo menos um usuário.', flags: 64 });
-    }
+    if (!targets.length) return reply('❌ Informe o usuário. Ex.: `O.addmoney @user 10k`');
     if (!amountRaw) {
-        return reply({
-            content: '❌ Informe o valor. Exemplos: `1000` · `10k` · `1m`',
-            flags: 64
-        });
+        return reply(
+            '❌ Informe o valor.\n' +
+                'Exemplos: `1000` · `1k` · `2.5k` · `1m` · `1b` · `50000`'
+        );
     }
 
-    const bet = resolveBet(amountRaw, Number.MAX_SAFE_INTEGER, { label: '✨' });
-    if (!bet.ok) return reply({ content: `❌ ${bet.error}`, flags: 64 });
+    // Admin: não depende do saldo do alvo (all/half não fazem sentido aqui)
+    const s = String(amountRaw).trim().toLowerCase();
+    if (['all', 'tudo', 'max', 'full', 'half', 'metade', 'meio'].includes(s) || /%$/.test(s)) {
+        return reply('❌ Em **addmoney** use valor fixo (`1k`, `5m`…). `all`/`half`/`%` são para apostas.');
+    }
 
-    const embeds = [];
-    const skipped = [];
+    const amount = parseAmount(amountRaw, null);
+    if (!Number.isFinite(amount) || amount <= 0) {
+        return reply('❌ Valor inválido. Use `1000`, `1k`, `2.5k`, `1m`, `1b`…');
+    }
 
+    const lines = [];
     for (const u of targets) {
-        if (!u || u.bot) {
-            if (u?.bot) skipped.push(u.username);
-            continue;
-        }
-        eter.add(u.id, bet.amount, { reason: 'addmoney', by: modUser?.id });
+        if (u.bot) continue;
+        eter.add(u.id, amount, { reason: 'addmoney' });
         const bal = eter.get(u.id);
-        embeds.push(receiptEmbed(u, bet.amount, bal, modUser));
+        lines.push(`**${u.tag || u.username}** · ✨ **+${fmt(amount)}** → saldo **${fmt(bal)}**`);
     }
+    if (!lines.length) return reply('❌ Nenhum usuário válido.');
 
-    if (!embeds.length) {
-        return reply({
-            content: '❌ Nenhum usuário válido (bots são ignorados).',
-            flags: 64
-        });
-    }
-
-    const payload = { embeds: embeds.slice(0, 10) };
-    if (skipped.length) {
-        payload.content = `_Ignorados (bots): ${skipped.join(', ')}_`;
-    }
-    if (embeds.length > 10) {
-        payload.content =
-            (payload.content ? payload.content + '\n' : '') +
-            `_… e mais ${embeds.length - 10} usuário(s)._`;
-    }
-
-    return reply(payload);
+    return reply({
+        embeds: [
+            new EmbedBuilder()
+                .setColor(0x22c55e)
+                .setTitle('Éter adicionado')
+                .setDescription(lines.join('\n'))
+                .setFooter({ text: `Mod: ${modMember.user?.tag || modMember.displayName || 'admin'}` })
+                .setTimestamp()
+        ]
+    });
 }
 
 module.exports = {
     name: 'addmoney',
-    aliases: ['addeter', "adicionar eter", 'givemoney', 'dar-eter'],
-    description: 'Adicionar éter a um ou mais usuários (admin)',
+    aliases: ['addeter', 'givemoney', 'addéter', 'dar-eter'],
+    description: 'Adicionar éter (admin) — 1k, 1m, 1b…',
     data: new SlashCommandBuilder()
-        .setName('adicionar eter')
+        .setName('adicionar-eter')
         .setDescription('Adicionar éter a um usuário')
-        .addUserOption((o) =>
-            o.setName('usuario').setDescription('Quem recebe o éter').setRequired(true)
-        )
+        .addUserOption((o) => o.setName('usuario').setDescription('Usuário').setRequired(true))
         .addStringOption((o) =>
             o
                 .setName('valor')
-                .setDescription('Quantidade (ex: 1000, 10k, 1m)')
+                .setDescription('Valor: 1000, 1k, 2.5k, 1m, 1b…')
                 .setRequired(true)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(message, args) {
         const targets = [...message.mentions.users.values()];
-        const amountRaw = args.find((a) => !a.startsWith('<@'));
-        await run(message.member, message.author, targets, amountRaw, (p) =>
-            message.reply(p)
-        );
+        const amountRaw = pickAmount(args);
+        await run(message.member, targets, amountRaw, (p) => message.reply(p));
     },
 
     async executeSlash(i) {
         await run(
             i.member,
-            i.user,
             [i.options.getUser('usuario', true)],
-            i.options.getString('valor', true),
-            (p) => {
-                if (typeof p === 'string') return i.reply({ content: p, flags: 64 });
-                if (p.content && !p.embeds) return i.reply({ ...p, flags: p.flags ?? 64 });
-                return i.reply(p);
-            }
+            i.options.getString('valor'),
+            (p) => (typeof p === 'string' ? i.reply({ content: p, ephemeral: true }) : i.reply(p))
         );
     }
 };
