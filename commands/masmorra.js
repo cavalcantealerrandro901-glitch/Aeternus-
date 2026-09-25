@@ -28,10 +28,11 @@ module.exports = {
             .setColor(0x4c1d95)
             .setTitle(`🏰 Masmorra — Piso ${floor}`)
             .setDescription(
-                `Monstros únicos por piso · drops pela sorte · até o **piso ${dungeon.MAX_IMPLEMENTED}**.\n` +
-                    `Derrota: **-20%** nível e atributos.\n\n` +
-                    `Progresso: mais alto **${prog.highest}** · próximo sugerido **${Math.min(dungeon.MAX_IMPLEMENTED, prog.highest + 1)}**\n` +
-                    `Piso 101 (história do Aeternus) virá depois.\n\n` +
+                `Piso com **vários monstros** (10–12 no início) + **boss** mais forte no final.\n` +
+                    `Derrote **todos** para liberar o próximo piso.\n` +
+                    `Recompensas: **XP**, **CP** e itens.\n\n` +
+                    `Progresso: mais alto **${prog.highest}** · sugerido **${Math.min(dungeon.MAX_IMPLEMENTED, prog.highest + 1)}**\n` +
+                    `Máximo atual: piso **${dungeon.MAX_IMPLEMENTED}**.\n\n` +
                     `[Entrar no combate](${url})`
             );
         return message.reply({

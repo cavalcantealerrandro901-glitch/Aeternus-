@@ -68,7 +68,8 @@ module.exports = {
                 if (!cmd) {
                     return interaction
                         .reply({
-                            content: '❌ Este slash não existe mais. Aguarde a sincronização.',
+                            content:
+                                '❌ Este slash não existe mais. Aguarde a sincronização.',
                             ephemeral: true
                         })
                         .catch(() => {});
@@ -97,7 +98,7 @@ module.exports = {
                 if (!cmd && (parts[0] === 'bj' || parts[0] === 'blackjack')) {
                     cmd = client.commands.get('blackjack') || client.commands.get('bj');
                 }
-                if (!cmd && parts[0] === 'pvp') cmd = client.commands.get('pvp');
+                if (!cmd && (parts[0] === 'pvp' || parts[0] === 'arena')) cmd = client.commands.get('arena');
                 if (!cmd && parts[0] === 'j') cmd = client.commands.get('j');
                 if (!cmd && parts[0] === 'rank') cmd = client.commands.get('rank');
                 if (!cmd && parts[0] === 'quiz') cmd = client.commands.get('quiz');

@@ -1,19 +1,28 @@
-# Deploy Docker no Render
-# No dashboard: Environment = Docker (não Native Node)
+# Blueprint Render — https://render.com
+# Serviço Web (bot + painel) + variáveis de ambiente
 services:
   - type: web
     name: aeternus-bot
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    runtime: node
     plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
     envVars:
-      - key: DISCORD_TOKEN
+      - key: NODE_ENV
+        value: production
+      - key: TOKEN
         sync: false
-      - key: YOUTUBE_API_KEY
+      - key: MONGO_URI
         sync: false
-      - key: MONGODB_URI
+      - key: CLIENT_ID
         sync: false
-      - key: FFMPEG_PATH
-        value: /usr/bin/ffmpeg
-      - key: YTDLP_PATH
-        value: /usr/local/bin/yt-dlp
+      - key: OWNER_ID
+        sync: false
+      - key: GUILD_ID
+        sync: false
+      - key: REQUIRE_MONGO
+        value: "1"
+      - key: ALLOW_LOCAL_DATA
+        value: "0"

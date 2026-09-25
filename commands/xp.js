@@ -43,6 +43,7 @@ function profileEmbed(user, p, rankInfo) {
         '⏳ Faltam **' + fmt(p.toNext) + '** XP para o nível ' + (p.level + 1),
         '',
         '🎁 **Multiplicador do Daily:** ×**' + p.mult.toFixed(2) + '**',
+        '_Cada nível aumenta o daily (máx. ×3.00)._',
         '',
         rankInfo
             ? '🏅 **Ranking global:** #**' + rankInfo.rank + '** de ' + rankInfo.total
@@ -57,7 +58,9 @@ function profileEmbed(user, p, rankInfo) {
         })
         .setTitle(title.emoji + '  Nível ' + p.level)
         .setDescription(lines.join('\n'))
-        .setThumbnail(user.displayAvatarURL({ size: 256 }));
+        .setThumbnail(user.displayAvatarURL({ size: 256 }))
+        .setFooter({ text: 'O.xp · O.level · O.nivel · /xp  ·  converse no chat para ganhar XP' })
+        .setTimestamp();
 }
 
 function leaderboardEmbed(client, list) {
@@ -79,12 +82,14 @@ function leaderboardEmbed(client, list) {
                   ' XP'
               );
           })
-        : ['_Ainda ninguém no ranking._'];
+        : ['_Ainda ninguém no ranking. Converse no chat!_'];
 
     return new EmbedBuilder()
         .setColor(0xfbbf24)
         .setTitle('🏆  Ranking de XP')
-        .setDescription(lines.join('\n'));
+        .setDescription(lines.join('\n'))
+        .setFooter({ text: 'Top 10 · XP global do bot' })
+        .setTimestamp();
 }
 
 function helpEmbed() {
@@ -93,15 +98,25 @@ function helpEmbed() {
         .setTitle('⭐  Sistema de XP')
         .setDescription(
             [
-                'Ganhe XP **conversando** nos chats do servidor.',
+                'Ganhe XP **conversando**, na **masmorra** e no **PvP**.',
+                'Há anti-spam no chat: mensagens seguidas dão menos XP.',
+                '',
+                '**Chat:** ~30–77 XP por mensagem',
+                '**PvP:** XP conforme a força do adversário + **CP** + 3–5 itens',
+                '**Masmorra:** XP e CP ao limpar o piso (vários monstros + boss)',
+                '**Daily:** multiplicador sobe com o nível (até ×3)',
                 '',
                 '**Comandos**',
                 '`O.xp` — seu progresso',
                 '`O.xp @user` — ver outro membro',
                 '`O.xp rank` — ranking',
-                '`O.xp info` — como funciona'
+                '`O.xp info` — como funciona',
+                '',
+                'Aliases: `level` · `nivel` · `lvl` · `rankxp`'
             ].join('\n')
-        );
+        )
+        .setFooter({ text: 'Aeternus · progressão' })
+        .setTimestamp();
 }
 
 function rows() {
@@ -139,7 +154,7 @@ function parseSub(args) {
 module.exports = {
     name: 'xp',
     aliases: ['level', 'nivel', 'nível', 'lvl', 'rankxp', 'experiencia', 'experiência'],
-    description: 'Mostra XP, nível e ranking',
+    description: 'Mostra XP, nível, ranking e multiplicador do daily',
     data: new SlashCommandBuilder()
         .setName('nivel')
         .setDescription('Ver nivel e XP')
@@ -171,6 +186,7 @@ module.exports = {
         }
 
         const user = message.mentions.users.first() || message.author;
+        // se o 1º arg for menção, parseSub já trata como me
         const p = xp.progress(user.id);
         const rankInfo = xp.rankOf(user.id);
         return message.reply({

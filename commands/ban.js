@@ -1,157 +1,79 @@
-const {
-  SlashCommandBuilder,
-  PermissionFlagsBits,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType
-} = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+
+function resolveMember(message, args) {
+    const m = message.mentions.members.first();
+    if (m) return m;
+    const id = String(args[0] || '').replace(/\D/g, '');
+    if (id) return message.guild.members.cache.get(id) || null;
+    return null;
+}
+
+function reasonFrom(args, hasMention) {
+    const start = hasMention || (args[0] && /^\d{15,}$/.test(args[0].replace(/\D/g, ''))) ? 1 : 1;
+    const r = args.slice(start).join(' ').trim();
+    return r || 'Sem motivo';
+}
 
 module.exports = {
-  name: 'ban',
-  aliases: ['banir', 'banear', 'punir'],
-  description: 'Bane um membro do servidor',
+    name: 'ban',
+    aliases: ['banir'],
+    description: 'Banir membro',
+    data: new SlashCommandBuilder()
+        .setName('banir-membro')
+        .setDescription('Banir membro')
+        .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
+        .addStringOption((o) => o.setName('motivo').setDescription('Motivo').setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 
-  data: new SlashCommandBuilder()
-    .setName('banir')
-    .setNameLocalizations({
-      'pt-BR': 'banir',
-      'es-ES': 'banear',
-      'en-US': 'ban'
-    })
-    .setDescription('Bane um membro do servidor')
-    .setDescriptionLocalizations({
-      'pt-BR': 'Bane um membro do servidor',
-      'es-ES': 'Banea a un miembro del servidor',
-      'en-US': 'Bans a member from the server'
-    })
-    .addUserOption(option =>
-      option.setName('usuario')
-        .setNameLocalizations({
-          'pt-BR': 'usuario',
-          'es-ES': 'usuario',
-          'en-US': 'user'
-        })
-        .setDescription('O usuário a ser banido')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('motivo')
-        .setNameLocalizations({
-          'pt-BR': 'motivo',
-          'es-ES': 'razon',
-          'en-US': 'reason'
-        })
-        .setDescription('Motivo do banimento')
-        .setRequired(false))
-    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+    async execute(message, args) {
+        if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) {
+            return message.reply('❌ Sem permissão.');
+        }
+        const member = resolveMember(message, args);
+        if (!member) return message.reply('❌ Mencione o membro ou informe o ID.');
+        if (member.id === message.author.id) return message.reply('❌ Você não pode se banir.');
+        if (member.id === message.client.user.id) return message.reply('❌ Não posso me banir.');
+        if (!member.bannable) return message.reply('❌ Não consigo banir este membro (cargo mais alto).');
+        const reason = reasonFrom(args, !!message.mentions.members.first());
+        try {
+            await member.ban({ reason: `${reason} · por ${message.author.tag}` });
+            await message.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0xef4444)
+                        .setTitle('Ban')
+                        .setDescription(`**${member.user.tag}**\n${reason}`)
+                        .setFooter({ text: `Mod: ${message.author.tag}` })
+                        .setTimestamp()
+                ]
+            });
+        } catch {
+            await message.reply('❌ Não consegui banir.');
+        }
+    },
 
-  async executeSlash(interaction) {
-    const user = interaction.options.getUser('usuario') || interaction.options.getUser('user');
-    const reason = interaction.options.getString('motivo') || interaction.options.getString('razon') || interaction.options.getString('reason') || 'Nenhum motivo informado.';
-
-    await runBanProcess(interaction, user, reason, true);
-  },
-
-  async executePrefix(message, args, prefix = '!') {
-    if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) {
-      return message.reply('❌ você não tem permissão para banir esse membro. Você precisa de um cargo de banimento para conseguir.');
+    async executeSlash(i) {
+        const user = i.options.getUser('usuario', true);
+        const reason = i.options.getString('motivo') || 'Sem motivo';
+        const member = await i.guild.members.fetch(user.id).catch(() => null);
+        if (!member) return i.reply({ content: '❌ Membro não encontrado.', ephemeral: true });
+        if (!member.bannable) {
+            return i.reply({ content: '❌ Não consigo banir este membro (cargo mais alto).', ephemeral: true });
+        }
+        try {
+            await member.ban({ reason: `${reason} · por ${i.user.tag}` });
+            await i.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0xef4444)
+                        .setTitle('Ban')
+                        .setDescription(`**${user.tag}**\n${reason}`)
+                        .setFooter({ text: `Mod: ${i.user.tag}` })
+                        .setTimestamp()
+                ]
+            });
+        } catch {
+            await i.reply({ content: '❌ Não consegui banir.', ephemeral: true });
+        }
     }
-
-    if (!args[0]) {
-      return message.reply(`❌ Comando invalido, use ${prefix}ban <usuario> motivo.`);
-    }
-
-    const targetUser = message.mentions.users.first() || await message.client.users.fetch(args[0]).catch(() => null);
-
-    if (!targetUser) {
-      return message.reply('❌ Usuário não encontrado. Verifique se ele esta no servidor.');
-    }
-
-    const reason = args.slice(1).join(' ') || 'Nenhum motivo informado.';
-    await runBanProcess(message, targetUser, reason, false, prefix);
-  }
 };
-
-async function runBanProcess(context, targetUser, reason, isSlash, prefix = '!') {
-  const guild = context.guild;
-  const author = isSlash ? context.user : context.author;
-  const member = await guild.members.fetch(targetUser.id).catch(() => null);
-
-  if (!member) {
-    const msg = '❌ Usuário não encontrado. Verifique se ele esta no servidor.';
-    return isSlash ? context.reply({ content: msg, ephemeral: true }) : context.reply(msg);
-  }
-
-  if (isSlash && !context.member.permissions.has(PermissionFlagsBits.BanMembers)) {
-    return context.reply({ content: '❌ você não tem permissão para banir esse membro. Você precisa de um cargo de banimento para conseguir.', ephemeral: true });
-  }
-
-  if (!member.bannable) {
-    const msg = '❌ Infelizmente eu não consigo banir esse membro. Ele tem o cargo acima ou igual ao meu.';
-    return isSlash ? context.reply({ content: msg, ephemeral: true }) : context.reply(msg);
-  }
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('confirm_ban')
-      .setLabel('Aceitar')
-      .setEmoji('✅')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('silent_ban')
-      .setLabel('Banimento Silencioso')
-      .setEmoji('🤫')
-      .setStyle(ButtonStyle.Secondary)
-  );
-
-  const promptContent = `<@${author.id}> você esta tem certeza que quer banir <@${targetUser.id}> do servidor? Basta clicar no botão de ✅aceitar ou no 🤫banimento silencioso.\nVocê tem 6 minutos para decidir.`;
-
-  let response;
-  if (isSlash) {
-    response = await context.reply({ content: promptContent, components: [row], fetchReply: true });
-  } else {
-    response = await context.reply({ content: promptContent, components: [row] });
-  }
-
-  const collector = response.createMessageComponentCollector({
-    componentType: ComponentType.Button,
-    time: 360000
-  });
-
-  collector.on('collect', async (i) => {
-    if (i.user.id !== author.id) {
-      return i.reply({ content: '❌ Apenas quem solicitou o banimento pode usar estes botões.', ephemeral: true });
-    }
-
-    try {
-      if (i.customId === 'confirm_ban') {
-        await guild.members.ban(targetUser.id, { reason });
-        await i.update({
-          content: `👮‍♂️ o usuário <@${targetUser.id}> foi banido. Ninguém mandou não cumprir as regras do servidor. Agora se deu mau.`,
-          components: []
-        });
-      } else if (i.customId === 'silent_ban') {
-        await guild.members.ban(targetUser.id, { reason, deleteMessageSeconds: 604800 });
-        await i.update({
-          content: `Banimento silêncio. O usuário <@${targetUser.id}> levou um banimento silêncio, ninguém mais se lembra dele.`,
-          components: []
-        });
-      }
-      collector.stop('handled');
-    } catch (err) {
-      console.error(err);
-      await i.reply({ content: '❌ Ocorreu um erro ao tentar banir o membro.', ephemeral: true });
-    }
-  });
-
-  collector.on('end', (collected, reasonEnd) => {
-    if (reasonEnd === 'time') {
-      const timeoutMsg = '⏱️ O tempo de 6 minutos esgotou e o banimento foi cancelado.';
-      if (isSlash) {
-        context.editReply({ content: timeoutMsg, components: [] }).catch(() => {});
-      } else {
-        response.edit({ content: timeoutMsg, components: [] }).catch(() => {});
-      }
-    }
-  });
-}

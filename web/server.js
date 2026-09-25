@@ -4,7 +4,6 @@ const cookieParser = require('cookie-parser');
 const { getSettings, setSettings, getPrefix } = require('../utils/settings');
 const player = require('../utils/player');
 const xp = require('../utils/xp');
-const trade = require('../utils/trade');
 const { registerAvatarRoutes } = require('../utils/avatarApi');
 
 function startWeb(client) {
@@ -23,7 +22,9 @@ function startWeb(client) {
             : null);
 
     app.get('/login', (req, res) => {
-        if (!CLIENT_ID || !REDIRECT) return res.status(500).send('OAuth não configurado');
+        if (!CLIENT_ID || !REDIRECT) {
+            return res.status(500).send('OAuth não configurado');
+        }
         const url =
             'https://discord.com/api/oauth2/authorize?client_id=' +
             CLIENT_ID +
@@ -51,7 +52,10 @@ function startWeb(client) {
             });
             const token = await tokenRes.json();
             if (!token.access_token) return res.redirect('/dashboard');
-            res.cookie('discord_token', token.access_token, { httpOnly: true, maxAge: 7 * 24 * 3600 * 1000 });
+            res.cookie('discord_token', token.access_token, {
+                httpOnly: true,
+                maxAge: 7 * 24 * 3600 * 1000
+            });
             res.redirect('/dashboard');
         } catch (e) {
             res.redirect('/dashboard');
@@ -71,7 +75,12 @@ function startWeb(client) {
         const g = client.guilds.cache.get(req.params.id);
         if (!g) return res.status(404).json({ error: 'guild' });
         const settings = getSettings(req.params.id);
-        res.json({ id: g.id, name: g.name, prefix: getPrefix(req.params.id), settings });
+        res.json({
+            id: g.id,
+            name: g.name,
+            prefix: getPrefix(req.params.id),
+            settings
+        });
     });
 
     app.post('/api/guild/:id/prefix', (req, res) => {
@@ -85,18 +94,20 @@ function startWeb(client) {
         res.json({ ok: true });
     });
 
-    app.post('/api/guild/:id/drops', (req, res) => res.json({ ok: true }));
-    app.post('/api/guild/:id/partnership', (req, res) => res.json({ ok: true }));
+    app.post('/api/guild/:id/drops', (req, res) => {
+        res.json({ ok: true });
+    });
 
+    app.post('/api/guild/:id/partnership', (req, res) => {
+        res.json({ ok: true });
+    });
+
+    // —— Arena & Masmorra ——
     const arenaEngine = require('../utils/arenaEngine');
     const dungeon = require('../utils/dungeon');
 
     app.get('/arena', (req, res) => {
         res.sendFile(path.join(__dirname, '..', 'public', 'arena.html'));
-    });
-
-    app.get('/wiki', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'wiki.html'));
     });
 
     app.get('/api/arena/:id', (req, res) => {
@@ -110,28 +121,6 @@ function startWeb(client) {
         const result = arenaEngine.applyMove(req.params.id, body.playerId, {
             moveId: body.moveId,
             targetId: body.targetId
-        });
-        if (!result.ok) return res.status(400).json(result);
-        return res.json(result);
-    });
-
-    app.post('/api/arena/:id/chat', (req, res) => {
-        const body = req.body || {};
-        const result = arenaEngine.addChat(req.params.id, {
-            userId: body.userId,
-            name: body.name,
-            text: body.text,
-            spectator: body.spectator
-        });
-        if (!result.ok) return res.status(400).json(result);
-        return res.json(result);
-    });
-
-    app.post('/api/arena/:id/react', (req, res) => {
-        const body = req.body || {};
-        const result = arenaEngine.addReaction(req.params.id, {
-            userId: body.userId,
-            emoji: body.emoji
         });
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
@@ -177,6 +166,18 @@ function startWeb(client) {
         });
     });
 
+    app.post('/api/dungeon/:id/advance', (req, res) => {
+        const body = req.body || {};
+        const result = dungeon.advanceFloor(req.params.id, body.playerId || body.userId);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json({
+            ok: true,
+            id: result.match.id,
+            match: dungeon.publicDungeon(result.match, body.playerId || body.userId)
+        });
+    });
+
+    // Avatar
     app.get('/avatar', (req, res) => {
         res.sendFile(path.join(__dirname, '..', 'public', 'avatar.html'));
     });
@@ -200,7 +201,9 @@ function startWeb(client) {
             const userId = String(body.userId || '').trim();
             if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
             if (!player.has(userId)) {
-                return res.status(400).json({ error: 'Crie o personagem no bot primeiro (O.j criar).' });
+                return res
+                    .status(400)
+                    .json({ error: 'Crie o personagem no bot primeiro (O.j criar).' });
             }
             const saved = player.setBattleAvatar(userId, body.avatar || {});
             if (!saved) return res.status(400).json({ error: 'Falha ao salvar' });
@@ -210,65 +213,33 @@ function startWeb(client) {
         }
     });
 
-    app.get('/troca', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'troca.html'));
-    });
-
-    app.get('/api/trade/:id', (req, res) => {
-        const s = trade.getTrade(req.params.id);
-        if (!s) return res.status(404).json({ ok: false, error: 'Troca não encontrada ou expirada' });
-        const as = String(req.query.as || '').trim() || null;
-        return res.json({ ok: true, trade: trade.publicSession(s, as) });
-    });
-
-    app.get('/api/trade/:id/bag', (req, res) => {
-        const s = trade.getTrade(req.params.id);
-        if (!s) return res.status(404).json({ ok: false, error: 'Troca não encontrada' });
-        const userId = String(req.query.userId || '').trim();
-        if (!trade.sideOf(s, userId)) {
-            return res.status(403).json({ ok: false, error: 'Sem permissão' });
-        }
-        return res.json({ ok: true, bag: trade.bagFor(userId) });
-    });
-
-    app.post('/api/trade/:id/offer', (req, res) => {
-        const body = req.body || {};
-        const userId = String(body.userId || '').trim();
-        const result = trade.setOffer(req.params.id, userId, {
-            eter: body.eter,
-            intensity: body.intensity,
-            itemIndexes: body.itemIndexes
-        });
-        if (!result.ok) return res.status(400).json(result);
-        return res.json({ ok: true, trade: trade.publicSession(result.session, userId) });
-    });
-
-    app.post('/api/trade/:id/confirm', (req, res) => {
-        const userId = String((req.body || {}).userId || '').trim();
-        const result = trade.toggleConfirm(req.params.id, userId);
-        if (!result.ok) return res.status(400).json(result);
-        if (result.executed) {
-            return res.json({ ok: true, executed: true, message: 'Troca concluída!' });
-        }
-        return res.json({ ok: true, executed: false, trade: trade.publicSession(result.session, userId) });
-    });
-
-    app.post('/api/trade/:id/cancel', (req, res) => {
-        const userId = String((req.body || {}).userId || '').trim();
-        const result = trade.cancelTrade(req.params.id, userId);
-        if (!result.ok) return res.status(400).json(result);
-        return res.json({ ok: true });
-    });
-
     app.get('/dashboard', (req, res) => {
         res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
     });
 
     app.get('/', (req, res) => res.redirect('/dashboard'));
 
-    const port = process.env.PORT || 10000;
-    const server = app.listen(port, () => {
-        console.log('Painel na porta', port);
+        app.get('/health', (req, res) => {
+        const mongo = (() => {
+            try {
+                const { isConnected } = require('../utils/mongo');
+                return isConnected();
+            } catch (_) {
+                return false;
+            }
+        })();
+        res.status(200).json({
+            ok: true,
+            service: 'aeternus',
+            mongo,
+            uptime: process.uptime()
+        });
+    });
+
+const port = process.env.PORT || 10000;
+    const host = process.env.HOST || '0.0.0.0';
+    const server = app.listen(port, host, () => {
+        console.log('Painel em http://' + host + ':' + port);
         if (REDIRECT) console.log('[web] OAuth redirect:', REDIRECT);
     });
     return server;
