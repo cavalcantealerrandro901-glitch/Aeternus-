@@ -385,12 +385,13 @@ function getInventory(guildId) {
 }
 
 /**
- * Oficial deposita item do inventário pessoal na guilda.
+ * Oficial deposita um ou mais itens iguais do inventário pessoal na guilda.
  * @param {string} guildId
  * @param {string} userId
- * @param {number} playerIndex1 - índice 1-based no inventário do jogador
+ * @param {number} playerIndex1 - índice 1-based de um item no inventário do jogador
+ * @param {number} [qty=1] - quantidade do mesmo item (mesmo id)
  */
-function depositItem(guildId, userId, playerIndex1) {
+function depositItem(guildId, userId, playerIndex1, qty = 1) {
     const data = all();
     const g = data[guildId];
     if (!g) return { ok: false, error: 'Guilda não encontrada.' };
@@ -398,23 +399,75 @@ function depositItem(guildId, userId, playerIndex1) {
 
     const player = require('./player');
     if (!player.has(userId)) return { ok: false, error: 'Sem perfil.' };
+
+    const amount = Math.max(1, Math.floor(Number(qty) || 1));
+    if (amount > 50) return { ok: false, error: 'Máximo de **50** itens por depósito.' };
+
     const inv = player.getInventory(userId, 'todos');
     const idx = Math.floor(Number(playerIndex1) || 0) - 1;
     if (idx < 0 || idx >= inv.length) {
         return { ok: false, error: 'Índice inválido. Veja `O.inventario`.' };
     }
-    const removed = player.removeItemAt(userId, idx);
-    if (!removed) return { ok: false, error: 'Não foi possível remover o item.' };
+
+    const ref = inv[idx];
+    const itemId = ref.id || ref.name;
+    if (!itemId) return { ok: false, error: 'Item inválido.' };
+
+    // Conta quantos do mesmo id o jogador tem
+    const same = inv.filter((it) => String(it.id || it.name) === String(itemId));
+    if (same.length < amount) {
+        return {
+            ok: false,
+            error:
+                `Você só tem **${same.length}**× **${ref.name || itemId}** no inventário ` +
+                `(pediu **${amount}**).`
+        };
+    }
+
+    // Remove `amount` entradas com esse id (do fim da lista para não bagunçar índices)
+    const pdata = player.all ? player.all() : null;
+    // removeItemAt usa índice 0-based na lista bruta — vamos remover por uid
+    const store = require('./store');
+    const players = store.load('players.json', {});
+    const p = players[userId];
+    if (!p || !Array.isArray(p.inventory)) return { ok: false, error: 'Inventário inválido.' };
+
+    const toMove = [];
+    let need = amount;
+    // Percorre de trás pra frente
+    for (let i = p.inventory.length - 1; i >= 0 && need > 0; i--) {
+        const it = p.inventory[i];
+        if (!it) continue;
+        if (String(it.id || it.name) !== String(itemId)) continue;
+        const [removed] = p.inventory.splice(i, 1);
+        toMove.push(removed);
+        need--;
+    }
+    if (toMove.length < amount) {
+        return { ok: false, error: 'Não foi possível remover a quantidade pedida.' };
+    }
+    p.updatedAt = Date.now();
+    store.save('players.json', players);
 
     ensureInventory(g);
-    const entry = {
-        ...removed,
-        depositedBy: userId,
-        depositedAt: Date.now()
-    };
-    g.inventory.push(entry);
+    const deposited = [];
+    for (const removed of toMove) {
+        const entry = {
+            ...removed,
+            depositedBy: userId,
+            depositedAt: Date.now()
+        };
+        g.inventory.push(entry);
+        deposited.push(entry);
+    }
     save(data);
-    return { ok: true, guild: g, item: entry };
+    return {
+        ok: true,
+        guild: g,
+        item: deposited[0],
+        items: deposited,
+        amount: deposited.length
+    };
 }
 
 /**

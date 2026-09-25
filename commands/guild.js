@@ -741,7 +741,7 @@ module.exports = {
                             .setColor(0x8b5cf6)
                             .setTitle(`📦 Baú · [${g.tag}] ${g.name}`)
                             .setDescription(
-                                '_Vazio._\n\nOficiais: `O.guild depositaritem <nº do seu inventário>`\n' +
+                                '_Vazio._\n\nOficiais: `O.guild depositaritem <nº> [qtd]`\n' +
                                     'Membros: `O.guild retiraritem <nº do baú>`'
                             )
                     ]
@@ -763,7 +763,7 @@ module.exports = {
                         .setDescription(
                             lines.join('\n') +
                                 more +
-                                '\n\n`O.guild depositaritem <nº>` · `O.guild retiraritem <nº>` · `O.guild removeritem <nº>`'
+                                '\n\n`O.guild depositaritem <nº> [qtd]` · `O.guild retiraritem <nº>` · `O.guild removeritem <nº>`'
                         )
                         .setFooter({ text: `${list.length} item(ns) · oficiais depositam · membros retiram` })
                 ]
@@ -774,16 +774,20 @@ module.exports = {
             const g = guilds.findByMember(message.author.id);
             if (!g) return message.reply('Você não está em uma guilda.');
             const n = parseInt(rest[0], 10);
+            const qty = parseInt(rest[1], 10) || 1;
             if (!n) {
                 return message.reply(
-                    'Uso: `O.guild depositaritem <número>`\nO número é o do **seu** `O.inventario`.'
+                    'Uso: `O.guild depositaritem <nº do inventário> [quantidade]`\n' +
+                        'Ex.: `O.guild depositaritem 3 5` — deposita 5 unidades do item nº 3\n' +
+                        'Você precisa ter essa quantidade do **mesmo item** no inventário.'
                 );
             }
-            const r = guilds.depositItem(g.id, message.author.id, n);
+            const r = guilds.depositItem(g.id, message.author.id, n, qty);
             if (!r.ok) return message.reply(`❌ ${r.error}`);
-            const name = r.item.name || r.item.id || 'Item';
+            const name = r.item?.name || r.item?.id || 'Item';
+            const q = r.amount || 1;
             return message.reply(
-                `📦 Depositou **${r.item.emoji || ''} ${name}** no baú de **[${g.tag}]**.`
+                `📦 Depositou **${q}×** ${r.item?.emoji || ''} **${name}** no baú de **[${g.tag}]**.`
             );
         }
 
