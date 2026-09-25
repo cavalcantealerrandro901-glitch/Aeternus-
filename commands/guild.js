@@ -19,39 +19,140 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
+/** Remove prefixo antigo [TAG] do apelido (sistema antigo). */
 function stripGuildTag(nick) {
     return String(nick || '')
         .replace(/^\s*\[[^\]]{1,12}\]\s*/u, '')
         .trim();
 }
 
-async function applyGuildNick(guild, userId, tagOrNull) {
-    if (!guild || !userId) return { ok: false, reason: 'no_guild' };
+/**
+ * Tag da guilda como "adesivo": cargo Discord ao lado do nome (não altera apelido).
+ * Cria/usa cargo com o nome da tag e atribui ao membro.
+ */
+async function ensureGuildTagRole(discordGuild, gameGuild) {
+    const { PermissionFlagsBits } = require('discord.js');
+    const me = discordGuild.members.me || (await discordGuild.members.fetchMe().catch(() => null));
+    if (!me?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
+        return { ok: false, reason: 'no_perm', role: null };
+    }
+
+    const tag = String(gameGuild.tag || '').slice(0, 20);
+    if (!tag) return { ok: false, reason: 'no_tag', role: null };
+
+    // Nome do cargo = tag (parece adesivo na lista/perfil)
+    const roleName = tag.length <= 100 ? tag : tag.slice(0, 100);
+
+    let role = null;
+    if (gameGuild.discordRoleId) {
+        role = discordGuild.roles.cache.get(gameGuild.discordRoleId) || null;
+        if (!role) {
+            try {
+                role = await discordGuild.roles.fetch(gameGuild.discordRoleId).catch(() => null);
+            } catch (_) {}
+        }
+    }
+    if (!role) {
+        role =
+            discordGuild.roles.cache.find(
+                (r) => r.name === roleName && !r.managed && r.id !== discordGuild.id
+            ) || null;
+    }
+    if (!role) {
+        try {
+            role = await discordGuild.roles.create({
+                name: roleName,
+                color: 0xa78bfa,
+                hoist: false,
+                mentionable: false,
+                reason: `Tag da guilda Aeternus [${tag}]`
+            });
+        } catch (e) {
+            console.error('[guild role create]', e.message);
+            return { ok: false, reason: e.message, role: null };
+        }
+    } else if (role.name !== roleName) {
+        try {
+            await role.setName(roleName, 'Atualizar tag da guilda');
+        } catch (_) {}
+    }
+
+    // Persistir id do cargo na guilda do jogo
+    try {
+        const data = guilds.all();
+        if (data[gameGuild.id]) {
+            data[gameGuild.id].discordRoleId = role.id;
+            require('../utils/store').save('guilds.json', data);
+            gameGuild.discordRoleId = role.id;
+        }
+    } catch (_) {}
+
+    // Cargo do bot precisa estar acima
+    if (me.roles.highest.comparePositionTo(role) <= 0) {
+        return { ok: false, reason: 'hierarchy_role', role };
+    }
+    return { ok: true, role };
+}
+
+/**
+ * Aplica ou remove o cargo-tag (adesivo). Também limpa apelido com [TAG] antigo.
+ * @param {import('discord.js').Guild} discordGuild
+ * @param {string} userId
+ * @param {object|null} gameGuild - guilda do jogo ou null para remover
+ */
+async function applyGuildBadge(discordGuild, userId, gameGuild) {
+    if (!discordGuild || !userId) return { ok: false, reason: 'no_guild' };
     try {
         const { PermissionFlagsBits } = require('discord.js');
-        const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
-        if (!me?.permissions?.has(PermissionFlagsBits.ManageNicknames)) {
+        const me = discordGuild.members.me || (await discordGuild.members.fetchMe().catch(() => null));
+        const member = await discordGuild.members.fetch(userId).catch(() => null);
+        if (!member) return { ok: false, reason: 'not_in_server' };
+
+        // Limpa prefixo antigo no apelido, se houver
+        if (
+            me?.permissions?.has(PermissionFlagsBits.ManageNicknames) &&
+            member.nickname &&
+            /^\s*\[[^\]]{1,12}\]\s*/u.test(member.nickname)
+        ) {
+            try {
+                if (member.id !== discordGuild.ownerId && me.roles.highest.comparePositionTo(member.roles.highest) > 0) {
+                    const cleaned = stripGuildTag(member.nickname);
+                    await member.setNickname(
+                        cleaned === member.user.username ? null : cleaned.slice(0, 32),
+                        'Remover tag antiga do apelido (Aeternus)'
+                    );
+                }
+            } catch (_) {}
+        }
+
+        if (!me?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
             return { ok: false, reason: 'no_perm' };
         }
-        const member = await guild.members.fetch(userId).catch(() => null);
-        if (!member) return { ok: false, reason: 'not_in_server' };
-        if (member.id === guild.ownerId) return { ok: false, reason: 'owner' };
-        if (me.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
-            return { ok: false, reason: 'hierarchy' };
+
+        if (gameGuild && gameGuild.tag) {
+            const ensured = await ensureGuildTagRole(discordGuild, gameGuild);
+            if (!ensured.ok || !ensured.role) return { ok: false, reason: ensured.reason || 'role' };
+            const role = ensured.role;
+            if (member.roles.cache.has(role.id)) return { ok: true, skipped: true, role };
+            await member.roles.add(role, 'Entrou na guilda Aeternus');
+            return { ok: true, role };
         }
-        const base = stripGuildTag(member.nickname || member.user.username);
-        let next;
-        if (tagOrNull) {
-            next = (`[${String(tagOrNull).slice(0, 6)}] ` + base).slice(0, 32);
-        } else {
-            next = base.slice(0, 32) || null;
+
+        // Remover: tira cargos de tag conhecidos das guildas do jogo neste servidor
+        const allG = guilds.list();
+        let removed = 0;
+        for (const g of allG) {
+            if (!g.discordRoleId) continue;
+            if (member.roles.cache.has(g.discordRoleId)) {
+                try {
+                    await member.roles.remove(g.discordRoleId, 'Saiu da guilda Aeternus');
+                    removed++;
+                } catch (_) {}
+            }
         }
-        if (next === member.user.username) next = null;
-        if ((member.nickname || null) === next) return { ok: true, skipped: true };
-        await member.setNickname(next, tagOrNull ? 'Tag da guilda Aeternus' : 'Saiu da guilda');
-        return { ok: true };
+        return { ok: true, removed };
     } catch (e) {
-        console.error('[guild nick]', e.message);
+        console.error('[guild badge]', e.message);
         return { ok: false, reason: e.message };
     }
 }
@@ -117,7 +218,7 @@ function helpEmbed() {
                 '`O.guild transferir @user`',
                 '`O.guild depositar / sacar <valor>`',
                 '`O.guild inventario` · depositar/retirar itens',
-                '`O.guild ranking` · `O.guild sincronizar` · `O.guild dissolver`'
+                '`O.guild ranking` · `O.guild sincronizar` (cargos-tag) · `O.guild dissolver`'
             ].join('\n')
         );
 }
@@ -636,9 +737,9 @@ module.exports = {
             if (!r.ok) return message.reply(`❌ ${r.error}`);
             let nickNote = '';
             if (message.guild) {
-                const nick = await applyGuildNick(message.guild, message.author.id, r.guild.tag);
+                const nick = await applyGuildBadge(message.guild, message.author.id, r.guild);
                 if (nick.ok && !nick.skipped) {
-                    nickNote = `\n🏷️ Tag **[${r.guild.tag}]** no apelido.`;
+                    nickNote = `\n🏷️ Tag **[${r.guild.tag}]** (cargo) aplicada.`;
                 }
             }
             const welcome = r.welcome ? `\n\n💬 ${r.welcome}` : '';
@@ -651,7 +752,7 @@ module.exports = {
         if (sub === 'sair' || sub === 'leave') {
             const r = guilds.leave(message.author.id);
             if (!r.ok) return message.reply(`❌ ${r.error}`);
-            if (message.guild) await applyGuildNick(message.guild, message.author.id, null);
+            if (message.guild) await applyGuildBadge(message.guild, message.author.id, null);
             return message.reply(`👋 Você saiu de **[${r.guild.tag}] ${r.guild.name}**.`);
         }
 
@@ -662,7 +763,7 @@ module.exports = {
             if (!user) return message.reply('Uso: `O.guild expulsar @user`');
             const r = guilds.kick(g.id, message.author.id, user.id);
             if (!r.ok) return message.reply(`❌ ${r.error}`);
-            if (message.guild) await applyGuildNick(message.guild, user.id, null);
+            if (message.guild) await applyGuildBadge(message.guild, user.id, null);
             return message.reply(`👢 <@${user.id}> foi expulso de **[${g.tag}]**.`);
         }
 
@@ -830,11 +931,11 @@ module.exports = {
             let fail = 0;
             for (const m of g.members || []) {
                 if (!m?.id) continue;
-                const r = await applyGuildNick(message.guild, m.id, g.tag);
+                const r = await applyGuildBadge(message.guild, m.id, g);
                 if (r.ok) ok++;
                 else fail++;
             }
-            return message.reply(`🏷️ Tags: **${ok}** ok · **${fail}** falha(s).`);
+            return message.reply(`🏷️ Cargos-tag: **${ok}** ok · **${fail}** falha(s). O bot precisa de **Gerenciar Cargos**.`);
         }
 
         if (sub === 'ranking' || sub === 'rank' || sub === 'top') {
@@ -1009,7 +1110,7 @@ module.exports = {
             inv.resolved = true;
             pendingInvites.delete(inviteId);
             if (interaction.guild) {
-                await applyGuildNick(interaction.guild, inv.targetId, r.guild.tag);
+                await applyGuildBadge(interaction.guild, inv.targetId, r.guild);
             }
             const welcome = r.welcome ? `\n\n💬 ${r.welcome}` : '';
             return interaction.update({
