@@ -1,0 +1,10 @@
+---
+const { command } = Astro.props;
+---
+
+<div class="copy-command-box" style="display: flex; align-items: center; justify-content: space-between; background: #1e1f22; border: 1px solid #35363c; padding: 10px 14px; border-radius: 8px; margin: 12px 0;">
+  <code style="color: #5865f2; font-weight: bold; font-family: monospace; font-size: 1rem;">{command}</code>
+  <button onclick={`navigator.clipboard.writeText('${command}')`} style="background: #5865f2; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+    📋 Copiar
+  </button>
+</div>

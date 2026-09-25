@@ -1,0 +1,22 @@
+---
+title: Status dos Serviços
+description: Monitorização em tempo real da infraestrutura do Aeternus.
+---
+
+import SystemStatusGrid from '../../components/SystemStatusGrid.astro';
+
+# ✦ STATUS DO AETERNUS
+
+<SystemStatusGrid 
+  services={[
+    { name: '🤖 Bot Core (Gateway)', status: 'online' },
+    { name: '💰 Sistema de Economia', status: 'online' },
+    { name: '🎵 Player de Música', status: 'online' },
+    { name: '🛡️ Módulo de Moderação', status: 'degraded' },
+    { name: '🌐 API Externa', status: 'online' }
+  ]}
+/>
+
+:::note[Atualização de Infraestrutura]
+O módulo de moderação está a passar por otimizações. Pode ocorrer um pequeno atraso no registo de advertências.
+:::

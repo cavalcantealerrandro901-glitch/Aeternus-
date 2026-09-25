@@ -155,7 +155,7 @@ const slash = new SlashCommandBuilder()
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 module.exports = {
-    name: 'registrarvip',
+    name: 'registrar vip',
     aliases: ['registrar', 'regvip', 'addvip', 'setvip', 'anotar'],
     description: 'Registrar anotação de compra, patrimônio, etc.',
     data: slash,

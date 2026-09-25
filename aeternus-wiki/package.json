@@ -1,0 +1,19 @@
+{
+  "name": "aeternus-wiki",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "npx tsx scripts/sync-commands.js && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.30.0",
+    "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

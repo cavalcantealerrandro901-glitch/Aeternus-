@@ -1,0 +1,16 @@
+---
+const { status } = Astro.props;
+
+const config = {
+  available: { label: 'Disponível', color: '#10B981', bg: '#064E3B', icon: '🟢' },
+  in_dev: { label: 'Em Desenvolvimento', color: '#F59E0B', bg: '#78350F', icon: '🟡' },
+  disabled: { label: 'Indisponível', color: '#EF4444', bg: '#7F1D1D', icon: '🔴' }
+};
+
+const current = config[status] || config.available;
+---
+
+<span style={`display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; background-color: ${current.bg}; color: ${current.color}; border: 1px solid ${current.color}40;`}>
+  <span>{current.icon}</span>
+  <span>{current.label}</span>
+</span>

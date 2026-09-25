@@ -13,7 +13,7 @@ module.exports = {
   description: 'Bane um membro do servidor',
 
   data: new SlashCommandBuilder()
-    .setName('ban')
+    .setName('banir')
     .setNameLocalizations({
       'pt-BR': 'banir',
       'es-ES': 'banear',

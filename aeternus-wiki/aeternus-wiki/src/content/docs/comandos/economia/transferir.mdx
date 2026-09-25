@@ -1,0 +1,42 @@
+---
+title: /transferir
+description: Documentação do comando de transferência do Aeternus.
+---
+
+import StatusBadge from '../../../../components/StatusBadge.astro';
+import CopyButton from '../../../../components/CopyButton.astro';
+import DiscordMessage from '../../../../components/DiscordMessage.astro';
+
+<StatusBadge status="available" />
+
+O comando `/transferir` permite enviar moedas da tua conta para outro utilizador com total segurança e confirmação imediata.
+
+### 📋 Atalho Rápido
+
+<CopyButton command="/transferir usuario:@utilizador quantia:100" />
+
+### ⚙️ Parâmetros
+
+| Parâmetro | Tipo | Obrigatório | Descrição |
+| :--- | :--- | :--- | :--- |
+| `usuario` | Menção | **Sim** | O membro que receberá os coins. |
+| `quantia` | Número | **Sim** | O valor exato a ser enviado (Mínimo: 1). |
+
+---
+
+### 💡 Exemplo Visual no Discord
+
+<DiscordMessage 
+  userCommand="/transferir usuario:@Maria quantia:500"
+  botTitle="💸 Transferência Realizada"
+  botDescription="Enviaste **500 coins** para **@Maria** com sucesso!"
+  color="#00FF7F"
+  fields={[
+    { name: 'Taxa', value: '0 coins' },
+    { name: 'Novo Saldo', value: '1.250 coins' }
+  ]}
+/>
+
+:::tip[Dica de Segurança]
+As transferências são irreversíveis! Verifica sempre duas vezes o utilizador antes de confirmar.
+:::

@@ -95,13 +95,13 @@ async function postAnywhere(channel, payload, serverName) {
 }
 
 module.exports = {
-    name: 'fazer-parceria',
+    name: 'fazer parceria',
     aliases: ['parceria', 'addparceria', 'novaparceria'],
     description: 'Registra parceria com texto personalizado (link dentro do texto)',
     category: 'moderacao',
 
     data: new SlashCommandBuilder()
-        .setName('fazer-parceria')
+        .setName('fazer parceria')
         .setDescription('Registra parceria: texto + representante, em qualquer canal')
         .addUserOption(function (o) {
             return o

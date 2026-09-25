@@ -8,7 +8,7 @@ module.exports = {
     category: 'moderacao',
 
     data: new SlashCommandBuilder()
-        .setName('configurar-mensagem-cargo')
+        .setName('configurar mensagem cargo')
         .setDescription('Mensagem de aviso ou expiração do cargo temporário')
         .addStringOption((o) =>
             o

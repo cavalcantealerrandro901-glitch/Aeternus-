@@ -1,0 +1,36 @@
+---
+title: /transferir
+description: Transfira coins do seu saldo para outro utilizador com segurança.
+---
+
+import StatusBadge from '../../../../components/StatusBadge.astro';
+import CopyButton from '../../../../components/CopyButton.astro';
+import DiscordMessage from '../../../../components/DiscordMessage.astro';
+
+<StatusBadge status="available" />
+
+Transfira coins do seu saldo para outro utilizador com segurança.
+
+### 📋 Copiar Comando
+
+<CopyButton command="/transferir usuario:@utilizador quantia:numero" />
+
+### ⚙️ Informações
+
+| Propriedade | Valor |
+| :--- | :--- |
+| **Categoria** | Economia |
+| **Cooldown** | 10 segundos |
+| **Permissões** | Enviar Mensagens |
+
+---
+
+### 💡 Exemplo de Uso
+
+<DiscordMessage 
+  userCommand="/transferir usuario:@Maria quantia:500"
+  botTitle="💸 Transferência Realizada"
+  botDescription="Enviaste **500 coins** para **@Maria** com sucesso!"
+  color="#00FF7F"
+  fields={[{"name":"Taxa da Transação","value":"0 coins","inline":true},{"name":"Novo Saldo","value":"1.250 coins","inline":true}]}
+/>

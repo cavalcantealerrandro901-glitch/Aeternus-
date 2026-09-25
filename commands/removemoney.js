@@ -50,11 +50,11 @@ async function run(modMember, modUser, target, amountRaw, reply) {
 }
 
 module.exports = {
-    name: 'removemoney',
+    name: 'remover money',
     aliases: ['removeeter', 'takemoney', 'tirar-eter'],
     description: 'Remover éter de um usuário (admin)',
     data: new SlashCommandBuilder()
-        .setName('remover-eter')
+        .setName('remover eter')
         .setDescription('Remover éter de um usuário')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Quem perde o éter').setRequired(true)

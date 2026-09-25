@@ -1,0 +1,46 @@
+---
+title: Central de Documentação do Aeternus
+description: Explora comandos, guias, estado dos serviços e novidades do Aeternus Bot.
+template: splash
+hero:
+  title: ''
+---
+
+import HeroBanner from '../../components/HeroBanner.astro';
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<HeroBanner />
+
+## 🔍 O que pretendes consultar hoje?
+
+<CardGrid grid={2}>
+  <Card title="💰 Economia Avançada" icon="laptop">
+    Aprende a usar o sistema de coins, transferências, loja e recompensas diárias.
+    
+    [Ver comandos de Economia →](/comandos/economia/transferir)
+  </Card>
+
+  <Card title="🎵 Música HQ" icon="open-book">
+    Reprodução de áudio em alta qualidade, listas de reprodução e controlos de fila.
+    
+    [Ver comandos de Música →](/comandos/musica)
+  </Card>
+
+  <Card title="🛡️ Moderação & Gestão" icon="setting">
+    Ferramentas automatizadas para manter o teu servidor seguro e organizado.
+    
+    [Ver comandos de Administração →](/comandos/administracao)
+  </Card>
+
+  <Card title="🆘 Suporte & Resolução" icon="warning">
+    Precisas de ajuda? Consulta o nosso guia passo a passo ou fala com a equipa.
+    
+    [Ir para o Suporte →](/suporte)
+  </Card>
+</CardGrid>
+
+---
+
+:::tip[Sabias que?]
+Podes pesquisar por qualquer comando diretamente pressionando <kbd>Ctrl</kbd> + <kbd>K</kbd> ou <kbd>⌘</kbd> + <kbd>K</kbd> em qualquer página da Wiki!
+:::

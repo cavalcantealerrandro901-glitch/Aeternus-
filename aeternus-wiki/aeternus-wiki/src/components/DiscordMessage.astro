@@ -1,0 +1,41 @@
+---
+const { userCommand, botTitle, botDescription, color = "#5865f2", fields = [] } = Astro.props;
+---
+
+<div style="background-color: #313338; border-radius: 8px; padding: 16px; color: #dbdee1; font-family: 'gg sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 16px 0;">
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: #5865f2; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">U</div>
+    <div>
+      <span style="font-weight: 600; color: #f2f3f5; font-size: 0.95rem;">Utilizador</span>
+      <div style="color: #949ba4; font-size: 0.9rem;">
+        <span style="background: #404249; color: #c4c9ce; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem;">{userCommand}</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 12px;">
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: #000; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; color: #5865f2;">A</div>
+    <div style="flex: 1;">
+      <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+        <span style="font-weight: 600; color: #f2f3f5; font-size: 0.95rem;">Aeternus</span>
+        <span style="background: #5865f2; color: white; font-size: 0.65rem; padding: 1px 4px; border-radius: 3px; font-weight: bold;">BOT</span>
+      </div>
+      
+      <div style={`border-left: 4px solid ${color}; background: #2b2d31; padding: 12px; border-radius: 4px; margin-top: 6px;`}>
+        {botTitle && <div style="font-weight: bold; color: #ffffff; font-size: 1rem; margin-bottom: 6px;">{botTitle}</div>}
+        {botDescription && <div style="font-size: 0.9rem; color: #dbdee1; margin-bottom: 8px;" set:html={botDescription} />}
+        
+        {fields.length > 0 && (
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 8px;">
+            {fields.map((field) => (
+              <div>
+                <div style="font-size: 0.75rem; font-weight: bold; color: #949ba4;">{field.name}</div>
+                <div style="font-size: 0.85rem; color: #f2f3f5;">{field.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</div>

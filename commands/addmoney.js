@@ -101,10 +101,10 @@ async function run(modMember, modUser, targets, amountRaw, reply) {
 
 module.exports = {
     name: 'addmoney',
-    aliases: ['addeter', 'givemoney', 'dar-eter'],
+    aliases: ['addeter', "adicionar eter", 'givemoney', 'dar-eter'],
     description: 'Adicionar éter a um ou mais usuários (admin)',
     data: new SlashCommandBuilder()
-        .setName('adicionar-eter')
+        .setName('adicionar eter')
         .setDescription('Adicionar éter a um usuário')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Quem recebe o éter').setRequired(true)

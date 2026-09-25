@@ -1,0 +1,62 @@
+:root {
+  --sl-color-accent-low: #1e1b4b;
+  --sl-color-accent: #5865f2;
+  --sl-color-accent-high: #c7d2fe;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #f2f3f5;
+  --sl-color-gray-2: #dbdee1;
+  --sl-color-gray-3: #949ba4;
+  --sl-color-gray-4: #4e5058;
+  --sl-color-gray-5: #313338;
+  --sl-color-gray-6: #2b2d31;
+  --sl-color-black: #1e1f22;
+}
+
+/* Botões da Landing Page */
+.hero-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+  justify-content: center;
+}
+
+.btn-primary {
+  background-color: #5865f2;
+  color: white !important;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(88, 101, 242, 0.4);
+}
+
+.btn-primary:hover {
+  background-color: #4752c4;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6);
+}
+
+.btn-secondary {
+  background-color: #2b2d31;
+  color: #dbdee1 !important;
+  border: 1px solid #4e5058;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: 8px;
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-secondary:hover {
+  background-color: #35373c;
+  border-color: #949ba4;
+  transform: translateY(-2px);
+}
