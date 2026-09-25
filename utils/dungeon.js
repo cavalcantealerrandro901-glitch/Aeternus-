@@ -197,7 +197,8 @@ function startFloor(userId, floor) {
         createdAt: Date.now(),
         dungeon: true,
         canAdvance: false,
-        rewards: null
+        rewards: null,
+        chat: []
     };
     dungeonMatches.set(id, match);
     return { ok: true, match };
@@ -455,8 +456,22 @@ function publicDungeon(match, asUserId) {
         monstersDefeated: match.monstersDefeated,
         canAdvance: !!match.canAdvance,
         rewards: match.rewards || null,
+        chat: (match.chat || []).slice(-80),
         youWon: match.status === 'finished' && match.winnerTeam === 'A'
     };
+}
+
+function postDungeonChat(matchId, playerId, text) {
+    const match = getDungeonMatch(matchId);
+    if (!match) return { ok: false, error: 'Masmorra não encontrada.' };
+    if (match.teamA[0] !== playerId) return { ok: false, error: 'Você não está nesta masmorra.' };
+    const msg = String(text || '').trim().slice(0, 300);
+    if (!msg) return { ok: false, error: 'Mensagem vazia.' };
+    if (!match.chat) match.chat = [];
+    const name = match.fighters[playerId]?.name || 'Jogador';
+    match.chat.push({ from: playerId, name, text: msg, t: Date.now() });
+    if (match.chat.length > 100) match.chat = match.chat.slice(-100);
+    return { ok: true, chat: match.chat.slice(-80) };
 }
 
 module.exports = {
@@ -467,5 +482,6 @@ module.exports = {
     applyDungeonMove,
     publicDungeon,
     advanceFloor,
-    monstersForFloor
+    monstersForFloor,
+    postDungeonChat
 };

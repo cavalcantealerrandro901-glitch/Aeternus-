@@ -166,6 +166,20 @@ function startWeb(client) {
         });
     });
 
+    app.post('/api/arena/:id/chat', (req, res) => {
+        const body = req.body || {};
+        const result = arenaEngine.postChat(req.params.id, body.playerId, body.text);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
+    });
+
+    app.post('/api/dungeon/:id/chat', (req, res) => {
+        const body = req.body || {};
+        const result = dungeon.postDungeonChat(req.params.id, body.playerId, body.text);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
+    });
+
     app.post('/api/dungeon/:id/advance', (req, res) => {
         const body = req.body || {};
         const result = dungeon.advanceFloor(req.params.id, body.playerId || body.userId);

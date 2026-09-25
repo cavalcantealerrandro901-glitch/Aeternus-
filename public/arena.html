@@ -52,9 +52,9 @@
   }
   .arena {
     display: grid;
-    grid-template-columns: minmax(160px, 1fr) minmax(80px, 1.1fr) minmax(160px, 1fr);
-    gap: 0.5rem;
-    max-width: 1100px;
+    grid-template-columns: minmax(120px, 0.9fr) minmax(70px, 1fr) minmax(120px, 0.9fr);
+    gap: 0.4rem;
+    max-width: 900px;
     width: 100%;
     margin: 0 auto;
     align-items: stretch;
@@ -73,11 +73,11 @@
 
   .card {
     background: linear-gradient(165deg, #241c14 0%, #120e0a 55%, #0c0a08 100%);
-    border: 2px solid var(--gold-dim);
-    border-radius: 14px;
-    padding: 0.75rem 0.65rem 0.85rem;
-    box-shadow: 0 0 0 1px #c9a22722 inset, 0 10px 32px #000a, 0 0 28px #c9a22712;
-    display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+    border: 1.5px solid var(--gold-dim);
+    border-radius: 10px;
+    padding: 0.45rem 0.4rem 0.5rem;
+    box-shadow: 0 0 0 1px #c9a22722 inset, 0 6px 20px #000a;
+    display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
     position: relative; width: 100%; min-width: 0;
   }
   .card.enemy {
@@ -89,17 +89,17 @@
     box-shadow: 0 0 0 2px #c9a22755 inset, 0 0 36px #c9a22733;
   }
   .card .name {
-    font-family: Cinzel, serif; font-size: 0.95rem; color: var(--gold);
-    text-align: center; line-height: 1.2; word-break: break-word;
+    font-family: Cinzel, serif; font-size: 0.78rem; color: var(--gold);
+    text-align: center; line-height: 1.15; word-break: break-word;
   }
   .card .class-line {
-    font-size: 0.72rem; color: var(--muted); margin-top: -0.2rem; text-align: center;
+    font-size: 0.62rem; color: var(--muted); margin-top: -0.15rem; text-align: center;
   }
   .card .portrait {
-    width: min(150px, 38vw); height: min(150px, 38vw);
-    max-width: 160px; max-height: 160px;
-    border-radius: 12px; border: 2px solid var(--gold);
-    object-fit: cover; background: #000; box-shadow: 0 0 18px #c9a22733;
+    width: min(96px, 26vw); height: min(96px, 26vw);
+    max-width: 110px; max-height: 110px;
+    border-radius: 10px; border: 1.5px solid var(--gold);
+    object-fit: cover; background: #000; box-shadow: 0 0 12px #c9a22733;
   }
   .card.enemy .portrait { border-color: #b91c1c; }
   .card .portrait.shake { animation: shake 0.45s; }
@@ -111,13 +111,13 @@
 
   .stat-block { width: 100%; margin-top: 0.15rem; }
   .stat-row {
-    display: flex; justify-content: space-between; font-size: 0.72rem;
-    color: var(--muted); margin-bottom: 0.12rem; font-family: Cinzel, serif;
+    display: flex; justify-content: space-between; font-size: 0.62rem;
+    color: var(--muted); margin-bottom: 0.08rem; font-family: Cinzel, serif;
   }
   .stat-row span:last-child { color: var(--ink); }
   .bar {
-    height: 14px; border-radius: 7px; background: #000c;
-    border: 1px solid #ffffff12; overflow: hidden; margin-bottom: 0.35rem;
+    height: 10px; border-radius: 5px; background: #000c;
+    border: 1px solid #ffffff12; overflow: hidden; margin-bottom: 0.22rem;
   }
   .bar > i {
     display: block; height: 100%; width: 100%;
@@ -190,23 +190,23 @@
     box-shadow: 0 -8px 28px #000a;
   }
   .actions-inner {
-    max-width: 720px; margin: 0 auto;
+    max-width: 560px; margin: 0 auto;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.45rem;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 0.3rem;
   }
   .actions-bar button {
     font-family: Cinzel, serif;
-    font-size: 0.82rem;
-    padding: 0.72rem 0.5rem;
-    min-height: 48px;
-    border-radius: 10px;
+    font-size: 0.7rem;
+    padding: 0.42rem 0.35rem;
+    min-height: 36px;
+    border-radius: 8px;
     border: 1px solid var(--gold-dim);
     background: linear-gradient(180deg, #3a2a12 0%, #1a1208 100%);
     color: var(--ink);
     cursor: pointer;
     width: 100%;
-    line-height: 1.25;
+    line-height: 1.2;
     transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
   }
   .actions-bar button:hover:not(:disabled) {
@@ -269,6 +269,100 @@
     background: linear-gradient(180deg, #3a2a12, #1a1208); color: var(--ink); cursor: pointer;
   }
   .wave-info { font-size: 0.8rem; color: var(--muted); text-align: center; margin-top: 0.2rem; }
+
+  /* ===== CHAT canto inferior direito ===== */
+  .chat-panel {
+    position: fixed;
+    right: 10px;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    width: min(340px, 92vw);
+    height: min(380px, 48vh);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(165deg, #1a1410ee 0%, #0c0a08f5 100%);
+    border: 1.5px solid var(--gold-dim);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px #000c, 0 0 20px #c9a22722;
+    overflow: hidden;
+  }
+  .chat-panel.collapsed { height: 42px; width: min(180px, 50vw); }
+  .chat-panel.collapsed .chat-body,
+  .chat-panel.collapsed .chat-input-row { display: none; }
+  .chat-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.4rem 0.55rem;
+    background: #241c14;
+    border-bottom: 1px solid #c9a22733;
+    font-family: Cinzel, serif; font-size: 0.78rem; color: var(--gold);
+    cursor: pointer; user-select: none;
+  }
+  .chat-head .tools { display: flex; gap: 0.25rem; }
+  .chat-head button {
+    background: #2a2010; border: 1px solid var(--gold-dim); color: var(--ink);
+    border-radius: 6px; padding: 0.15rem 0.35rem; cursor: pointer; font-size: 0.85rem;
+  }
+  .chat-body {
+    flex: 1; overflow-y: auto; padding: 0.55rem 0.5rem;
+    display: flex; flex-direction: column; gap: 0.4rem;
+  }
+  .chat-msg {
+    max-width: 88%; padding: 0.35rem 0.55rem; border-radius: 12px;
+    font-size: 0.82rem; line-height: 1.3; word-break: break-word;
+  }
+  .chat-msg .who {
+    display: block; font-size: 0.65rem; opacity: 0.75; margin-bottom: 0.1rem;
+    font-family: Cinzel, serif;
+  }
+  .chat-msg.mine {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #3a2a14, #2a1c10);
+    border: 1px solid #c9a22755;
+    border-bottom-right-radius: 4px;
+    text-align: right;
+  }
+  .chat-msg.theirs {
+    align-self: flex-start;
+    background: linear-gradient(135deg, #1a2430, #121820);
+    border: 1px solid #3b82f655;
+    border-bottom-left-radius: 4px;
+    text-align: left;
+  }
+  .chat-input-row {
+    display: flex; gap: 0.3rem; padding: 0.4rem;
+    border-top: 1px solid #c9a22722; background: #100c0a;
+  }
+  .chat-input-row input {
+    flex: 1; background: #0a0806; border: 1px solid var(--gold-dim);
+    border-radius: 8px; color: var(--ink); padding: 0.4rem 0.5rem;
+    font-family: inherit; font-size: 0.85rem;
+  }
+  .chat-input-row button {
+    background: linear-gradient(180deg, #3a2a12, #1a1208);
+    border: 1px solid var(--gold-dim); color: var(--ink);
+    border-radius: 8px; padding: 0.35rem 0.55rem; cursor: pointer;
+    font-family: Cinzel, serif; font-size: 0.72rem;
+  }
+  .emoji-fly {
+    position: fixed; z-index: 90; pointer-events: none;
+    font-size: 1.6rem;
+    animation: emojiRise 1.6s ease-out forwards;
+  }
+  @keyframes emojiRise {
+    0% { transform: translateY(0) scale(0.6); opacity: 0; }
+    15% { opacity: 1; transform: translateY(-20px) scale(1.15); }
+    70% { opacity: 1; }
+    100% { transform: translateY(-180px) scale(1); opacity: 0; }
+  }
+  @media (max-width: 640px) {
+    .chat-panel {
+      width: min(100vw - 12px, 320px);
+      height: min(300px, 40vh);
+      right: 6px;
+      bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    }
+  }
+
   .hidden { display: none !important; }
 </style>
 </head>
@@ -330,6 +424,22 @@
   </div>
 </div>
 
+
+
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head" id="chatHead">
+    <span>💬 Chat da luta</span>
+    <div class="tools">
+      <button type="button" id="emojiRainBtn" title="Emojis">✨</button>
+      <button type="button" id="chatToggleBtn" title="Recolher">−</button>
+    </div>
+  </div>
+  <div class="chat-body" id="chatBody"></div>
+  <div class="chat-input-row">
+    <input id="chatInput" maxlength="300" placeholder="Digite uma mensagem…" autocomplete="off" />
+    <button type="button" id="chatSendBtn">Enviar</button>
+  </div>
+</div>
 
 <div class="victory-overlay hidden" id="victoryOverlay">
   <div class="victory-box">
@@ -576,12 +686,102 @@ function applyState(s) {
   } else if (s.yourTurn) {
     setTop('Sua vez — escolha uma habilidade abaixo', '');
   }
+  if (s.chat) renderChat(s.chat);
   if (s.lastEffect) playEffect(s.lastEffect);
   else if (s.log?.length) {
     const last = s.log[s.log.length - 1];
     if (last?.text && s.status !== 'finished') setTop(last.text, '');
   }
 }
+
+
+let lastChatLen = 0;
+const EMOJI_SETS = [
+  ['❤️','💕','💖','💗','💓'],
+  ['🔥','⚡','💥','✨','🌟'],
+  ['😂','🤣','😆','😹','😜'],
+  ['⚔️','🛡️','🗡️','🏹','🏆'],
+  ['🌸','🌺','🍀','🌈','⭐']
+];
+
+function renderChat(list) {
+  const box = $('chatBody');
+  if (!box) return;
+  const msgs = Array.isArray(list) ? list : [];
+  if (msgs.length === lastChatLen && box.children.length) return;
+  lastChatLen = msgs.length;
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.innerHTML = '';
+  msgs.forEach((m) => {
+    const mine = String(m.from) === String(asUser);
+    const el = document.createElement('div');
+    el.className = 'chat-msg ' + (mine ? 'mine' : 'theirs');
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = mine ? 'Você' : (m.name || 'Jogador');
+    el.appendChild(who);
+    el.appendChild(document.createTextNode(m.text || ''));
+    box.appendChild(el);
+  });
+  if (atBottom || true) box.scrollTop = box.scrollHeight;
+}
+
+async function sendChat() {
+  const input = $('chatInput');
+  const text = (input.value || '').trim();
+  if (!text || !matchId || !asUser) return;
+  input.value = '';
+  const url = isDungeon ? '/api/dungeon/' + matchId + '/chat' : '/api/arena/' + matchId + '/chat';
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: asUser, text })
+    });
+    const data = await res.json();
+    if (data.ok) renderChat(data.chat);
+    else setTop(data.error || 'Erro no chat', 'hit');
+  } catch (_) {
+    setTop('Falha ao enviar chat', 'hit');
+  }
+}
+
+function launchEmojiRain() {
+  const set = EMOJI_SETS[Math.floor(Math.random() * EMOJI_SETS.length)];
+  const baseX = window.innerWidth - 80;
+  const baseY = window.innerHeight - 120;
+  for (let i = 0; i < 10; i++) {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'emoji-fly';
+      el.textContent = set[i % set.length];
+      const dx = (Math.random() - 0.5) * 120;
+      el.style.left = (baseX + dx) + 'px';
+      el.style.top = baseY + 'px';
+      el.style.fontSize = (1.2 + Math.random() * 0.9) + 'rem';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1700);
+    }, i * 70);
+  }
+}
+
+function wireChatUi() {
+  const send = $('chatSendBtn');
+  const input = $('chatInput');
+  const toggle = $('chatToggleBtn');
+  const rain = $('emojiRainBtn');
+  if (send) send.onclick = sendChat;
+  if (input) input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sendChat(); }
+  });
+  if (toggle) toggle.onclick = (e) => {
+    e.stopPropagation();
+    $('chatPanel').classList.toggle('collapsed');
+    toggle.textContent = $('chatPanel').classList.contains('collapsed') ? '+' : '−';
+  };
+  if (rain) rain.onclick = (e) => { e.stopPropagation(); launchEmojiRain(); };
+}
+wireChatUi();
 
 async function doMove(moveId) {
   if (!matchId || !asUser) return;

@@ -122,7 +122,8 @@ function createMatch({ mode = '1v1', teamA = [], teamB = [], bet = 0, fun = fals
         bet: Number(bet) || 0,
         lastEffect: null,
         createdAt: Date.now(),
-        rewards: null
+        rewards: null,
+        chat: []
     };
     arenas.set(id, match);
     return { ok: true, match };
@@ -432,10 +433,24 @@ function publicState(match, asUserId) {
         you: asUserId || null,
         yourTurn: match.currentId === asUserId,
         rewards: match.rewards || null,
+        chat: (match.chat || []).slice(-80),
         youWon: match.status === 'finished' && asUserId
             ? (match.winnerTeam === 'A' ? match.teamA : match.teamB).includes(asUserId)
             : null
     };
+}
+
+function postChat(matchId, playerId, text) {
+    const match = getMatch(matchId);
+    if (!match) return { ok: false, error: 'Arena não encontrada.' };
+    if (!match.fighters[playerId]) return { ok: false, error: 'Você não está nesta luta.' };
+    const msg = String(text || '').trim().slice(0, 300);
+    if (!msg) return { ok: false, error: 'Mensagem vazia.' };
+    if (!match.chat) match.chat = [];
+    const name = match.fighters[playerId]?.name || 'Jogador';
+    match.chat.push({ from: playerId, name, text: msg, t: Date.now() });
+    if (match.chat.length > 100) match.chat = match.chat.slice(-100);
+    return { ok: true, chat: match.chat.slice(-80) };
 }
 
 module.exports = {
@@ -446,5 +461,6 @@ module.exports = {
     publicState,
     loadFighter,
     rollChest,
-    rollPvpItems
+    rollPvpItems,
+    postChat
 };
