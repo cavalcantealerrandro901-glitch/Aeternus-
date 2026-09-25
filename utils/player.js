@@ -1,69 +1,29 @@
 const store = require('./store');
 const itemsCatalog = require('./items');
 const crypto = require('crypto');
+const classesMod = require('./classes');
 
-const CLASSES = {
-    mago: {
-        id: 'mago',
-        name: 'Mago',
-        emoji: '🧙',
-        desc: 'Alto poder mágico e mana',
-        bonus: { forca: 1, defesa: 0, agilidade: 1, vida: 0 },
-        manaMult: 1.4,
-        color: 0x7c3aed,
-        banner: 'https://placehold.co/600x200/4c1d95/e9d5ff/png?text=%F0%9F%A7%99+MAGO&font=roboto'
-    },
-    arqueiro: {
-        id: 'arqueiro',
-        name: 'Arqueiro',
-        emoji: '🏹',
-        desc: 'Agilidade e críticos',
-        bonus: { forca: 1, defesa: 0, agilidade: 3, vida: 0 },
-        manaMult: 1.0,
-        color: 0x16a34a,
-        banner: 'https://placehold.co/600x200/14532d/bbf7d0/png?text=%F0%9F%8F%B9+ARQUEIRO&font=roboto'
-    },
-    tanque: {
-        id: 'tanque',
-        name: 'Tanque',
-        emoji: '🛡️',
-        desc: 'Defesa e vida elevadas',
-        bonus: { forca: 0, defesa: 3, agilidade: 0, vida: 3 },
-        manaMult: 0.85,
-        color: 0x64748b,
-        banner: 'https://placehold.co/600x200/334155/e2e8f0/png?text=%F0%9F%9B%A1+TANQUE&font=roboto'
-    },
-    healer: {
-        id: 'healer',
-        name: 'Healer',
-        emoji: '💊',
-        desc: 'Suporte e recuperação',
-        bonus: { forca: 0, defesa: 1, agilidade: 1, vida: 2 },
-        manaMult: 1.25,
-        color: 0xec4899,
-        banner: 'https://placehold.co/600x200/9d174d/fce7f3/png?text=%F0%9F%92%8A+HEALER&font=roboto'
-    },
-    guerreiro: {
-        id: 'guerreiro',
-        name: 'Guerreiro',
-        emoji: '⚔️',
-        desc: 'Força equilibrada',
-        bonus: { forca: 3, defesa: 1, agilidade: 0, vida: 1 },
-        manaMult: 0.95,
-        color: 0xdc2626,
-        banner: 'https://placehold.co/600x200/7f1d1d/fecaca/png?text=%E2%9A%94+GUERREIRO&font=roboto'
-    },
-    assassino: {
-        id: 'assassino',
-        name: 'Assassino',
-        emoji: '🗡️',
-        desc: 'Dano alto e velocidade',
-        bonus: { forca: 2, defesa: 0, agilidade: 3, vida: 0 },
-        manaMult: 0.9,
-        color: 0x312e81,
-        banner: 'https://placehold.co/600x200/1e1b4b/c7d2fe/png?text=%F0%9F%97%A1+ASSASSINO&font=roboto'
+/** Proxy para o novo sistema de classes (classes.js). */
+const CLASSES = new Proxy(
+    {},
+    {
+        get(_, prop) {
+            if (prop === 'toJSON' || prop === Symbol.toStringTag) return undefined;
+            return classesMod.allClasses()[prop];
+        },
+        ownKeys() {
+            return Object.keys(classesMod.allClasses());
+        },
+        getOwnPropertyDescriptor(_, prop) {
+            const all = classesMod.allClasses();
+            if (prop in all) return { enumerable: true, configurable: true, value: all[prop] };
+            return undefined;
+        },
+        has(_, prop) {
+            return prop in classesMod.allClasses();
+        }
     }
-};
+);
 
 const ITEM_CATEGORIES = [
     { value: 'arma', name: 'Armas' },
@@ -75,12 +35,18 @@ const ITEM_CATEGORIES = [
 ];
 
 const CLASS_ITEMS = {
-    mago: ['cajado_arcano', 'grimorio', 'orbe_mana'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
-    arqueiro: ['arco_longo', 'aljava', 'botas_vento'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
-    tanque: ['escudo_ferro', 'armadura_pesada', 'elmo_guerra'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
-    healer: ['cajado_luz', 'pocao_sagrada', 'amuleto_vida'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
-    guerreiro: ['espada_aco', 'machado', 'cinto_forca'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
-    assassino: ['adagas', 'capa_sombra', 'veneno'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean)
+    cavalheiro_eter: ['espada_aco', 'machado', 'cinto_forca'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    bruxo_ruinas: ['cajado_arcano', 'grimorio', 'orbe_mana'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    cacador_sombras: ['arco_longo', 'aljava', 'botas_vento'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    oraculo_vital: ['cajado_luz', 'pocao_sagrada', 'amuleto_vida'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    berserker_ferro: ['machado', 'espada_aco', 'cinto_forca'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    tecelao_tempestade: ['cajado_arcano', 'orbe_mana', 'grimorio'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    guardiao_runico: ['escudo_ferro', 'armadura_pesada', 'elmo_guerra'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    lamina_fantasma: ['adagas', 'capa_sombra', 'veneno'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
+    ceifador_negro: ['foice_grande', 'manto_negro', 'dado_da_morte']
+        .map((id) => itemsCatalog.getItemDef(id))
+        .filter(Boolean),
+    l_detetive_arcano: []
 };
 
 function all() {
@@ -101,22 +67,26 @@ function get(userId) {
 }
 
 function getClass(classId) {
-    return CLASSES[classId] || CLASSES.guerreiro;
+    return classesMod.getClass(classId);
 }
 
 function maxManaFromLevel(level, classId) {
     const lv = Math.max(0, Number(level) || 0);
-    const mult = CLASSES[classId]?.manaMult || 1;
+    const resolved = classesMod.resolveClassId(classId);
+    const mult = (resolved && classesMod.getClass(resolved)?.manaMult) || 1;
     return Math.floor((20 + lv * 4) * mult);
 }
 
 function create(userId, { name, classId, photoUrl }) {
-    if (!CLASSES[classId]) throw new Error('Classe inválida');
+    const resolved = classesMod.resolveClassId(classId);
+    if (!classesMod.getClass(resolved)) throw new Error('Classe inválida');
     const data = all();
+    const claim = classesMod.canClaim(resolved, userId, data);
+    if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
     const profile = {
         userId,
         name: String(name).slice(0, 32),
-        classId,
+        classId: resolved,
         photoUrl: photoUrl || null,
         inventory: [],
         equipped: { arma: null, armadura: null, acessorio: null },
@@ -132,6 +102,12 @@ function create(userId, { name, classId, photoUrl }) {
 function update(userId, patch) {
     const data = all();
     if (!data[userId]) return null;
+    if (patch && patch.classId != null) {
+        const resolved = classesMod.resolveClassId(patch.classId);
+        const claim = classesMod.canClaim(resolved, userId, data);
+        if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
+        patch = { ...patch, classId: resolved };
+    }
     data[userId] = { ...data[userId], ...patch, updatedAt: Date.now() };
     save(data);
     return data[userId];
@@ -142,16 +118,18 @@ function getBattleAvatar(userId) {
     return (p && p.battleAvatar) || null;
 }
 
-/** Avatar 3D/realista gerado por descrição (imagem + prompt). */
+/** Avatar de batalha a partir de imagem transformada (+ expressões na arena). */
 function setBattleAvatar(userId, avatar) {
     if (!get(userId)) return null;
-    const imageUrl = String(avatar.imageUrl || avatar.url || '').trim().slice(0, 500);
+    const imageUrl = String(avatar.imageUrl || avatar.url || '').trim().slice(0, 800);
     const description = String(avatar.description || avatar.prompt || '').trim().slice(0, 500);
+    const sourceUrl = String(avatar.sourceUrl || '').trim().slice(0, 800) || null;
     if (!imageUrl) return null;
     const clean = {
-        type: 'ai3d',
+        type: avatar.type || 'ai3d',
         description,
         imageUrl,
+        sourceUrl,
         updatedAt: Date.now()
     };
     return update(userId, {
@@ -197,7 +175,7 @@ function itemCategory(item) {
 }
 
 function rollClassItem(classId) {
-    return itemsCatalog.rollDropItem(classId || 'guerreiro');
+    return itemsCatalog.rollDropItem(classesMod.resolveClassId(classId || 'cavalheiro_eter'));
 }
 
 function getInventory(userId, category) {
@@ -350,12 +328,17 @@ function useItem(userId, index1) {
     const effects = removed.effects || def?.effects || {};
     const result = { ok: true, item: removed, action: 'use', messages: [] };
 
-    if (classChange && CLASSES[classChange]) {
-        data[userId].classId = classChange;
+    if (classChange) {
+        const resolved = classesMod.resolveClassId(classChange);
+        const cls = classesMod.getClass(resolved);
+        if (!cls) return { ok: false, error: 'Classe inválida.' };
+        const claim = classesMod.canClaim(resolved, userId, data);
+        if (!claim.ok) return { ok: false, error: claim.reason || 'Classe indisponível.' };
+        data[userId].classId = resolved;
         result.action = 'class';
-        result.newClass = CLASSES[classChange];
+        result.newClass = cls;
         result.messages.push(
-            `Classe alterada para **${CLASSES[classChange].emoji} ${CLASSES[classChange].name}**.`
+            `Classe alterada para **${cls.emoji} ${cls.name}**.`
         );
     }
 
@@ -455,8 +438,22 @@ function count() {
     return Object.keys(all()).filter((id) => has(id)).length;
 }
 
+function changeClass(userId, classId) {
+    const data = all();
+    if (!data[userId]) return { ok: false, error: 'Sem perfil.' };
+    const resolved = classesMod.resolveClassId(classId);
+    const cls = classesMod.getClass(resolved);
+    if (!cls) return { ok: false, error: 'Classe inválida.' };
+    const claim = classesMod.canClaim(resolved, userId, data);
+    if (!claim.ok) return { ok: false, error: claim.reason || 'Classe indisponível.' };
+    data[userId].classId = resolved;
+    save(data);
+    return { ok: true, class: cls };
+}
+
 module.exports = {
     CLASSES,
+    changeClass,
     CLASS_ITEMS,
     ITEM_CATEGORIES,
     all,

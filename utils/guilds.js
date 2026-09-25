@@ -10,7 +10,8 @@ const player = require('./player');
 const CREATE_COST = 5000;
 const MAX_NAME = 24;
 const MAX_TAG = 5;
-const MAX_DESC = 200;
+const MAX_DESC = 300;
+const MAX_WELCOME = 300;
 const MAX_MEMBERS_BASE = 15;
 const MAX_MEMBERS_PER_LEVEL = 2;
 
@@ -66,12 +67,16 @@ function slugName(name) {
         .slice(0, MAX_NAME);
 }
 
-function createGuild(ownerId, name, tag) {
+/**
+ * @param {string} ownerId
+ * @param {{ name, tag, description?, welcome?, imageUrl?, imageTag? }} opts
+ */
+function createGuild(ownerId, opts = {}) {
     if (!player.has(ownerId)) return { ok: false, error: 'Crie o perfil com `O.j criar`.' };
     if (findByMember(ownerId)) return { ok: false, error: 'Você já está em uma guilda. Saia antes de criar outra.' };
 
-    name = slugName(name);
-    tag = String(tag || '')
+    const name = slugName(opts.name);
+    let tag = String(opts.tag || '')
         .trim()
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, '')
@@ -95,7 +100,10 @@ function createGuild(ownerId, name, tag) {
         id,
         name,
         tag,
-        description: '',
+        description: String(opts.description || '').trim().slice(0, MAX_DESC),
+        welcome: String(opts.welcome || '').trim().slice(0, MAX_WELCOME),
+        imageUrl: opts.imageUrl || null,
+        imageTag: String(opts.imageTag || '').trim().slice(0, 64) || null,
         ownerId,
         level: 1,
         xp: 0,
@@ -114,6 +122,27 @@ function setDescription(guildId, userId, desc) {
     if (!g) return { ok: false, error: 'Guilda não encontrada.' };
     if (!isOfficer(g, userId)) return { ok: false, error: 'Só o líder ou oficiais podem editar.' };
     g.description = String(desc || '').trim().slice(0, MAX_DESC);
+    save(data);
+    return { ok: true, guild: g };
+}
+
+function setWelcome(guildId, userId, text) {
+    const data = all();
+    const g = data[guildId];
+    if (!g) return { ok: false, error: 'Guilda não encontrada.' };
+    if (!isOfficer(g, userId)) return { ok: false, error: 'Só o líder ou oficiais podem editar.' };
+    g.welcome = String(text || '').trim().slice(0, MAX_WELCOME);
+    save(data);
+    return { ok: true, guild: g };
+}
+
+function setImage(guildId, userId, imageUrl, imageTag) {
+    const data = all();
+    const g = data[guildId];
+    if (!g) return { ok: false, error: 'Guilda não encontrada.' };
+    if (!isOfficer(g, userId)) return { ok: false, error: 'Só o líder ou oficiais podem editar.' };
+    if (imageUrl) g.imageUrl = String(imageUrl).slice(0, 500);
+    if (imageTag != null) g.imageTag = String(imageTag || '').trim().slice(0, 64) || null;
     save(data);
     return { ok: true, guild: g };
 }
@@ -146,7 +175,7 @@ function acceptInvite(userId, guildIdOrName) {
     g.invites = g.invites.filter((id) => id !== userId);
     g.members.push({ id: userId, role: 'member', joinedAt: Date.now() });
     save(data);
-    return { ok: true, guild: g };
+    return { ok: true, guild: g, welcome: g.welcome || null };
 }
 
 function leave(userId) {
@@ -213,7 +242,6 @@ function disband(guildId, byUserId) {
     const g = data[guildId];
     if (!g) return { ok: false, error: 'Guilda não encontrada.' };
     if (!isOwner(g, byUserId)) return { ok: false, error: 'Só o líder dissolve.' };
-    // devolve banco ao líder
     if (g.bank > 0) {
         eter.add(byUserId, g.bank, { reason: 'guild_disband' });
     }
@@ -232,7 +260,6 @@ function deposit(userId, amount) {
     if (eter.get(userId) < n) return { ok: false, error: 'Éter insuficiente.' };
     eter.remove(userId, n, { reason: 'guild_deposit' });
     guild.bank = Math.floor(Number(guild.bank) || 0) + n;
-    // XP leve da guilda
     guild.xp = Math.floor(Number(guild.xp) || 0) + Math.floor(n / 100);
     while (guild.xp >= guildLevelNeed(guild.level)) {
         guild.xp -= guildLevelNeed(guild.level);
@@ -274,6 +301,8 @@ function ranking(limit = 10) {
 
 module.exports = {
     CREATE_COST,
+    MAX_DESC,
+    MAX_WELCOME,
     all,
     list,
     get,
@@ -285,6 +314,8 @@ module.exports = {
     maxMembers,
     createGuild,
     setDescription,
+    setWelcome,
+    setImage,
     invite,
     acceptInvite,
     leave,

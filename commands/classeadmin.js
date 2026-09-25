@@ -28,12 +28,14 @@ module.exports = {
         }
 
         if (sub === 'criar' || sub === 'create') {
+            // O.classeadmin criar id|Nome|emoji|tipo|desc|poder1|poder2|desv1|desv2
             const raw = args.slice(1).join(' ');
             const parts = raw.split('|').map((s) => s.trim());
             if (parts.length < 5) {
                 return message.reply(
                     'Uso:\n`O.classeadmin criar id|Nome|emoji|tipo|descrição|poder1|poder2|desv1|desv2`\n' +
-                        'Tipos: melee, magic, ranged, support, tank'
+                        'Tipos: melee, magic, ranged, support, tank\n' +
+                        'Exemplo: `O.classeadmin criar monge_vento|Monge do Vento|🍃|melee|Combatente ágil|Soco ciclone|Meditação|Pouca armadura|Mana baixa`'
                 );
             }
             try {
@@ -62,8 +64,21 @@ module.exports = {
             return message.reply(`Removida classe custom \`${id}\`.`);
         }
 
+        if (sub === 'setar' || sub === 'set' || sub === 'dar') {
+            const user = message.mentions.users.first();
+            const classId = args.find((a) => !a.startsWith('<@') && a !== sub);
+            if (!user || !classId) {
+                return message.reply('Uso: `O.classeadmin setar @user <id_da_classe>`\nEx.: `O.classeadmin setar @voce deus_criador`');
+            }
+            const player = require('../utils/player');
+            if (!player.has(user.id)) return message.reply('Usuário sem perfil.');
+            const r = player.changeClass(user.id, classId);
+            if (!r.ok) return message.reply('❌ ' + r.error);
+            return message.reply(`✅ ${user.username} agora é ${r.class.emoji} **${r.class.name}**.`);
+        }
+
         return message.reply(
-            'Subcomandos: `lista` · `criar id|Nome|emoji|tipo|desc|poderes|desvantagens` · `remover <id>`'
+            'Subcomandos: `lista` · `criar ...` · `remover <id>` · `setar @user <id>`'
         );
     }
 };

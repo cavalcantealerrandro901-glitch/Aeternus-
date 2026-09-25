@@ -1,3 +1,8 @@
+/**
+ * Classes Aeternus — sistema de classes.
+ * Classes customizadas (admin) ficam em data/custom_classes.json via store.
+ * Classes com maxHolders limitam quantos jogadores podem tê-las (ex: única = 1).
+ */
 const store = require('./store');
 
 const RARITIES = {
@@ -19,248 +24,282 @@ function splitList(v, max) {
         .slice(0, max);
 }
 
+/** Única classe inicial do sistema (todas as antigas foram removidas). */
 const BASE_CLASSES = {
-    cavalheiro_eter: {
-        id: 'cavalheiro_eter', name: 'Cavalheiro do Éter', emoji: '⚔️', type: 'melee', rarity: 'comum', rarityName: 'Comum',
-        desc: 'Guerreiro abençoado pelo Éter. Equilíbrio entre lâmina e resistência sagrada.',
-        uniqueAbilities: ['Juramento do Éter', 'Postura Sagrada'],
-        activeAbilities: ['Golpe de Éter', 'Investida', 'Escudo de Fé', 'Grito de Guerra'],
-        uniquePassives: ['Aura protetora', 'Resistência sagrada', 'Maestria com espada'],
-        passives: ['Defesa firme', 'Vitalidade', 'Determinação', 'Foco em combate', 'Presença'],
-        powers: ['Golpe de Éter', 'Investida', 'Escudo de Fé', 'Grito de Guerra'],
-        disadvantages: ['Mana limitada', 'Mobilidade média'],
-        bonus: { forca: 3, defesa: 2, agilidade: 1, vida: 2 }, manaMult: 0.95, color: 0xc9a227,
-        basicAttack: { id: 'golpe_espada', name: 'Golpe de Espada', emoji: '⚔️', type: 'physical', power: 1.0, mana: 0 }
-    },
-    bruxo_ruinas: {
-        id: 'bruxo_ruinas', name: 'Bruxo das Ruínas', emoji: '📜', type: 'magic', rarity: 'rara', rarityName: 'Rara',
-        desc: 'Canaliza magia proibida das ruínas antigas.',
-        uniqueAbilities: ['Maldição Ancestral', 'Pacto das Ruínas'],
-        activeAbilities: ['Rajada Arcana', 'Dreno de mana', 'Explosão sombria', 'Véu das ruínas'],
-        uniquePassives: ['Afinidade arcana', 'Sede de mana', 'Conhecimento proibido'],
-        passives: ['Poder mágico', 'Concentração', 'Resistência mental', 'Fluxo de éter', 'Sombra'],
-        powers: ['Rajada Arcana', 'Dreno de mana', 'Explosão sombria', 'Véu das ruínas'],
-        disadvantages: ['Vida baixa', 'Defesa frágil'],
-        bonus: { forca: 1, defesa: 0, agilidade: 1, vida: 0 }, manaMult: 1.45, color: 0x6d28d9,
-        basicAttack: { id: 'toque_sombrio', name: 'Toque Sombrio', emoji: '🌑', type: 'magic', power: 0.95, mana: 4 }
-    },
-    cacador_sombras: {
-        id: 'cacador_sombras', name: 'Caçador de Sombras', emoji: '🏹', type: 'ranged', rarity: 'rara', rarityName: 'Rara',
-        desc: 'Emboscadas e tiros precisos nas penumbras.',
-        uniqueAbilities: ['Marca da Presa', 'Passo Sombrio'],
-        activeAbilities: ['Tiro preciso', 'Chuva de flechas', 'Armadilha', 'Fuga sombria'],
-        uniquePassives: ['Olho de falcão', 'Stealth', 'Crítico letal'],
-        passives: ['Agilidade', 'Precisão', 'Instinto', 'Velocidade', 'Foco'],
-        powers: ['Tiro preciso', 'Chuva de flechas', 'Armadilha', 'Fuga sombria'],
-        disadvantages: ['Pouca vida'],
-        bonus: { forca: 2, defesa: 0, agilidade: 4, vida: 0 }, manaMult: 1.0, color: 0x166534,
-        basicAttack: { id: 'tiro_sombrio', name: 'Tiro Sombrio', emoji: '🏹', type: 'physical', power: 1.05, mana: 0 }
-    },
-    oraculo_vital: {
-        id: 'oraculo_vital', name: 'Oráculo Vital', emoji: '🌿', type: 'support', rarity: 'incomum', rarityName: 'Incomum',
-        desc: 'Cura, protege e sustenta aliados.',
-        uniqueAbilities: ['Bênção da Fonte', 'Laço Vital'],
-        activeAbilities: ['Cura vital', 'Escudo de vida', 'Purificar', 'Regeneração em massa'],
-        uniquePassives: ['Mãos sagradas', 'Empatia', 'Fluxo vital'],
-        passives: ['Cura aumentada', 'Mana estável', 'Proteção', 'Serenidade', 'Suporte'],
-        powers: ['Cura vital', 'Escudo de vida', 'Purificar', 'Regeneração em massa'],
-        disadvantages: ['Dano direto baixo'],
-        bonus: { forca: 0, defesa: 2, agilidade: 1, vida: 3 }, manaMult: 1.3, color: 0x059669,
-        basicAttack: { id: 'pulso_vital', name: 'Pulso Vital', emoji: '💚', type: 'magic', power: 0.7, mana: 3 }
-    },
-    berserker_ferro: {
-        id: 'berserker_ferro', name: 'Berserker de Ferro', emoji: '🪓', type: 'melee', rarity: 'epica', rarityName: 'Épica',
-        desc: 'Fúria incontrolável. Quanto mais ferido, mais destrutivo.',
-        uniqueAbilities: ['Sede de Sangue', 'Último Fôlego'],
-        activeAbilities: ['Golpe furioso', 'Fúria', 'Cleave', 'Ignorar dor'],
-        uniquePassives: ['Fúria crescente', 'Pele de ferro', 'Sede de combate'],
-        passives: ['Força bruta', 'Crítico selvagem', 'Resistência', 'Adrenalina', 'Ímpeto'],
-        powers: ['Golpe furioso', 'Fúria', 'Cleave', 'Ignorar dor'],
-        disadvantages: ['Defesa baixa', 'Pouca mana'],
-        bonus: { forca: 4, defesa: 0, agilidade: 2, vida: 1 }, manaMult: 0.8, color: 0xb91c1c,
-        basicAttack: { id: 'golpe_furioso', name: 'Golpe Furioso', emoji: '🪓', type: 'physical', power: 1.15, mana: 0 }
-    },
-    tecelao_tempestade: {
-        id: 'tecelao_tempestade', name: 'Tecelão da Tempestade', emoji: '⛈️', type: 'magic', rarity: 'epica', rarityName: 'Épica',
-        desc: 'Manipula raios e ventos.',
-        uniqueAbilities: ['Olho da Tempestade', 'Condutor Celeste'],
-        activeAbilities: ['Raio em cadeia', 'Rajada', 'Explosão elétrica', 'Vento cortante'],
-        uniquePassives: ['Carga estática', 'Afinidade elemental', 'Tempestade interior'],
-        passives: ['Dano elétrico', 'Controle', 'Velocidade de conjuração', 'Alcance', 'Instabilidade'],
-        powers: ['Raio em cadeia', 'Rajada', 'Explosão elétrica', 'Vento cortante'],
-        disadvantages: ['Mana cara'],
-        bonus: { forca: 2, defesa: 1, agilidade: 2, vida: 1 }, manaMult: 1.25, color: 0x0284c7,
-        basicAttack: { id: 'faisca', name: 'Faísca', emoji: '⚡', type: 'magic', power: 0.9, mana: 3 }
-    },
-    guardiao_runico: {
-        id: 'guardiao_runico', name: 'Guardião Rúnico', emoji: '🛡️', type: 'tank', rarity: 'incomum', rarityName: 'Incomum',
-        desc: 'Muralha viva marcada por runas.',
-        uniqueAbilities: ['Runa Suprema', 'Muralha Ancestral'],
-        activeAbilities: ['Impacto rúnico', 'Provocar', 'Barreira', 'Reflexo de dano'],
-        uniquePassives: ['Pele rúnica', 'Aço vivo', 'Guardião'],
-        passives: ['Defesa alta', 'Bloqueio', 'Vitalidade', 'Ameaças', 'Endurecido'],
-        powers: ['Impacto rúnico', 'Provocar', 'Barreira', 'Reflexo de dano'],
-        disadvantages: ['Dano baixo', 'Lento'],
-        bonus: { forca: 1, defesa: 4, agilidade: 0, vida: 3 }, manaMult: 0.9, color: 0x475569,
-        basicAttack: { id: 'bash_runico', name: 'Impacto Rúnico', emoji: '🛡️', type: 'physical', power: 0.75, mana: 0 }
-    },
-    lamina_fantasma: {
-        id: 'lamina_fantasma', name: 'Lâmina Fantasma', emoji: '👻', type: 'melee', rarity: 'lendaria', rarityName: 'Lendária',
-        desc: 'Assassino entre o material e o espectro.',
-        uniqueAbilities: ['Forma Espectral', 'Corte entre Mundos'],
-        activeAbilities: ['Corte fantasma', 'Veneno etéreo', 'Evasão', 'Execução'],
-        uniquePassives: ['Entre mundos', 'Crítico fantasma', 'Invisibilidade parcial'],
-        passives: ['Agilidade espectral', 'Letalidade', 'Furtividade', 'Precisão', 'Sombra'],
-        powers: ['Corte fantasma', 'Veneno etéreo', 'Evasão', 'Execução'],
-        disadvantages: ['Vida muito baixa'],
-        bonus: { forca: 3, defesa: 0, agilidade: 3, vida: 0 }, manaMult: 0.95, color: 0x4c1d95,
-        basicAttack: { id: 'corte_fantasma', name: 'Corte Fantasma', emoji: '🗡️', type: 'physical', power: 1.1, mana: 0 }
-    },
-    ceifador_negro: {
-        id: 'ceifador_negro',
-        name: 'Ceifador Negro',
-        emoji: '🖤',
-        type: 'melee',
-        rarity: 'unica',
-        rarityName: 'Única',
-        exclusiveOwner: '1483097258944630897',
-        desc: 'Classe única do Ceifador. Lâmina e névoa negra — só um portador no Aeternus.',
-        uniqueAbilities: ['Decapitação', 'Véu da Morte'],
-        activeAbilities: ['Decapitação', 'Corte Fantasma', 'Estocada Fantasma', 'Manto Negro', 'Véu da Morte', 'Dado da Morte'],
-        uniquePassives: ['Aura da Morte', 'Maldição do Ceifador', 'Mão Negra'],
-        passives: ['Aura da Morte', 'Maldição de Nível', 'Maldição do Ceifador', 'Mão Negra'],
-        powers: ['Decapitação', 'Corte Fantasma', 'Estocada Fantasma', 'Manto Negro', 'Véu da Morte', 'Dado da Morte'],
-        disadvantages: [],
-        abilityIds: {
-            active: ['cn_decapitacao', 'cn_corte_fantasma', 'cn_estocada_fantasma', 'cn_manto_negro', 'cn_veu_morte', 'cn_dado_morte'],
-            passive: ['cn_aura_morte', 'cn_maldicao_nivel', 'cn_maldicao_ceifador', 'cn_mao_negra']
-        },
-        classGear: { weapon: 'foice_grande', armor: 'manto_negro_armadura', accessory: 'dado_da_morte' },
-        bonus: { forca: 250, defesa: 200, agilidade: 230, vida: 220 },
-        manaMult: 1.2,
-        color: 0x0f0f0f,
-        basicAttack: { id: 'corte_ceifador', name: 'Corte do Ceifador', emoji: '🖤', type: 'physical', power: 1.15, mana: 0 }
-    },
-    detetive_arcano: {
-        id: 'detetive_arcano',
+    l_detetive_arcano: {
+        id: 'l_detetive_arcano',
         name: 'L — O Detetive Arcano',
         emoji: '🕵️',
         type: 'magic',
         rarity: 'unica',
         rarityName: 'Única',
-        exclusiveOwner: '1460227733023096875',
-        desc: 'Mente afiada e magia investigativa. Só um portador enxerga o tabuleiro completo.',
-        uniqueAbilities: ['Xeque-Mate', 'Dedução Impossível'],
-        activeAbilities: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador'],
-        uniquePassives: ['Um Passo à Frente', 'Gênio da Dedução', 'A Verdade Sempre Aparece'],
-        passives: ['Mente Analítica', 'Memória Fotográfica', 'Suspeita Constante', 'Raciocínio Reverso', 'Instinto Investigativo'],
-        powers: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador', 'Xeque-Mate', 'Dedução Impossível'],
-        disadvantages: [],
-        abilityIds: {
-            active: ['l_cartas_deducao', 'l_correntes_suspeita', 'l_olho_analitico', 'l_bengala_investigador', 'l_xeque_mate', 'l_deducao_impossivel'],
-            passive: ['l_mente_analitica', 'l_memoria_fotografica', 'l_suspeita_constante', 'l_raciocinio_reverso', 'l_instinto_investigativo', 'l_um_passo_frente', 'l_genio_deducao', 'l_verdade_aparece']
-        },
-        classGear: {
-            weapon: 'bengala_investigador',
-            armor: 'capa_detetive_arcano',
-            accessory: 'caderno_deducoes',
-            extra: 'lentes_analiticas'
-        },
-        bonus: { forca: 200, defesa: 200, agilidade: 240, vida: 210 },
-        manaMult: 1.35,
+        maxHolders: 1,
+        exclusive: true,
+        desc:
+            'Mente analítica e olho mágico. Deduz fraquezas, prevê movimentos e transforma informação em poder. Apenas uma pessoa no servidor pode usar esta classe.',
+        uniqueAbilities: [
+            'Xeque-Mate — Usa todas as informações coletadas para prever movimentos; precisão extrema e ignora parte da defesa. Quanto mais dados, mais forte.',
+            'Dedução Impossível — Encontra a solução que ninguém viu (ilusão, verdadeiro inimigo, origem de habilidade). 1× por combate.'
+        ],
+        activeAbilities: [
+            'Cartas da Dedução — Cartas mágicas afiadas; cada acerto revela info do alvo e aumenta o dano das próximas cartas.',
+            'Correntes da Suspeita — Correntes negras que perseguem o alvo; se fugir, atacar outro ou usar movimento, ficam mais fortes e podem imobilizar.',
+            'Olho Analítico — Analisa o inimigo por alguns segundos e revela fraqueza, resistência ou habilidade.',
+            'Bengala do Investigador — A bengala vira arma escolhida (espada, lança ou corrente) com efeito diferente em cada forma.'
+        ],
+        uniquePassives: [
+            'Um Passo à Frente — Prevê parcialmente o próximo movimento de um alvo já analisado; 1× por rodada reduz dano ou reposiciona.',
+            'Gênio da Dedução — Quanto mais tempo contra o mesmo inimigo, mais bônus cumulativos de precisão, percepção e poder investigativo.',
+            'A Verdade Sempre Aparece — Sob ilusão/disfarce/manipulação mental, busca inconsistências e pode quebrar o efeito revelando a verdade.'
+        ],
+        passives: [
+            'Mente Analítica — Ao observar uma habilidade inimiga, ganha pequeno bônus contra ela.',
+            'Memória Fotográfica — Nunca esquece o que viu; reconhece info, símbolos, rostos e movimentos de imediato.',
+            'Suspeita Constante — Bônus para perceber emboscadas, armadilhas, mentiras e ataques surpresa.',
+            'Raciocínio Reverso — Após tomar dano de uma habilidade, entende melhor e reduz dano de repetições da mesma técnica.',
+            'Instinto Investigativo — Em ambiente desconhecido, percebe pistas mágicas, objetos escondidos e alterações no cenário.'
+        ],
+        powers: [
+            'Cartas da Dedução',
+            'Correntes da Suspeita',
+            'Olho Analítico',
+            'Bengala do Investigador'
+        ],
+        disadvantages: [
+            'Classe exclusiva (só 1 jogador)',
+            'Depende de observar o inimigo para maximizar o poder',
+            'Dedução Impossível limitada a 1× por combate'
+        ],
+        bonus: { forca: 1, defesa: 1, agilidade: 3, vida: 1 },
+        manaMult: 1.25,
         color: 0x1e3a5f,
-        basicAttack: { id: 'apontar_pista', name: 'Apontar a Pista', emoji: '🔍', type: 'magic', power: 0.95, mana: 2 }
+        basicAttack: {
+            id: 'golpe_bengala',
+            name: 'Golpe de Bengala',
+            emoji: '🪄',
+            type: 'magic',
+            power: 0.95,
+            mana: 0
+        },
+        custom: false
     },
+
+    ceifador_negro: {
+        id: 'ceifador_negro',
+        name: 'Ceifador Negro',
+        emoji: '💀',
+        type: 'melee',
+        rarity: 'unica',
+        rarityName: 'Única',
+        maxHolders: 1,
+        exclusive: true,
+        boundUserId: '1483097258944630897',
+        desc:
+            'Avatar da morte com foice e véu negro. Marca inimigos, quebra defesas e joga o destino no Dado da Morte. Classe Única — apenas o usuário vinculado pode possuí-la.',
+        uniqueAbilities: [
+            'Decapitação [Épica] — Consome 1 ponto de atributo aleatório permanentemente do usuário. Só pode ser usada 1× por partida.',
+            'Dado da Morte [Épico] — Dado de 6 lados: 4–6 oponente perde 50% da vida máx. e você recupera 25% do dano; 1–2 você perde 50% da vida máx.; 3 ambos perdem 25% da vida máx.'
+        ],
+        activeAbilities: [
+            'Corte Fantasma [Rara] — Ignora parte da defesa e causa dano verdadeiro.',
+            'Estocada Fantasma [Rara] — Quebra a defesa do alvo, causando pouco dano direto.',
+            'Manto Negro — Envolve-se em névoa negra e fica intocável por 1 turno.',
+            'Véu da Morte [Épica] — Por 2 turnos, chance de 5% a 50% de sobreviver a um golpe fatal.'
+        ],
+        uniquePassives: [
+            'Aura da Morte [Épica] — Ao iniciar a batalha, inimigos recebem Marca da Morte e perdem 1% da vida máxima a cada turno.',
+            'Maldição do Ceifador [Épica] — A cada kill, perde 5% de chance de ser o primeiro a atacar na próxima batalha.',
+            'Mão Negra [Épica] — Sem arma: −30% dano. Com Foice Grande equipada: +30% dano.'
+        ],
+        passives: [
+            'Maldição de Nível [Rara] — Se o inimigo tiver pelo menos 10 níveis a menos, o usuário recebe Marca da Morte no início da partida.',
+            'Presença Funérea — Inimigos sob Marca da Morte sofrem leve redução de cura recebida.',
+            'Frio do Túmulo — Resistência parcial a efeitos de medo e paralisia menores.',
+            'Colheita Sombria — Ao eliminar um alvo marcado, recupera uma pequena parcela de mana.',
+            'Silêncio do Véu — Em Manto Negro, não pode ser alvo de habilidades de suporte inimigas.'
+        ],
+        powers: [
+            'Corte Fantasma',
+            'Estocada Fantasma',
+            'Manto Negro',
+            'Véu da Morte'
+        ],
+        disadvantages: [
+            'Classe exclusiva vinculada a um usuário',
+            'Decapitação custa atributo permanente e 1× por partida',
+            'Dado da Morte pode virar contra você',
+            'Maldição do Ceifador reduz iniciativa após kills'
+        ],
+        classGear: {
+            arma: 'foice_grande',
+            armadura: 'manto_negro',
+            acessorio: 'dado_da_morte'
+        },
+        bonus: { forca: 4, defesa: 1, agilidade: 2, vida: 2 },
+        manaMult: 0.9,
+        color: 0x1a1a1a,
+        basicAttack: {
+            id: 'golpe_foice',
+            name: 'Golpe de Foice',
+            emoji: '☠️',
+            type: 'physical',
+            power: 1.1,
+            mana: 0
+        },
+        custom: false
+    }
+,
     deus_criador: {
         id: 'deus_criador',
         name: 'Deus Criador',
         emoji: '🌌',
+        rarity: 'mitica',
+        rarityName: 'Mítica',
         type: 'magic',
-        rarity: 'unica',
-        rarityName: 'Única',
-        exclusiveOwner: '',
-        desc: 'Classe única absoluta. Molda o Éter, cria e desfaz o combate. Só um portador existe.',
-        uniqueAbilities: ['Fiat Lux', 'Apocalipse do Éter'],
-        activeAbilities: ['Fiat Lux', 'Mão Criadora', 'Julgamento Celeste', 'Reescrever Destino', 'Apocalipse do Éter', 'Gênese'],
-        uniquePassives: ['Onipresença', 'Autor da Realidade', 'Imortalidade Relativa'],
-        passives: ['Onipresença', 'Autor da Realidade', 'Imortalidade Relativa', 'Sabedoria Infinita', 'Vontade Divina'],
-        powers: ['Fiat Lux', 'Mão Criadora', 'Julgamento Celeste', 'Reescrever Destino', 'Apocalipse do Éter', 'Gênese'],
-        disadvantages: [],
-        abilityIds: {
-            active: ['dc_fiat_lux', 'dc_mao_criadora', 'dc_julgamento', 'dc_reescrever', 'dc_apocalipse', 'dc_genese'],
-            passive: ['dc_onipresenca', 'dc_autor_realidade', 'dc_imortalidade', 'dc_sabedoria', 'dc_vontade']
-        },
-        classGear: {
-            weapon: 'cetro_genese',
-            armor: 'manto_cosmos',
-            accessory: 'olho_criador',
-            extra: 'livro_dos_mundos'
-        },
-        bonus: { forca: 300, defesa: 300, agilidade: 280, vida: 320 },
+        maxHolders: 1,
+        exclusive: true,
+        boundUserId: process.env.OWNER_ID || process.env.BOT_OWNER_ID || process.env.ADMIN_ID || '1483097258944630897',
+        desc: 'O arquiteto do Aeternus. Poder absoluto sobre a criação e o destino. Classe exclusiva do criador.',
+        uniqueAbilities: [
+            'Gênese — Reescreve uma regra menor do combate por alguns turnos.',
+            'Veredito Divino — Julga o alvo; dano massivo ou selamento de habilidade.'
+        ],
+        activeAbilities: [
+            'Raio Primordial — Energia criadora que ignora parte da defesa.',
+            'Mão do Arquiteto — Cura ou reforça com poder divino.',
+            'Véu do Cosmos — Intangível por um turno.',
+            'Decreto — Força o inimigo a pular a próxima ação ofensiva.'
+        ],
+        uniquePassives: [
+            'Onisciência — Percepção máxima de ilusões e emboscadas.',
+            'Imortalidade Relativa — Chance de resistir a golpe fatal 1× por combate.',
+            'Autoridade — Bônus cumulativo enquanto permanece em combate.'
+        ],
+        passives: [
+            'Presença Divina — Inimigos sofrem menor precisão.',
+            'Criação Constante — Regenera mana além do normal.',
+            'Olhar do Criador — Revela fraquezas ao iniciar a luta.',
+            'Equilíbrio — Reduz dano de técnicas repetidas.',
+            'Eco do Éter — Pequeno bônus em todos os atributos.'
+        ],
+        powers: ['Raio Primordial', 'Mão do Arquiteto', 'Véu do Cosmos', 'Decreto'],
+        disadvantages: ['Classe exclusiva do criador', 'Não aparece na lista pública'],
+        bonus: { forca: 5, defesa: 5, agilidade: 5, vida: 5 },
         manaMult: 1.5,
-        color: 0xfbbf24,
-        basicAttack: { id: 'toque_divino', name: 'Toque Divino', emoji: '✨', type: 'magic', power: 1.4, mana: 0 }
+        color: 0xc4b5fd,
+        basicAttack: {
+            id: 'toque_criador',
+            name: 'Toque do Criador',
+            emoji: '✨',
+            type: 'magic',
+            power: 1.35,
+            mana: 0
+        },
+        classGear: null
     }
 };
 
-const LEGACY_MAP = {
-    mago: 'bruxo_ruinas', arqueiro: 'cacador_sombras', tanque: 'guardiao_runico',
-    healer: 'oraculo_vital', guerreiro: 'cavalheiro_eter', assassino: 'lamina_fantasma'
-};
+/** Sem mapeamento legado — classes antigas foram removidas. */
+const LEGACY_MAP = {};
 
-function loadCustom() { return store.load('custom_classes.json', {}); }
-function saveCustom(data) { store.save('custom_classes.json', data); }
-function allClasses() { return { ...BASE_CLASSES, ...loadCustom() }; }
+function loadCustom() {
+    return store.load('custom_classes.json', {});
+}
+
+function saveCustom(data) {
+    store.save('custom_classes.json', data);
+}
+
+/** Apaga todas as classes custom e deixa só as BASE. */
+function clearAllCustom() {
+    saveCustom({});
+    return true;
+}
+
+function allClasses() {
+    return { ...BASE_CLASSES, ...loadCustom() };
+}
+
 function getClass(classId) {
     const all = allClasses();
-    if (all[classId]) return all[classId];
+    if (classId && all[classId]) return all[classId];
     const mapped = LEGACY_MAP[classId];
     if (mapped && all[mapped]) return all[mapped];
-    return all.cavalheiro_eter;
+    // Não força classe exclusiva em quem tinha classe antiga removida
+    return null;
 }
+
 function resolveClassId(classId) {
     const all = allClasses();
-    if (all[classId]) return classId;
-    return LEGACY_MAP[classId] || 'cavalheiro_eter';
+    if (classId && all[classId]) return classId;
+    if (LEGACY_MAP[classId] && all[LEGACY_MAP[classId]]) return LEGACY_MAP[classId];
+    return classId || null;
 }
-function listClasses(userId) {
-    const all = Object.values(allClasses());
-    if (userId == null) return all.filter((c) => !c.exclusiveOwner);
-    const uid = String(userId);
-    return all.filter((c) => !c.exclusiveOwner || String(c.exclusiveOwner) === uid);
+
+function listClasses() {
+    return Object.values(allClasses());
 }
-function canUseClass(userId, classId) {
+
+/** Classes que aparecem na lista pública (sem exclusivas/únicas/míticas vinculadas). */
+function listSelectableClasses() {
+    return listClasses().filter((c) => {
+        if (!c) return false;
+        if (c.exclusive || c.maxHolders === 1) return false;
+        if (c.rarity === 'unica' || c.rarity === 'mitica') return false;
+        if (c.boundUserId) return false;
+        return true;
+    });
+}
+
+/**
+ * Quantos jogadores já usam esta classe.
+ * @param {string} classId
+ * @param {object} playersMap — player.all()
+ * @returns {string[]} userIds
+ */
+function holdersOf(classId, playersMap) {
+    const resolved = resolveClassId(classId);
+    if (!resolved || !playersMap) return [];
+    return Object.keys(playersMap).filter((uid) => {
+        const p = playersMap[uid];
+        return p && resolveClassId(p.classId) === resolved;
+    });
+}
+
+/**
+ * Pode este user pegar a classe? (respeita boundUserId / maxHolders / exclusive)
+ * @returns {{ ok: boolean, reason?: string, holders?: string[] }}
+ */
+function canClaim(classId, userId, playersMap) {
     const cls = getClass(classId);
-    if (!cls) return false;
-    if (!cls.exclusiveOwner) return true;
-    return String(cls.exclusiveOwner) === String(userId);
+    if (!cls) return { ok: false, reason: 'Classe não existe.' };
+    const uid = String(userId);
+    if (cls.boundUserId && String(cls.boundUserId) !== uid) {
+        return {
+            ok: false,
+            reason: 'Esta classe está **vinculada a outro usuário** e não pode ser escolhida por você.'
+        };
+    }
+    const max = Number(cls.maxHolders);
+    if (!max || max <= 0) return { ok: true };
+    const holders = holdersOf(classId, playersMap);
+    if (holders.includes(uid)) return { ok: true, holders };
+    if (holders.length >= max) {
+        return {
+            ok: false,
+            reason:
+                max === 1
+                    ? 'Esta classe **exclusiva** já está com outro jogador. Apenas uma pessoa pode usá-la.'
+                    : `Limite de **${max}** jogadores nesta classe já atingido.`,
+            holders
+        };
+    }
+    return { ok: true, holders };
 }
-function enforceExclusiveOwners() {
-    try {
-        const player = require('./player');
-        const data = player.all();
-        let changed = false;
-        for (const cls of Object.values(BASE_CLASSES)) {
-            if (!cls.exclusiveOwner) continue;
-            const owner = String(cls.exclusiveOwner);
-            for (const [uid, p] of Object.entries(data || {})) {
-                if (!p) continue;
-                if (String(p.classId || p.class) === cls.id && String(uid) !== owner) {
-                    p.classId = 'cavalheiro_eter';
-                    changed = true;
-                }
-            }
-            if (data[owner]) {
-                if (String(data[owner].classId || data[owner].class) !== cls.id) {
-                    data[owner].classId = cls.id;
-                    data[owner].class = cls.id;
-                    changed = true;
-                }
-            }
-        }
-        if (changed) player.save(data);
-    } catch (_) {}
-}
+
+/**
+ * Admin: cria ou atualiza classe customizada.
+ */
 function createClass(payload) {
     const id = String(payload.id || payload.name || '')
         .toLowerCase()
@@ -268,34 +307,45 @@ function createClass(payload) {
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-z0-9_]/g, '_')
         .replace(/_+/g, '_')
-        .slice(0, 32);
+        .slice(0, 40);
     if (!id || id.length < 2) throw new Error('Nome/ID inválido');
     if (BASE_CLASSES[id] && !payload.force) throw new Error('Não pode sobrescrever classe base do sistema');
+
     const rarity = String(payload.rarity || payload.raridade || 'comum').toLowerCase();
     if (!RARITIES[rarity]) throw new Error('Raridade inválida: ' + rarity);
+
     const custom = loadCustom();
     const uniqueAbilities = splitList(payload.uniqueAbilities || payload.habilidades_unicas, 2);
     const activeAbilities = splitList(payload.activeAbilities || payload.ativas, 4);
     const uniquePassives = splitList(payload.uniquePassives || payload.passivas_unicas, 3);
     const passives = splitList(payload.passives || payload.passivas, 5);
+
     while (uniqueAbilities.length < 2) uniqueAbilities.push('—');
     while (activeAbilities.length < 4) activeAbilities.push('—');
     while (uniquePassives.length < 3) uniquePassives.push('—');
     while (passives.length < 5) passives.push('—');
+
+    const exclusive = rarity === 'unica' || rarity === 'mitica' || payload.exclusive === true || payload.maxHolders === 1;
+    const maxHolders = exclusive
+        ? 1
+        : Math.max(0, Number(payload.maxHolders ?? 0) || 0);
+
     const cls = {
         id,
-        name: String(payload.name || id).slice(0, 40),
+        name: String(payload.name || id).slice(0, 48),
         emoji: String(payload.emoji || '✨').slice(0, 8),
         type: String(payload.type || 'melee').slice(0, 16),
         rarity,
         rarityName: RARITIES[rarity].name,
-        desc: String(payload.desc || '').slice(0, 500),
+        exclusive: !!exclusive,
+        maxHolders: maxHolders || undefined,
+        desc: String(payload.desc || '').slice(0, 800),
         uniqueAbilities: uniqueAbilities.slice(0, 2),
         activeAbilities: activeAbilities.slice(0, 4),
         uniquePassives: uniquePassives.slice(0, 3),
         passives: passives.slice(0, 5),
         powers: activeAbilities.slice(0, 4),
-        disadvantages: splitList(payload.disadvantages || payload.desvantagens, 6),
+        disadvantages: splitList(payload.disadvantages || payload.desvantagens, 8),
         bonus: {
             forca: Number(payload.forca ?? 1) || 1,
             defesa: Number(payload.defesa ?? 1) || 1,
@@ -309,8 +359,8 @@ function createClass(payload) {
             name: String(payload.basicName || 'Ataque Básico').slice(0, 32),
             emoji: String(payload.basicEmoji || '⚔️').slice(0, 8),
             type: ['magic', 'support'].includes(String(payload.type || '')) ? 'magic' : 'physical',
-            power: 1,
-            mana: 0
+            power: Math.min(1.5, Math.max(0.5, Number(payload.basicPower ?? 1) || 1)),
+            mana: Math.max(0, Number(payload.basicMana ?? 0) || 0)
         },
         custom: true,
         createdAt: custom[id]?.createdAt || Date.now(),
@@ -320,6 +370,7 @@ function createClass(payload) {
     saveCustom(custom);
     return cls;
 }
+
 function deleteCustomClass(id) {
     const custom = loadCustom();
     if (!custom[id]) return false;
@@ -327,7 +378,29 @@ function deleteCustomClass(id) {
     saveCustom(custom);
     return true;
 }
+
+// Garante que não sobrem customs antigas ao carregar o módulo pela 1ª vez após reset
+try {
+    const cur = loadCustom();
+    if (cur && Object.keys(cur).length) {
+        // não apaga automaticamente em todo boot — só quando admin pedir
+    }
+} catch (_) {}
+
 module.exports = {
-    BASE_CLASSES, LEGACY_MAP, RARITIES, allClasses, getClass, resolveClassId,
-    listClasses, canUseClass, enforceExclusiveOwners, createClass, deleteCustomClass, loadCustom, splitList
+    BASE_CLASSES,
+    LEGACY_MAP,
+    allClasses,
+    getClass,
+    resolveClassId,
+    listClasses,
+    listSelectableClasses,
+    createClass,
+    deleteCustomClass,
+    clearAllCustom,
+    loadCustom,
+    RARITIES,
+    splitList,
+    holdersOf,
+    canClaim
 };

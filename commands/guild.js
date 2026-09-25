@@ -1,8 +1,16 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} = require('discord.js');
 const player = require('../utils/player');
 const guilds = require('../utils/guilds');
-const { parseAmount, looksLikeAmount, resolveBet } = require('../utils/parseAmount');
+const { looksLikeAmount, resolveBet } = require('../utils/parseAmount');
 const eter = require('../utils/eter');
+
+/** userId -> draft creation state */
+const drafts = new Map();
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -14,7 +22,7 @@ function roleLabel(role) {
     return '🛡️ Membro';
 }
 
-function guildEmbed(g, client) {
+function guildEmbed(g) {
     const members = (g.members || [])
         .slice()
         .sort((a, b) => {
@@ -25,24 +33,30 @@ function guildEmbed(g, client) {
         return `${i + 1}. <@${m.id}> — ${roleLabel(m.role)}`;
     });
     const need = guilds.guildLevelNeed(g.level);
-    return new EmbedBuilder()
+    const emb = new EmbedBuilder()
         .setColor(0xa78bfa)
         .setTitle(`[${g.tag}] ${g.name}`)
         .setDescription(
             [
                 g.description || '_Sem descrição._',
+                g.welcome ? `\n💬 **Boas-vindas:** ${g.welcome}` : '',
                 '',
                 `🎚️ Nível **${g.level}** · XP **${fmt(g.xp)}** / ${fmt(need)}`,
                 `👥 Membros **${g.members.length}** / **${guilds.maxMembers(g)}**`,
                 `🏦 Banco **✨ ${fmt(g.bank)}**`,
                 `👑 Líder <@${g.ownerId}>`,
+                g.imageTag ? `🏷️ Tag da imagem: \`${g.imageTag}\`` : '',
                 '',
                 '**Membros**',
                 lines.join('\n') || '_Ninguém._'
-            ].join('\n')
+            ]
+                .filter(Boolean)
+                .join('\n')
         )
         .setFooter({ text: `ID ${g.id} · O.guild ajuda` })
         .setTimestamp();
+    if (g.imageUrl) emb.setThumbnail(g.imageUrl).setImage(g.imageUrl);
+    return emb;
 }
 
 function helpEmbed() {
@@ -51,35 +65,218 @@ function helpEmbed() {
         .setTitle('🏰 Sistema de Guildas')
         .setDescription(
             [
-                `Criar custa **✨ ${fmt(guilds.CREATE_COST)}**.`,
+                `Criar custa **✨ ${fmt(guilds.CREATE_COST)}** e é feito **no PV do bot**.`,
                 '',
                 '**Comandos**',
-                '`O.guild criar <nome> <tag>` — cria (tag 2–5 chars)',
+                '`O.guild criar` — inicia criação no privado',
                 '`O.guild info [nome|tag]` — ver guilda',
-                '`O.guild membros` — lista da sua',
                 '`O.guild convidar @user` — convite',
                 '`O.guild aceitar <nome|tag>` — entrar',
-                '`O.guild sair` — deixar a guilda',
-                '`O.guild expulsar @user`',
-                '`O.guild promover @user` / `O.guild rebaixar @user`',
-                '`O.guild transferir @user` — passar liderança',
-                '`O.guild depositar <valor>` — all/half/1k…',
-                '`O.guild sacar <valor>` — líder/oficiais',
-                '`O.guild desc <texto>` — descrição',
-                '`O.guild ranking` — top guildas',
-                '`O.guild dissolver` — líder dissolve (banco volta)',
+                '`O.guild sair` · `O.guild expulsar @user`',
+                '`O.guild promover / rebaixar @user`',
+                '`O.guild transferir @user`',
+                '`O.guild depositar <valor>` · `O.guild sacar <valor>`',
+                '`O.guild desc <texto>` · `O.guild boasvindas <texto>`',
+                '`O.guild imagem` — envia no PV a nova foto',
+                '`O.guild ranking` · `O.guild dissolver`',
                 '',
                 'Aliases: `O.guilda` · `O.clã` · `O.clan`'
             ].join('\n')
         );
 }
 
+function pickImageFromMessage(message) {
+    const att = message.attachments?.find(
+        (a) =>
+            (a.contentType && a.contentType.startsWith('image/')) ||
+            /\.(png|jpe?g|gif|webp)$/i.test(a.name || a.url || '')
+    );
+    if (att) return att.url;
+    const urlMatch = String(message.content || '').match(/https?:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?/i);
+    if (urlMatch) return urlMatch[0];
+    return null;
+}
+
+async function startCreateDm(message) {
+    if (!player.has(message.author.id)) {
+        return message.reply('Crie o perfil com `O.j criar` antes.');
+    }
+    if (guilds.findByMember(message.author.id)) {
+        return message.reply('Você já está em uma guilda.');
+    }
+    const bal = eter.get(message.author.id);
+    if (bal < guilds.CREATE_COST) {
+        return message.reply(
+            `Custo: **✨ ${fmt(guilds.CREATE_COST)}**. Você tem **${fmt(bal)}**.`
+        );
+    }
+
+    drafts.set(message.author.id, {
+        step: 'name',
+        name: null,
+        tag: null,
+        description: '',
+        welcome: '',
+        imageUrl: null,
+        imageTag: null,
+        at: Date.now()
+    });
+
+    const payload = {
+        embeds: [
+            new EmbedBuilder()
+                .setColor(0xa78bfa)
+                .setTitle('🏰 Criar guilda — no privado')
+                .setDescription(
+                    [
+                        `Custo ao finalizar: **✨ ${fmt(guilds.CREATE_COST)}**`,
+                        '',
+                        '**Passo 1/6 — Nome**',
+                        'Envie o **nome** da guilda (3–24 caracteres).',
+                        '',
+                        'Depois pedirei: tag · descrição · boas-vindas · imagem · tag da imagem.',
+                        'Digite `cancelar` a qualquer momento.'
+                    ].join('\n')
+                )
+        ]
+    };
+
+    try {
+        await message.author.send(payload);
+        if (message.guild) {
+            return message.reply('📬 Abri a criação da guilda no **seu PV**. Verifique as mensagens privadas.');
+        }
+        return null;
+    } catch {
+        drafts.delete(message.author.id);
+        return message.reply(
+            '❌ Não consegui enviar PV. Abra suas mensagens diretas com o bot e tente de novo.'
+        );
+    }
+}
+
+async function advanceDraft(message) {
+    const uid = message.author.id;
+    const d = drafts.get(uid);
+    if (!d) return false;
+    if (Date.now() - d.at > 15 * 60 * 1000) {
+        drafts.delete(uid);
+        await message.channel.send('⏱️ Criação expirada. Use `O.guild criar` de novo.');
+        return true;
+    }
+    d.at = Date.now();
+    const text = String(message.content || '').trim();
+    if (/^cancelar$/i.test(text)) {
+        drafts.delete(uid);
+        await message.channel.send('❌ Criação cancelada.');
+        return true;
+    }
+
+    if (d.step === 'name') {
+        if (text.length < 3) {
+            await message.channel.send('Nome muito curto (mín. 3). Tente de novo.');
+            return true;
+        }
+        d.name = text.slice(0, 24);
+        d.step = 'tag';
+        await message.channel.send(
+            `✅ Nome: **${d.name}**\n\n**Passo 2/6 — Tag**\nEnvie a tag (2–5 letras/números), ex.: \`LOBO\``
+        );
+        return true;
+    }
+
+    if (d.step === 'tag') {
+        const tag = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+        if (tag.length < 2) {
+            await message.channel.send('Tag inválida. Use 2–5 letras/números.');
+            return true;
+        }
+        if (guilds.findByName(tag) || guilds.findByName(d.name)) {
+            await message.channel.send('Nome ou tag já em uso. Envie outra tag ou `cancelar`.');
+            return true;
+        }
+        d.tag = tag;
+        d.step = 'description';
+        await message.channel.send(
+            `✅ Tag: **[${d.tag}]**\n\n**Passo 3/6 — Descrição**\nConte sobre a guilda (ou envie \`pular\`).`
+        );
+        return true;
+    }
+
+    if (d.step === 'description') {
+        if (!/^pular$/i.test(text)) d.description = text.slice(0, guilds.MAX_DESC || 300);
+        d.step = 'welcome';
+        await message.channel.send(
+            '**Passo 4/6 — Frase de boas-vindas**\nMensagem que novos membros verão ao entrar (ou `pular`).'
+        );
+        return true;
+    }
+
+    if (d.step === 'welcome') {
+        if (!/^pular$/i.test(text)) d.welcome = text.slice(0, guilds.MAX_WELCOME || 300);
+        d.step = 'image';
+        await message.channel.send(
+            '**Passo 5/6 — Imagem**\nEnvie uma **foto** (anexo) ou um **link** de imagem, ou `pular`.'
+        );
+        return true;
+    }
+
+    if (d.step === 'image') {
+        const img = pickImageFromMessage(message);
+        if (img) d.imageUrl = img;
+        else if (!/^pular$/i.test(text) && text) {
+            if (/^https?:\/\//i.test(text)) d.imageUrl = text;
+            else {
+                await message.channel.send('Envie uma imagem, um link ou `pular`.');
+                return true;
+            }
+        }
+        d.step = 'imageTag';
+        await message.channel.send(
+            '**Passo 6/6 — Tag da imagem**\nUm rótulo curto (ex.: `emblema`, `banner`) ou `pular`.\nDepois a guilda será criada.'
+        );
+        return true;
+    }
+
+    if (d.step === 'imageTag') {
+        if (!/^pular$/i.test(text)) d.imageTag = text.slice(0, 64);
+        const r = guilds.createGuild(uid, {
+            name: d.name,
+            tag: d.tag,
+            description: d.description,
+            welcome: d.welcome,
+            imageUrl: d.imageUrl,
+            imageTag: d.imageTag
+        });
+        drafts.delete(uid);
+        if (!r.ok) {
+            await message.channel.send(`❌ ${r.error}`);
+            return true;
+        }
+        await message.channel.send({
+            content: `🏰 Guilda **[${r.guild.tag}] ${r.guild.name}** criada! (−✨ ${fmt(guilds.CREATE_COST)})`,
+            embeds: [guildEmbed(r.guild)]
+        });
+        return true;
+    }
+
+    return true;
+}
+
 module.exports = {
     name: 'guild',
     aliases: ['guilda', 'clã', 'cla', 'clan', 'clans'],
     description: 'Sistema de guildas / clãs',
+    drafts,
+    advanceDraft,
 
     async execute(message, args) {
+        // Continuar wizard se estiver no meio da criação em DM
+        if (!message.guild && drafts.has(message.author.id)) {
+            await advanceDraft(message);
+            return;
+        }
+
         const sub = String(args[0] || 'ajuda').toLowerCase();
         const rest = args.slice(1);
 
@@ -88,17 +285,7 @@ module.exports = {
         }
 
         if (sub === 'criar' || sub === 'create') {
-            const tag = rest[rest.length - 1];
-            const name = rest.slice(0, -1).join(' ');
-            if (!name || !tag) {
-                return message.reply('Uso: `O.guild criar <nome da guilda> <TAG>`\nEx.: `O.guild criar Lobos do Éter LOBO`');
-            }
-            const r = guilds.createGuild(message.author.id, name, tag);
-            if (!r.ok) return message.reply(`❌ ${r.error}`);
-            return message.reply({
-                content: `🏰 Guilda **[${r.guild.tag}] ${r.guild.name}** criada! (−✨ ${fmt(guilds.CREATE_COST)})`,
-                embeds: [guildEmbed(r.guild)]
-            });
+            return startCreateDm(message);
         }
 
         if (sub === 'info' || sub === 'ver') {
@@ -132,8 +319,11 @@ module.exports = {
             if (!key) return message.reply('Uso: `O.guild aceitar <nome|tag>`');
             const r = guilds.acceptInvite(message.author.id, key);
             if (!r.ok) return message.reply(`❌ ${r.error}`);
+            const welcome = r.welcome
+                ? `\n\n💬 ${r.welcome}`
+                : '';
             return message.reply({
-                content: `✅ Você entrou em **[${r.guild.tag}] ${r.guild.name}**!`,
+                content: `✅ Você entrou em **[${r.guild.tag}] ${r.guild.name}**!${welcome}`,
                 embeds: [guildEmbed(r.guild)]
             });
         }
@@ -218,6 +408,38 @@ module.exports = {
             return message.reply({ content: '📝 Descrição atualizada.', embeds: [guildEmbed(r.guild)] });
         }
 
+        if (sub === 'boasvindas' || sub === 'welcome' || sub === 'bemvindo') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            const text = rest.join(' ').trim();
+            if (!text) return message.reply('Uso: `O.guild boasvindas <texto>`');
+            const r = guilds.setWelcome(g.id, message.author.id, text);
+            if (!r.ok) return message.reply(`❌ ${r.error}`);
+            return message.reply({ content: '💬 Boas-vindas atualizadas.', embeds: [guildEmbed(r.guild)] });
+        }
+
+        if (sub === 'imagem' || sub === 'foto' || sub === 'banner') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            if (!guilds.isOfficer(g, message.author.id)) {
+                return message.reply('Só líder/oficiais alteram a imagem.');
+            }
+            try {
+                await message.author.send(
+                    'Envie neste PV a **nova imagem** da guilda (anexo ou link) e, na mesma mensagem ou em seguida, a **tag** (opcional).\nEx.: anexe a foto e escreva `emblema`.'
+                );
+                drafts.set(message.author.id, {
+                    step: 'edit_image',
+                    guildId: g.id,
+                    at: Date.now()
+                });
+                if (message.guild) return message.reply('📬 Envie a imagem no **PV do bot**.');
+            } catch {
+                return message.reply('Abra o PV com o bot e tente de novo.');
+            }
+            return;
+        }
+
         if (sub === 'ranking' || sub === 'rank' || sub === 'top') {
             const top = guilds.ranking(10);
             if (!top.length) return message.reply('Nenhuma guilda ainda.');
@@ -287,4 +509,30 @@ module.exports = {
         }
         return false;
     }
+};
+
+// Export helper for messageCreate DM routing
+module.exports.handleGuildDm = async function handleGuildDm(message) {
+    const d = drafts.get(message.author.id);
+    if (!d) return false;
+    if (d.step === 'edit_image') {
+        const img = pickImageFromMessage(message);
+        if (!img) {
+            await message.channel.send('Envie uma **imagem** (anexo ou link).');
+            return true;
+        }
+        const tag = String(message.content || '')
+            .replace(/https?:\/\/\S+/gi, '')
+            .trim()
+            .slice(0, 64);
+        const r = guilds.setImage(d.guildId, message.author.id, img, tag || null);
+        drafts.delete(message.author.id);
+        if (!r.ok) {
+            await message.channel.send(`❌ ${r.error}`);
+            return true;
+        }
+        await message.channel.send({ content: '🖼️ Imagem da guilda atualizada.', embeds: [guildEmbed(r.guild)] });
+        return true;
+    }
+    return advanceDraft(message);
 };
