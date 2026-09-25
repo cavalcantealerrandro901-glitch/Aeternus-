@@ -9,7 +9,30 @@ const player = require('./player');
 
 const CREATE_COST = 5000;
 const MAX_NAME = 24;
-const MAX_TAG = 5;
+const MAX_TAG = 6; // letras/números/emojis (grafemas)
+
+/** Normaliza tag para comparação (case-insensitive nas letras). */
+function tagKey(tag) {
+    return [...String(tag || '')]
+        .map((ch) => (/[A-Za-zÀ-ÿ]/.test(ch) ? ch.toLowerCase() : ch))
+        .join('');
+}
+
+/** Mantém letras (maiús/minús), números e emojis; remove espaços. */
+function sanitizeTag(raw) {
+    const chars = [...String(raw || '').trim()].filter((ch) => {
+        if (/\s/.test(ch)) return false;
+        if (/[A-Za-z0-9À-ÿ]/.test(ch)) return true;
+        // emojis e símbolos unicode (não ASCII de pontuação simples)
+        const cp = ch.codePointAt(0);
+        if (cp >= 0x1f000) return true; // emoji blocks
+        if (cp >= 0x2600 && cp <= 0x27bf) return true; // misc symbols
+        if (cp >= 0x1f300 && cp <= 0x1faff) return true;
+        if (cp > 0x7f && !/[\u2000-\u206f]/.test(ch)) return true;
+        return false;
+    });
+    return chars.slice(0, MAX_TAG).join('');
+}
 const MAX_DESC = 300;
 const MAX_WELCOME = 300;
 const MAX_MEMBERS_BASE = 15;
@@ -39,16 +62,16 @@ function findByName(name) {
         list().find((g) => {
             if (!g || typeof g !== 'object') return false;
             const n = String(g.name || '').toLowerCase();
-            const tag = String(g.tag || '').toLowerCase();
-            return n === q || tag === q;
+            const tag = tagKey(g.tag);
+            return n === q || tag === q || tag === tagKey(q);
         }) || null
     );
 }
 
 function isTagTaken(tag) {
-    const q = String(tag || '').trim().toUpperCase();
+    const q = tagKey(tag);
     if (!q) return false;
-    return list().some((g) => g && String(g.tag || '').toUpperCase() === q);
+    return list().some((g) => g && tagKey(g.tag) === q);
 }
 
 function isNameTaken(name) {
@@ -95,13 +118,11 @@ function createGuild(ownerId, opts = {}) {
     if (findByMember(ownerId)) return { ok: false, error: 'Você já está em uma guilda. Saia antes de criar outra.' };
 
     const name = slugName(opts.name);
-    let tag = String(opts.tag || '')
-        .trim()
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, '')
-        .slice(0, MAX_TAG);
+    const tag = sanitizeTag(opts.tag);
     if (name.length < 3) return { ok: false, error: 'Nome da guilda: mínimo 3 caracteres.' };
-    if (tag.length < 2) return { ok: false, error: 'Tag: 2 a 5 letras/números. Ex.: `AES`' };
+    if ([...tag].length < 2) {
+        return { ok: false, error: 'Tag: 2 a 6 caracteres (letras, números ou emojis). Ex.: `Aes`, `LOBO`, `🔥G`' };
+    }
     if (isNameTaken(name) || isTagTaken(tag) || findByName(name) || findByName(tag)) return { ok: false, error: 'Nome ou tag já em uso.' };
 
     const bal = eter.get(ownerId);
@@ -328,6 +349,8 @@ module.exports = {
     findByName,
     isTagTaken,
     isNameTaken,
+    sanitizeTag,
+    tagKey,
     findByMember,
     memberOf,
     isOfficer,

@@ -199,16 +199,15 @@ async function advanceDraftInner(message, uid, d) {
     }
 
     if (d.step === 'tag') {
-        // Aceita letras (com acento vira base), números; remove espaços/símbolos
-        let tag = String(text || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toUpperCase()
-            .replace(/[^A-Z0-9]/g, '')
-            .slice(0, 5);
-        if (tag.length < 2) {
+        const tag = guilds.sanitizeTag
+            ? guilds.sanitizeTag(text)
+            : String(text || '').trim().slice(0, 6);
+        if ([...tag].length < 2) {
             await message.channel.send(
-                'Tag inválida. Use **2 a 5 letras/números** (ex.: `LOBO`, `AES`, `G1`).\nSem espaços nem símbolos.'
+                'Tag inválida. Use **2 a 6** caracteres:\n' +
+                    '• Letras **maiúsculas ou minúsculas** (ex.: `Lobo`, `AES`)\n' +
+                    '• Números e **emojis** (ex.: `🔥G`, `G1`)\n' +
+                    'Sem espaços.'
             );
             return true;
         }
@@ -228,7 +227,6 @@ async function advanceDraftInner(message, uid, d) {
             }
         } catch (e) {
             console.error('[guild tag check]', e);
-            // não bloqueia criação por falha de leitura
         }
         d.tag = tag;
         d.step = 'description';
