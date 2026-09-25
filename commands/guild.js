@@ -116,7 +116,8 @@ function helpEmbed() {
                 '`O.guild promover / rebaixar @user`',
                 '`O.guild transferir @user`',
                 '`O.guild depositar / sacar <valor>`',
-                '`O.guild ranking` · `O.guild sincronizar` · `O.guild dissolver`'
+                '`O.guild inventario` · depositar/retirar itens
+`O.guild ranking` · `O.guild sincronizar` · `O.guild dissolver`'
             ].join('\n')
         );
 }
@@ -727,6 +728,91 @@ module.exports = {
         }
         if (sub === 'imagem' || sub === 'foto') {
             return startEditDm(message, 'imagem');
+        }
+
+        if (sub === 'inventario' || sub === 'inv' || sub === 'bau' || sub === 'baú') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            const list = guilds.getInventory(g.id);
+            if (!list.length) {
+                return message.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(0x8b5cf6)
+                            .setTitle(`📦 Baú · [${g.tag}] ${g.name}`)
+                            .setDescription(
+                                '_Vazio._\n\nOficiais: `O.guild depositaritem <nº do seu inventário>`\n' +
+                                    'Membros: `O.guild retiraritem <nº do baú>`'
+                            )
+                    ]
+                });
+            }
+            const lines = list.slice(0, 25).map((it) => {
+                const name = it.name || it.id || 'Item';
+                const emoji = it.emoji || '📦';
+                const rare = it.rarity ? ` · ${it.rarity}` : '';
+                const by = it.depositedBy ? ` · por <@${it.depositedBy}>` : '';
+                return `**${it.index}.** ${emoji} **${name}**${rare}${by}`;
+            });
+            const more = list.length > 25 ? `\n_…e mais ${list.length - 25}_` : '';
+            return message.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0x8b5cf6)
+                        .setTitle(`📦 Baú · [${g.tag}] ${g.name}`)
+                        .setDescription(
+                            lines.join('\n') +
+                                more +
+                                '\n\n`O.guild depositaritem <nº>` · `O.guild retiraritem <nº>` · `O.guild removeritem <nº>`'
+                        )
+                        .setFooter({ text: `${list.length} item(ns) · oficiais depositam · membros retiram` })
+                ]
+            });
+        }
+
+        if (sub === 'depositaritem' || sub === 'depitem' || sub === 'doaritem') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            const n = parseInt(rest[0], 10);
+            if (!n) {
+                return message.reply(
+                    'Uso: `O.guild depositaritem <número>`\nO número é o do **seu** `O.inventario`.'
+                );
+            }
+            const r = guilds.depositItem(g.id, message.author.id, n);
+            if (!r.ok) return message.reply(`❌ ${r.error}`);
+            const name = r.item.name || r.item.id || 'Item';
+            return message.reply(
+                `📦 Depositou **${r.item.emoji || ''} ${name}** no baú de **[${g.tag}]**.`
+            );
+        }
+
+        if (sub === 'retiraritem' || sub === 'pegaritem' || sub === 'withdrawitem') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            const n = parseInt(rest[0], 10);
+            if (!n) {
+                return message.reply(
+                    'Uso: `O.guild retiraritem <número>`\nVeja os números em `O.guild inventario`.'
+                );
+            }
+            const r = guilds.withdrawItem(g.id, message.author.id, n);
+            if (!r.ok) return message.reply(`❌ ${r.error}`);
+            const name = r.item.name || r.item.id || 'Item';
+            return message.reply(
+                `📦 Você retirou **${r.item.emoji || ''} ${name}** do baú para o seu inventário.`
+            );
+        }
+
+        if (sub === 'removeritem' || sub === 'delitem') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            const n = parseInt(rest[0], 10);
+            if (!n) return message.reply('Uso: `O.guild removeritem <número do baú>`');
+            const r = guilds.removeGuildItem(g.id, message.author.id, n);
+            if (!r.ok) return message.reply(`❌ ${r.error}`);
+            const name = r.item.name || r.item.id || 'Item';
+            return message.reply(`🗑️ Removeu **${name}** do baú da guilda.`);
         }
 
         if (sub === 'sincronizar' || sub === 'sync' || sub === 'nicks') {

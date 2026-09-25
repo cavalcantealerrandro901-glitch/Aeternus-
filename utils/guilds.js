@@ -159,6 +159,7 @@ function createGuild(ownerId, opts = {}) {
         bank: 0,
         members: [{ id: ownerId, role: 'owner', joinedAt: Date.now() }],
         invites: [],
+        inventory: [],
         createdAt: Date.now()
     };
     save(data);
@@ -371,6 +372,90 @@ function guildLevelNeed(level) {
     return Math.floor(500 + lv * 250);
 }
 
+
+function ensureInventory(g) {
+    if (!Array.isArray(g.inventory)) g.inventory = [];
+    return g.inventory;
+}
+
+function getInventory(guildId) {
+    const g = get(guildId);
+    if (!g) return [];
+    return ensureInventory(g).map((it, i) => ({ ...it, index: i + 1 }));
+}
+
+/**
+ * Oficial deposita item do inventário pessoal na guilda.
+ * @param {string} guildId
+ * @param {string} userId
+ * @param {number} playerIndex1 - índice 1-based no inventário do jogador
+ */
+function depositItem(guildId, userId, playerIndex1) {
+    const data = all();
+    const g = data[guildId];
+    if (!g) return { ok: false, error: 'Guilda não encontrada.' };
+    if (!isOfficer(g, userId)) return { ok: false, error: 'Só líder/oficiais depositam itens.' };
+
+    const player = require('./player');
+    if (!player.has(userId)) return { ok: false, error: 'Sem perfil.' };
+    const inv = player.getInventory(userId, 'todos');
+    const idx = Math.floor(Number(playerIndex1) || 0) - 1;
+    if (idx < 0 || idx >= inv.length) {
+        return { ok: false, error: 'Índice inválido. Veja `O.inventario`.' };
+    }
+    const removed = player.removeItemAt(userId, idx);
+    if (!removed) return { ok: false, error: 'Não foi possível remover o item.' };
+
+    ensureInventory(g);
+    const entry = {
+        ...removed,
+        depositedBy: userId,
+        depositedAt: Date.now()
+    };
+    g.inventory.push(entry);
+    save(data);
+    return { ok: true, guild: g, item: entry };
+}
+
+/**
+ * Membro retira item do inventário da guilda para o inventário pessoal.
+ */
+function withdrawItem(guildId, userId, guildIndex1) {
+    const data = all();
+    const g = data[guildId];
+    if (!g) return { ok: false, error: 'Guilda não encontrada.' };
+    if (!memberOf(g, userId)) return { ok: false, error: 'Você não é membro.' };
+
+    ensureInventory(g);
+    const idx = Math.floor(Number(guildIndex1) || 0) - 1;
+    if (idx < 0 || idx >= g.inventory.length) {
+        return { ok: false, error: 'Índice inválido. Use `O.guild inventario`.' };
+    }
+    const [item] = g.inventory.splice(idx, 1);
+    save(data);
+
+    const player = require('./player');
+    const { depositedBy, depositedAt, index, ...clean } = item;
+    player.addItem(userId, clean);
+    return { ok: true, guild: g, item: clean };
+}
+
+/** Oficial remove item do baú (sem devolver — destrói ou só remove). */
+function removeGuildItem(guildId, userId, guildIndex1) {
+    const data = all();
+    const g = data[guildId];
+    if (!g) return { ok: false, error: 'Guilda não encontrada.' };
+    if (!isOfficer(g, userId)) return { ok: false, error: 'Só líder/oficiais removem itens do baú.' };
+    ensureInventory(g);
+    const idx = Math.floor(Number(guildIndex1) || 0) - 1;
+    if (idx < 0 || idx >= g.inventory.length) {
+        return { ok: false, error: 'Índice inválido.' };
+    }
+    const [item] = g.inventory.splice(idx, 1);
+    save(data);
+    return { ok: true, guild: g, item };
+}
+
 function ranking(limit = 10) {
     return list()
         .filter((g) => g && g.name)
@@ -415,5 +500,10 @@ module.exports = {
     deposit,
     withdraw,
     ranking,
-    guildLevelNeed
+    guildLevelNeed,
+    getInventory,
+    depositItem,
+    withdrawItem,
+    removeGuildItem,
+    ensureInventory
 };
