@@ -53,7 +53,10 @@ function parseTeams(args, authorId) {
 }
 
 function parseBet(args, maxBal) {
-    const raw = args.find((a) => !a.startsWith('<@') && !/^vs$/i.test(a) && /[\d]/.test(a));
+    const { looksLikeAmount } = require('../utils/parseAmount');
+    const raw = args.find(
+        (a) => !a.startsWith('<@') && !/^vs$/i.test(a) && looksLikeAmount(a)
+    );
     if (!raw) return { ok: true, amount: 0 };
     return resolveBet(raw, maxBal, { label: '✨' });
 }
