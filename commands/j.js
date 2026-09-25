@@ -47,7 +47,13 @@ function classSelect(customId = 'j:class') {
 }
 
 function profileEmbed(user, profile) {
-    const cls = player.getClass(profile.classId);
+    if (!profile) {
+        return new EmbedBuilder()
+            .setColor(0xef4444)
+            .setTitle('Sem perfil')
+            .setDescription('Crie com `O.j criar`.');
+    }
+    const cls = profile.classId ? player.getClass(profile.classId) : null;
     const st = xp.get(user.id);
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
     const classLabel = cls

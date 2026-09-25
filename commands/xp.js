@@ -30,6 +30,7 @@ function titleForLevel(level) {
 }
 
 function profileEmbed(user, p, rankInfo) {
+    p = p || { level: 0, totalXp: 0, current: 0, need: 100, pct: 0, toNext: 100, mult: 1 };
     const title = titleForLevel(p.level);
     const lines = [
         title.emoji + ' **Título:** ' + title.name,
@@ -42,7 +43,7 @@ function profileEmbed(user, p, rankInfo) {
         '🔹 ' + fmt(p.current) + ' / ' + fmt(p.need) + ' XP',
         '⏳ Faltam **' + fmt(p.toNext) + '** XP para o nível ' + (p.level + 1),
         '',
-        '🎁 **Multiplicador do Daily:** ×**' + p.mult.toFixed(2) + '**',
+        '🎁 **Multiplicador do Daily:** ×**' + Number(p && p.mult != null ? p.mult : 1).toFixed(2) + '**',
         '_Cada nível aumenta o daily (máx. ×3.00)._',
         '',
         rankInfo

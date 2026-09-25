@@ -47,7 +47,9 @@ function save(data) {
 }
 
 function list() {
-    return Object.values(all());
+    const data = all();
+    if (!data || typeof data !== 'object') return [];
+    return Object.values(data).filter((g) => g && typeof g === 'object');
 }
 
 function get(id) {
@@ -81,7 +83,14 @@ function isNameTaken(name) {
 }
 
 function findByMember(userId) {
-    return list().find((g) => (g.members || []).some((m) => m.id === userId)) || null;
+    const uid = String(userId || '');
+    return (
+        list().find((g) =>
+            (Array.isArray(g.members) ? g.members : []).some(
+                (m) => m && String(m.id) === uid
+            )
+        ) || null
+    );
 }
 
 function memberOf(guild, userId) {

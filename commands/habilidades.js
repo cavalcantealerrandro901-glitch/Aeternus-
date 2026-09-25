@@ -16,13 +16,56 @@ function classLabel(userId) {
     return `${cls.emoji || ''} **${cls.name}**`;
 }
 
+function safeListActive(userId) {
+    if (typeof abilities.listForPlayer === 'function') {
+        return abilities.listForPlayer(userId, 'active') || [];
+    }
+    if (typeof abilities.listByKind === 'function') {
+        return abilities.listByKind('active', userId) || [];
+    }
+    return [];
+}
+
+function safeLoadout(userId) {
+    if (typeof abilities.sanitizeLoadout === 'function') {
+        return abilities.sanitizeLoadout(userId);
+    }
+    if (typeof abilities.loadLoadout === 'function') {
+        return abilities.loadLoadout(userId);
+    }
+    return { active: [null, null, null, null], passive: [null, null, null, null, null] };
+}
+
+function safeEquipped(userId) {
+    if (typeof abilities.getEquippedAbilities === 'function') {
+        return abilities.getEquippedAbilities(userId);
+    }
+    const loadout = safeLoadout(userId);
+    return {
+        active: (loadout.active || []).map((id) => (id && abilities.getAbility ? abilities.getAbility(id) : null)),
+        passive: (loadout.passive || []).map((id) => (id && abilities.getAbility ? abilities.getAbility(id) : null)),
+        loadout
+    };
+}
+
+function allowed(userId, abilityId) {
+    if (typeof abilities.abilityAllowedForUser === 'function') {
+        return abilities.abilityAllowedForUser(userId, abilityId);
+    }
+    if (typeof abilities.canUseAbility === 'function') {
+        const ab = abilities.getAbility(abilityId);
+        return abilities.canUseAbility(userId, ab);
+    }
+    return true;
+}
+
 function classLoreLines(userId) {
     const p = player.get(userId);
     const cls = p ? classes.getClass(p.classId) : null;
     if (!cls) return [];
     const out = [];
-    const act = cls.activeAbilities || cls.powers || [];
     const uniq = cls.uniqueAbilities || [];
+    const act = cls.activeAbilities || cls.powers || [];
     if (uniq.length) {
         out.push('**👁️ Únicas da classe**');
         uniq.slice(0, 4).forEach((x, i) => out.push(`${i + 1}. ${x}`));
@@ -35,16 +78,17 @@ function classLoreLines(userId) {
 }
 
 function panel(userId) {
-    abilities.sanitizeLoadout(userId);
-    const loadout = abilities.loadLoadout(userId);
-    const list = abilities.listForPlayer(userId, 'active');
-    const { active } = abilities.getEquippedAbilities(userId);
+    const loadout = safeLoadout(userId);
+    const list = safeListActive(userId);
+    const { active } = safeEquipped(userId);
+    const slots = Array.isArray(active) ? active : [null, null, null, null];
 
-    const lines = active.map((a, i) =>
-        a
+    const lines = [0, 1, 2, 3].map((i) => {
+        const a = slots[i];
+        return a
             ? `**${i + 1}.** ${a.emoji || '⚔️'} **${a.name}**${a.unique ? ' ⭐' : ''} — ${(a.desc || '').slice(0, 90)}`
-            : `**${i + 1}.** _(vazio)_`
-    );
+            : `**${i + 1}.** _(vazio)_`;
+    });
 
     const lore = classLoreLines(userId);
     const emb = new EmbedBuilder()
@@ -53,7 +97,7 @@ function panel(userId) {
         .setDescription(
             [
                 `Classe: ${classLabel(userId)}`,
-                'Equipe só habilidades **da sua classe**. Elas aparecem na arena.',
+                'Equipe só habilidades **da sua classe**.',
                 '',
                 '**Loadout atual**',
                 lines.join('\n'),
@@ -66,7 +110,7 @@ function panel(userId) {
         .setFooter({
             text: list.length
                 ? `${list.length} ativas disponíveis · O.passivas para passivas`
-                : 'Nenhuma ativa cadastrada para esta classe no motor de combate'
+                : 'Nenhuma ativa no motor de combate para esta classe'
         });
 
     if (!list.length) {
@@ -94,17 +138,9 @@ function panel(userId) {
                         label: `${a.unique ? '⭐ ' : ''}${a.name}`.slice(0, 100),
                         value: a.id,
                         description: (a.desc || `Mana ${a.mana || 0}`).slice(0, 50),
-                        default: loadout.active[slot] === a.id
+                        default: (loadout.active || [])[slot] === a.id
                     }))
                 ])
-        )
-    );
-    rows.push(
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('habilidades:refresh')
-                .setLabel('Atualizar')
-                .setStyle(ButtonStyle.Secondary)
         )
     );
     return { embeds: [emb], components: rows };
@@ -129,29 +165,25 @@ module.exports = {
         if (!player.has(uid)) {
             return interaction.reply({ content: 'Crie o perfil primeiro.', ephemeral: true });
         }
-
-        if (id === 'habilidades:refresh') {
-            return interaction.update(panel(uid));
-        }
-
+        if (id === 'habilidades:refresh') return interaction.update(panel(uid));
         if (id.startsWith('habilidades:sel:')) {
             const slot = parseInt(id.split(':')[2], 10);
             const value = interaction.values?.[0];
-            const loadout = abilities.loadLoadout(uid);
+            const loadout = safeLoadout(uid);
+            if (!Array.isArray(loadout.active)) loadout.active = [null, null, null, null];
             if (value === 'none') {
                 loadout.active[slot] = null;
             } else {
-                if (!abilities.abilityAllowedForUser(uid, value)) {
+                if (!allowed(uid, value)) {
                     return interaction.reply({
                         content: 'Essa habilidade não é da sua classe.',
                         ephemeral: true
                     });
                 }
-                // evita duplicar a mesma skill em dois slots
                 loadout.active = loadout.active.map((x, i) => (i !== slot && x === value ? null : x));
                 loadout.active[slot] = value;
             }
-            abilities.saveLoadout(uid, loadout);
+            if (typeof abilities.saveLoadout === 'function') abilities.saveLoadout(uid, loadout);
             return interaction.update(panel(uid));
         }
         return false;

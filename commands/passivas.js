@@ -16,6 +16,48 @@ function classLabel(userId) {
     return `${cls.emoji || ''} **${cls.name}**`;
 }
 
+function safeListPassive(userId) {
+    if (typeof abilities.listForPlayer === 'function') {
+        return abilities.listForPlayer(userId, 'passive') || [];
+    }
+    if (typeof abilities.listByKind === 'function') {
+        return abilities.listByKind('passive', userId) || [];
+    }
+    return [];
+}
+
+function safeLoadout(userId) {
+    if (typeof abilities.sanitizeLoadout === 'function') {
+        return abilities.sanitizeLoadout(userId);
+    }
+    if (typeof abilities.loadLoadout === 'function') {
+        return abilities.loadLoadout(userId);
+    }
+    return { active: [null, null, null, null], passive: [null, null, null, null, null] };
+}
+
+function safeEquipped(userId) {
+    if (typeof abilities.getEquippedAbilities === 'function') {
+        return abilities.getEquippedAbilities(userId);
+    }
+    const loadout = safeLoadout(userId);
+    return {
+        active: (loadout.active || []).map((id) => (id && abilities.getAbility ? abilities.getAbility(id) : null)),
+        passive: (loadout.passive || []).map((id) => (id && abilities.getAbility ? abilities.getAbility(id) : null)),
+        loadout
+    };
+}
+
+function allowed(userId, abilityId) {
+    if (typeof abilities.abilityAllowedForUser === 'function') {
+        return abilities.abilityAllowedForUser(userId, abilityId);
+    }
+    if (typeof abilities.canUseAbility === 'function') {
+        return abilities.canUseAbility(userId, abilities.getAbility(abilityId));
+    }
+    return true;
+}
+
 function classLoreLines(userId) {
     const p = player.get(userId);
     const cls = p ? classes.getClass(p.classId) : null;
@@ -35,16 +77,17 @@ function classLoreLines(userId) {
 }
 
 function panel(userId) {
-    abilities.sanitizeLoadout(userId);
-    const loadout = abilities.loadLoadout(userId);
-    const list = abilities.listForPlayer(userId, 'passive');
-    const { passive } = abilities.getEquippedAbilities(userId);
+    const loadout = safeLoadout(userId);
+    const list = safeListPassive(userId);
+    const { passive } = safeEquipped(userId);
+    const slots = Array.isArray(passive) ? passive : [null, null, null, null, null];
 
-    const lines = passive.map((a, i) =>
-        a
+    const lines = [0, 1, 2, 3, 4].map((i) => {
+        const a = slots[i];
+        return a
             ? `**${i + 1}.** ${a.emoji || '✨'} **${a.name}**${a.unique ? ' ⭐' : ''} — ${(a.desc || '').slice(0, 90)}`
-            : `**${i + 1}.** _(vazio)_`
-    );
+            : `**${i + 1}.** _(vazio)_`;
+    });
 
     const lore = classLoreLines(userId);
     const emb = new EmbedBuilder()
@@ -66,7 +109,7 @@ function panel(userId) {
         .setFooter({
             text: list.length
                 ? `${list.length} passivas disponíveis · O.habilidades para ativas`
-                : 'Nenhuma passiva cadastrada para esta classe no motor de combate'
+                : 'Nenhuma passiva no motor de combate para esta classe'
         });
 
     if (!list.length) {
@@ -94,12 +137,11 @@ function panel(userId) {
                         label: `${a.unique ? '⭐ ' : ''}${a.name}`.slice(0, 100),
                         value: a.id,
                         description: (a.desc || '').slice(0, 50),
-                        default: loadout.passive[slot] === a.id
+                        default: (loadout.passive || [])[slot] === a.id
                     }))
                 ])
         )
     );
-    // Discord max 5 rows — refresh replaces last row if needed: keep 5 selects only
     return { embeds: [emb], components: rows.slice(0, 5) };
 }
 
@@ -122,19 +164,16 @@ module.exports = {
         if (!player.has(uid)) {
             return interaction.reply({ content: 'Crie o perfil primeiro.', ephemeral: true });
         }
-
-        if (id === 'passivas:refresh') {
-            return interaction.update(panel(uid));
-        }
-
+        if (id === 'passivas:refresh') return interaction.update(panel(uid));
         if (id.startsWith('passivas:sel:')) {
             const slot = parseInt(id.split(':')[2], 10);
             const value = interaction.values?.[0];
-            const loadout = abilities.loadLoadout(uid);
+            const loadout = safeLoadout(uid);
+            if (!Array.isArray(loadout.passive)) loadout.passive = [null, null, null, null, null];
             if (value === 'none') {
                 loadout.passive[slot] = null;
             } else {
-                if (!abilities.abilityAllowedForUser(uid, value)) {
+                if (!allowed(uid, value)) {
                     return interaction.reply({
                         content: 'Essa passiva não é da sua classe.',
                         ephemeral: true
@@ -143,7 +182,7 @@ module.exports = {
                 loadout.passive = loadout.passive.map((x, i) => (i !== slot && x === value ? null : x));
                 loadout.passive[slot] = value;
             }
-            abilities.saveLoadout(uid, loadout);
+            if (typeof abilities.saveLoadout === 'function') abilities.saveLoadout(uid, loadout);
             return interaction.update(panel(uid));
         }
         return false;
