@@ -116,8 +116,8 @@ function helpEmbed() {
                 '`O.guild promover / rebaixar @user`',
                 '`O.guild transferir @user`',
                 '`O.guild depositar / sacar <valor>`',
-                '`O.guild inventario` · depositar/retirar itens
-`O.guild ranking` · `O.guild sincronizar` · `O.guild dissolver`'
+                '`O.guild inventario` · depositar/retirar itens',
+                '`O.guild ranking` · `O.guild sincronizar` · `O.guild dissolver`'
             ].join('\n')
         );
 }
