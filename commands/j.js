@@ -46,82 +46,112 @@ function classSelect(customId = 'j:class') {
     );
 }
 
-function profileEmbed(user, profile) {
+function profileEmbed(user, profile, opts = {}) {
     if (!profile) {
         return new EmbedBuilder()
             .setColor(0xef4444)
             .setTitle('Sem perfil')
             .setDescription('Crie com `O.j criar`.');
     }
+
     const cls = profile.classId ? player.getClass(profile.classId) : null;
-    const st = xp.get(user.id);
+    const st = xp.get(user.id) || { level: 0, xp: 0, attrs: {} };
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
-    const classLabel = cls
-        ? `${cls.emoji || ''} ${cls.name}`
-        : 'Sem classe — use `/classe escolher`';
+    const displayName =
+        (profile.name && String(profile.name).trim()) ||
+        null;
 
     let eterBal = 0;
-    let cpBal = 0;
-    let guildLine = '_Sem guilda_';
+    let cristaisBal = 0;
     try {
         eterBal = require('../utils/eter').get(user.id) || 0;
     } catch (_) {}
     try {
-        cpBal = require('../utils/cp').get(user.id) || 0;
+        cristaisBal = require('../utils/cp').get(user.id) || 0;
     } catch (_) {}
     try {
-        const g = require('../utils/guilds').findByMember(user.id);
-        if (g) guildLine = `**[${g.tag}] ${g.name}** · Nv.${g.level}`;
+        const cristais = require('../utils/cristais');
+        if (cristais && typeof cristais.get === 'function') {
+            cristaisBal = cristais.get(user.id) || cristaisBal;
+        }
     } catch (_) {}
 
-    let skillsLine = '_Equipe com `O.habilidades` / `O.passivas`_';
+    let guildLine = '_Sem guilda_';
     try {
-        const abilities = require('../utils/abilities');
-        abilities.sanitizeLoadout(user.id);
-        const eq = abilities.getEquippedAbilities(user.id);
-        const act = (eq.active || []).filter(Boolean).map((a) => a.emoji || a.name).slice(0, 4);
-        const pas = (eq.passive || []).filter(Boolean).map((a) => a.emoji || a.name).slice(0, 5);
-        skillsLine =
-            `⚔️ Ativas: ${act.length ? act.join(' ') : '—'}\n` +
-            `✨ Passivas: ${pas.length ? pas.join(' ') : '—'}`;
+        const g = require('../utils/guilds').findByMember(user.id);
+        if (g) {
+            guildLine = `**[${g.tag || '???'}] ${g.name || 'Guilda'}** · Nv.${g.level || 1}`;
+        }
     } catch (_) {}
 
     const attrs = st.attrs || {};
-    const attrBits = [
-        `💪 ${attrs.forca || 0}`,
-        `⚡ ${attrs.agilidade || 0}`,
-        `🛡️ ${attrs.constituicao || 0}`,
-        `🧠 ${attrs.inteligencia || 0}`,
-        `✨ ${attrs.espirito || 0}`,
-        `🍀 ${attrs.sorte || 0}`
-    ].join(' · ');
+    const forca = Number(attrs.forca ?? 0);
+    const agilidade = Number(attrs.agilidade ?? 0);
+    const defesa = Number(attrs.defesa ?? attrs.constituicao ?? 0);
+    const inteligencia = Number(attrs.inteligencia ?? attrs.espirito ?? 0);
+    const vitalidade = Number(attrs.vitalidade ?? attrs.vida ?? attrs.constituicao ?? 0);
+    const sorte = Number(attrs.sorte ?? 0);
 
+    const manaMax =
+        typeof player.maxManaFromLevel === 'function'
+            ? player.maxManaFromLevel(st.level, profile.classId)
+            : 20 + Number(st.level || 0) * 4;
+
+    const classLine = cls
+        ? `**Classe:** ${cls.emoji || '⚔️'} ${cls.name}`
+        : '**Classe:** _Sem classe — use `/classe escolher`_';
+    const classDesc = cls?.desc
+        ? String(cls.desc).slice(0, 220) + (cls.desc.length > 220 ? '…' : '')
+        : '';
+
+    const titleName = displayName || 'Sem nome';
     const emb = new EmbedBuilder()
         .setColor((cls && cls.color) || 0xa78bfa)
-        .setAuthor({
-            name: `${profile.name} · ${classLabel}`,
-            iconURL: user.displayAvatarURL({ size: 64 })
-        })
+        .setTitle(titleName)
         .setThumbnail(photo)
         .setDescription(
             [
-                cls ? `${cls.emoji || '⚔️'} **${cls.name}**` : '⚠️ Sem classe válida',
-                cls?.desc ? `_${String(cls.desc).slice(0, 160)}${cls.desc.length > 160 ? '…' : ''}_` : '',
+                !displayName
+                    ? '_Use `O.j editar nome <nome>` para definir seu nome._'
+                    : null,
+                classLine,
+                classDesc ? `_${classDesc}_` : null,
                 '',
-                `🎚️ **Nível ${st.level}** · XP **${Number(st.xp || 0).toLocaleString('pt-BR')}**`,
-                `💙 Mana máx. **${player.maxManaFromLevel(st.level, profile.classId)}**`,
-                `✨ Éter **${Number(eterBal).toLocaleString('pt-BR')}** · 💠 CP **${Number(cpBal).toLocaleString('pt-BR')}**`,
-                `🏰 Guilda: ${guildLine}`,
+                `🎚️ **Nível** ${Number(st.level || 0)} · **XP** ${Number(st.xp || 0).toLocaleString('pt-BR')}`,
                 '',
-                `**Atributos**\n${attrBits}`,
+                `💙 **Mana máx:** ${manaMax}`,
                 '',
-                `**Loadout**\n${skillsLine}`
+                `✨ **Éter** ${Number(eterBal).toLocaleString('pt-BR')} · 💠 **cristais** ${Number(cristaisBal).toLocaleString('pt-BR')}`,
+                '',
+                `🏰 **Guilda:** ${guildLine}`,
+                '',
+                '─────────────────────────────',
+                '**Atributos**',
+                '',
+                `💪 **força:** ${forca}`,
+                `⚡ **agilidade:** ${agilidade}`,
+                `🛡️ **defesa:** ${defesa}`,
+                `🧠 **inteligência:** ${inteligencia}`,
+                `✨ **vitalidade:** ${vitalidade}`,
+                `🍀 **sorte:** ${sorte}`,
+                '─────────────────────────────'
             ]
-                .filter((x) => x !== '')
+                .filter((x) => x != null)
                 .join('\n')
-        )
-        .setFooter({ text: 'O.j perfil · O.habilidades · O.passivas · O.guild' })
-        .setTimestamp();
+        );
+
+    const serverName = opts.guildName || opts.serverName || null;
+    const dateStr = new Date().toLocaleDateString('pt-BR');
+    emb.setFooter({
+        text: [
+            'Aeternus • jogador • perfil',
+            dateStr,
+            serverName
+        ]
+            .filter(Boolean)
+            .join(' • ')
+    });
+    emb.setTimestamp();
     return emb;
 }
 
@@ -231,8 +261,8 @@ function atributosPayload(user) {
     };
 }
 
-function profilePayload(user, profile) {
-    return { embeds: [profileEmbed(user, profile)], components: [] };
+function profilePayload(user, profile, opts = {}) {
+    return { embeds: [profileEmbed(user, profile, opts)], components: [] };
 }
 
 async function beginCreate(interaction) {
@@ -331,7 +361,7 @@ async function tryConsumePhotoMessage(message, client) {
         await channel
             .send({
                 content: '✅ Personagem criado com a foto enviada!',
-                embeds: [profileEmbed(message.author, profile)]
+                embeds: [profileEmbed(message.author, profile, { guildName: message.guild?.name })]
             })
             .catch(() => {});
         return true;
@@ -405,7 +435,7 @@ module.exports = {
                 }
                 return message.reply(String(target) + ' ainda não tem personagem.');
             }
-            return message.reply(profilePayload(target, player.get(target.id)));
+            return message.reply(profilePayload(target, player.get(target.id), { guildName: message.guild?.name }));
         }
 
         return message.reply(
@@ -437,7 +467,7 @@ module.exports = {
                 flags: MessageFlags.Ephemeral
             });
         }
-        return i.reply(profilePayload(i.user, player.get(i.user.id)));
+        return i.reply(profilePayload(i.user, player.get(i.user.id), { guildName: i.guild?.name }));
     },
 
     async handleComponent(interaction) {
@@ -828,7 +858,7 @@ async function finishProfile(user, data, channel, interaction, fromPhoto = false
             require('../utils/store').save('xp.json', dataXp);
         } catch (_) {}
 
-        const emb = profileEmbed(user, profile);
+        const emb = profileEmbed(user, profile, { guildName: interaction.guild?.name || null });
         emb.setTitle('✅ ' + profile.name + ' · perfil criado');
         if (profile.photoUrl) emb.setThumbnail(profile.photoUrl);
 
