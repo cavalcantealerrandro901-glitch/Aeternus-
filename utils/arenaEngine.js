@@ -22,25 +22,56 @@ function maxMana(level, classId, manaBonus) {
 function loadFighter(userId) {
     const prof = player.get(userId);
     if (!prof) return null;
-    const st = xp.get(userId);
-    const attrs = { ...st.attrs };
+    const st = xp.get(userId) || { level: 0, attrs: {} };
+    const attrs = { ...(st.attrs || {}) };
     const classId = classes.resolveClassId(prof.classId);
-    const cls = classes.getClass(classId);
+    const cls = (classId && classes.getClass(classId)) || {
+        id: classId || 'unknown',
+        name: 'Sem classe',
+        emoji: '❓',
+        type: 'melee',
+        bonus: {},
+        basicAttack: { id: 'basico', name: 'Ataque', emoji: '⚔️', type: 'physical', power: 1, mana: 0 }
+    };
     for (const [k, v] of Object.entries(cls.bonus || {})) attrs[k] = (attrs[k] || 0) + Number(v || 0);
+    // defaults se attrs vazios
+    for (const k of ['forca', 'defesa', 'agilidade', 'vida']) {
+        if (attrs[k] == null) attrs[k] = k === 'vida' ? 10 : 5;
+    }
     try {
         const eq = player.getEquipmentBonuses?.(userId) || {};
         for (const [k, v] of Object.entries(eq)) if (typeof v === 'number') attrs[k] = (attrs[k] || 0) + v;
     } catch (_) {}
-    const passMods = abilities.sumPassiveMods(userId);
-    const equipped = abilities.getEquippedAbilities(userId);
+    let passMods = {};
+    let equipped = { active: [], passive: [] };
+    try {
+        passMods = abilities.sumPassiveMods?.(userId) || {};
+        equipped = abilities.getEquippedAbilities?.(userId) || equipped;
+    } catch (_) {}
     const hp = maxHp(attrs, st.level);
     const mana = maxMana(st.level, classId, passMods.manaBonus);
     return {
-        id: userId, name: prof.name || 'Guerreiro', classId, className: cls.name, emoji: cls.emoji, type: cls.type,
-        photo: player.getBattlePhoto(userId), battleAvatar: player.getBattleAvatar(userId),
-        level: st.level, attrs, passMods,
-        actives: equipped.active.filter(Boolean), passives: equipped.passive.filter(Boolean),
-        basicAttack: cls.basicAttack, hp, maxHp: hp, mana, maxMana: mana, effects: [], cds: {}, team: null
+        id: userId,
+        name: prof.name || 'Guerreiro',
+        classId: classId || cls.id,
+        className: cls.name || 'Sem classe',
+        emoji: cls.emoji || '❓',
+        type: cls.type || 'melee',
+        photo: player.getBattlePhoto?.(userId),
+        battleAvatar: player.getBattleAvatar?.(userId),
+        level: st.level || 0,
+        attrs,
+        passMods,
+        actives: (equipped.active || []).filter(Boolean),
+        passives: (equipped.passive || []).filter(Boolean),
+        basicAttack: cls.basicAttack || { id: 'basico', name: 'Ataque', emoji: '⚔️', type: 'physical', power: 1, mana: 0 },
+        hp,
+        maxHp: hp,
+        mana,
+        maxMana: mana,
+        effects: [],
+        cds: {},
+        team: null
     };
 }
 

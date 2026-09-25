@@ -27,22 +27,39 @@ const ATTR_META = [
 
 function classSelect(customId = 'j:class') {
     const classesMod = require('../utils/classes');
-    const list = (classesMod.listSelectableClasses
+    let list = classesMod.listSelectableClasses
         ? classesMod.listSelectableClasses()
-        : Object.values(player.CLASSES)
-    ).slice(0, 25);
+        : Object.values(player.CLASSES || {});
+    list = (list || [])
+        .filter((c) => c && c.id && c.name)
+        .slice(0, 25);
+    // Discord exige 1–25 options; se vazio, opção placeholder
+    const options =
+        list.length > 0
+            ? list.map((c) => {
+                  const label = String(c.name || c.id).slice(0, 100) || c.id;
+                  const value = String(c.id).slice(0, 100);
+                  let description = `${c.rarityName || c.rarity || 'Comum'} · ${String(c.desc || '').slice(0, 40)}`;
+                  description = description.slice(0, 100);
+                  if (!description.trim()) description = 'Classe';
+                  const opt = { label, value, description };
+                  const em = c.emoji && String(c.emoji);
+                  // emoji unicode curto (não custom id)
+                  if (em && em.length <= 4 && !em.includes(':')) opt.emoji = em;
+                  return opt;
+              })
+            : [
+                  {
+                      label: 'Nenhuma classe disponível',
+                      value: 'none',
+                      description: 'Peça a um admin para cadastrar classes'
+                  }
+              ];
     return new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
             .setCustomId(customId)
             .setPlaceholder('Escolha sua classe')
-            .addOptions(
-                list.map((c) => ({
-                    label: String(c.name).slice(0, 100),
-                    value: c.id,
-                    description: `${c.rarityName || c.rarity || 'Comum'} · ${(c.desc || '').slice(0, 50)}`.slice(0, 100),
-                    emoji: c.emoji && String(c.emoji).length <= 2 ? c.emoji : undefined
-                }))
-            )
+            .addOptions(options)
     );
 }
 
