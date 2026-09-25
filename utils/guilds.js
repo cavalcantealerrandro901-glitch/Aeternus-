@@ -35,7 +35,26 @@ function get(id) {
 function findByName(name) {
     const q = String(name || '').trim().toLowerCase();
     if (!q) return null;
-    return list().find((g) => g.name.toLowerCase() === q || g.tag.toLowerCase() === q) || null;
+    return (
+        list().find((g) => {
+            if (!g || typeof g !== 'object') return false;
+            const n = String(g.name || '').toLowerCase();
+            const tag = String(g.tag || '').toLowerCase();
+            return n === q || tag === q;
+        }) || null
+    );
+}
+
+function isTagTaken(tag) {
+    const q = String(tag || '').trim().toUpperCase();
+    if (!q) return false;
+    return list().some((g) => g && String(g.tag || '').toUpperCase() === q);
+}
+
+function isNameTaken(name) {
+    const q = String(name || '').trim().toLowerCase();
+    if (!q) return false;
+    return list().some((g) => g && String(g.name || '').toLowerCase() === q);
 }
 
 function findByMember(userId) {
@@ -83,7 +102,7 @@ function createGuild(ownerId, opts = {}) {
         .slice(0, MAX_TAG);
     if (name.length < 3) return { ok: false, error: 'Nome da guilda: mínimo 3 caracteres.' };
     if (tag.length < 2) return { ok: false, error: 'Tag: 2 a 5 letras/números. Ex.: `AES`' };
-    if (findByName(name) || findByName(tag)) return { ok: false, error: 'Nome ou tag já em uso.' };
+    if (isNameTaken(name) || isTagTaken(tag) || findByName(name) || findByName(tag)) return { ok: false, error: 'Nome ou tag já em uso.' };
 
     const bal = eter.get(ownerId);
     if (bal < CREATE_COST) {
@@ -307,6 +326,8 @@ module.exports = {
     list,
     get,
     findByName,
+    isTagTaken,
+    isNameTaken,
     findByMember,
     memberOf,
     isOfficer,

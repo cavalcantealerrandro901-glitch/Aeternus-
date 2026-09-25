@@ -159,6 +159,19 @@ async function advanceDraft(message) {
     const uid = message.author.id;
     const d = drafts.get(uid);
     if (!d) return false;
+    try {
+        return await advanceDraftInner(message, uid, d);
+    } catch (e) {
+        console.error('[guild draft]', e);
+        try {
+            await message.channel.send('❌ Erro na criação da guilda. Tente de novo com `O.guild criar` ou `cancelar`.');
+        } catch (_) {}
+        return true;
+    }
+}
+
+async function advanceDraftInner(message, uid, d) {
+    if (!d) return false;
     if (Date.now() - d.at > 15 * 60 * 1000) {
         drafts.delete(uid);
         await message.channel.send('⏱️ Criação expirada. Use `O.guild criar` de novo.');
@@ -186,14 +199,36 @@ async function advanceDraft(message) {
     }
 
     if (d.step === 'tag') {
-        const tag = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+        // Aceita letras (com acento vira base), números; remove espaços/símbolos
+        let tag = String(text || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, '')
+            .slice(0, 5);
         if (tag.length < 2) {
-            await message.channel.send('Tag inválida. Use 2–5 letras/números.');
+            await message.channel.send(
+                'Tag inválida. Use **2 a 5 letras/números** (ex.: `LOBO`, `AES`, `G1`).\nSem espaços nem símbolos.'
+            );
             return true;
         }
-        if (guilds.findByName(tag) || guilds.findByName(d.name)) {
-            await message.channel.send('Nome ou tag já em uso. Envie outra tag ou `cancelar`.');
-            return true;
+        try {
+            if (guilds.isTagTaken?.(tag) || guilds.findByName(tag)) {
+                await message.channel.send(
+                    `A tag **[${tag}]** já está em uso. Envie outra ou digite \`cancelar\`.`
+                );
+                return true;
+            }
+            if (guilds.isNameTaken?.(d.name) || guilds.findByName(d.name)) {
+                await message.channel.send(
+                    'O **nome** da guilda já está em uso. Digite `cancelar` e comece de novo com outro nome.'
+                );
+                drafts.delete(uid);
+                return true;
+            }
+        } catch (e) {
+            console.error('[guild tag check]', e);
+            // não bloqueia criação por falha de leitura
         }
         d.tag = tag;
         d.step = 'description';
