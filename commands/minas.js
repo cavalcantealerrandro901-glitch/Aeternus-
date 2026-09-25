@@ -4,7 +4,7 @@ const {
     ButtonBuilder,
     ButtonStyle
 } = require('discord.js');
-const flocos = require('../utils/flocos');
+const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const { fmt, betFooter, C } = require('../utils/gameStyle');
 
@@ -62,14 +62,14 @@ async function autoEnd(game, client) {
         const win = potentialAt(game.amount, game.opened.size, game.bombCount);
         game.cashed = true;
         game._lastWin = win;
-        flocos.add(game.userId, win, { reason: 'mines auto' });
-        note += `\n💵 Saque automático: ❄️ **${fmt(win)}**`;
+        eter.add(game.userId, win, { reason: 'mines auto' });
+        note += `\n💵 Saque automático: ✨ **${fmt(win)}**`;
     } else if (game.opened.size > 0 && game.fun) {
         game.cashed = true;
         note += '\n🏁 Diversão encerrada.';
     } else {
         game.dead = true;
-        if (!game.fun) note += `\nPrejuízo: ❄️ **${fmt(game.amount)}** (nenhuma casa).`;
+        if (!game.fun) note += `\nPrejuízo: ✨ **${fmt(game.amount)}** (nenhuma casa).`;
     }
     clearTimer(game);
 
@@ -100,7 +100,7 @@ function resultBanner(game) {
         const profit = win - game.amount;
         return [
             `🎉 **Você ganhou!**`,
-            `❄️ Recebeu **${fmt(win)}** flocos`,
+            `✨ Recebeu **${fmt(win)}** éter`,
             `📊 Lucro **+${fmt(Math.max(0, profit))}** · Multi ×**${multAt(game.opened.size, game.bombCount)}**`,
             `💎 Gemas **${game.opened.size}** · 💣 Minas **${game.bombCount}**`
         ].join('\n');
@@ -108,7 +108,7 @@ function resultBanner(game) {
     // perdeu
     return [
         `😢 **Você perdeu.**`,
-        `💸 Prejuízo de ❄️ **${fmt(game.amount)}** flocos`,
+        `💸 Prejuízo de ✨ **${fmt(game.amount)}** éter`,
         `_Tente novamente — a próxima pode ser sua._`
     ].join('\n');
 }
@@ -142,16 +142,16 @@ function panelEmbed(game, extra) {
     const lines = [
         `**${status}**`,
         '',
-        game.fun ? '🎮 Modo diversão · sem aposta' : `❄️ Aposta **${fmt(game.amount)}** flocos`,
+        game.fun ? '🎮 Modo diversão · sem aposta' : `✨ Aposta **${fmt(game.amount)}** éter`,
         `💎 Abertas **${opened}** / **${safeTotal}**  ·  💣 Minas **${bombs}**`,
         `🟩 Livres **${freeLeft}** / **${safeTotal}**  ·  📦 Casas **${TOTAL}**`
     ];
 
     if (!game.fun) {
         lines.push(
-            `📈 Multi atual **×${curM}**${opened > 0 ? ` → ❄️ **${fmt(curPay)}**` : ''}`,
+            `📈 Multi atual **×${curM}**${opened > 0 ? ` → ✨ **${fmt(curPay)}**` : ''}`,
             opened < safeTotal && !game.dead && !game.cashed
-                ? `⏭️ Próximo multi **×${nextM}** → ❄️ **${fmt(nextPay)}** _(abrir +1)_`
+                ? `⏭️ Próximo multi **×${nextM}** → ✨ **${fmt(nextPay)}** _(abrir +1)_`
                 : null
         );
     }
@@ -169,7 +169,7 @@ function panelEmbed(game, extra) {
         .setFooter({
             text: game.fun
                 ? 'O.mines <1-11> · AFK 7 min'
-                : `Flocos ❄️ · AFK 7 min · ${betFooter()}`
+                : `Éter ✨ · AFK 7 min · ${betFooter()}`
         })
         .setTimestamp();
 }
@@ -217,7 +217,7 @@ function controlsRow(game) {
     const canCash = game.opened.size > 0 && !ended;
 
     let cashLabel = game.fun ? 'Encerrar' : 'Sacar';
-    if (!game.fun && canCash) cashLabel = `Sacar ❄️ ${fmt(pot)}`;
+    if (!game.fun && canCash) cashLabel = `Sacar ✨ ${fmt(pot)}`;
 
     const buttons = [
         new ButtonBuilder()
@@ -331,7 +331,7 @@ function openCell(game, idx) {
         if (!game.fun && game.amount > 0) {
             win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
-            flocos.add(game.userId, win, { reason: 'mines clear' });
+            eter.add(game.userId, win, { reason: 'mines clear' });
         }
         return { ok: true, bomb: false, autoWin: true, win };
     }
@@ -372,16 +372,20 @@ function endPayload(game, note) {
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'mine', 'campo'],
-    description: 'Mines 4×4 em flocos',
+    description: 'Mines 4×4 em Éter ✨ — all/half/k/m/b',
 
     async execute(message, args, client) {
         const bombsRaw = parseInt(args[0], 10);
         if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
             return message.reply(
                 [
-                    '💎 **Mines 4×4** · moeda ❄️ flocos',
-                    '🎮 `O.mines <1-11>` — diversão',
-                    '❄️ `O.mines <bombas> <valor|all|half>` — aposta',
+                    '💎 **Mines 4×4** · moeda **✨ Éter**',
+                    '',
+                    '🎮 **Diversão:** `O.minas <bombas>`',
+                    '✨ **Aposta:** `O.minas <bombas> <valor>`',
+                    '',
+                    '**Valores:** `1000` · `1k` · `2.5k` · `1m` · `1b` · `all` · `half` · `50%`',
+                    '**Bombas:** 1 a 11  ·  Grade 4×4',
                     '⏱️ AFK 7 min → saque automático se houver gemas.'
                 ].join('\n')
             );
@@ -391,9 +395,9 @@ module.exports = {
         if (args[1] == null || args[1] === '') {
             game = makeGame(message.author.id, 0, bombsRaw, true);
         } else {
-            const bet = resolveBet(args[1], flocos.get(message.author.id), { label: '❄️' });
+            const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
             if (!bet.ok) return message.reply(`❌ ${bet.error}`);
-            flocos.remove(message.author.id, bet.amount, { reason: 'mines bet' });
+            eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
             game = makeGame(message.author.id, bet.amount, bombsRaw, false);
         }
 
@@ -427,11 +431,11 @@ module.exports = {
             if (game.fun) {
                 ng = makeGame(game.userId, 0, game.bombCount, true);
             } else {
-                const bet = resolveBet(String(game.amount), flocos.get(game.userId), { label: '❄️' });
+                const bet = resolveBet(String(game.amount), eter.get(game.userId), { label: '✨' });
                 if (!bet.ok) {
                     return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
                 }
-                flocos.remove(game.userId, bet.amount, { reason: 'mines again' });
+                eter.remove(game.userId, bet.amount, { reason: 'mines again' });
                 ng = makeGame(game.userId, bet.amount, game.bombCount, false);
             }
             clearTimer(game);
@@ -489,7 +493,7 @@ module.exports = {
             game.cashed = true;
             const win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
-            flocos.add(game.userId, win, { reason: 'mines cash' });
+            eter.add(game.userId, win, { reason: 'mines cash' });
             return interaction.update(endPayload(game));
         }
 
