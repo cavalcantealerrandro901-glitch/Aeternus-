@@ -165,6 +165,39 @@ function createGuild(ownerId, opts = {}) {
     return { ok: true, guild: data[id] };
 }
 
+
+function setName(guildId, userId, name) {
+    const data = all();
+    const g = data[guildId];
+    if (!g) return { ok: false, error: 'Guilda não encontrada.' };
+    if (!isOwner(g, userId)) return { ok: false, error: 'Só o líder altera o nome.' };
+    name = slugName(name);
+    if (name.length < 3) return { ok: false, error: 'Nome: mínimo 3 caracteres.' };
+    if (isNameTaken(name) && String(g.name || '').toLowerCase() !== name.toLowerCase()) {
+        return { ok: false, error: 'Nome já em uso.' };
+    }
+    g.name = name;
+    save(data);
+    return { ok: true, guild: g };
+}
+
+function setTag(guildId, userId, tagRaw) {
+    const data = all();
+    const g = data[guildId];
+    if (!g) return { ok: false, error: 'Guilda não encontrada.' };
+    if (!isOwner(g, userId)) return { ok: false, error: 'Só o líder altera a tag.' };
+    const tag = sanitizeTag(tagRaw);
+    if ([...tag].length < 2) {
+        return { ok: false, error: 'Tag inválida (2–6 letras/números/emojis).' };
+    }
+    if (isTagTaken(tag) && tagKey(g.tag) !== tagKey(tag)) {
+        return { ok: false, error: 'Tag já em uso.' };
+    }
+    g.tag = tag;
+    save(data);
+    return { ok: true, guild: g };
+}
+
 function setDescription(guildId, userId, desc) {
     const data = all();
     const g = data[guildId];
@@ -367,6 +400,8 @@ module.exports = {
     isOwner,
     maxMembers,
     createGuild,
+    setName,
+    setTag,
     setDescription,
     setWelcome,
     setImage,
