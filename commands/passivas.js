@@ -1,45 +1,87 @@
-const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-const abilities = require('../utils/abilities');
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    StringSelectMenuBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} = require('discord.js');
 const player = require('../utils/player');
+const classes = require('../utils/classes');
+const abilities = require('../utils/abilities');
 
-module.exports = {
-    name: 'passivas',
-    aliases: ['passive', 'passives'],
-    description: 'Equipa as 5 habilidades passivas',
-    async execute(message) {
-        if (!player.has(message.author.id)) {
-            return message.reply('Crie seu perfil com `O.j criar`.');
-        }
-        return message.reply(panel(message.author.id));
-    },
-    async handleComponent(interaction) {
-        const uid = interaction.user.id;
-        if (!interaction.isStringSelectMenu()) return;
-        const id = interaction.customId || '';
-        if (!id.startsWith('passivas:sel:')) return;
-        const slot = Number(id.split(':')[2]);
-        const abilityId = interaction.values[0];
-        if (abilityId === 'none') abilities.unequipSlot(uid, 'passive', slot);
-        else {
-            const r = abilities.equipAbility(uid, abilityId, slot);
-            if (!r.ok) return interaction.reply({ content: r.error, ephemeral: true });
-        }
-        return interaction.update(panel(uid));
+function classLabel(userId) {
+    const p = player.get(userId);
+    const cls = p ? classes.getClass(p.classId) : null;
+    if (!cls) return 'Sem classe — use `/classe escolher`';
+    return `${cls.emoji || ''} **${cls.name}**`;
+}
+
+function classLoreLines(userId) {
+    const p = player.get(userId);
+    const cls = p ? classes.getClass(p.classId) : null;
+    if (!cls) return [];
+    const out = [];
+    const up = cls.uniquePassives || [];
+    const pa = cls.passives || [];
+    if (up.length) {
+        out.push('**🔮 Passivas únicas**');
+        up.slice(0, 5).forEach((x, i) => out.push(`${i + 1}. ${x}`));
     }
-};
+    if (pa.length) {
+        out.push('**🧠 Passivas da classe**');
+        pa.slice(0, 6).forEach((x, i) => out.push(`${i + 1}. ${x}`));
+    }
+    return out;
+}
 
 function panel(userId) {
+    abilities.sanitizeLoadout(userId);
     const loadout = abilities.loadLoadout(userId);
-    const passives = abilities.listByKind('passive', userId);
+    const list = abilities.listForPlayer(userId, 'passive');
     const { passive } = abilities.getEquippedAbilities(userId);
+
     const lines = passive.map((a, i) =>
-        a ? `**${i + 1}.** ${a.emoji} **${a.name}** — ${a.desc}` : `**${i + 1}.** _(vazio)_`
+        a
+            ? `**${i + 1}.** ${a.emoji || '✨'} **${a.name}**${a.unique ? ' ⭐' : ''} — ${(a.desc || '').slice(0, 90)}`
+            : `**${i + 1}.** _(vazio)_`
     );
-    const embed = new EmbedBuilder()
+
+    const lore = classLoreLines(userId);
+    const emb = new EmbedBuilder()
         .setColor(0x7c3aed)
         .setTitle('✨ Passivas (5 slots)')
-        .setDescription(lines.join('\n') || '_Nenhuma_')
-        .setFooter({ text: 'Classe exclusiva: só vê as passivas permitidas' });
+        .setDescription(
+            [
+                `Classe: ${classLabel(userId)}`,
+                'Equipe só passivas **da sua classe**.',
+                '',
+                '**Loadout atual**',
+                lines.join('\n'),
+                lore.length ? '\n' + lore.join('\n') : ''
+            ]
+                .filter(Boolean)
+                .join('\n')
+                .slice(0, 4000)
+        )
+        .setFooter({
+            text: list.length
+                ? `${list.length} passivas disponíveis · O.habilidades para ativas`
+                : 'Nenhuma passiva cadastrada para esta classe no motor de combate'
+        });
+
+    if (!list.length) {
+        return {
+            embeds: [emb],
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('passivas:refresh')
+                        .setLabel('Atualizar')
+                        .setStyle(ButtonStyle.Secondary)
+                )
+            ]
+        };
+    }
 
     const rows = [0, 1, 2, 3, 4].map((slot) =>
         new ActionRowBuilder().addComponents(
@@ -47,9 +89,9 @@ function panel(userId) {
                 .setCustomId(`passivas:sel:${slot}`)
                 .setPlaceholder(`Passiva ${slot + 1}`)
                 .addOptions([
-                    { label: 'Remover', value: 'none', emoji: '❌' },
-                    ...passives.slice(0, 24).map((a) => ({
-                        label: a.name.slice(0, 100),
+                    { label: 'Remover', value: 'none', description: 'Esvaziar este slot' },
+                    ...list.slice(0, 24).map((a) => ({
+                        label: `${a.unique ? '⭐ ' : ''}${a.name}`.slice(0, 100),
                         value: a.id,
                         description: (a.desc || '').slice(0, 50),
                         default: loadout.passive[slot] === a.id
@@ -57,5 +99,53 @@ function panel(userId) {
                 ])
         )
     );
-    return { embeds: [embed], components: rows };
+    // Discord max 5 rows — refresh replaces last row if needed: keep 5 selects only
+    return { embeds: [emb], components: rows.slice(0, 5) };
 }
+
+module.exports = {
+    name: 'passivas',
+    aliases: ['passive', 'passives', 'passiva'],
+    description: 'Equipa passivas da sua classe',
+
+    async execute(message) {
+        if (!player.has(message.author.id)) {
+            return message.reply('Crie o perfil com `O.j criar`.');
+        }
+        return message.reply(panel(message.author.id));
+    },
+
+    async handleComponent(interaction) {
+        const id = interaction.customId || '';
+        if (!id.startsWith('passivas:')) return false;
+        const uid = interaction.user.id;
+        if (!player.has(uid)) {
+            return interaction.reply({ content: 'Crie o perfil primeiro.', ephemeral: true });
+        }
+
+        if (id === 'passivas:refresh') {
+            return interaction.update(panel(uid));
+        }
+
+        if (id.startsWith('passivas:sel:')) {
+            const slot = parseInt(id.split(':')[2], 10);
+            const value = interaction.values?.[0];
+            const loadout = abilities.loadLoadout(uid);
+            if (value === 'none') {
+                loadout.passive[slot] = null;
+            } else {
+                if (!abilities.abilityAllowedForUser(uid, value)) {
+                    return interaction.reply({
+                        content: 'Essa passiva não é da sua classe.',
+                        ephemeral: true
+                    });
+                }
+                loadout.passive = loadout.passive.map((x, i) => (i !== slot && x === value ? null : x));
+                loadout.passive[slot] = value;
+            }
+            abilities.saveLoadout(uid, loadout);
+            return interaction.update(panel(uid));
+        }
+        return false;
+    }
+};

@@ -12,8 +12,6 @@ const {
 } = require('discord.js');
 const player = require('../utils/player');
 const xp = require('../utils/xp');
-const classesUtil = require('../utils/classes');
-const abilities = require('../utils/abilities');
 
 const drafts = new Map();
 const photoWait = new Map();
@@ -28,176 +26,97 @@ const ATTR_META = [
 ];
 
 function classSelect(customId = 'j:class') {
+    const classesMod = require('../utils/classes');
+    const list = (classesMod.listSelectableClasses
+        ? classesMod.listSelectableClasses()
+        : Object.values(player.CLASSES)
+    ).slice(0, 25);
     return new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
             .setCustomId(customId)
             .setPlaceholder('Escolha sua classe')
             .addOptions(
-                Object.values(player.CLASSES || {}).map((c) => ({
-                    label: c.name,
+                list.map((c) => ({
+                    label: String(c.name).slice(0, 100),
                     value: c.id,
-                    description: (c.desc || '').slice(0, 100),
-                    emoji: c.emoji
+                    description: `${c.rarityName || c.rarity || 'Comum'} · ${(c.desc || '').slice(0, 50)}`.slice(0, 100),
+                    emoji: c.emoji && String(c.emoji).length <= 2 ? c.emoji : undefined
                 }))
             )
     );
 }
 
-function resolveClass(profile) {
-    const id = profile?.classId || profile?.class;
-    try {
-        return classesUtil.getClass(id) || player.getClass(id);
-    } catch (_) {
-        return player.getClass(id);
-    }
-}
-
-function xpBar(cur, need, width = 12) {
-    const n = Math.max(1, Number(need) || 1);
-    const c = Math.max(0, Math.min(n, Number(cur) || 0));
-    const filled = Math.round((c / n) * width);
-    return '█'.repeat(filled) + '░'.repeat(Math.max(0, width - filled));
-}
-
-function abilityDmgLabel(a) {
-    if (!a) return '';
-    const power = Number(a.power);
-    if (Number.isFinite(power) && power > 0) {
-        const dmg = Math.round(power * 100);
-        return ' · 💥 `' + dmg + '`';
-    }
-    if (a.effect === 'heal' || a.type === 'heal') return ' · 💚 cura';
-    if (a.type === 'buff' || a.kind === 'passive') return ' · ✨ buff';
-    if (a.effect) return ' · ✨ ' + String(a.effect).slice(0, 16);
-    return '';
-}
-
-function itemStatLine(it) {
-    if (!it) return '';
-    const eff = it.effects || {};
-    const bits = Object.entries(eff)
-        .filter(([, v]) => Number(v))
-        .map(([k, v]) => k.slice(0, 5) + ' ' + Number(v))
-        .slice(0, 4);
-    const extra = bits.length ? ' · ' + bits.join(', ') : '';
-    return (it.emoji || '•') + ' **' + (it.name || it.id) + '**' + extra;
-}
-
 function profileEmbed(user, profile) {
-    const cls = resolveClass(profile);
+    const cls = player.getClass(profile.classId);
     const st = xp.get(user.id);
-    const prog = typeof xp.progress === 'function' ? xp.progress(user.id) : null;
-    const rank = typeof xp.rankOf === 'function' ? xp.rankOf(user.id) : null;
-    const attrs = (typeof xp.getAttrs === 'function' ? xp.getAttrs(user.id) : st.attrs) || {};
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
-    const hpMax = typeof xp.maxHp === 'function' ? xp.maxHp(user.id) : 100;
-    const manaMax =
-        typeof xp.maxMana === 'function'
-            ? xp.maxMana(user.id)
-            : player.maxManaFromLevel(st.level, profile.classId);
-    const exclusive = cls.exclusiveOwner ? ' · 🔒 **Única**' : '';
-    const rarity = cls.rarityName || cls.rarity || 'Comum';
+    const classLabel = cls
+        ? `${cls.emoji || ''} ${cls.name}`
+        : 'Sem classe — use `/classe escolher`';
 
-    let equippedAb = { active: [], passive: [] };
+    let eterBal = 0;
+    let cpBal = 0;
+    let guildLine = '_Sem guilda_';
     try {
-        equippedAb = abilities.getEquippedAbilities(user.id);
+        eterBal = require('../utils/eter').get(user.id) || 0;
+    } catch (_) {}
+    try {
+        cpBal = require('../utils/cp').get(user.id) || 0;
+    } catch (_) {}
+    try {
+        const g = require('../utils/guilds').findByMember(user.id);
+        if (g) guildLine = `**[${g.tag}] ${g.name}** · Nv.${g.level}`;
     } catch (_) {}
 
-    const actLine =
-        (equippedAb.active || [])
-            .filter(Boolean)
-            .map((a) => (a.emoji || '⚔️') + ' **' + a.name + '**' + abilityDmgLabel(a))
-            .slice(0, 4)
-            .join('\n') || '_nenhuma_';
-    const pasLine =
-        (equippedAb.passive || [])
-            .filter(Boolean)
-            .map((a) => (a.emoji || '✨') + ' **' + a.name + '**' + abilityDmgLabel(a))
-            .slice(0, 5)
-            .join('\n') || '_nenhuma_';
-
-    let eqLine = '_vazio_';
+    let skillsLine = '_Equipe com `O.habilidades` / `O.passivas`_';
     try {
-        const eq = player.getEquipped(user.id) || {};
-        const parts = [];
-        if (eq.weapon) parts.push(itemStatLine(eq.weapon));
-        if (eq.armor) parts.push(itemStatLine(eq.armor));
-        if (eq.accessory) parts.push(itemStatLine(eq.accessory));
-        if (parts.length) eqLine = parts.join('\n');
+        const abilities = require('../utils/abilities');
+        abilities.sanitizeLoadout(user.id);
+        const eq = abilities.getEquippedAbilities(user.id);
+        const act = (eq.active || []).filter(Boolean).map((a) => a.emoji || a.name).slice(0, 4);
+        const pas = (eq.passive || []).filter(Boolean).map((a) => a.emoji || a.name).slice(0, 5);
+        skillsLine =
+            `⚔️ Ativas: ${act.length ? act.join(' ') : '—'}\n` +
+            `✨ Passivas: ${pas.length ? pas.join(' ') : '—'}`;
     } catch (_) {}
 
+    const attrs = st.attrs || {};
     const attrBits = [
-        '💪 ' + Number(attrs.forca || 0),
-        '⚡ ' + Number(attrs.agilidade || 0),
-        '🛡️ ' + Number(attrs.constituicao || attrs.defesa || 0),
-        '🧠 ' + Number(attrs.inteligencia || 0),
-        '✨ ' + Number(attrs.espirito || 0),
-        '🍀 ' + Number(attrs.sorte || 0)
+        `💪 ${attrs.forca || 0}`,
+        `⚡ ${attrs.agilidade || 0}`,
+        `🛡️ ${attrs.constituicao || 0}`,
+        `🧠 ${attrs.inteligencia || 0}`,
+        `✨ ${attrs.espirito || 0}`,
+        `🍀 ${attrs.sorte || 0}`
     ].join(' · ');
 
-    const level = Number(st.level || 1);
-    const xpCur = prog ? Number(prog.current || prog.xpInLevel || 0) : Number(st.xp || 0);
-    const xpNeed = prog ? Number(prog.needed || prog.next || 100) : 100;
-    const bar = xpBar(xpCur, xpNeed);
-    const rankTxt = rank != null ? '#' + rank : '—';
-    const pts = Number(st.attrPoints || 0);
-    const eter = Number(profile.eter ?? st.eter ?? 0);
-
     const emb = new EmbedBuilder()
-        .setColor(cls.color || 0xa78bfa)
+        .setColor((cls && cls.color) || 0xa78bfa)
         .setAuthor({
-            name: profile.name + ' · Nv.' + level,
+            name: `${profile.name} · ${classLabel}`,
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle((cls.emoji || '⚔️') + ' ' + cls.name + exclusive)
+        .setThumbnail(photo)
         .setDescription(
             [
-                (cls.desc || '').slice(0, 180),
+                cls ? `${cls.emoji || '⚔️'} **${cls.name}**` : '⚠️ Sem classe válida',
+                cls?.desc ? `_${String(cls.desc).slice(0, 160)}${cls.desc.length > 160 ? '…' : ''}_` : '',
                 '',
-                '🏅 **Ranking** ' + rankTxt + ' · **Raridade** ' + rarity,
-                '📈 **XP** `' + xpCur.toLocaleString('pt-BR') + '` / `' + xpNeed.toLocaleString('pt-BR') + '`',
-                '`' + bar + '`',
+                `🎚️ **Nível ${st.level}** · XP **${Number(st.xp || 0).toLocaleString('pt-BR')}**`,
+                `💙 Mana máx. **${player.maxManaFromLevel(st.level, profile.classId)}**`,
+                `✨ Éter **${Number(eterBal).toLocaleString('pt-BR')}** · 💠 CP **${Number(cpBal).toLocaleString('pt-BR')}**`,
+                `🏰 Guilda: ${guildLine}`,
                 '',
-                '❤️ **HP** `' +
-                    Number(hpMax).toLocaleString('pt-BR') +
-                    '` · 🔷 **Mana** `' +
-                    Number(manaMax).toLocaleString('pt-BR') +
-                    '`',
-                eter ? '💎 **Éter** `' + eter.toLocaleString('pt-BR') + '`' : null,
-                pts > 0 ? '✦ **Pontos de atributo:** ' + pts : null
+                `**Atributos**\n${attrBits}`,
+                '',
+                `**Loadout**\n${skillsLine}`
             ]
-                .filter(Boolean)
+                .filter((x) => x !== '')
                 .join('\n')
         )
-        .addFields(
-            { name: '📊 Atributos', value: attrBits || '—', inline: false },
-            { name: '⚔️ Habilidades ativas', value: actLine.slice(0, 1020), inline: false },
-            { name: '✨ Passivas', value: pasLine.slice(0, 1020), inline: false },
-            { name: '🎒 Equipado', value: eqLine.slice(0, 1020), inline: false }
-        )
-        .setThumbnail(photo)
-        .setFooter({ text: 'ID ' + user.id + ' · O.j atributos · O.habilidades · O.passivas' });
-
-    if (cls.banner) emb.setImage(cls.banner);
+        .setFooter({ text: 'O.j perfil · O.habilidades · O.passivas · O.guild' })
+        .setTimestamp();
     return emb;
-}
-
-function profilePayload(user, profile) {
-    const rows = [
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('j:gotoattrs:' + user.id)
-                .setLabel('Atributos')
-                .setEmoji('📊')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setCustomId('j:refreshperfil:' + user.id)
-                .setLabel('Atualizar')
-                .setEmoji('🔄')
-                .setStyle(ButtonStyle.Secondary)
-        )
-    ];
-    return { embeds: [profileEmbed(user, profile)], components: rows };
 }
 
 function atributosPayload(user) {
@@ -205,7 +124,7 @@ function atributosPayload(user) {
     const attrs = st.attrs || {};
     const points = Number(st.attrPoints || 0);
     const profile = player.get(user.id);
-    const cls = profile ? resolveClass(profile) : null;
+    const cls = profile ? player.getClass(profile.classId) : null;
     const nome = (profile?.name || user.username || 'Aventureiro').toUpperCase();
     const level = Number(st.level || 0);
     const hpMax = xp.maxHp(user.id);
@@ -222,7 +141,14 @@ function atributosPayload(user) {
 
     const attrLines = ATTR_META.map((a) => {
         const v = Number(attrs[a.key] || 0);
-        return a.emoji + ' **' + pad(a.label) + '** `' + String(v).padStart(3, ' ') + '`   `[ + ]`';
+        return (
+            a.emoji +
+            ' **' +
+            pad(a.label) +
+            '** `' +
+            String(v).padStart(3, ' ') +
+            '`   `[ + ]`'
+        );
     });
 
     const emb = new EmbedBuilder()
@@ -293,7 +219,14 @@ function atributosPayload(user) {
         )
     );
 
-    return { embeds: [emb], components };
+    return {
+        embeds: [emb],
+        components
+    };
+}
+
+function profilePayload(user, profile) {
+    return { embeds: [profileEmbed(user, profile)], components: [] };
 }
 
 async function beginCreate(interaction) {
@@ -303,7 +236,9 @@ async function beginCreate(interaction) {
             flags: MessageFlags.Ephemeral
         });
     }
+
     drafts.set(interaction.user.id, { step: 'name' });
+
     const modal = new ModalBuilder().setCustomId('j:name').setTitle('Nome do personagem');
     modal.addComponents(
         new ActionRowBuilder().addComponents(
@@ -317,11 +252,96 @@ async function beginCreate(interaction) {
                 .setPlaceholder('Ex: Lyra, Kael, Shadow…')
         )
     );
+
     await interaction.showModal(modal);
 }
 
+async function startPhotoWait(user, draft) {
+    try {
+        const dm = await user.createDM();
+        const cls = player.getClass(draft.classId);
+        await dm.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(cls.color || 0xa78bfa)
+                    .setTitle('📸 Foto do personagem')
+                    .setDescription(
+                        [
+                            'Olá, **' + draft.name + '** (' + cls.emoji + ' ' + cls.name + ')!',
+                            '',
+                            'Envie **uma imagem** nesta conversa para usar no perfil.',
+                            'Quando a foto for recebida, o personagem será criado na hora.'
+                        ].join('\n')
+                    )
+            ],
+            components: [
+                new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('j:avatar')
+                        .setLabel('Usar avatar do Discord')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setEmoji('🖼️')
+                )
+            ]
+        });
+        photoWait.set(user.id, { ...draft, at: Date.now() });
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+
+// Detecção de imagem unificada em utils/dmPhoto.js (anexo, embed, CDN, link)
+const dmPhoto = require('../utils/dmPhoto');
+const pickImageUrl = dmPhoto.pickImageUrl;
+const isImageAttachment = dmPhoto.isImageAttachment;
+
+async function tryConsumePhotoMessage(message, client) {
+    if (client) return dmPhoto.tryConsumePhotoMessage(message, client);
+    const userId = message.author?.id;
+    if (!userId) return false;
+    const draft = photoWait.get(userId) || drafts.get(userId);
+    if (!draft || !draft.classId || !draft.name) return false;
+    const photoUrl = pickImageUrl(message);
+    if (!photoUrl) return false;
+
+    const channel = message.channel;
+    await channel.send({ content: '📸 **Foto recebida!** Criando seu personagem…' }).catch(() => {});
+
+    try {
+        if (player.has(userId)) {
+            player.update(userId, { photoUrl });
+        } else {
+            player.create(userId, {
+                name: draft.name,
+                classId: draft.classId,
+                photoUrl
+            });
+        }
+        photoWait.delete(userId);
+        drafts.delete(userId);
+        const profile = player.get(userId);
+        await channel
+            .send({
+                content: '✅ Personagem criado com a foto enviada!',
+                embeds: [profileEmbed(message.author, profile)]
+            })
+            .catch(() => {});
+        return true;
+    } catch (e) {
+        await channel.send('❌ Erro ao salvar: ' + e.message).catch(() => {});
+        return false;
+    }
+}
+
+
 module.exports = {
     name: 'j',
+    tryConsumePhotoMessage,
+    pickImageUrl,
+    profileEmbed,
+    drafts,
     aliases: ['jogador', 'personagem', 'perfiljogador'],
     description: 'Perfil de jogador / atributos',
     data: new SlashCommandBuilder()
@@ -386,6 +406,8 @@ module.exports = {
             [
                 'Uso:',
                 '`O.j perfil` — ver perfil',
+                '`O.habilidades` / `O.passivas` — loadout de combate',
+                '`O.guild` — guildas · `O.arena` — PvP',
                 '`O.j atributos` — ficha e pontos',
                 '`O.j criar` — criar personagem'
             ].join('\n')
@@ -416,50 +438,25 @@ module.exports = {
         const id = interaction.customId || '';
         if (!id.startsWith('j:')) return;
 
-        if (id.startsWith('j:gotoattrs:')) {
-            const ownerId = id.split(':')[2];
-            if (String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({
-                    content: 'Só o dono pode abrir os atributos.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-            return interaction.update(atributosPayload(interaction.user));
-        }
-        if (id.startsWith('j:refreshperfil:')) {
-            const ownerId = id.split(':')[2];
-            if (!player.has(ownerId)) {
-                return interaction.reply({
-                    content: 'Perfil não encontrado.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-            if (String(interaction.user.id) !== String(ownerId)) {
-                try {
-                    const u = await interaction.client.users.fetch(ownerId);
-                    return interaction.update(profilePayload(u, player.get(ownerId)));
-                } catch (_) {
-                    return interaction.reply({
-                        content: 'Não foi possível atualizar.',
-                        flags: MessageFlags.Ephemeral
-                    });
-                }
-            }
-            return interaction.update(profilePayload(interaction.user, player.get(ownerId)));
-        }
-
         if (id === 'j:start') return beginCreate(interaction);
+
+        if (id.startsWith('j:attrinfo:')) {
+            return interaction.deferUpdate().catch(() => {});
+        }
 
         if (id.startsWith('j:attrplus:')) {
             const parts = id.split(':');
             let attrKey = String(parts[2] || '').toLowerCase();
             const ownerId = parts[3];
             if (attrKey === 'vida' || attrKey === 'defesa') attrKey = 'constituicao';
+
             const meta = ATTR_META.find((a) => a.key === attrKey);
             const eph = MessageFlags.Ephemeral;
+
             if (!meta) {
                 return interaction.reply({
-                    content: '⚠️ Botão antigo. Use `O.j atributos` de novo.',
+                    content:
+                        '⚠️ Este botão é antigo. Use `O.j atributos` de novo para abrir a ficha atualizada.',
                     flags: eph
                 });
             }
@@ -471,14 +468,25 @@ module.exports = {
             }
             const spent = xp.spendAttrPoint(ownerId, attrKey);
             if (!spent || !spent.ok) {
-                const msg = String((spent && spent.error) || 'Não foi possível gastar o ponto.').trim();
+                const msg =
+                    String(
+                        (spent && spent.error) || 'Não foi possível gastar o ponto de atributo.'
+                    ).trim() || 'Não foi possível gastar o ponto de atributo.';
                 return interaction.reply({ content: msg, flags: eph });
             }
+            const payload = atributosPayload(interaction.user);
+            if (payload.content === null) delete payload.content;
             try {
-                await interaction.update(atributosPayload(interaction.user));
-            } catch (_) {
+                await interaction.update(payload);
+            } catch (err) {
                 await interaction
-                    .reply({ content: '✅ **' + meta.label + '** aumentou!', flags: eph })
+                    .reply({
+                        content:
+                            '✅ **' +
+                            meta.label +
+                            '** aumentou! Abra de novo com `O.j atributos`.',
+                        flags: eph
+                    })
                     .catch(() => {});
             }
             return;
@@ -495,7 +503,7 @@ module.exports = {
             const pts = Number(xp.get(ownerId).attrPoints || 0);
             if (pts <= 0) {
                 return interaction.reply({
-                    content: 'Você não tem pontos para distribuir.',
+                    content: 'Você não tem pontos para distribuir. Suba de nível para ganhar mais.',
                     flags: MessageFlags.Ephemeral
                 });
             }
@@ -521,28 +529,13 @@ module.exports = {
                 )
             );
             return interaction.update({
-                content: '⚖️ **Depositar pontos** · **' + pts + '** disponível(is)\nEscolha **um atributo**:',
+                content:
+                    '⚖️ **Depositar pontos** · **' +
+                    pts +
+                    '** disponível(is)\nEscolha **um atributo**:',
                 embeds: [],
                 components: rows
             });
-        }
-
-        if (id.startsWith('j:attrcancel:')) {
-            return interaction.update(atributosPayload(interaction.user));
-        }
-
-        if (id.startsWith('j:attrredis:')) {
-            const ownerId = id.split(':')[2];
-            if (String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({
-                    content: 'Só o dono do perfil pode usar estes botões.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-            if (typeof xp.redistribuirAttrs === 'function') {
-                xp.redistribuirAttrs(ownerId);
-            }
-            return interaction.update(atributosPayload(interaction.user));
         }
 
         if (id.startsWith('j:attrpick:')) {
@@ -552,7 +545,10 @@ module.exports = {
             if (attrKey === 'vida' || attrKey === 'defesa') attrKey = 'constituicao';
             const meta = ATTR_META.find((a) => a.key === attrKey);
             if (!meta) {
-                return interaction.reply({ content: 'Atributo inválido.', flags: MessageFlags.Ephemeral });
+                return interaction.reply({
+                    content: 'Atributo inválido.',
+                    flags: MessageFlags.Ephemeral
+                });
             }
             if (String(interaction.user.id) !== String(ownerId)) {
                 return interaction.reply({
@@ -561,18 +557,28 @@ module.exports = {
                 });
             }
             const pts = Number(xp.get(ownerId).attrPoints || 0);
-            if (pts <= 0) return interaction.update(atributosPayload(interaction.user));
+            if (pts <= 0) {
+                return interaction.update(atributosPayload(interaction.user));
+            }
             const opts = [];
-            for (const n of [1, 2, 3, 5, 10]) if (n <= pts) opts.push(n);
+            for (const n of [1, 2, 3, 5, 10]) {
+                if (n <= pts) opts.push(n);
+            }
             const half = Math.floor(pts / 2);
             if (half >= 1 && !opts.includes(half)) opts.push(half);
             if (!opts.includes(pts)) opts.push(pts);
             opts.sort((a, b) => a - b);
+
             const rows = [];
             let row = new ActionRowBuilder();
             for (let i = 0; i < opts.length; i++) {
                 const n = opts[i];
-                const label = n === pts ? 'Tudo (' + n + ')' : String(n);
+                const label =
+                    n === pts
+                        ? 'Tudo (' + n + ')'
+                        : n === half && half !== pts
+                          ? 'Metade (' + n + ')'
+                          : String(n);
                 row.addComponents(
                     new ButtonBuilder()
                         .setCustomId('j:attrqty:' + attrKey + ':' + ownerId + ':' + n)
@@ -597,7 +603,14 @@ module.exports = {
                 )
             );
             return interaction.update({
-                content: '⚖️ **' + meta.emoji + ' ' + meta.label + '**\nVocê tem **' + pts + '** pontos. Quanto depositar?',
+                content:
+                    '⚖️ **' +
+                    meta.emoji +
+                    ' ' +
+                    meta.label +
+                    '**\nVocê tem **' +
+                    pts +
+                    '** ponto(s).\nEscolha **quantos** depositar neste atributo:',
                 embeds: [],
                 components: rows
             });
@@ -607,57 +620,241 @@ module.exports = {
             const parts = id.split(':');
             let attrKey = String(parts[2] || '').toLowerCase();
             const ownerId = parts[3];
-            const amount = Number(parts[4] || 1);
+            const amount = Math.floor(Number(parts[4]) || 0);
             if (attrKey === 'vida' || attrKey === 'defesa') attrKey = 'constituicao';
+            const meta = ATTR_META.find((a) => a.key === attrKey);
+            if (!meta) {
+                return interaction.reply({
+                    content: 'Atributo inválido.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
             if (String(interaction.user.id) !== String(ownerId)) {
                 return interaction.reply({
                     content: 'Só o dono do perfil pode usar estes botões.',
                     flags: MessageFlags.Ephemeral
                 });
             }
-            if (typeof xp.spendAttrPoints === 'function') {
-                xp.spendAttrPoints(ownerId, attrKey, amount);
-            } else {
-                for (let i = 0; i < amount; i++) xp.spendAttrPoint(ownerId, attrKey);
+            if (amount <= 0) {
+                return interaction.reply({
+                    content: 'Quantidade inválida.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const spent = xp.spendAttrPoints
+                ? xp.spendAttrPoints(ownerId, attrKey, amount)
+                : null;
+            if (!spent || !spent.ok) {
+                const msg = String((spent && spent.error) || 'Falha ao depositar.').trim();
+                return interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
+            }
+            const payload = atributosPayload(interaction.user);
+            payload.content =
+                '✅ Depositou **' +
+                spent.spent +
+                '** ponto(s) em **' +
+                meta.emoji +
+                ' ' +
+                meta.label +
+                '**.';
+            return interaction.update(payload);
+        }
+
+        if (id.startsWith('j:attrcancel:')) {
+            const ownerId = id.split(':')[2];
+            if (String(interaction.user.id) !== String(ownerId)) {
+                return interaction.reply({
+                    content: 'Só o dono do perfil pode usar estes botões.',
+                    flags: MessageFlags.Ephemeral
+                });
             }
             return interaction.update(atributosPayload(interaction.user));
         }
 
-        if (id === 'j:avatar') {
-            const draft = photoWait.get(interaction.user.id);
-            if (!draft) {
+        if (id.startsWith('j:attrredis:')) {
+            const ownerId = id.split(':')[2];
+            if (String(interaction.user.id) !== String(ownerId)) {
                 return interaction.reply({
-                    content: 'Sessão de foto expirada. Use `O.j criar` de novo.',
+                    content: 'Só o dono do perfil pode usar estes botões.',
                     flags: MessageFlags.Ephemeral
                 });
             }
-            try {
-                player.create(interaction.user.id, {
-                    name: draft.name,
-                    classId: draft.classId,
-                    photoUrl: interaction.user.displayAvatarURL({ size: 256, extension: 'png' })
+            const res = xp.redistribuirAttrs(ownerId);
+            if (!res || !res.ok) {
+                return interaction.reply({
+                    content: 'Não foi possível redistribuir agora.',
+                    flags: MessageFlags.Ephemeral
                 });
-                photoWait.delete(interaction.user.id);
-                drafts.delete(interaction.user.id);
-                return interaction.update({
-                    content: '✅ Personagem criado com o avatar do Discord!',
+            }
+            const payload = atributosPayload(interaction.user);
+            await interaction.update(payload);
+            return interaction
+                .followUp({
+                    content:
+                        res.refund > 0
+                            ? '🔄 Redistribuído! **' +
+                              res.refund +
+                              '** ponto(s) voltaram para o saldo.'
+                            : '🔄 Atributos já estavam na base. Nenhum ponto a devolver.',
+                    flags: MessageFlags.Ephemeral
+                })
+                .catch(() => {});
+        }
+
+        if (id === 'j:class' && interaction.isStringSelectMenu()) {
+            const draft = drafts.get(interaction.user.id);
+            if (!draft || !draft.name) {
+                return interaction.reply({
+                    content: 'Sessão expirada. Clique em **Criar meu perfil** de novo.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const classId = interaction.values[0];
+            if (!player.getClass(classId) && !player.CLASSES[classId]) {
+                return interaction.reply({
+                    content: 'Classe inválida.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            draft.classId = classId;
+            draft.step = 'photo';
+            drafts.set(interaction.user.id, draft);
+
+            const cls = player.getClass(classId);
+            await interaction.update({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(cls.color)
+                        .setTitle(cls.emoji + ' Classe escolhida: ' + cls.name)
+                        .setDescription(
+                            'Personagem **' +
+                                draft.name +
+                                '**.\n\nContinue no **PV** para enviar a **foto**, ou use o botão de avatar.'
+                        )
+                ],
+                components: []
+            });
+
+            const ok = await startPhotoWait(interaction.user, draft);
+            if (!ok) {
+                await interaction.followUp({
+                    content:
+                        'Não consegui abrir seu PV. Use o botão **Usar avatar do Discord** se aparecer, ou ative DMs.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            return;
+        }
+
+        if (id === 'j:avatar') {
+            const draft = drafts.get(interaction.user.id) || photoWait.get(interaction.user.id);
+            if (!draft || !draft.name || !draft.classId) {
+                return interaction.reply({
+                    content: 'Sessão expirada. Use `O.j criar` de novo.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            const photoUrl = interaction.user.displayAvatarURL({ size: 256, extension: 'png' });
+            await interaction
+                .update({
+                    content: '🖼️ **Usando seu avatar do Discord** como foto…',
                     embeds: [],
                     components: []
-                });
-            } catch (e) {
-                return interaction.reply({ content: 'Erro: ' + e.message, flags: MessageFlags.Ephemeral });
-            }
+                })
+                .catch(() => {});
+            await finishProfile(
+                interaction.user,
+                { name: draft.name, classId: draft.classId, photoUrl },
+                interaction.channel,
+                null,
+                true
+            );
+            drafts.delete(interaction.user.id);
+            photoWait.delete(interaction.user.id);
+            return;
         }
     },
 
     async handleModal(interaction) {
         if (interaction.customId !== 'j:name') return;
-        const nome = interaction.fields.getTextInputValue('nome').trim();
-        drafts.set(interaction.user.id, { step: 'class', name: nome });
-        return interaction.reply({
-            content: 'Escolha a **classe** de **' + nome + '**:',
+        const name = interaction.fields.getTextInputValue('nome')?.trim();
+        if (!name || name.length < 2) {
+            return interaction.reply({
+                content: 'Nome inválido.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+        drafts.set(interaction.user.id, { step: 'class', name });
+        await interaction.reply({
+            content: 'Olá, **' + name + '**! Escolha sua classe:',
             components: [classSelect('j:class')],
             flags: MessageFlags.Ephemeral
         });
     }
 };
+
+async function finishProfile(user, data, channel, interaction, fromPhoto = false) {
+    try {
+        if (player.has(user.id)) {
+            const msg = {
+                content: 'Você já tinha um perfil. Use `O.j perfil` no servidor.',
+                embeds: [],
+                components: []
+            };
+            if (interaction && interaction.update) return interaction.update(msg);
+            return channel.send(msg).catch(() => {});
+        }
+
+        const profile = player.create(user.id, data);
+        const cls = player.getClass(profile.classId);
+
+        try {
+            const dataXp = xp.all();
+            const cur = dataXp[user.id] || { xp: 0, level: 0, attrs: { ...xp.BASE_ATTR } };
+            if (!cur.attrs) cur.attrs = { ...xp.BASE_ATTR };
+            for (const [k0, v] of Object.entries(cls.bonus || {})) {
+                let k = k0;
+                if (k === 'defesa' || k === 'vida') k = 'constituicao';
+                if (!xp.ATTR_KEYS.includes(k)) continue;
+                cur.attrs[k] = (cur.attrs[k] || 0) + Number(v || 0);
+            }
+            dataXp[user.id] = cur;
+            require('../utils/store').save('xp.json', dataXp);
+        } catch (_) {}
+
+        const emb = profileEmbed(user, profile);
+        emb.setTitle('✅ ' + profile.name + ' · perfil criado');
+        if (profile.photoUrl) emb.setThumbnail(profile.photoUrl);
+
+        const notice = fromPhoto
+            ? profile.photoUrl
+                ? '✅ **Foto salva no perfil!** Use `O.j perfil` no servidor para ver de novo.'
+                : '✅ Perfil criado (sem foto customizada).'
+            : '✅ **Perfil criado com sucesso!**';
+
+        if (interaction && interaction.update) {
+            await interaction.update({
+                content: notice,
+                embeds: [emb],
+                components: []
+            });
+        } else {
+            await channel
+                .send({
+                    content: notice,
+                    embeds: [emb],
+                    components: []
+                })
+                .catch(() => {});
+        }
+    } catch (e) {
+        const err = '❌ Erro ao criar perfil: ' + e.message;
+        if (interaction && interaction.reply) {
+            await interaction
+                .reply({ content: err, flags: MessageFlags.Ephemeral })
+                .catch(() => {});
+        } else if (channel && channel.send) {
+            await channel.send(err).catch(() => {});
+        }
+    }
+}
