@@ -16,6 +16,60 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
+/** Remove prefixos de tag de guilda do apelido: [TAG] nome */
+function stripGuildTag(nick) {
+    return String(nick || '')
+        .replace(/^\s*\[[^\]]{1,12}\]\s*/u, '')
+        .trim();
+}
+
+/**
+ * Coloca ou remove a tag da guilda no apelido do servidor.
+ * Precisa de permissão Gerenciar Apelidos e cargo acima do membro.
+ */
+async function applyGuildNick(guild, userId, tagOrNull) {
+    if (!guild || !userId) return { ok: false, reason: 'no_guild' };
+    try {
+        const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+        if (!me?.permissions?.has?.('ManageNicknames') && !me?.permissions?.has?.(1n << 27n)) {
+            // ManageNicknames bit
+            try {
+                const { PermissionFlagsBits } = require('discord.js');
+                if (!me?.permissions?.has(PermissionFlagsBits.ManageNicknames)) {
+                    return { ok: false, reason: 'no_perm' };
+                }
+            } catch (_) {
+                return { ok: false, reason: 'no_perm' };
+            }
+        }
+        const member = await guild.members.fetch(userId).catch(() => null);
+        if (!member) return { ok: false, reason: 'not_in_server' };
+        if (member.id === guild.ownerId) return { ok: false, reason: 'owner' };
+        if (me.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
+            return { ok: false, reason: 'hierarchy' };
+        }
+
+        const base = stripGuildTag(member.nickname || member.user.username);
+        let next;
+        if (tagOrNull) {
+            const tag = String(tagOrNull).slice(0, 6);
+            const prefix = `[${tag}] `;
+            next = (prefix + base).slice(0, 32);
+        } else {
+            next = base.slice(0, 32) || null;
+        }
+        // se for igual ao username, Discord prefere null
+        if (next === member.user.username) next = null;
+        if ((member.nickname || null) === next) return { ok: true, skipped: true };
+        await member.setNickname(next, tagOrNull ? 'Tag da guilda Aeternus' : 'Saiu da guilda');
+        return { ok: true };
+    } catch (e) {
+        console.error('[guild nick]', e.message);
+        return { ok: false, reason: e.message };
+    }
+}
+
+
 function roleLabel(role) {
     if (role === 'owner') return '👑 Líder';
     if (role === 'officer') return '⭐ Oficial';
@@ -79,7 +133,7 @@ function helpEmbed() {
                 '`O.guild depositar <valor>` · `O.guild sacar <valor>`',
                 '`O.guild desc <texto>` · `O.guild boasvindas <texto>`',
                 '`O.guild imagem` — envia no PV a nova foto',
-                '`O.guild ranking` · `O.guild dissolver`',
+                '`O.guild ranking` · `O.guild sincronizar` · `O.guild dissolver`',
                 '',
                 'Aliases: `O.guilda` · `O.clã` · `O.clan`'
             ].join('\n')
@@ -353,11 +407,22 @@ module.exports = {
             if (!key) return message.reply('Uso: `O.guild aceitar <nome|tag>`');
             const r = guilds.acceptInvite(message.author.id, key);
             if (!r.ok) return message.reply(`❌ ${r.error}`);
-            const welcome = r.welcome
-                ? `\n\n💬 ${r.welcome}`
-                : '';
+            let nickNote = '';
+            if (message.guild) {
+                const nick = await applyGuildNick(message.guild, message.author.id, r.guild.tag);
+                if (nick.ok && !nick.skipped) {
+                    nickNote = `\n🏷️ Tag **[${r.guild.tag}]** adicionada ao seu apelido.`;
+                } else if (!nick.ok && nick.reason === 'no_perm') {
+                    nickNote =
+                        '\n⚠️ Não consegui alterar apelidos (falta permissão **Gerenciar Apelidos**).';
+                } else if (!nick.ok && nick.reason === 'hierarchy') {
+                    nickNote =
+                        '\n⚠️ Não consegui alterar seu apelido (cargo igual/acima do bot).';
+                }
+            }
+            const welcome = r.welcome ? `\n\n💬 ${r.welcome}` : '';
             return message.reply({
-                content: `✅ Você entrou em **[${r.guild.tag}] ${r.guild.name}**!${welcome}`,
+                content: `✅ Você entrou em **[${r.guild.tag}] ${r.guild.name}**!${welcome}${nickNote}`,
                 embeds: [guildEmbed(r.guild)]
             });
         }
@@ -365,7 +430,12 @@ module.exports = {
         if (sub === 'sair' || sub === 'leave') {
             const r = guilds.leave(message.author.id);
             if (!r.ok) return message.reply(`❌ ${r.error}`);
-            return message.reply(`👋 Você saiu de **[${r.guild.tag}] ${r.guild.name}**.`);
+            if (message.guild) {
+                await applyGuildNick(message.guild, message.author.id, null);
+            }
+            return message.reply(
+                `👋 Você saiu de **[${r.guild.tag}] ${r.guild.name}**. A tag foi removida do apelido (se possível).`
+            );
         }
 
         if (sub === 'expulsar' || sub === 'kick') {
@@ -375,6 +445,9 @@ module.exports = {
             if (!user) return message.reply('Uso: `O.guild expulsar @user`');
             const r = guilds.kick(g.id, message.author.id, user.id);
             if (!r.ok) return message.reply(`❌ ${r.error}`);
+            if (message.guild) {
+                await applyGuildNick(message.guild, user.id, null);
+            }
             return message.reply(`👢 <@${user.id}> foi expulso de **[${g.tag}]**.`);
         }
 
@@ -474,7 +547,31 @@ module.exports = {
             return;
         }
 
-        if (sub === 'ranking' || sub === 'rank' || sub === 'top') {
+        if (sub === 'sincronizar' || sub === 'sync' || sub === 'nicks') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            if (!guilds.isOfficer(g, message.author.id)) {
+                return message.reply('Só líder/oficiais sincronizam tags.');
+            }
+            if (!message.guild) {
+                return message.reply('Use este comando **no servidor**, não no PV.');
+            }
+            let ok = 0;
+            let fail = 0;
+            for (const m of g.members || []) {
+                if (!m?.id) continue;
+                const r = await applyGuildNick(message.guild, m.id, g.tag);
+                if (r.ok) ok++;
+                else fail++;
+            }
+            return message.reply(
+                `🏷️ Tags sincronizadas em **${message.guild.name}**: ${ok} ok · ${fail} falha(s).
+` +
+                    '_O bot precisa de **Gerenciar Apelidos** e cargo acima dos membros._'
+            );
+        }
+
+                if (sub === 'ranking' || sub === 'rank' || sub === 'top') {
             const top = (guilds.ranking(10) || []).filter((g) => g && typeof g === 'object');
             if (!top.length) return message.reply('Nenhuma guilda ainda.');
             const lines = top.map((g, i) => {
