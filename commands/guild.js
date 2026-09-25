@@ -259,6 +259,7 @@ async function startCreateDm(message) {
         welcome: '',
         imageUrl: null,
         imageTag: null,
+        sourceDiscordGuildId: message.guild?.id || null,
         at: Date.now()
     });
     try {
@@ -574,15 +575,45 @@ async function advanceDraftInner(message, uid, d) {
             description: d.description,
             welcome: d.welcome,
             imageUrl: d.imageUrl,
-            imageTag: d.imageTag
+            imageTag: d.imageTag,
+            discordGuildId: d.sourceDiscordGuildId || null
         });
         drafts.delete(uid);
         if (!r.ok) {
             await message.channel.send(`❌ ${r.error}`);
             return true;
         }
+
+        let roleNote = '';
+        try {
+            const client = message.client;
+            const dgid = d.sourceDiscordGuildId || r.guild.discordGuildId;
+            if (client && dgid) {
+                const discordGuild = await client.guilds.fetch(dgid).catch(() => null);
+                if (discordGuild) {
+                    const badge = await applyGuildBadge(discordGuild, uid, r.guild);
+                    if (badge.ok) {
+                        roleNote = `\n🏷️ Cargo-tag **${r.guild.tag}** criado e atribuído a você.`;
+                    } else if (badge.reason === 'no_perm') {
+                        roleNote =
+                            '\n⚠️ Não foi possível criar o cargo (falta **Gerenciar Cargos**). Use `O.guild sincronizar` no servidor.';
+                    } else if (badge.reason === 'hierarchy_role') {
+                        roleNote =
+                            '\n⚠️ Suba o cargo do bot acima do cargo da tag e use `O.guild sincronizar`.';
+                    }
+                }
+            } else {
+                roleNote =
+                    '\n💡 No servidor, use `O.guild sincronizar` para criar o cargo-tag.';
+            }
+        } catch (e) {
+            console.error('[guild create role]', e.message);
+        }
+
         await message.channel.send({
-            content: `🏰 Guilda **[${r.guild.tag}] ${r.guild.name}** criada! (−✨ ${fmt(guilds.CREATE_COST)})`,
+            content:
+                `🏰 Guilda **[${r.guild.tag}] ${r.guild.name}** criada! (−✨ ${fmt(guilds.CREATE_COST)})` +
+                roleNote,
             embeds: [guildEmbed(r.guild)]
         });
         return true;
@@ -1004,8 +1035,29 @@ module.exports = {
             }
             const r = guilds.disband(guildId, ownerId);
             if (!r.ok) return interaction.update({ content: `❌ ${r.error}`, components: [] });
+
+            // Apaga o cargo-tag do Discord
+            let roleNote = '';
+            try {
+                const meta = r.roleMeta || {};
+                const dgid = meta.discordGuildId || interaction.guild?.id;
+                const rid = meta.discordRoleId;
+                if (dgid && rid) {
+                    const dg = await interaction.client.guilds.fetch(dgid).catch(() => null);
+                    const role = dg ? await dg.roles.fetch(rid).catch(() => null) : null;
+                    if (role && role.editable) {
+                        await role.delete('Guilda Aeternus dissolvida');
+                        roleNote = ' Cargo-tag removido do servidor.';
+                    } else if (role) {
+                        roleNote = ' (não foi possível apagar o cargo — hierarquia/permissão).';
+                    }
+                }
+            } catch (e) {
+                console.error('[guild disband role]', e.message);
+            }
+
             return interaction.update({
-                content: `💥 Guilda dissolvida. ✨ **${fmt(r.refunded)}** devolvidos.`,
+                content: `💥 Guilda dissolvida. ✨ **${fmt(r.refunded)}** devolvidos ao líder.${roleNote}`,
                 components: []
             });
         }

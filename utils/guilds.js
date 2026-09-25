@@ -160,6 +160,8 @@ function createGuild(ownerId, opts = {}) {
         members: [{ id: ownerId, role: 'owner', joinedAt: Date.now() }],
         invites: [],
         inventory: [],
+        discordRoleId: null,
+        discordGuildId: opts.discordGuildId || null,
         createdAt: Date.now()
     };
     save(data);
@@ -328,9 +330,14 @@ function disband(guildId, byUserId) {
     if (g.bank > 0) {
         eter.add(byUserId, g.bank, { reason: 'guild_disband' });
     }
+    const roleMeta = {
+        discordRoleId: g.discordRoleId || null,
+        discordGuildId: g.discordGuildId || null,
+        tag: g.tag
+    };
     delete data[guildId];
     save(data);
-    return { ok: true, refunded: g.bank || 0 };
+    return { ok: true, refunded: g.bank || 0, roleMeta };
 }
 
 function deposit(userId, amount) {
