@@ -294,15 +294,30 @@ module.exports = {
         const qtd = Math.min(MAX_BATCH, Math.max(1, i.options.getInteger('quantidade') || 1));
 
         let created = 0;
+        let lastErr = null;
         for (let n = 0; n < qtd; n++) {
-            await createDropMsg(i, {
-                tempo: tempo,
-                winners: winners,
-                premio: premio,
-                isSlash: true,
-                silent: true
-            });
-            created++;
+            try {
+                const d = await createDropMsg(i, {
+                    tempo: tempo,
+                    winners: winners,
+                    premio: premio,
+                    isSlash: true,
+                    silent: true
+                });
+                if (d) created++;
+            } catch (e) {
+                lastErr = e;
+                console.error('[drop slash]', e?.message || e);
+                break;
+            }
+        }
+
+        if (!created) {
+            const hint =
+                lastErr?.code === 50013
+                    ? '❌ Sem permissão para enviar no canal. Dê **Ver canal**, **Enviar mensagens** e **Inserir links** ao bot.'
+                    : '❌ Não foi possível publicar o drop. Verifique permissões do bot neste canal.';
+            return i.editReply({ content: hint }).catch(() => {});
         }
 
         return i
@@ -420,15 +435,46 @@ async function createDropMsg(ctx, opts) {
     if (conf.enabled === false) {
         const msg = '❌ Drops desativados no painel.';
         if (opts.silent) return null;
-        if (isSlash) return ctx.editReply({ content: msg });
-        return ctx.reply(msg);
+        if (isSlash) return ctx.editReply({ content: msg }).catch(() => {});
+        return ctx.reply(msg).catch(() => {});
     }
 
     const prize = drops.parsePrize(premio);
     const duration = drops.parseDuration(tempo);
     const endsAt = Date.now() + duration;
-    const channel = ctx.channel;
     const author = ctx.user || ctx.author;
+
+    // Canal: configurado no painel, ou o canal atual
+    let channel = ctx.channel;
+    if (conf.channelId) {
+        const ch =
+            guild.channels.cache.get(conf.channelId) ||
+            (await guild.channels.fetch(conf.channelId).catch(() => null));
+        if (ch && ch.isTextBased?.()) channel = ch;
+    }
+
+    const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+    const need = [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ];
+    const perms = channel.permissionsFor?.(me);
+    const missing = perms ? need.filter((p) => !perms.has(p)) : need;
+    if (!me || missing.length) {
+        const msg =
+            '❌ Não consigo publicar o drop aqui: falta permissão no canal ' +
+            (channel?.toString?.() || '') +
+            '.\nPreciso de **Ver canal**, **Enviar mensagens** e **Inserir links**.';
+        if (opts.silent) {
+            // ainda avisa no slash
+            if (isSlash) await ctx.editReply({ content: msg }).catch(() => {});
+            else if (ctx.reply) await ctx.reply(msg).catch(() => {});
+            return null;
+        }
+        if (isSlash) return ctx.editReply({ content: msg }).catch(() => {});
+        return ctx.reply(msg).catch(() => {});
+    }
 
     const embed = buildEmbed(
         {
@@ -443,10 +489,23 @@ async function createDropMsg(ctx, opts) {
         author.tag
     );
 
-    const msg = await channel.send({
-        embeds: [embed],
-        components: [joinRow('pending', 0)]
-    });
+    let msg;
+    try {
+        msg = await channel.send({
+            embeds: [embed],
+            components: [joinRow('pending', 0)]
+        });
+    } catch (e) {
+        const code = e?.code || e?.rawError?.code;
+        const msgErr =
+            code === 50013 || /Missing Permissions/i.test(String(e?.message || ''))
+                ? '❌ **Missing Permissions** — o bot não pode enviar mensagens neste canal.\nDê **Ver canal**, **Enviar mensagens** e **Inserir links** no cargo do Aeternus (e confira permissões do canal).'
+                : '❌ Falha ao publicar o drop: ' + (e?.message || 'erro desconhecido');
+        console.error('[drop send]', e?.message || e);
+        if (isSlash) return ctx.editReply({ content: msgErr }).catch(() => {});
+        if (ctx.reply) return ctx.reply(msgErr).catch(() => {});
+        return null;
+    }
 
     const drop = drops.createDrop({
         id: msg.id,
@@ -469,7 +528,9 @@ async function createDropMsg(ctx, opts) {
     if (opts.silent) return drop;
 
     if (isSlash) {
-        return ctx.editReply({ content: '✅ Drop publicado.' }).catch(() => {});
+        const where =
+            channel.id !== ctx.channel?.id ? ` em ${channel}` : '';
+        return ctx.editReply({ content: '✅ Drop publicado' + where + '.' }).catch(() => {});
     }
     return drop;
 }
