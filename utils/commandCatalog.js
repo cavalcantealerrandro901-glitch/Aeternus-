@@ -100,6 +100,7 @@ const CATEGORIES = {
         emoji: '🛠️',
         description: 'Ferramentas do dia a dia',
         commands: [
+            { name: 'wiki', desc: 'Wiki oficial', usage: 'wiki', example: 'O.wiki', about: 'Abre a wiki oficial do Aeternus (RPG, guildas, economia, jogos).' },
             { name: 'help', desc: 'Central de ajuda', usage: 'help [categoria|comando]', example: 'O.ajuda saldo', about: 'Lista categorias ou detalhes de um comando.' },
             { name: 'ping', desc: 'Latência', usage: 'ping', example: 'O.ping', about: 'Mostra latência da API e do round-trip.' },
             { name: 'afk', desc: 'Modo AFK', usage: 'afk [motivo]', example: 'O.afk almoço', about: 'Marca você como AFK; remove ao falar de novo.' },
@@ -166,6 +167,8 @@ function findCommand(query) {
         ajuda: 'help',
         comandos: 'help',
         cmds: 'help',
+        guia: 'wiki',
+        docs: 'wiki',
         clear: 'limpar',
         purge: 'limpar',
         convites: 'invites',

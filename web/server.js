@@ -106,6 +106,10 @@ function startWeb(client) {
     const arenaEngine = require('../utils/arenaEngine');
     const dungeon = require('../utils/dungeon');
 
+    app.get('/wiki', (req, res) => {
+        res.sendFile(path.join(__dirname, '..', 'public', 'wiki.html'));
+    });
+
     app.get('/arena', (req, res) => {
         res.sendFile(path.join(__dirname, '..', 'public', 'arena.html'));
     });
