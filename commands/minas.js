@@ -18,27 +18,53 @@ const COLS = 4;
 const ROWS = 4;
 const TOTAL = COLS * ROWS;
 const MAX_BOMBS = 11;
-const HOUSE = 0.80; // multiplicador mais baixo (antes 0.96)
+// Multi só começa a subir após um limiar de gemas (1 bomba → 7 casas).
+// Mais bombas = limiar menor + crescimento mais agressivo (mais risco, mais ganho).
+const HOUSE = 0.95; // na 7ª gema (1 bomba) já multiplica um pouco
 const IDLE_MS = 7 * 60 * 1000;
 const BOMB_CHANCE = 0.26; // 26% de chance de bomba no botão aleatório
 
 const games = new Map();
 
+/** Com 1 bomba precisa abrir 7; cada bomba a mais reduz 1 (mín. 1). */
+function opensBeforeMult(bombs) {
+    const b = Math.max(1, Math.min(Number(bombs) || 1, MAX_BOMBS));
+    return Math.max(1, 8 - b); // 1→7, 2→6, …, 7→1
+}
+
+/**
+ * Multiplicador atual.
+ * - Antes do limiar: ×1.00 (sem lucro)
+ * - No limiar e depois: sobe a cada gema; mais bombas = curva mais íngreme
+ */
 function multAt(opened, bombs) {
-    if (opened <= 0) return 1;
+    const o = Math.max(0, Math.floor(Number(opened) || 0));
+    if (o <= 0) return 1;
+    const b = Math.max(1, Math.min(Number(bombs) || 1, TOTAL - 1));
+    const threshold = opensBeforeMult(b);
+    if (o < threshold) return 1;
+
     let m = 1;
-    for (let i = 0; i < opened; i++) {
-        const safeLeft = TOTAL - bombs - i;
+    // Só conta os passos a partir do limiar (na 7ª gema com 1 bomba começa a multiplicar)
+    for (let i = threshold - 1; i < o; i++) {
         const tilesLeft = TOTAL - i;
+        const safeLeft = TOTAL - b - i;
         if (safeLeft <= 0 || tilesLeft <= 0) break;
-        m *= tilesLeft / safeLeft;
+        // boost de risco: cada bomba extra aumenta o ganho por casa
+        const riskBoost = 1 + (b - 1) * 0.06;
+        m *= (tilesLeft / safeLeft) * riskBoost;
     }
-    return Number(Math.max(1, m * HOUSE).toFixed(2));
+    const raw = m * HOUSE;
+    // Garante que no limiar o multi já "multiplicou" (ligeiramente acima de 1)
+    if (o >= threshold && raw < 1.05) return 1.05;
+    return Number(Math.max(1, raw).toFixed(2));
 }
 
 function potentialAt(amount, opened, bombs) {
     if (!amount || opened <= 0) return 0;
-    return Math.floor(amount * multAt(opened, bombs));
+    const m = multAt(opened, bombs);
+    if (m <= 1) return Math.floor(amount); // no limiar mínimo devolve a aposta (sem lucro)
+    return Math.floor(amount * m);
 }
 
 function clearTimer(game) {
@@ -137,7 +163,7 @@ function panelEmbed(game, extra) {
     const softPhrase =
         game.dead || game.cashed
             ? null
-            : '-# Toque em uma casa ou use **Aleatório**. O multi sobe a cada gema.';
+            : '-# Toque em uma casa ou use **Aleatório**. O multi só sobe após o limiar (1💣 = 7 gemas); mais bombas = limiar menor e multi maior.';
 
     const lines = [
         `**${status}**`,
