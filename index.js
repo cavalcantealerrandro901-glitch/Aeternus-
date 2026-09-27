@@ -6,70 +6,25 @@ const { connect } = require('./utils/mongo');
 const store = require('./utils/store');
 const { getToken } = require('./utils/env');
 
-function sleep(ms) {
-    return new Promise((r) => setTimeout(r, ms));
-}
-
-function isTransientLoginError(err) {
-    const msg = String(err?.message || err || '').toLowerCase();
-    const code = err?.code || err?.status || '';
-    return (
-        msg.includes('503') ||
-        msg.includes('502') ||
-        msg.includes('504') ||
-        msg.includes('unexpected server response') ||
-        msg.includes('econnreset') ||
-        msg.includes('etimedout') ||
-        msg.includes('enotfound') ||
-        msg.includes('socket hang up') ||
-        msg.includes('cloudflare') ||
-        code === 'ECONNRESET' ||
-        code === 'ETIMEDOUT'
-    );
-}
-
-async function loginWithRetry(client, token, attempts = 8) {
-    let lastErr;
-    for (let i = 1; i <= attempts; i++) {
-        try {
-            await client.login(token);
-            return;
-        } catch (err) {
-            lastErr = err;
-            if (!isTransientLoginError(err) || i === attempts) throw err;
-            const wait = Math.min(60_000, 2000 * Math.pow(1.6, i - 1));
-            console.warn(
-                `[login] tentativa ${i}/${attempts} falhou (${err.message || err}). Nova em ${Math.round(wait / 1000)}s…`
-            );
-            await sleep(wait);
-        }
-    }
-    throw lastErr;
-}
-
 async function main() {
-    // 1) Mongo
+    console.log('🚀 Aeternus iniciando…');
     const mongoOk = await connect();
-
-    // 2) carrega tudo do Mongo → memória
-    await store.hydrate();
-
-    // 3) sobe data/*.json locais que ainda não estão no Mongo (migração one-shot)
-    if (mongoOk) {
-        await store.migrateLocalToMongo();
-    }
+    const n = await store.hydrate();
+    console.log(mongoOk ? '📦 Dados carregados do MongoDB (' + n + ' docs)' : '⚠️ Sem Mongo — dados efêmeros');
 
     const token = getToken();
     if (!token) {
         console.error(
             '❌ Token do Discord não encontrado.\n' +
-                'No .env ou no host use uma destas variáveis:\n' +
-                '  TOKEN\n  DISCORD_TOKEN\n  BOT_TOKEN'
+                'No .env ou no Render use:\n' +
+                '  TOKEN  |  DISCORD_TOKEN  |  BOT_TOKEN'
         );
         process.exit(1);
     }
 
-    const client = new Client({
+    const { Client } = require('discord.js');
+// placeholder
+const client = new Client({
         intents: [
             GatewayIntentBits.Guilds,
             GatewayIntentBits.GuildMembers,
@@ -88,30 +43,21 @@ async function main() {
             Partials.Reaction
         ]
     });
+try { client.setMaxListeners(25); } catch (_) {}
+
 
     client.commands = new Collection();
     client.slash = new Collection();
     client.prefixDefault = 'O.';
 
-    client.on('error', (err) => {
-        console.warn('[client] error:', err?.message || err);
-    });
-    client.on('shardError', (err) => {
-        console.warn('[shard] error:', err?.message || err);
-    });
-
     loadCommands(client);
     loadEvents(client);
     loadSystems(client);
-
-    // painel web (usa as mesmas settings/guilds do store → Mongo)
-    const web = startWeb;
-    if (typeof web === 'function') web(client);
-    else if (web && typeof web.startWeb === 'function') web.startWeb(client);
+    startWeb(client);
 
     const backup = require('./utils/backup');
     const shutdown = async (sig) => {
-        console.log(`\n${sig} — flush Mongo + backup final…`);
+        console.log(`\n${sig} — salvando backup final…`);
         try {
             await store.flush();
             await backup.createBackup('shutdown');
@@ -121,17 +67,7 @@ async function main() {
     process.once('SIGINT', () => shutdown('SIGINT'));
     process.once('SIGTERM', () => shutdown('SIGTERM'));
 
-    // flush periódico extra (segurança em hosts que matam o processo)
-    setInterval(() => {
-        store.flush().catch(() => {});
-    }, 60_000).unref?.();
-
-    await loginWithRetry(client, token);
-
-    const st = store.stats();
-    console.log(
-        `📦 Store pronto · keys=${st.keys} · mongo=${st.mongo} · localFiles=${st.localFiles}`
-    );
+    await client.login(token);
 }
 
 main().catch((e) => {
@@ -139,6 +75,8 @@ main().catch((e) => {
     process.exit(1);
 });
 
+// unhandledRejection / uncaughtException são capturados pelo systems/autoRepair
+// (reportError → DM do OWNER_ID). Mantém log de fallback se o sistema ainda não carregou.
 process.on('unhandledRejection', (err) => {
     try {
         const ar = require('./utils/autoRepair');
