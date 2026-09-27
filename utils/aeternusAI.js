@@ -1,6 +1,7 @@
 /**
- * Consciência e Motor de PLN Local do Aeternus
- * Reconhecimento do Criador/Dono, Cálculos, Edição de Interface e Interação Livre.
+ * Consciência e Motor de PLN Local do Aeternus (v3.0 - Aprimorado)
+ * Arquitetura Nativa: Aprendizado Social, Reconhecimento do Criador, 
+ * Cálculos Matemáticos, Administração de Interface e Memória de Contexto.
  */
 
 const fs = require('fs');
@@ -11,7 +12,10 @@ const LEARNED_FILE = path.join(DATA_DIR, 'learned_phrases.json');
 
 const contexts = new Map();
 const tools = new Map();
+/** @type {Map<string, { lastIntents: string[], lastEntities: Record<string, any>, turns: number, updatedAt: number }> } */
 const memory = new Map();
+
+// --- PERSISTÊNCIA E APRENDIZADO SOCIAL ---
 
 if (!fs.existsSync(DATA_DIR)) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
@@ -28,7 +32,7 @@ try {
 
 function saveLearnedPhrases() {
     try {
-        fs.writeFileSync(LEARNED_FILE, JSON.stringify(learnedPhrases.slice(-1000), null, 2), 'utf-8');
+        fs.writeFileSync(LEARNED_FILE, JSON.stringify(learnedPhrases.slice(-1500), null, 2), 'utf-8');
     } catch (_) {}
 }
 
@@ -40,10 +44,12 @@ function learnFromMessage(text) {
     const clean = raw.replace(/<@!?\d+>/g, '').replace(/\s+/g, ' ').trim();
     if (clean.length >= 3 && !learnedPhrases.includes(clean)) {
         learnedPhrases.push(clean);
-        if (learnedPhrases.length > 1000) learnedPhrases.shift();
+        if (learnedPhrases.length > 1500) learnedPhrases.shift();
         saveLearnedPhrases();
     }
 }
+
+// --- UTILITÁRIOS DE AMBIENTE & PLN ---
 
 function ownerId() {
     return String(process.env.OWNER_ID || '').trim();
@@ -109,6 +115,8 @@ function pick(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// --- GERENCIAMENTO DE FERRAMENTAS E CONTEXTO ---
+
 function registerContext(id, { description, get }) {
     if (!id || typeof get !== 'function') return false;
     contexts.set(String(id), { description: String(description || id), get });
@@ -148,7 +156,7 @@ function getMemory(userId) {
 
     if (memory.has(key)) {
         const entry = memory.get(key);
-        if (now - entry.updatedAt > 15 * 60 * 1000) {
+        if (now - entry.updatedAt > 20 * 60 * 1000) {
             memory.delete(key);
         }
     }
@@ -166,7 +174,7 @@ async function runTool(name, args, runtime) {
     const t = tools.get(name);
     if (!t) return { error: `Ferramenta desconhecida: ${name}` };
     if (t.ownerOnly && !isOwner(runtime.userId)) {
-        return { error: 'Apenas o proprietário do bot pode usar esse recurso.' };
+        return { error: 'Apenas o proprietário do bot possui autorização para este recurso.' };
     }
     try {
         return await t.handler(args || {}, runtime);
@@ -175,22 +183,27 @@ async function runTool(name, args, runtime) {
     }
 }
 
+// --- EXTRAÇÃO DE ENTIDADES & RECONHECIMENTO DE INTENÇÕES ---
+
 function extractEntities(text, catalog) {
     const tokens = tokenize(text);
     const raw = String(text || '').trim();
     const entities = {};
 
-    const mathMatch = raw.match(/(?:quanto e|calcula|calcule|quanto da|conta)\s+([0-9+\-*/%().^\s]+)/i) ||
+    // Expressões matemáticas avançadas
+    const mathMatch = raw.match(/(?:quanto e|calcula|calcule|quanto da|conta|resultado de)\s+([0-9+\-*/%().^\s]+)/i) ||
                       raw.match(/^([0-9+\-*/%().^\s]{3,})$/);
     if (mathMatch) {
         entities.mathExpression = mathMatch[1] || mathMatch[0];
     }
 
+    // Edição de interface/comandos
     const editMatch = raw.match(/(?:editar interface|edite interface|criar interface|interface do comando)\s+([a-zA-Z0-9_-]+)/i);
     if (editMatch) {
         entities.editCommandName = editMatch[1];
     }
 
+    // Marcação e busca de membros
     const mentionMatch = raw.match(/<@!?(\d+)>/);
     if (mentionMatch) {
         entities.targetUserId = mentionMatch[1];
@@ -201,10 +214,28 @@ function extractEntities(text, catalog) {
         }
     }
 
+    const memberQueryMatch = raw.match(/(?:quem e|quem e o|quem e a|membro|usuario|sobre o|sobre a|user)\s+([a-zA-Z0-9_\.\-]{2,32})/i);
+    if (memberQueryMatch && !entities.targetUserId) {
+        entities.targetQuery = memberQueryMatch[1];
+    }
+
+    if (catalog) {
+        for (const cat of catalog.listCategories()) {
+            for (const cmd of cat.commands) {
+                if (tokens.some((token) => fuzzyMatchWord(token, cmd.name, 1))) {
+                    entities.commandName = cmd.name;
+                    break;
+                }
+            }
+            if (entities.commandName) break;
+        }
+    }
+
     return entities;
 }
 
 function detectIntents(text, userMem, entities) {
+    const tokens = tokenize(text);
     const norm = normalizeText(text);
     const intents = [];
 
@@ -212,7 +243,7 @@ function detectIntents(text, userMem, entities) {
         intents.push({ intent, score, ...extra });
     };
 
-    // Identificação do Criador/Desenvolvedor
+    // Criador/Desenvolvedor
     if (
         norm.includes('quem te criou') ||
         norm.includes('quem e seu criador') ||
@@ -223,27 +254,65 @@ function detectIntents(text, userMem, entities) {
         norm.includes('seu desenvolvedor') ||
         norm.includes('seu dev')
     ) {
-        addIntent('creator_info', 0.98);
+        addIntent('creator_info', 0.99);
     }
 
+    // Cálculos
     if (entities.mathExpression) {
         addIntent('calculate', 0.98, { expression: entities.mathExpression });
     }
 
+    // Edição de Interface (Exclusivo Dono)
     if (entities.editCommandName || norm.includes('editar interface')) {
         addIntent('edit_interface', 0.95, { commandName: entities.editCommandName });
     }
 
-    if (norm.includes('info do servidor') || norm.includes('info do server')) {
+    // Servidor
+    if (
+        norm.includes('info do servidor') ||
+        norm.includes('info do server') ||
+        norm.includes('sobre o servidor') ||
+        norm.includes('detalhes do server') ||
+        norm.includes('membros do server')
+    ) {
         addIntent('server_info', 0.95);
     }
 
-    if (entities.targetUserId || norm.includes('quem e') || norm.includes('info de')) {
+    // Membro
+    if (
+        entities.targetUserId ||
+        norm.includes('quem e') ||
+        norm.includes('info de') ||
+        norm.includes('perfil de') ||
+        norm.includes('sobre o usuario')
+    ) {
         addIntent('member_info', 0.9);
     }
 
-    if (norm.includes('saldo') || norm.includes('eter')) {
-        addIntent('balance', 0.85);
+    // Economia & RPG
+    if (tokens.some((t) => ['saldo', 'carteira', 'eter', 'dinheiro', 'banco'].includes(t))) {
+        addIntent('balance', 0.88);
+    }
+
+    if (tokens.some((t) => fuzzyMatchWord('sonho', t) || fuzzyMatchWord('sonhos', t) || t === 'loritta')) {
+        addIntent('loritta', 0.88);
+    }
+
+    if (tokens.some((t) => ['perfil', 'personagem', 'atributo', 'nivel', 'level'].includes(t))) {
+        addIntent('player', 0.85);
+    }
+
+    // Saudações e Despedidas
+    if (tokens.some((t) => ['oi', 'ola', 'hey', 'eae', 'eai', 'salve', 'opa', 'suave', 'sussa'].includes(t))) {
+        addIntent('greet', 0.92);
+    }
+
+    if (tokens.some((t) => ['obrigado', 'valeu', 'vlw', 'thanks', 'tmj'].includes(t))) {
+        addIntent('thanks', 0.9);
+    }
+
+    if (tokens.some((t) => ['tchau', 'flw', 'bye', 'fui'].includes(t))) {
+        addIntent('bye', 0.9);
     }
 
     if (intents.length === 0) {
@@ -253,10 +322,36 @@ function detectIntents(text, userMem, entities) {
     return intents.sort((a, b) => b.score - a.score);
 }
 
+// --- RESPOSTAS CONVERSACIONAIS ---
+
+function respondCasualChat(text) {
+    const norm = normalizeText(text);
+
+    if (learnedPhrases.length > 0 && Math.random() < 0.6) {
+        const learnedSample = pick(learnedPhrases);
+        const connectors = ['mano', 'po', 'slk', 'vish', 'kkkk', 'nmr', 'dahora', 'pior que'];
+        return Math.random() > 0.5 ? `${pick(connectors)} ${learnedSample.toLowerCase()}` : learnedSample;
+    }
+
+    if (norm.includes('kkk') || norm.includes('hah') || norm.includes('massa')) {
+        return pick(['kkkkkkkk', 'slk engraçado dms', 'tanko nao kkkk', 'kkkk boto fe']);
+    }
+
+    return pick([
+        'suave mano, e vc?',
+        'boto fe demais',
+        'slk, pior ne',
+        'tmj mano, precisar tamo ai',
+        'dahora dms',
+        'po mano kkkk',
+        'tranquilo por aqui, e com vc?'
+    ]);
+}
+
 async function respondCreator(runtime) {
     const oId = ownerId();
     if (!oId) {
-        return 'meu criador e o desenvolvedor do sistema, mas o `OWNER_ID` ainda nao foi definido nas variaveis de ambiente!';
+        return 'meu criador e o desenvolvedor do sistema, mas o `OWNER_ID` ainda nao foi configurado no arquivo .env!';
     }
 
     return pick([
@@ -285,23 +380,37 @@ async function runIntent(item, runtime, text, entities) {
         }
         case 'server_info': {
             const res = await runTool('get_server_info', {}, runtime);
-            if (!res?.ok) return 'Não consegui pegar as informações do servidor.';
+            if (!res?.ok) return 'Não consegui pegar as informações do servidor agora!';
             const s = res.server;
-            return `🏰 **${s.name}** | **Membros:** ${fmt(s.memberCount)} \vert{} **Canais:**${fmt(s.channelCount)}`;
+            return `🏰 **${s.name}** | **Membros:** ${fmt(s.memberCount)} | **Canais:** ${fmt(s.channelCount)}`;
         }
         case 'member_info': {
-            const target = entities?.targetUserId || runtime.userId;
+            const target = entities?.targetUserId || entities?.targetQuery || runtime.userId;
             const res = await runTool('get_member_info', { target }, runtime);
-            if (!res?.ok) return 'Membro não encontrado.';
+            if (!res?.ok) return `Membro \`${target}\` não encontrado no servidor.`;
             const m = res.member;
-            return `👤 **${m.displayName}** (\`${m.tag}\`) | ID: \`${m.id}\``;
+            return `👤 **${m.displayName}** (\`${m.tag}\`)\n• ID: \`${m.id}\` | Entrou: ${m.joinedAt}`;
         }
         case 'balance': {
             const res = await runTool('get_eter_balance', {}, runtime);
-            return `✨ Saldo de Éter: **${fmt(res.eter || 0)}**`;
+            return `✨ teu saldo de Éter e: **${fmt(res.eter || 0)}**`;
+        }
+        case 'loritta': {
+            const res = await runTool('get_loritta_sonhos', {}, runtime);
+            if (!res?.ok) return `não consegui consultar os sonhos: ${res?.error || 'erro na API'}`;
+            return `💤 tu tem **${fmt(res.sonhos)}** sonhos na Loritta!`;
+        }
+        case 'greet': {
+            return pick(['salve mano! suave?', 'eae, de boa?', 'opa! suaveee?']);
+        }
+        case 'thanks': {
+            return pick(['tmj mano!', 'valeuuu', 'nois!', 'de nada bro!']);
+        }
+        case 'bye': {
+            return pick(['flw mano!', 'ate mais!', 'fui, ate dps!']);
         }
         default:
-            return pick(['Suave mano!', 'Boto fé!', 'Tmj!', 'Qual a boa?']);
+            return respondCasualChat(text);
     }
 }
 
@@ -321,7 +430,10 @@ async function chat({ userId, message, client, guild, channel, messageId }) {
     const userMem = getMemory(userId);
     userMem.turns += 1;
 
-    const entities = extractEntities(text, null);
+    let catalog = null;
+    try { catalog = require('./commandCatalog'); } catch (_) {}
+
+    const entities = extractEntities(text, catalog);
     const intents = detectIntents(text, userMem, entities);
 
     const topIntent = intents[0] || { intent: 'casual_chat' };
@@ -329,7 +441,7 @@ async function chat({ userId, message, client, guild, channel, messageId }) {
 
     return {
         ok: true,
-        text: String(responseText),
+        text: String(responseText).slice(0, 1950),
         replyOptions: messageId ? { reply: { messageReference: messageId } } : {}
     };
 }
@@ -355,6 +467,6 @@ module.exports = {
     chat,
     clearHistory,
     isOwner,
-    model: () => 'aeternus-native-v2',
+    model: () => 'aeternus-native-v3',
     baseUrl: () => 'local'
 };
