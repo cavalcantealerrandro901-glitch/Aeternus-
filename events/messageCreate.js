@@ -1,8 +1,6 @@
 const aeternusAI = require('../utils/aeternusAI');
 const { PermissionFlagsBits } = require('discord.js');
 
-const DEFAULT_PREFIX = '!';
-
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
@@ -17,25 +15,24 @@ module.exports = {
             }
         }
 
-        // 1. Tratamento de Comandos por Prefixo (ex: !ajuda, !trabalhar)
-        if (message.content.startsWith(DEFAULT_PREFIX)) {
-            const args = message.content.slice(DEFAULT_PREFIX.length).trim().split(/ +/);
+        const prefix = message.client.prefixDefault || 'O.';
+
+        // 1. Se a mensagem começa com o prefixo do bot, deixa o handler de comandos original processar
+        if (message.content.startsWith(prefix)) {
+            const args = message.content.slice(prefix.length).trim().split(/ +/);
             const commandName = args.shift().toLowerCase();
 
-            // Se o bot armazena os comandos em client.commands (padrão comum em handlers)
-            const command = message.client.commands?.get(commandName) || message.client.commands?.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
+            const command = message.client.commands?.get(commandName) || 
+                            message.client.commands?.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
 
             if (command) {
                 try {
                     await command.execute(message, args, message.client);
                 } catch (err) {
                     console.error(`Erro ao executar o comando ${commandName}:`, err);
-                    try {
-                        await message.reply({ content: '❌ Ocorreu um erro ao executar este comando.' });
-                    } catch (_) {}
                 }
             }
-            return; // Encerra para não misturar comando com IA
+            return;
         }
 
         // 2. Verifica se o bot foi mencionado na mensagem para conversar com a IA
