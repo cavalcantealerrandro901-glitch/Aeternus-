@@ -426,111 +426,147 @@ module.exports = {
 };
 
 async function createDropMsg(ctx, opts) {
-    const premio = opts.premio;
-    const tempo = opts.tempo;
-    const winners = opts.winners;
-    const isSlash = opts.isSlash;
-    const guild = ctx.guild;
-    const conf = getSettings(guild.id).drops || {};
-    if (conf.enabled === false) {
-        const msg = '❌ Drops desativados no painel.';
-        if (opts.silent) return null;
-        if (isSlash) return ctx.editReply({ content: msg }).catch(() => {});
-        return ctx.reply(msg).catch(() => {});
-    }
-
-    const prize = drops.parsePrize(premio);
-    const duration = drops.parseDuration(tempo);
-    const endsAt = Date.now() + duration;
-    const author = ctx.user || ctx.author;
-
-    // Canal: configurado no painel, ou o canal atual
-    let channel = ctx.channel;
-    if (conf.channelId) {
-        const ch =
-            guild.channels.cache.get(conf.channelId) ||
-            (await guild.channels.fetch(conf.channelId).catch(() => null));
-        if (ch && ch.isTextBased?.()) channel = ch;
-    }
-
-    const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
-    const need = [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.EmbedLinks
-    ];
-    const perms = channel.permissionsFor?.(me);
-    const missing = perms ? need.filter((p) => !perms.has(p)) : need;
-    if (!me || missing.length) {
-        const msg =
-            '❌ Não consigo publicar o drop aqui: falta permissão no canal ' +
-            (channel?.toString?.() || '') +
-            '.\nPreciso de **Ver canal**, **Enviar mensagens** e **Inserir links**.';
-        if (opts.silent) {
-            // ainda avisa no slash
+    try {
+        const premio = opts.premio;
+        const tempo = opts.tempo;
+        const winners = opts.winners;
+        const isSlash = opts.isSlash;
+        const guild = ctx.guild;
+        if (!guild) {
+            const msg = '❌ Use este comando em um servidor.';
             if (isSlash) await ctx.editReply({ content: msg }).catch(() => {});
             else if (ctx.reply) await ctx.reply(msg).catch(() => {});
             return null;
         }
-        if (isSlash) return ctx.editReply({ content: msg }).catch(() => {});
-        return ctx.reply(msg).catch(() => {});
-    }
 
-    const embed = buildEmbed(
-        {
+        const conf = (getSettings(guild.id) || {}).drops || {};
+        if (conf.enabled === false) {
+            const msg = '❌ Drops desativados no painel.';
+            if (isSlash) await ctx.editReply({ content: msg }).catch(() => {});
+            else if (ctx.reply) await ctx.reply(msg).catch(() => {});
+            return null;
+        }
+
+        const prize = drops.parsePrize(premio);
+        const duration = drops.parseDuration(tempo);
+        const endsAt = Date.now() + duration;
+        const author = ctx.user || ctx.author;
+
+        const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+        const need = [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.EmbedLinks
+        ];
+
+        function canSend(ch) {
+            if (!ch || !ch.isTextBased?.()) return false;
+            if (!me) return false;
+            try {
+                const perms = ch.permissionsFor(me);
+                if (!perms) return false;
+                return need.every((p) => perms.has(p));
+            } catch (_) {
+                return false;
+            }
+        }
+
+        // Candidatos: canal do painel → canal da interação
+        const candidates = [];
+        if (conf.channelId) {
+            const ch =
+                guild.channels.cache.get(conf.channelId) ||
+                (await guild.channels.fetch(conf.channelId).catch(() => null));
+            if (ch) candidates.push(ch);
+        }
+        if (ctx.channel) candidates.push(ctx.channel);
+
+        let channel = candidates.find((c) => canSend(c)) || null;
+
+        // Último recurso: followUp ephemeral não publica no chat — avisa
+        if (!channel) {
+            const msg =
+                '❌ Sem permissão para **enviar mensagens** no canal do drop.\n' +
+                'No Discord: **Configurações do canal → Permissões → cargo do Aeternus** → ative:\n' +
+                '• Ver canal\n• Enviar mensagens\n• Inserir links\n' +
+                (conf.channelId
+                    ? '\n_Também confira o canal configurado no painel de drops._'
+                    : '');
+            if (isSlash) await ctx.editReply({ content: msg }).catch(() => {});
+            else if (ctx.reply) await ctx.reply({ content: msg }).catch(() => {});
+            return null;
+        }
+
+        const embed = buildEmbed(
+            {
+                prize: prize,
+                winners: winners,
+                endsAt: endsAt,
+                participants: {},
+                requirements: conf.requirements || {},
+                guildId: guild.id
+            },
+            guild,
+            author.tag
+        );
+
+        let msg;
+        try {
+            msg = await channel.send({
+                embeds: [embed],
+                components: [joinRow('pending', 0)]
+            });
+        } catch (e) {
+            console.error('[drop send]', e?.code, e?.message);
+            const msgErr =
+                '❌ Falha ao publicar (código ' +
+                (e?.code || '?') +
+                '). Dê ao bot **Ver canal**, **Enviar mensagens** e **Inserir links** neste canal.';
+            if (isSlash) await ctx.editReply({ content: msgErr }).catch(() => {});
+            else if (ctx.reply) await ctx.reply({ content: msgErr }).catch(() => {});
+            return null;
+        }
+
+        const drop = drops.createDrop({
+            id: msg.id,
+            guildId: guild.id,
+            channelId: channel.id,
+            messageId: msg.id,
             prize: prize,
             winners: winners,
             endsAt: endsAt,
+            ended: false,
             participants: {},
-            requirements: conf.requirements || {},
-            guildId: guild.id
-        },
-        guild,
-        author.tag
-    );
-
-    let msg;
-    try {
-        msg = await channel.send({
-            embeds: [embed],
-            components: [joinRow('pending', 0)]
+            createdBy: author.id,
+            createdByTag: author.tag,
+            requirements: conf.requirements || {}
         });
+
+        await msg.edit({ components: [joinRow(drop.id, 0)] }).catch(() => {});
+        schedule(ctx.client, drop);
+
+        if (opts.silent) {
+            if (isSlash && !opts.skipAck) {
+                /* ack no executeSlash */
+            }
+            return drop;
+        }
+
+        if (isSlash) {
+            const where = channel.id !== ctx.channel?.id ? ' em ' + channel.toString() : '';
+            await ctx.editReply({ content: '✅ Drop publicado' + where + '.' }).catch(() => {});
+        }
+        return drop;
     } catch (e) {
-        const code = e?.code || e?.rawError?.code;
-        const msgErr =
-            code === 50013 || /Missing Permissions/i.test(String(e?.message || ''))
-                ? '❌ **Missing Permissions** — o bot não pode enviar mensagens neste canal.\nDê **Ver canal**, **Enviar mensagens** e **Inserir links** no cargo do Aeternus (e confira permissões do canal).'
-                : '❌ Falha ao publicar o drop: ' + (e?.message || 'erro desconhecido');
-        console.error('[drop send]', e?.message || e);
-        if (isSlash) return ctx.editReply({ content: msgErr }).catch(() => {});
-        if (ctx.reply) return ctx.reply(msgErr).catch(() => {});
+        console.error('[createDropMsg]', e?.message || e);
+        try {
+            if (opts.isSlash) {
+                await ctx.editReply({
+                    content: '❌ Erro ao criar drop. Verifique permissões do bot no canal.'
+                }).catch(() => {});
+            }
+        } catch (_) {}
         return null;
     }
-
-    const drop = drops.createDrop({
-        id: msg.id,
-        guildId: guild.id,
-        channelId: channel.id,
-        messageId: msg.id,
-        prize: prize,
-        winners: winners,
-        endsAt: endsAt,
-        ended: false,
-        participants: {},
-        createdBy: author.id,
-        createdByTag: author.tag,
-        requirements: conf.requirements || {}
-    });
-
-    await msg.edit({ components: [joinRow(drop.id, 0)] }).catch(() => {});
-    schedule(ctx.client, drop);
-
-    if (opts.silent) return drop;
-
-    if (isSlash) {
-        const where =
-            channel.id !== ctx.channel?.id ? ` em ${channel}` : '';
-        return ctx.editReply({ content: '✅ Drop publicado' + where + '.' }).catch(() => {});
-    }
-    return drop;
 }
+
