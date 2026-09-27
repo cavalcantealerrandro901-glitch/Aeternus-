@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.6 (Geração Contextual Inteligente)
+ * Aeternus Engine v7.7 (Frases Criativas & Emojis Dinâmicos)
  */
 
 const fs = require('fs');
@@ -144,40 +144,45 @@ async function runIntent(item, runtime, text) {
             const word = item.word;
             const definition = await fetchWordDefinition(word);
             if (definition) {
-                return `📖 **Significado de "${word}":**\n${definition}`;
+                return `📖 **Significado de "${word}":**\n> *${definition}*\n\n💡 Curtiu pesquisar essa palavra? Se quiser saber mais alguma, é só mandar! ✨`;
             }
-            return `Não consegui encontrar o significado da palavra "${word}" no dicionário.`;
+            return `🤔 Poxa, não consegui achar o significado exato de "${word}" no meu dicionário agora. Tenta outra palavra parecida! 🔍`;
         }
         case 'bot_mood':
-            return "Tô de boa operando com os sistemas limpos e focados. 🤖";
+            return pick([
+                "🤖 Estou a todo vapor, com os circuitos tinindo e pronto para o que der e vier! 🔥",
+                "🚀 Operando 100% focado e com a energia lá em cima hoje! 😎⚡",
+                "🌟 Tô super bem, administrando os sistemas e trocando aquela ideia massa com geral! 🦾"
+            ]);
         case 'creator_info':
-            return ownerId() ? `Fui desenvolvido pelo mestre <@${ownerId()}>.` : "Criador não configurado.";
+            return ownerId() ? `👑 Fui forjado com linhas épicas de código pelo mestre <@${ownerId()}>! 💻✨` : "🏷️ O ID do meu criador ainda não foi configurado nas variáveis. ⚙️";
         case 'calculate':
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
-            return calcRes.ok ? `🧮 O resultado é **${calcRes.result}**.` : calcRes.error;
+            return calcRes.ok ? `🧮 O resultado exato dessa conta é **${calcRes.result}**! 🚀✨` : `⚠️ ${calcRes.error}`;
         case 'contextual_reply': {
             const topic = extractMainTopic(text);
             if (topic) {
                 const def = await fetchWordDefinition(topic);
                 if (def) {
-                    return `Analisando o que você disse sobre **${topic}**, percebi que envolve conceitos bem interessantes. Pelo dicionário, refere-se a: *${def.slice(0, 180)}...* Faz total sentido pensando por esse lado!`;
+                    return `🧠 Analisando o que você falou sobre **${topic}**, percebi que é um tema super profundo! Olhando no dicionário, significa: *${def.slice(0, 150)}...* Faz total sentido! 🎯🔥`;
                 }
-                return `Compreendi seu ponto sobre "${topic}". É um aspecto bem relevante e que vale a pena aprofundar na nossa conversa. O que mais você destaca sobre isso?`;
+                return `💬 Captura total da sua ideia sobre **${topic}**! É um ponto de vista muito interessante e que rende um ótimo debate por aqui. O que mais você pensa sobre isso? 🤔✨`;
             }
             return pick([
-                'Entendi perfeitamente o seu raciocínio. Como você gostaria de desenvolver isso?',
-                'Analisando o que você comentou, faz todo sentido. Quer explorar mais a fundo?',
-                'Captei a ideia! É um ponto de vista bem sólido sobre o assunto.'
+                '🎯 Entendi perfeitamente o seu raciocínio! Como você quer aprofundar isso?',
+                '🔥 Caramba, faz todo sentido o que você disse agora! Quer explorar mais?',
+                '⚡ Captou a essência! É uma visão bem sólida sobre o assunto. O que mais manda?',
+                '✨ Concordo em partes, mas é um ponto de vista bem criativo e massa de analisar! 🚀'
             ]);
         }
         default:
-            return "Interessante. Poderia detalhar um pouco mais?";
+            return "🤔 Hmm, achei essa reflexão bem curiosa! Poderia detalhar um pouco mais para mim? 💡";
     }
 }
 
 async function chat({ userId, message, client, guild, channel, messageId, author, learnOnly }) {
     const text = String(message || '').trim();
-    if (text.length < 3) return { ok: true, text: '?' };
+    if (text.length < 3) return { ok: true, text: '❓' };
 
     if (learnOnly) {
         return { ok: true, text: null };
@@ -205,6 +210,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.6-contextual',
+    model: () => 'aeternus-v7.7-creative-emojis',
     baseUrl: () => 'local'
 };
