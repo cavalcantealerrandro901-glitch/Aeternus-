@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.13 (Interactive Trivia & Dynamic Challenge Core)
+ * Aeternus Engine v7.14 (Achievement Badges & Interactive Core)
  */
 
 const fs = require('fs');
@@ -74,11 +74,29 @@ function getUserProfile(userId, displayName) {
             xp: 0, 
             level: 1,
             persona: 'default',
+            badges: ['Iniciante ⚡'],
             history: []
         };
     }
     usersDb[userId].interactions += 1;
     return usersDb[userId];
+}
+
+function checkAndAwardBadges(profile) {
+    if (!profile.badges) profile.badges = ['Iniciante ⚡'];
+    
+    if (profile.level >= 3 && !profile.badges.includes('Veterano 🛡️')) {
+        profile.badges.push('Veterano 🛡️');
+    }
+    if (profile.level >= 5 && !profile.badges.includes('Lendário 🌟')) {
+        profile.badges.push('Lendário 🌟');
+    }
+    if (profile.persona === 'cyberpunk' && !profile.badges.includes('Ciber-Hacker 🦾')) {
+        profile.badges.push('Ciber-Hacker 🦾');
+    }
+    if (profile.persona === 'medieval' && !profile.badges.includes('Cavaleiro Místico ⚔️')) {
+        profile.badges.push('Cavaleiro Místico ⚔️');
+    }
 }
 
 function addXpAndCheckLevel(profile, bonus = 0) {
@@ -93,6 +111,7 @@ function addXpAndCheckLevel(profile, bonus = 0) {
         profile.affinity = Math.min(100, profile.affinity + 10);
         leveledUp = true;
     }
+    checkAndAwardBadges(profile);
     saveData();
     return { xpGain, leveledUp };
 }
@@ -153,7 +172,7 @@ async function runTool(name, args, runtime) {
     try { return await t.handler(args || {}, runtime); } catch (e) { return { error: e.message }; }
 }
 
-function detectIntents(text, profile) {
+function detectIntents(text) {
     const norm = normalizeText(text);
 
     if (norm.match(/desafio|trivia|quiz|pergunta/)) return { intent: 'start_trivia', score: 0.99 };
@@ -183,6 +202,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
 
     if (item.intent === 'set_persona') {
         profile.persona = item.persona;
+        checkAndAwardBadges(profile);
         saveData();
         if (item.persona === 'cyberpunk') return `⚡ **Modo Cibernético ATIVADO!** Conexão neural estabelecida, parceiro! 🦾🕶️`;
         if (item.persona === 'medieval') return `🛡️ **Modo Místico ATIVADO!** Que a força dos reinos antigos guie nossa jornada! ⚔️📜`;
@@ -193,23 +213,23 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         const randomQ = pick(triviaQuestions);
         profile.activeTrivia = randomQ.a;
         saveData();
-        return `🧠 **DESAFIO TRIBUTÁRIO / TRIVIA AETERNUS:**\n> *${randomQ.q}*\n\n💡 Responda com o valor ou palavra correta para ganhar um bônus monstruoso de XP! 🚀🎯`;
+        return `🧠 **DESAFIO TRIVIA AETERNUS:**\n> *${randomQ.q}*\n\n💡 Responda com o valor ou palavra correta para faturar um bônus de **+50 XP**! 🚀🎯`;
     }
 
-    // Checa se o usuário está respondendo a uma trivia ativa
     let triviaBonus = 0;
     if (profile.activeTrivia) {
         const cleanAns = normalizeText(text);
         if (cleanAns.includes(profile.activeTrivia)) {
             profile.activeTrivia = null;
-            triviaBonus = 50; // Bônus gigante de XP
+            if (!profile.badges.includes('Mestre do Saber 🏆')) {
+                profile.badges.push('Mestre do Saber 🏆');
+            }
             saveData();
-            return `🎉 **RESPOSTA CORRETA!** Você gabaritou o desafio e garantiu um bônus épico de **+50 XP** na sua ficha! 🏆🔥`;
+            return `🎉 **RESPOSTA CORRETA!** Você gabaritou o desafio, ganhou **+50 XP** e desbloqueou a insígnia **Mestre do Saber 🏆**! 🔥`;
         }
     }
 
-    const title = profile.level >= 5 ? "Lendário 🌟" : profile.level >= 3 ? "Veterano 🛡️" : "Novato ⚡";
-    let prefix = profile.persona === 'cyberpunk' ? `[CYBER-NET] ` : profile.persona === 'medieval' ? `[VALE MÍSTICO] ` : (profile.affinity > 75 ? `Parceiro ${profile.name} (${title})! ` : "");
+    let prefix = profile.persona === 'cyberpunk' ? `[CYBER-NET] ` : profile.persona === 'medieval' ? `[VALE MÍSTICO] ` : (profile.affinity > 75 ? `Parceiro ${profile.name}! ` : "");
 
     if (levelUpInfo.leveledUp) {
         prefix += `🎉 **LEVEL UP!** Subiu para o **Nível ${profile.level}**! 🚀🔥\n\n`;
@@ -217,11 +237,11 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
 
     switch (item.intent) {
         case 'user_profile':
-            return `${prefix}📊 **Ficha de Status:**\n` +
-                   `• **Nível:** ${profile.level} (${title})\n` +
+            return `${prefix}📊 **Ficha de Status & Conquistas:**\n` +
+                   `• **Nível:** ${profile.level}\n` +
                    `• **XP Atual:** ${profile.xp} / ${profile.level * 100}\n` +
                    `• **Afinidade:** ${profile.affinity}%\n` +
-                   `• **Persona:** ${profile.persona.toUpperCase()} 🌟`;
+                   `• **Medalhas:** ${profile.badges.join(', ')} 🌟`;
         case 'dictionary_lookup': {
             const word = item.word;
             const definition = await fetchWordDefinition(word);
@@ -232,7 +252,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         }
         case 'bot_mood':
             return pick([
-                `${prefix}🤖 Sistemas v7.13 operando com motor de Trivia e XP ativo! 🔥`,
+                `${prefix}🤖 Sistemas v7.14 operando com o motor de badges e total fluidez! 🔥`,
                 `${prefix}🚀 Tudo tinindo por aqui! Servidores sincronizados e prontos para o desafio. 😎⚡`,
                 `${prefix}🌟 Núcleo inteligente processando com alta performance! 🦾`
             ]);
@@ -248,12 +268,12 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
                 if (def) {
                     return `${prefix}🧠 Analisando **${topic}**, encontrei conexões diretas no acervo: *${def.slice(0, 120)}...* Fascinante! 🎯🔥`;
                 }
-                return `${prefix}💬 Excelente abordagem sobre **${topic}**! Nossa engine está processando sua linha de raciocínio. Quer tentar um **"desafio"** para testar seus conhecimentos? 🤔✨`;
+                return `${prefix}💬 Excelente abordagem sobre **${topic}**! Nossa engine está processando sua linha de raciocínio. Mande um **"desafio"** para testar sua mente! 🤔✨`;
             }
             return pick([
                 `${prefix}🎯 Entendi exatamente o seu ponto! Como quer prosseguir?`,
                 `${prefix}🔥 Ótima linha de pensamento! Quer aprofundar mais aspectos sobre isso?`,
-                `${prefix}⚡ Captado! Sua argumentação está bem sólida. Mande um "desafio" se quiser testar sua mente!`,
+                `${prefix}⚡ Captado! Sua argumentação está bem sólida. O que mais manda?`,
                 `${prefix}✨ Perspectiva super criativa e rica em detalhes! 🚀`
             ]);
         }
@@ -275,7 +295,7 @@ async function chat({ userId, message, client, guild, channel, messageId, author
     const levelUpInfo = addXpAndCheckLevel(profile, 0);
 
     const runtime = { userId: String(userId), client, guild, channel, messageId, isOwner: isOwner(userId) };
-    const intent = detectIntents(text, profile);
+    const intent = detectIntents(text);
     const responseText = await runIntent(intent, runtime, text, profile, levelUpInfo);
 
     return { ok: true, text: String(responseText).slice(0, 1950), replyOptions: messageId ? { reply: { messageReference: messageId } } : {} };
@@ -296,6 +316,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.13-trivia-engine',
+    model: () => 'aeternus-v7.14-achievements',
     baseUrl: () => 'local'
 };
