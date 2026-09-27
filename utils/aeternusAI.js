@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.1 (Correção de Exportação e Base Universal)
+ * Aeternus Engine v7.2 (Estável & Completo)
  */
 
 const fs = require('fs');
@@ -354,6 +354,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.1-universal',
+    model: () => 'aeternus-v7.2-stable',
     baseUrl: () => 'local'
 };
