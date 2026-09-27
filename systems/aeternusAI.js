@@ -1,27 +1,18 @@
 /**
- * Carrega o núcleo da IA e registra no boot.
- * Novos módulos podem: require('../utils/aeternusAI').registerContext(...)
+ * Consciência nativa do Aeternus (sem API de IA externa).
  */
 const ai = require('../utils/aeternusAI');
 
 function setup(client) {
     const ready = () => {
-        if (ai.configured()) {
-            console.log(
-                `🧠 [IA] Aeternus AI ativa · model=${ai.model()} · tools=${ai.listTools().length} · contexts=${ai.listContexts().length}`
-            );
-        } else {
-            console.log(
-                '🧠 [IA] Aeternus AI inativa — defina AETERNUS_AI_API_KEY (ou OPENAI/GROQ/XAI).'
-            );
-        }
+        console.log(
+            `🧠 [Aeternus] consciência nativa · tools=${ai.listTools().length} · contexts=${ai.listContexts().length}`
+        );
     };
     if (client.isReady?.()) ready();
     else client.once('clientReady', ready);
 
-    return {
-        stop() {}
-    };
+    return { stop() {} };
 }
 
 module.exports = { setup };
