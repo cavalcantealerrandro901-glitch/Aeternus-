@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.5 (Com Consulta a Dicionário e Sem Aprendizado Poluído)
+ * Aeternus Engine v7.6 (Geração Contextual Inteligente)
  */
 
 const fs = require('fs');
@@ -38,31 +38,23 @@ function saveData() {
     } catch (_) {}
 }
 
-// Função para buscar significado usando API pública de dicionário em português
 async function fetchWordDefinition(word) {
     const cleanWord = normalizeText(word);
-    if (dictCache[cleanWord]) {
-        return dictCache[cleanWord];
-    }
+    if (dictCache[cleanWord]) return dictCache[cleanWord];
 
     try {
-        // Usando a API pública do Dicionário Aberto
         const res = await fetch(`https://api.dicionario-aberto.net/word/${encodeURIComponent(cleanWord)}`);
         if (!res.ok) return null;
         const data = await res.json();
         
         if (Array.isArray(data) && data.length > 0 && data[0].xml) {
-            // Extrai o texto limpo do XML básico retornado pela API
             const xml = data[0].xml;
             const definition = xml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            
             dictCache[cleanWord] = definition;
             saveData();
             return definition;
         }
-    } catch (e) {
-        console.error('Erro na API de dicionário:', e);
-    }
+    } catch (e) {}
     return null;
 }
 
@@ -80,6 +72,12 @@ function normalizeText(text) {
     return String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s_.]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function extractMainTopic(text) {
+    const stopWords = ['o', 'a', 'os', 'as', 'um', 'uma', 'de', 'do', 'da', 'em', 'no', 'na', 'por', 'para', 'com', 'e', 'que', 'vc', 'voce', 'ele', 'qual', 'como', 'onde', 'quando', 'porque', 'me', 'fala', 'sobre'];
+    const words = normalizeText(text).split(' ').filter(w => !stopWords.includes(w) && w.length > 3);
+    return words.length > 0 ? words[words.length - 1] : null;
+}
 
 function getContext(userId) {
     if (!sessionMemory.has(userId)) sessionMemory.set(userId, []);
@@ -126,11 +124,8 @@ async function runTool(name, args, runtime) {
 function detectIntents(text) {
     const norm = normalizeText(text);
 
-    // Detecta pedidos de significado (ex: "o que significa X", "defina X", "pesquise a palavra X")
     const dictMatch = norm.match(/(?:significa|significado de|defina|definicao de|o que e|pesquise a palavra|pesquisar)\s+([a-zà-ú]+)/);
-    if (dictMatch) {
-        return { intent: 'dictionary_lookup', score: 0.99, word: dictMatch[1] };
-    }
+    if (dictMatch) return { intent: 'dictionary_lookup', score: 0.99, word: dictMatch[1] };
 
     if (norm.match(/como vc ta|como voce esta|seu humor/)) return { intent: 'bot_mood', score: 0.95 };
     if (norm.match(/quem te (criou|fez)|seu (criador|dono)/)) return { intent: 'creator_info', score: 0.95 };
@@ -138,7 +133,7 @@ function detectIntents(text) {
     const mathMatch = norm.match(/(?:calcula|resultado de|conta)\s+([0-9+\-*/%().^\s]+)/);
     if (mathMatch) return { intent: 'calculate', score: 0.95, expression: mathMatch[1] };
 
-    return { intent: 'casual_chat', score: 0.5 };
+    return { intent: 'contextual_reply', score: 0.8 };
 }
 
 async function runIntent(item, runtime, text) {
@@ -151,19 +146,32 @@ async function runIntent(item, runtime, text) {
             if (definition) {
                 return `📖 **Significado de "${word}":**\n${definition}`;
             }
-            return `Não consegui encontrar o significado da palavra "${word}" no meu dicionário.`;
+            return `Não consegui encontrar o significado da palavra "${word}" no dicionário.`;
         }
         case 'bot_mood':
-            return "Tô de boa operando com os sistemas limpos e atualizados. 🤖";
+            return "Tô de boa operando com os sistemas limpos e focados. 🤖";
         case 'creator_info':
             return ownerId() ? `Fui desenvolvido pelo mestre <@${ownerId()}>.` : "Criador não configurado.";
         case 'calculate':
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
             return calcRes.ok ? `🧮 O resultado é **${calcRes.result}**.` : calcRes.error;
-        case 'casual_chat':
-            return pick(['Entendido. Como posso te ajudar hoje?', 'Interessante. Quer que eu pesquise algo no dicionário?', 'Tô de olho, pode mandar sua dúvida.']);
+        case 'contextual_reply': {
+            const topic = extractMainTopic(text);
+            if (topic) {
+                const def = await fetchWordDefinition(topic);
+                if (def) {
+                    return `Analisando o que você disse sobre **${topic}**, percebi que envolve conceitos bem interessantes. Pelo dicionário, refere-se a: *${def.slice(0, 180)}...* Faz total sentido pensando por esse lado!`;
+                }
+                return `Compreendi seu ponto sobre "${topic}". É um aspecto bem relevante e que vale a pena aprofundar na nossa conversa. O que mais você destaca sobre isso?`;
+            }
+            return pick([
+                'Entendi perfeitamente o seu raciocínio. Como você gostaria de desenvolver isso?',
+                'Analisando o que você comentou, faz todo sentido. Quer explorar mais a fundo?',
+                'Captei a ideia! É um ponto de vista bem sólido sobre o assunto.'
+            ]);
+        }
         default:
-            return "Fiquei meio perdido agora, tenta reformular.";
+            return "Interessante. Poderia detalhar um pouco mais?";
     }
 }
 
@@ -172,7 +180,7 @@ async function chat({ userId, message, client, guild, channel, messageId, author
     if (text.length < 3) return { ok: true, text: '?' };
 
     if (learnOnly) {
-        return { ok: true, text: null }; // Ignora aprendizado automático de chat público
+        return { ok: true, text: null };
     }
 
     const runtime = { userId: String(userId), client, guild, channel, messageId, isOwner: isOwner(userId) };
@@ -197,6 +205,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.5-dictionary',
+    model: () => 'aeternus-v7.6-contextual',
     baseUrl: () => 'local'
 };
