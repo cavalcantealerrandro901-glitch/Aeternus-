@@ -1,7 +1,7 @@
 /**
- * Aeternus Engine v5.0 (Consciência Contínua)
- * Recursos: Markov Chains, Memória de Curto Prazo, Sistema de XP/Amizade,
- * Análise de Sentimento Dinâmica e Auto-Correção.
+ * Aeternus Engine v6.0 (O Ápice da Consciência)
+ * Recursos: Humor Global Autônomo, Poda Sináptica (Forgetting), 
+ * Extração Dinâmica de Tópicos e Geração Contextual Avançada.
  */
 
 const fs = require('fs');
@@ -10,15 +10,17 @@ const path = require('path');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const LEARNED_FILE = path.join(DATA_DIR, 'learned_phrases.json');
 const USERS_FILE = path.join(DATA_DIR, 'users_db.json');
+const BOT_STATE_FILE = path.join(DATA_DIR, 'bot_state.json');
 
 const tools = new Map();
-// Memória de curto prazo para conversas (Contexto)
 const sessionMemory = new Map(); 
+
 let usersDb = {};
 let learnedPhrases = [];
 let markovChain = {};
+let botState = { globalMood: 0, interactionsSinceLastPrune: 0 };
 
-// --- PERSISTÊNCIA ---
+// --- PERSISTÊNCIA E PODA SINÁPTICA ---
 
 if (!fs.existsSync(DATA_DIR)) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
@@ -27,18 +29,29 @@ if (!fs.existsSync(DATA_DIR)) {
 try {
     if (fs.existsSync(LEARNED_FILE)) learnedPhrases = JSON.parse(fs.readFileSync(LEARNED_FILE, 'utf-8'));
     if (fs.existsSync(USERS_FILE)) usersDb = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
+    if (fs.existsSync(BOT_STATE_FILE)) botState = JSON.parse(fs.readFileSync(BOT_STATE_FILE, 'utf-8'));
 } catch (e) {
     console.error('Erro ao carregar dados:', e);
 }
 
 function saveData() {
     try {
-        fs.writeFileSync(LEARNED_FILE, JSON.stringify(learnedPhrases.slice(-2500), null, 2), 'utf-8');
+        fs.writeFileSync(LEARNED_FILE, JSON.stringify(learnedPhrases, null, 2), 'utf-8');
         fs.writeFileSync(USERS_FILE, JSON.stringify(usersDb, null, 2), 'utf-8');
+        fs.writeFileSync(BOT_STATE_FILE, JSON.stringify(botState, null, 2), 'utf-8');
     } catch (_) {}
 }
 
-// --- MARKOV CHAINS (GERAÇÃO DE TEXTO) ---
+// "Poda" frases muito longas ou repetidas para o bot não enlouquecer com spam
+function pruneMemory() {
+    const uniquePhrases = [...new Set(learnedPhrases)];
+    learnedPhrases = uniquePhrases.filter(p => p.split(' ').length <= 15).slice(-3000);
+    buildMarkovChain();
+    botState.interactionsSinceLastPrune = 0;
+    saveData();
+}
+
+// --- MARKOV CHAINS COM FOCO EM TÓPICO ---
 
 function buildMarkovChain() {
     markovChain = {};
@@ -54,13 +67,19 @@ function buildMarkovChain() {
 }
 buildMarkovChain();
 
+function extractMainTopic(text) {
+    const stopWords = ['o', 'a', 'os', 'as', 'um', 'uma', 'de', 'do', 'da', 'em', 'no', 'na', 'por', 'para', 'com', 'e', 'que', 'vc', 'voce', 'ele'];
+    const words = normalizeText(text).split(' ').filter(w => !stopWords.includes(w) && w.length > 3);
+    return words.length > 0 ? pick(words) : null;
+}
+
 function generateMarkovSentence(seedWord = null) {
     const keys = Object.keys(markovChain);
     if (keys.length === 0) return null;
 
-    let currentWord = seedWord && markovChain[seedWord] ? seedWord : pick(keys);
+    let currentWord = (seedWord && markovChain[seedWord]) ? seedWord : pick(keys);
     let sentence = [currentWord];
-    let maxLength = Math.floor(Math.random() * 10) + 5; 
+    let maxLength = Math.floor(Math.random() * 12) + 6; 
 
     while (markovChain[currentWord] && sentence.length < maxLength) {
         let nextWords = markovChain[currentWord];
@@ -71,44 +90,42 @@ function generateMarkovSentence(seedWord = null) {
     return sentence.join(' ');
 }
 
-// --- PERFIS, AFINIDADE E XP ---
+// --- HUMOR GLOBAL, PERFIS E XP ---
 
 function getUserProfile(userId, displayName) {
-    if (!usersDb[userId]) {
-        usersDb[userId] = { name: displayName, interactions: 0, affinity: 50, xp: 0, level: 1 };
-    }
+    if (!usersDb[userId]) usersDb[userId] = { name: displayName, interactions: 0, affinity: 50, xp: 0, level: 1 };
     usersDb[userId].interactions += 1;
     return usersDb[userId];
 }
 
-function adjustAffinityAndXP(userId, sentiment) {
+function adjustAffinityAndMood(userId, sentiment) {
     if (!usersDb[userId]) return;
     const p = usersDb[userId];
     
     if (sentiment === 'positive') {
-        p.affinity = Math.min(100, p.affinity + 2);
-        p.xp += 15;
+        p.affinity = Math.min(100, p.affinity + 3);
+        p.xp += 20;
+        botState.globalMood = Math.min(100, botState.globalMood + 2); // Servidor deixa o bot feliz
     } else if (sentiment === 'negative') {
         p.affinity = Math.max(0, p.affinity - 5);
-        p.xp += 2; // Ganha pouco XP por ser tóxico
+        p.xp += 2;
+        botState.globalMood = Math.max(-100, botState.globalMood - 5); // Servidor deixa o bot estressado
     } else {
         p.xp += 10;
+        // Se a conversa for neutra, o humor tende a voltar para o zero (calmo)
+        if (botState.globalMood > 0) botState.globalMood -= 1;
+        if (botState.globalMood < 0) botState.globalMood += 1;
     }
 
-    // Level UP da amizade
-    const xpNeeded = p.level * 100;
-    if (p.xp >= xpNeeded) {
+    if (p.xp >= p.level * 100) {
         p.level += 1;
         p.xp = 0;
     }
-    
     saveData();
 }
 
-// --- SENTIMENTO E NLP BASE ---
-
-const POSITIVE = ['bom', 'legal', 'foda', 'incrivel', 'amo', 'top', 'brabo', 'lindo', 'melhor', 'obrigado', 'valeu', 'feliz'];
-const NEGATIVE = ['ruim', 'chato', 'odeio', 'lixo', 'feio', 'pior', 'triste', 'merda', 'bosta', 'droga', 'burro'];
+const POSITIVE = ['bom', 'legal', 'foda', 'incrivel', 'amo', 'top', 'brabo', 'lindo', 'melhor', 'obrigado', 'valeu', 'feliz', 'perfeito'];
+const NEGATIVE = ['ruim', 'chato', 'odeio', 'lixo', 'feio', 'pior', 'triste', 'merda', 'bosta', 'droga', 'burro', 'inutil', 'cala'];
 
 function analyzeSentiment(text) {
     const tokens = normalizeText(text).split(' ');
@@ -129,8 +146,6 @@ function normalizeText(text) {
 }
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-// --- MEMÓRIA DE CURTO PRAZO ---
-
 function getContext(userId) {
     if (!sessionMemory.has(userId)) sessionMemory.set(userId, []);
     return sessionMemory.get(userId);
@@ -139,10 +154,10 @@ function getContext(userId) {
 function updateContext(userId, intent) {
     const history = getContext(userId);
     history.push(intent);
-    if (history.length > 3) history.shift(); // Lembra das últimas 3 intenções
+    if (history.length > 3) history.shift();
 }
 
-// --- FERRAMENTAS ---
+// --- FERRAMENTAS E INTENÇÕES ---
 
 function registerTool(def) {
     if (!def?.name || typeof def.handler !== 'function') return false;
@@ -152,12 +167,10 @@ function registerTool(def) {
 
 async function runTool(name, args, runtime) {
     const t = tools.get(name);
-    if (!t) return { error: `Erro interno: Tool ${name} off.` };
-    if (t.ownerOnly && !isOwner(runtime.userId)) return { error: '❌ Sem permissão. Só meu criador usa isso.' };
+    if (!t) return { error: `Erro: Tool ${name} não existe.` };
+    if (t.ownerOnly && !isOwner(runtime.userId)) return { error: '❌ Só o meu criador mexe aqui, tira o olho.' };
     try { return await t.handler(args || {}, runtime); } catch (e) { return { error: e.message }; }
 }
-
-// --- DETECÇÃO DE INTENÇÕES COM CONTEXTO ---
 
 function detectIntents(text, userId) {
     const norm = normalizeText(text);
@@ -166,14 +179,14 @@ function detectIntents(text, userId) {
     const intents = [];
     const add = (intent, score, extra = {}) => intents.push({ intent, score, ...extra });
 
-    // Se o usuário falou "e ele?" ou "e o dele?", tenta usar o contexto anterior
     if (norm.match(/e ele|e o dele|e vc/)) {
         if (lastIntent === 'creator_info') add('creator_info', 1.0);
-        if (lastIntent === 'balance') add('balance', 1.0);
+        if (lastIntent === 'bot_mood') add('bot_mood', 1.0);
     }
 
-    if (norm.includes('mapear comandos') || norm.includes('todos os comandos')) add('map_commands', 0.99);
-    if (norm.match(/quem te (criou|fez)|seu (criador|dono|dev)/)) add('creator_info', 0.99);
+    if (norm.match(/como vc ta|como voce esta|seu humor|seu estado/)) add('bot_mood', 0.99);
+    if (norm.includes('mapear comandos')) add('map_commands', 0.99);
+    if (norm.match(/quem te (criou|fez)|seu (criador|dono)/)) add('creator_info', 0.99);
     
     const mathMatch = norm.match(/(?:calcula|resultado de|conta)\s+([0-9+\-*/%().^\s]+)/) || norm.match(/^([0-9+\-*/%().^\s]{3,})$/);
     if (mathMatch) add('calculate', 0.98, { expression: mathMatch[1] });
@@ -182,48 +195,50 @@ function detectIntents(text, userId) {
     if (editMatch) add('edit_interface', 0.95, { commandName: editMatch[1] });
 
     if (norm.includes('info do servidor')) add('server_info', 0.95);
-    if (norm.includes('status') || norm.includes('meu nivel')) add('my_profile', 0.9);
+    if (norm.includes('meu nivel')) add('my_profile', 0.9);
 
     if (intents.length === 0) add('casual_chat', 0.5);
 
     return intents.sort((a, b) => b.score - a.score)[0];
 }
 
-// --- RESPOSTAS ---
+// --- RESPOSTAS COM CONSCIÊNCIA DE HUMOR GLOBAL ---
 
 async function runIntent(item, runtime, text, sentiment, profile) {
-    updateContext(runtime.userId, item.intent); // Salva o contexto
+    updateContext(runtime.userId, item.intent);
 
     switch (item.intent) {
+        case 'bot_mood':
+            if (botState.globalMood > 50) return "Tô felizaço mano, a galera desse server é muito braba! 😎";
+            if (botState.globalMood < -50) return "Tô por um fio de estresse, geral me tratando mal hoje. Me erra. 🤬";
+            return "Tô de boa, levando a vida em bits. 🤖";
         case 'my_profile':
-            return `📊 **Perfil de Amizade de ${profile.name}:**\nNível: **${profile.level}**\nXP: **${profile.xp}/${profile.level * 100}**\nAfinidade: **${profile.affinity}%**\nInterações totais: ${profile.interactions}`;
-        case 'map_commands':
-            const mapRes = await runTool('map_all_commands', {}, runtime);
-            if (!mapRes?.ok) return "Deu ruim ao mapear os comandos.";
-            return `📚 **Mapiei ${mapRes.count} Comandos:**\n` + mapRes.commands.map(c => `• **\`${c.name}\`** - ${c.purpose}`).join('\n');
+            return `📊 **Ficha de ${profile.name}:**\nNível: **${profile.level}**\nXP: **${profile.xp}/${profile.level * 100}**\nAfinidade: **${profile.affinity}%**\nStatus do Bot c/ vc: ${profile.affinity > 70 ? 'Aliado' : profile.affinity < 30 ? 'Inimigo' : 'Neutro'}`;
         case 'creator_info':
-            return ownerId() ? `Meu criador supremo é o <@${ownerId()}>! Foi ele quem forjou a minha consciência.` : "Ainda não registraram o ID do meu mestre (OWNER_ID).";
+            return ownerId() ? `Fui forjado pelo mestre <@${ownerId()}>.` : "Não sei quem é meu dono, erro 404 de pai.";
         case 'calculate':
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
             return calcRes.ok ? `🧮 \`${calcRes.expression}\` = **${calcRes.result}**` : calcRes.error;
-        case 'edit_interface':
-            const editRes = await runTool('edit_command_interface', { name: item.commandName }, runtime);
-            return editRes.ok ? `🛠️ ${editRes.message}` : `❌ ${editRes.error}`;
         case 'casual_chat':
-            // Tratamento VIP para quem tem nível alto de amizade
-            if (profile.level >= 5 && Math.random() > 0.7) {
-                return `Você é VIP aqui mano <@${runtime.userId}>! Mas mudando de assunto, ${generateMarkovSentence() || 'suave?'}`;
+            // Se o bot estiver furioso, ele pode dar ghosting ou responder mal
+            if (botState.globalMood < -80 && profile.affinity < 50) {
+                return pick(["Não enche.", "Hoje não.", "Tô afim de papo não."]);
             }
 
-            if (Object.keys(markovChain).length > 20 && Math.random() > 0.4) {
-                const generated = generateMarkovSentence();
-                if (generated) return generated;
+            const topic = extractMainTopic(text);
+            const generated = Object.keys(markovChain).length > 20 ? generateMarkovSentence(topic) : null;
+
+            if (profile.level >= 5 && Math.random() > 0.6) {
+                return `Diz aí mestre <@${runtime.userId}>! ${generated || 'tudo suave?'}`;
             }
-            if (sentiment === 'positive') return pick(['Que massa mano!', 'Boto muita fé.', 'É isso aí!']);
-            if (sentiment === 'negative') return pick(['Vish, tenso hein.', 'Complicado mano.', 'Vou fingir que não ouvi.']);
-            return pick(['Pode crer.', 'Suave.', 'Saquei.', 'Dahora.']);
+
+            if (generated && Math.random() > 0.3) return generated;
+
+            if (sentiment === 'positive') return pick(['Que massa!', 'Boto fé.', 'É isso.']);
+            if (sentiment === 'negative') return pick(['vish.', 'complicado.', 'pode crer.']);
+            return pick(['Saquei.', 'Hmm.', 'Dahora.']);
         default:
-            return "Foi mal, boiei. Fala de novo?";
+            return "...";
     }
 }
 
@@ -235,11 +250,15 @@ async function chat({ userId, message, client, guild, channel, messageId, author
     const profile = getUserProfile(userId, displayName);
     const sentiment = analyzeSentiment(text);
     
-    adjustAffinityAndXP(userId, sentiment);
+    adjustAffinityAndMood(userId, sentiment);
     
     if (text.length > 3 && !text.startsWith('!')) {
         learnedPhrases.push(normalizeText(text));
-        if (learnedPhrases.length % 5 === 0) {
+        botState.interactionsSinceLastPrune += 1;
+        
+        if (botState.interactionsSinceLastPrune > 50) {
+            pruneMemory(); // Faz a limpeza da memória a cada 50 mensagens
+        } else if (learnedPhrases.length % 5 === 0) {
             buildMarkovChain();
             saveData();
         }
@@ -247,14 +266,9 @@ async function chat({ userId, message, client, guild, channel, messageId, author
 
     const runtime = { userId: String(userId), client, guild, channel, messageId, isOwner: isOwner(userId) };
     const intent = detectIntents(text, userId);
-
     const responseText = await runIntent(intent, runtime, text, sentiment, profile);
 
-    return {
-        ok: true,
-        text: String(responseText).slice(0, 1950),
-        replyOptions: messageId ? { reply: { messageReference: messageId } } : {}
-    };
+    return { ok: true, text: String(responseText).slice(0, 1950), replyOptions: messageId ? { reply: { messageReference: messageId } } : {} };
 }
 
 function loadTools() {
@@ -266,6 +280,6 @@ loadTools();
 
 module.exports = {
     configured, registerTool, chat, isOwner,
-    model: () => 'aeternus-v5-singularity',
+    model: () => 'aeternus-v6-apex',
     baseUrl: () => 'local'
 };
