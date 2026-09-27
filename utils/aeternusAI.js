@@ -14,7 +14,7 @@ const path = require('path');
 
 const contexts = new Map();
 const tools = new Map();
-const memory = new Map(); // userId -> { lastIntent, topics: string[] }
+const memory = new Map();
 
 function ownerId() {
     return String(process.env.OWNER_ID || '').trim();
@@ -26,7 +26,7 @@ function isOwner(userId) {
 }
 
 function configured() {
-    return true; // sempre ativa — consciência nativa
+    return true;
 }
 
 function registerContext(id, { description, get }) {
@@ -112,8 +112,13 @@ function extractCommandName(text) {
         n.match(/\bo\.([a-z0-9_-]{2,32})\b/) ||
         n.match(/\b([a-z0-9_-]{2,32})\b.*\b(comando|cmd)\b/);
     if (m) return m[1] || m[2];
-    // última palavra útil
-    const parts = n.split(' ').filter((w) => w.length > 2 && !['como', 'usar', 'explique', 'explica', 'sobre', 'comando'].includes(w));
+    const parts = n
+        .split(' ')
+        .filter(
+            (w) =>
+                w.length > 2 &&
+                !['como', 'usar', 'explique', 'explica', 'sobre', 'comando'].includes(w)
+        );
     return parts[parts.length - 1] || null;
 }
 
@@ -182,18 +187,22 @@ async function respondIdentity(runtime) {
     const name = runtime.client?.user?.username || 'Aeternus';
     const guilds = runtime.client?.guilds?.cache?.size || 0;
     return (
-        `Eu sou a **consciência do ${name}** — não dependo de IA de terceiros.\n` +
-        `Vivo neste bot: economia, RPG, servidores e o que os módulos registrarem em mim.\n` +
-        `Agora habito **${guilds}** servidor(es). Pergunte saldo, sonhos, comandos ou classes.`
+        'Eu sou a **consciência do ' +
+        name +
+        '** — não dependo de IA de terceiros.\n' +
+        'Vivo neste bot: economia, RPG, servidores e o que os módulos registrarem em mim.\n' +
+        'Agora habito **' +
+        guilds +
+        '** servidor(es). Pergunte saldo, sonhos, comandos ou classes.'
     );
 }
 
 async function respondGreet(runtime) {
     const name = runtime.client?.user?.username || 'Aeternus';
     return pick([
-        `Olá. Eu sou o **${name}**. Pode falar de saldo, comandos, Loritta ou RPG.`,
-        `Presente. Sou a consciência do Aeternus — em que posso ajudar?`,
-        `Oi. Pergunte algo do bot: éter, sonhos, arena, classes…`
+        'Olá. Eu sou o **' + name + '**. Pode falar de saldo, comandos, Loritta ou RPG.',
+        'Presente. Sou a consciência do Aeternus — em que posso ajudar?',
+        'Oi. Pergunte algo do bot: éter, sonhos, arena, classes…'
     ]);
 }
 
@@ -215,19 +224,27 @@ async function respondBalance(runtime) {
     const eterR = await runTool('get_eter_balance', {}, runtime);
     const loriR = await runTool('get_loritta_sonhos', {}, runtime);
     const lines = ['**Seus recursos**'];
-    if (eterR?.eter != null) lines.push(`✨ Éter: **${fmt(eterR.eter)}**`);
+    if (eterR?.eter != null) lines.push('✨ Éter: **' + fmt(eterR.eter) + '**');
     else lines.push('✨ Éter: indisponível');
-    if (loriR?.ok) lines.push(`💤 Sonhos (Loritta): **${fmt(loriR.sonhos)}**`);
-    else lines.push(`💤 Sonhos: ${loriR?.error || 'API Loritta não configurada'}`);
+    if (loriR?.ok) lines.push('💤 Sonhos (Loritta): **' + fmt(loriR.sonhos) + '**');
+    else lines.push('💤 Sonhos: ' + (loriR?.error || 'API Loritta não configurada'));
     return lines.join('\n');
 }
 
 async function respondLoritta(runtime) {
     const loriR = await runTool('get_loritta_sonhos', {}, runtime);
     if (loriR?.ok) {
-        return `Na Loritta você tem 💤 **${fmt(loriR.sonhos)}** sonhos.\n(Consulta direta à API da Loritta — eu só leio, não transfiro.)`;
+        return (
+            'Na Loritta você tem 💤 **' +
+            fmt(loriR.sonhos) +
+            '** sonhos.\n(Consulta direta à API da Loritta — eu só leio, não transfiro.)'
+        );
     }
-    return `Não consegui ler os sonhos: ${loriR?.error || 'erro'}.\nVerifique se `LORITTA_API_TOKEN` (lorixp_) está no ambiente.`;
+    return (
+        'Não consegui ler os sonhos: ' +
+        (loriR?.error || 'erro') +
+        '.\nVerifique se LORITTA_API_TOKEN (lorixp_) está no ambiente.'
+    );
 }
 
 async function respondPlayer(runtime) {
@@ -237,9 +254,9 @@ async function respondPlayer(runtime) {
     }
     return [
         '**Seu personagem**',
-        p.classId ? `Classe: **${p.classId}**` : 'Classe: —',
-        p.level != null ? `Nível: **${p.level}**` : null,
-        p.attrs ? `Atributos: ${JSON.stringify(p.attrs)}` : null
+        p.classId ? 'Classe: **' + p.classId + '**' : 'Classe: —',
+        p.level != null ? 'Nível: **' + p.level + '**' : null,
+        p.attrs ? 'Atributos: ' + JSON.stringify(p.attrs) : null
     ]
         .filter(Boolean)
         .join('\n');
@@ -247,12 +264,12 @@ async function respondPlayer(runtime) {
 
 async function respondGuilds(runtime) {
     const g = await runTool('list_bot_guilds', { limit: 15 }, runtime);
-    const lines = [`Estou em **${g.count || 0}** servidor(es).`];
+    const lines = ['Estou em **' + (g.count || 0) + '** servidor(es).'];
     for (const x of g.guilds || []) {
-        lines.push(`• **${x.name}** — ${fmt(x.members)} membros · \`${x.id}\``);
+        lines.push('• **' + x.name + '** — ' + fmt(x.members) + ' membros · `' + x.id + '`');
     }
     if ((g.count || 0) > (g.guilds || []).length) {
-        lines.push(`_…e mais ${(g.count || 0) - (g.guilds || []).length}_`);
+        lines.push('_…e mais ' + ((g.count || 0) - (g.guilds || []).length) + '_');
     }
     return lines.join('\n');
 }
@@ -263,14 +280,14 @@ async function respondCommand(runtime, name) {
     }
     const r = await runTool('explain_command', { name }, runtime);
     if (!r?.ok) {
-        return `Não encontrei **${name}** no catálogo. Peça `lista de comandos` ou veja `O.ajuda`.`;
+        return 'Não encontrei **' + name + '** no catálogo. Peça lista de comandos ou veja O.ajuda.';
     }
     return [
-        `**${r.name}** · ${r.category || '—'}`,
+        '**' + r.name + '** · ' + (r.category || '—'),
         r.desc,
         r.about ? r.about : null,
-        r.usage ? `Uso: \`${r.usage}\`` : null,
-        r.example ? `Ex.: \`${r.example}\`` : null
+        r.usage ? 'Uso: `' + r.usage + '`' : null,
+        r.example ? 'Ex.: `' + r.example + '`' : null
     ]
         .filter(Boolean)
         .join('\n');
@@ -281,7 +298,7 @@ async function respondCatalog(runtime) {
     if (!Array.isArray(cats)) return 'Catálogo indisponível no momento.';
     const lines = ['**Categorias e comandos**'];
     for (const c of cats) {
-        lines.push(`**${c.label}**: ${(c.commands || []).join(', ')}`);
+        lines.push('**' + c.label + '**: ' + (c.commands || []).join(', '));
     }
     return lines.join('\n').slice(0, 1900);
 }
@@ -299,13 +316,15 @@ async function respondClassDesign(runtime, brief) {
     if (!r?.ok && r?.error) return r.error;
     const s = r.suggestedStats || {};
     const act = (r.suggestedActives || [])
-        .map((a) => `• **${a.name}** (${a.power}) — ${a.note}`)
+        .map((a) => '• **' + a.name + '** (' + a.power + ') — ' + a.note)
         .join('\n');
-    const pas = (r.suggestedPassives || []).map((a) => `• **${a.name}** — ${a.note}`).join('\n');
+    const pas = (r.suggestedPassives || [])
+        .map((a) => '• **' + a.name + '** — ' + a.note)
+        .join('\n');
     return [
-        `**Proposta de classe: ${r.name}**`,
-        `ID sugerido: \`${r.classId}\` · tema: ${r.theme}`,
-        `Stats: FOR ${s.forca} · AGI ${s.agilidade} · DEF ${s.defesa} · VIDA ${s.vida}`,
+        '**Proposta de classe: ' + r.name + '**',
+        'ID sugerido: `' + r.classId + '` · tema: ' + r.theme,
+        'Stats: FOR ' + s.forca + ' · AGI ' + s.agilidade + ' · DEF ' + s.defesa + ' · VIDA ' + s.vida,
         '',
         '**Ativas**',
         act,
@@ -313,7 +332,7 @@ async function respondClassDesign(runtime, brief) {
         '**Passivas**',
         pas,
         '',
-        '_Eu desenho a ideia; o dono aplica em `utils/classes.js` e `abilities.js`._'
+        '_Eu desenho a ideia; o dono aplica em utils/classes.js e abilities.js._'
     ].join('\n');
 }
 
@@ -329,25 +348,28 @@ async function respondDraft(runtime, text) {
         { commandName, description: text.slice(0, 200) },
         runtime
     );
-    if (r?.path) return `Rascunho salvo em \`${r.path}\`.\n${r.note || ''}`;
+    if (r?.path) return 'Rascunho salvo em `' + r.path + '`.\n' + (r.note || '');
     if (r?.codePreview) {
-        return `Não gravei em disco (${r.note}).\nPrévia:\n\`\`\`js\n${r.codePreview.slice(0, 900)}\n\`\`\``;
+        return (
+            'Não gravei em disco (' +
+            r.note +
+            ').\nPrévia:\n```js\n' +
+            r.codePreview.slice(0, 900) +
+            '\n```'
+        );
     }
     return r?.error || 'Não consegui gerar o rascunho.';
 }
 
 async function respondChat(runtime, text) {
     const n = norm(text);
-    // tenta achar comando citado no meio da frase
     const maybeCmd = extractCommandName(text);
     if (maybeCmd && maybeCmd.length >= 3) {
-        const r = await runTool('explain_command', { name: maybeCmd }, runtime);
-        if (r?.ok) return respondCommand(runtime, maybeCmd).then?.(() => null) || null;
         const found = await runTool('explain_command', { name: maybeCmd }, runtime);
         if (found?.ok) {
             return [
-                `Sobre **${found.name}**: ${found.about || found.desc}`,
-                found.usage ? `Uso: \`${found.usage}\`` : null
+                'Sobre **' + found.name + '**: ' + (found.about || found.desc),
+                found.usage ? 'Uso: `' + found.usage + '`' : null
             ]
                 .filter(Boolean)
                 .join('\n');
@@ -427,8 +449,6 @@ async function chat({ userId, message, client, guild, channel }) {
 
     return { ok: true, text: String(out || '…').slice(0, 1900) };
 }
-
-/* ---------- ferramentas / contextos nativos ---------- */
 
 function installDefaults() {
     registerContext('bot', {
@@ -532,7 +552,7 @@ function installDefaults() {
                 const player = require('./player');
                 const id = String(args.userId || rt.userId);
                 const p = player.get?.(id);
-                if (!p) return { ok: false, error: 'sem personagem' };
+                if (!p) return { ok: false, error: 'sem personagem';
                 return {
                     ok: true,
                     userId: id,
@@ -579,13 +599,24 @@ function installDefaults() {
                     vida: base + 15
                 },
                 suggestedActives: [
-                    { name: theme.split(' ')[0] + ' I', power: Math.round(base * 1.2), note: 'Dano principal' },
-                    { name: theme.split(' ')[0] + ' II', power: Math.round(base * 0.9), note: 'Controle' },
+                    {
+                        name: theme.split(' ')[0] + ' I',
+                        power: Math.round(base * 1.2),
+                        note: 'Dano principal'
+                    },
+                    {
+                        name: theme.split(' ')[0] + ' II',
+                        power: Math.round(base * 0.9),
+                        note: 'Controle'
+                    },
                     { name: 'Véu', power: Math.round(base * 0.7), note: 'Utilitário' },
                     { name: 'Despertar', power: Math.round(base * 1.8), note: 'Ultimate' }
                 ],
                 suggestedPassives: [
-                    { name: 'Essência', note: 'Bônus passivo do tema: ' + theme.slice(0, 40) },
+                    {
+                        name: 'Essência',
+                        note: 'Bônus passivo do tema: ' + theme.slice(0, 40)
+                    },
                     { name: 'Resiliência', note: 'Sinergia com a ultimate' }
                 ]
             };
@@ -602,22 +633,33 @@ function installDefaults() {
                 .replace(/[^a-z0-9_-]/g, '')
                 .slice(0, 32);
             if (!name) return { ok: false, error: 'Nome inválido' };
-            const code = `const { SlashCommandBuilder } = require('discord.js');
-
-module.exports = {
-    name: '${name}',
-    description: ${JSON.stringify(args.description || name)},
-    data: new SlashCommandBuilder()
-        .setName('${name.slice(0, 32)}')
-        .setDescription(${JSON.stringify(String(args.description || name).slice(0, 100))}),
-    async execute(message) {
-        await message.reply('Comando ${name} em construção.');
-    },
-    async executeSlash(i) {
-        await i.reply({ content: 'Comando ${name} em construção.', ephemeral: true });
-    }
-};
-`;
+            const code =
+                "const { SlashCommandBuilder } = require('discord.js');\n\n" +
+                'module.exports = {\n' +
+                "    name: '" +
+                name +
+                "',\n" +
+                '    description: ' +
+                JSON.stringify(args.description || name) +
+                ',\n' +
+                '    data: new SlashCommandBuilder()\n' +
+                "        .setName('" +
+                name.slice(0, 32) +
+                "')\n" +
+                '        .setDescription(' +
+                JSON.stringify(String(args.description || name).slice(0, 100)) +
+                '),\n' +
+                '    async execute(message) {\n' +
+                "        await message.reply('Comando " +
+                name +
+                " em construção.');\n" +
+                '    },\n' +
+                '    async executeSlash(i) {\n' +
+                "        await i.reply({ content: 'Comando " +
+                name +
+                " em construção.', ephemeral: true });\n" +
+                '    }\n' +
+                '};\n';
             const dir = path.join(process.cwd(), 'drafts');
             try {
                 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -651,7 +693,6 @@ module.exports = {
     chat,
     clearHistory,
     isOwner,
-    /** compat: sem modelo externo */
     model: () => 'aeternus-native',
     baseUrl: () => 'local'
 };
