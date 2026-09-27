@@ -12,6 +12,7 @@ const CATEGORIES = {
             { name: 'banco', desc: 'Ver banco', usage: 'banco [@user]', example: 'O.banco', about: 'Mostra carteira, cofre e total de éter.' },
             { name: 'depositar', desc: 'Depositar no banco', usage: 'depositar <valor|all|half>', example: 'O.dep 1k', about: 'Guarda éter no cofre (protegido de roubos).' },
             { name: 'sacar', desc: 'Sacar do banco', usage: 'sacar <valor|all|half>', example: 'O.sacar 500', about: 'Retira éter do cofre para a carteira.' },
+            { name: 'cambio', desc: 'Câmbio Éter ⇄ Sonhos (Loritta)', usage: 'cambio [comprar|vender|saldo] <valor>', example: 'O.cambio comprar 100', about: 'Troca éter do Aeternus por sonhos da Loritta e vice-versa.' },
             { name: 'pay', desc: 'Transferir éter', usage: 'pay @user <valor>', example: 'O.pay @user 2k', about: 'Envia éter da sua carteira para outro membro.' },
             { name: 'transacoes', desc: 'Extrato', usage: 'transacoes', example: 'O.transacoes', about: 'Lista as últimas movimentações de éter.' },
             { name: 'work', desc: 'Trabalhar por éter', usage: 'work', example: 'O.work', about: 'Ganha éter trabalhando (com ranking de cargos).' },
