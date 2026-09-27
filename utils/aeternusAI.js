@@ -1,6 +1,6 @@
 /**
  * Consciência e Motor de PLN Local do Aeternus (Sem APIs Externas)
- * Suporte a consultas de informações de membros e do servidor com linguagem natural e informal.
+ * Processamento de Linguagem Natural, Aprensiadagem Social e Carregamento Modular de Ferramentas.
  */
 
 const fs = require('fs');
@@ -13,8 +13,6 @@ const contexts = new Map();
 const tools = new Map();
 /** @type {Map<string, { lastIntents: string[], lastEntities: Record<string, any>, turns: number, updatedAt: number }> } */
 const memory = new Map();
-
-// --- SISTEMA DE MEMÓRIA E APRENDIZADO DE GÍRIAS E FRASES ---
 
 if (!fs.existsSync(DATA_DIR)) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
@@ -47,8 +45,6 @@ function learnFromMessage(text) {
         saveLearnedPhrases();
     }
 }
-
-// --- UTILITÁRIOS DE PLN & FUZZY MATCHING ---
 
 function ownerId() {
     return String(process.env.OWNER_ID || '').trim();
@@ -113,8 +109,6 @@ function fmt(n) {
 function pick(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
-
-// --- REGISTRO DE FERRAMENTAS E CONTEXTOS ---
 
 function registerContext(id, { description, get }) {
     if (!id || typeof get !== 'function') return false;
@@ -182,14 +176,11 @@ async function runTool(name, args, runtime) {
     }
 }
 
-// --- EXTRAÇÃO DE ENTIDADES & CLASSIFICAÇÃO DE INTENÇÕES ---
-
 function extractEntities(text, catalog) {
     const tokens = tokenize(text);
     const raw = String(text || '').trim();
     const entities = {};
 
-    // Extração de Mencionados ou IDs de Membros
     const mentionMatch = raw.match(/<@!?(\d+)>/);
     if (mentionMatch) {
         entities.targetUserId = mentionMatch[1];
@@ -200,7 +191,6 @@ function extractEntities(text, catalog) {
         }
     }
 
-    // Busca por nomes/termos de usuário na mensagem
     const memberQueryMatch = raw.match(/(?:quem e|quem e o|quem e a|membro|usuario|sobre o|sobre a|user)\s+([a-zA-Z0-9_\.\-]{2,32})/i);
     if (memberQueryMatch && !entities.targetUserId) {
         entities.targetQuery = memberQueryMatch[1];
@@ -265,7 +255,6 @@ function detectIntents(text, userMem, entities) {
         }
     }
 
-    // Consulta de Informações do Servidor
     if (
         norm.includes('info do servidor') ||
         norm.includes('info do server') ||
@@ -280,7 +269,6 @@ function detectIntents(text, userMem, entities) {
         addIntent('server_info', 0.95);
     }
 
-    // Consulta de Informações de Membros
     if (
         entities.targetUserId ||
         norm.includes('quem e') ||
@@ -358,8 +346,6 @@ function detectIntents(text, userMem, entities) {
 
     return intents.sort((a, b) => b.score - a.score);
 }
-
-// --- GERADOR DE RESPOSTAS INFORMAIS E HUMANADAS ---
 
 function respondCasualChat(text) {
     const norm = normalizeText(text);
@@ -529,8 +515,6 @@ async function respondOverview(runtime) {
     return parts.join('\n');
 }
 
-// --- PIPELINE DE EXECUÇÃO ---
-
 async function runIntent(item, runtime, text, entities) {
     switch (item.intent) {
         case 'clear':
@@ -573,12 +557,13 @@ async function runIntent(item, runtime, text, entities) {
     }
 }
 
-async function chat({ userId, message, client, guild, channel }) {
+async function chat({ userId, message, client, guild, channel, messageId }) {
     const runtime = {
         userId: String(userId),
         client,
         guild,
         channel,
+        messageId,
         isOwner: isOwner(userId)
     };
 
@@ -611,230 +596,32 @@ async function chat({ userId, message, client, guild, channel }) {
     let output = chunks.filter(Boolean).join('\n\n');
     if (!output) output = respondCasualChat(text);
 
-    return { ok: true, text: String(output).slice(0, 1950) };
+    return {
+        ok: true,
+        text: String(output).slice(0, 1950),
+        replyOptions: messageId ? { reply: { messageReference: messageId } } : {}
+    };
 }
 
-// --- BOOTSTRAP DE CONTEXTOS E TOOLS NATIVAS ---
+// Carregamento automático das ferramentas registradas em /tools
+function loadTools() {
+    try {
+        const registerServerTools = require('../tools/serverTools');
+        registerServerTools({ registerTool });
+    } catch (_) {}
 
-function installDefaults() {
-    registerContext('bot', {
-        description: 'Identidade do bot',
-        get: async ({ client }) => ({
-            tag: client?.user?.tag || null,
-            id: client?.user?.id || null,
-            guildCount: client?.guilds?.cache?.size || 0
-        })
-    });
+    try {
+        const registerEconomyTools = require('../tools/economyTools');
+        registerEconomyTools({ registerTool });
+    } catch (_) {}
 
-    registerContext('guild', {
-        description: 'Servidor atual',
-        get: async ({ guild }) =>
-            guild
-                ? { id: guild.id, name: guild.name, members: guild.memberCount }
-                : { inGuild: false }
-    });
-
-    registerTool({
-        name: 'get_server_info',
-        description: 'Obtém detalhes e estatísticas do servidor atual',
-        handler: async (args, rt) => {
-            const g = rt.guild;
-            if (!g) return { ok: false, error: 'Fora de um servidor.' };
-
-            return {
-                ok: true,
-                server: {
-                    id: g.id,
-                    name: g.name,
-                    ownerId: g.ownerId,
-                    memberCount: g.memberCount,
-                    channelCount: g.channels?.cache?.size || 0,
-                    roleCount: g.roles?.cache?.size || 0,
-                    premiumTier: g.premiumTier ?? 0,
-                    premiumSubscriptionCount: g.premiumSubscriptionCount ?? 0,
-                    createdAt: g.createdAt ? new Date(g.createdAt).toLocaleDateString('pt-BR') : 'Desconhecido'
-                }
-            };
-        }
-    });
-
-    registerTool({
-        name: 'get_member_info',
-        description: 'Obtém informações sobre um membro do servidor',
-        handler: async (args, rt) => {
-            const g = rt.guild;
-            if (!g) return { ok: false, error: 'Fora de um servidor.' };
-
-            const target = String(args.target || rt.userId).trim();
-            let member = null;
-
-            if (/^\d{17,19}$/.test(target)) {
-                member = g.members.cache.get(target) || (await g.members.fetch(target).catch(() => null));
-            }
-
-            if (!member && target) {
-                const queryNorm = normalizeText(target);
-                member = g.members.cache.find(
-                    (m) =>
-                        normalizeText(m.user.username).includes(queryNorm) ||
-                        normalizeText(m.displayName).includes(queryNorm)
-                );
-            }
-
-            if (!member) return { ok: false, error: 'Membro não encontrado.' };
-
-            const highestRole = member.roles?.highest?.name !== '@everyone' ? member.roles?.highest?.name : 'Sem cargo especial';
-
-            return {
-                ok: true,
-                member: {
-                    id: member.id,
-                    displayName: member.displayName,
-                    tag: member.user.tag || member.user.username,
-                    isBot: member.user.bot,
-                    highestRole,
-                    joinedAt: member.joinedAt ? new Date(member.joinedAt).toLocaleDateString('pt-BR') : 'Desconhecido',
-                    createdAt: member.user.createdAt ? new Date(member.user.createdAt).toLocaleDateString('pt-BR') : 'Desconhecido'
-                }
-            };
-        }
-    });
-
-    registerTool({
-        name: 'get_eter_balance',
-        description: 'Consulta o saldo de Éter',
-        handler: async (args, rt) => {
-            const eter = require('./eter');
-            const id = String(args.userId || rt.userId);
-            return { userId: id, eter: eter.get(id) };
-        }
-    });
-
-    registerTool({
-        name: 'get_loritta_sonhos',
-        description: 'Consulta o saldo de Sonhos na Loritta',
-        handler: async (args, rt) => {
-            const loritta = require('./loritta');
-            const id = String(args.userId || rt.userId);
-            if (!loritta.configured()) {
-                return { ok: false, error: 'Chave LORITTA_API_TOKEN não configurada.' };
-            }
-            try {
-                const u = await loritta.getUser(id);
-                return { ok: true, userId: id, sonhos: u.sonhos ?? u.money ?? null };
-            } catch (e) {
-                return { ok: false, error: e.message || String(e) };
-            }
-        }
-    });
-
-    registerTool({
-        name: 'explain_command',
-        description: 'Explica a utilização de um comando',
-        handler: async (args) => {
-            const catalog = require('./commandCatalog');
-            const found = catalog.findCommand(args.name);
-            if (!found) return { ok: false, error: 'Comando não encontrado.' };
-            return {
-                ok: true,
-                name: found.name,
-                desc: found.desc,
-                usage: found.usage,
-                example: found.example,
-                about: found.about,
-                category: found.category?.label
-            };
-        }
-    });
-
-    registerTool({
-        name: 'list_command_categories',
-        description: 'Lista categorias do catálogo',
-        handler: async () => {
-            const catalog = require('./commandCatalog');
-            return catalog.listCategories().map((c) => ({
-                id: c.id,
-                label: c.label,
-                commands: c.commands.map((x) => x.name)
-            }));
-        }
-    });
-
-    registerTool({
-        name: 'list_bot_guilds',
-        description: 'Lista servidores onde o bot está presente',
-        handler: async (args, rt) => {
-            const limit = Math.min(50, Math.max(1, Number(args.limit) || 25));
-            const list = [...(rt.client?.guilds?.cache?.values() || [])]
-                .slice(0, limit)
-                .map((g) => ({ id: g.id, name: g.name, members: g.memberCount }));
-            return { count: rt.client?.guilds?.cache?.size || 0, guilds: list };
-        }
-    });
-
-    registerTool({
-        name: 'get_player_summary',
-        description: 'Resumo do perfil RPG',
-        handler: async (args, rt) => {
-            try {
-                const player = require('./player');
-                const id = String(args.userId || rt.userId);
-                const p = player.get?.(id);
-                if (!p) return { ok: false, error: 'Sem ficha de personagem.' };
-                return {
-                    ok: true,
-                    userId: id,
-                    classId: p.classId || p.classe || null,
-                    level: p.level || p.nivel || null,
-                    attrs: p.attrs || p.atributos || null
-                };
-            } catch (e) {
-                return { ok: false, error: e.message || String(e) };
-            }
-        }
-    });
-
-    registerTool({
-        name: 'design_rpg_class',
-        description: 'Gera um modelo de classe RPG',
-        handler: async (args) => {
-            const power = String(args.powerLevel || 'rara').toLowerCase();
-            const base = /unica|lend/.test(power) ? 220 : /epic|epica/.test(power) ? 160 : /rar/.test(power) ? 120 : 80;
-            const theme = String(args.theme || 'mistério');
-            const name = String(args.name || 'Nova Classe');
-            return {
-                ok: true,
-                classId: name
-                    .toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/[^a-z0-9]+/g, '_')
-                    .replace(/^_|_$/g, '')
-                    .slice(0, 40),
-                name,
-                theme,
-                suggestedStats: {
-                    forca: base + 10,
-                    agilidade: base,
-                    defesa: base + 5,
-                    vida: base + 15
-                },
-                suggestedActives: [
-                    { name: `${theme.split(' ')[0]} I`, power: Math.round(base * 1.2), note: 'Dano Principal' },
-                    { name: `${theme.split(' ')[0]} II`, power: Math.round(base * 0.9), note: 'Controle de Grupo' },
-                    { name: 'Evasão', power: Math.round(base * 0.7), note: 'Mobilidade' },
-                    { name: 'Despertar', power: Math.round(base * 1.8), note: 'Habilidade Suprema' }
-                ],
-                suggestedPassives: [
-                    { name: 'Essência', note: `Tema: ${theme.slice(0, 40)}` },
-                    { name: 'Resiliência', note: 'Sinergia de Combate' }
-                ]
-            };
-        }
-    });
+    try {
+        const registerRpgTools = require('../tools/rpgTools');
+        registerRpgTools({ registerTool });
+    } catch (_) {}
 }
 
-installDefaults();
+loadTools();
 
 module.exports = {
     configured,

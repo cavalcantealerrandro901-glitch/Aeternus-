@@ -3,438 +3,136 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Masmorra do Castelo 3D</title>
+  <title>PvP 2D Discord</title>
+  <script src="/socket.io/socket.io.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; touch-action: none; }
-    html, body { width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: system-ui, sans-serif; color: white; }
-    #game-viewport { position: relative; width: 100vw; height: 100vh; background: #000; }
-    canvas { width: 100vw; height: 100vh; display: block; }
-    
-    /* HUD Topo */
-    .hud-top { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; align-items: center; z-index: 10; pointer-events: none; }
-    .status-panel { background: rgba(15, 23, 42, 0.85); padding: 4px 8px; border-radius: 8px; border: 1px solid #475569; }
-    .bar-bg { width: 90px; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; margin-top: 2px; }
-    .bar-hp { background: linear-gradient(90deg, #ef4444, #f43f5e); width: 100%; height: 100%; }
-    
-    .inventory-bar { display: flex; gap: 4px; background: rgba(15, 23, 42, 0.85); padding: 4px 8px; border-radius: 8px; border: 1px solid #475569; font-size: 0.75rem; }
-    .item-slot { background: #1e293b; padding: 2px 5px; border-radius: 4px; display: flex; align-items: center; gap: 2px; }
+    body { background: #020617; color: white; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
 
-    /* Controles Ergonómicos Elevados (Mais para cima) */
-    .controls-container { 
-      position: absolute; 
-      bottom: 45px; 
-      left: 14px; 
-      right: 14px; 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: flex-end; 
-      z-index: 10; 
-      pointer-events: none; 
-    }
-    .dpad-grid, .action-grid { pointer-events: auto; }
+    #login-screen { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; }
+    .card { background: #0f172a; border: 2px solid #6366f1; border-radius: 12px; padding: 24px; text-align: center; max-width: 320px; width: 90%; }
+    input { width: 100%; padding: 10px; margin: 12px 0; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 1rem; text-align: center; }
+    button { width: 100%; padding: 12px; background: #6366f1; border: none; border-radius: 8px; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; }
 
-    .dpad-grid { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 50px); gap: 4px; }
-    .btn-ctrl { background: rgba(30, 41, 59, 0.85); color: white; border: 1px solid #6366f1; border-radius: 12px; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
-    .btn-ctrl:active { background: #4338ca; transform: scale(0.92); }
+    #game-container { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+    canvas { background: #0f172a; border: 2px solid #334155; border-radius: 12px; width: 95vw; max-width: 800px; height: auto; aspect-ratio: 4/3; }
 
-    .btn-fwd  { grid-column: 2; grid-row: 1; }
-    .btn-left { grid-column: 1; grid-row: 2; }
-    .btn-right{ grid-column: 3; grid-row: 2; }
-    .btn-bwd  { grid-column: 2; grid-row: 3; }
-
-    .action-grid { position: relative; width: 170px; height: 150px; }
-    .btn-act { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.6); font-size: 1.3rem; }
-    .btn-act:active { transform: scale(0.9); }
-    
-    .btn-main { bottom: 10px; right: 10px; width: 66px; height: 66px; background: linear-gradient(135deg, #f97316, #dc2626); border-color: #fdba74; }
-    .btn-lightning { bottom: 75px; right: 2px; width: 58px; height: 58px; background: linear-gradient(135deg, #eab308, #ca8a04); border-color: #fef08a; }
-    .btn-potion { bottom: 10px; right: 85px; width: 52px; height: 52px; background: linear-gradient(135deg, #16a34a, #15803d); border-color: #86efac; }
-
-    #victory-modal { display: none; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.9); z-index: 100; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .controls { position: absolute; bottom: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; align-items: flex-end; z-index: 10; pointer-events: none; }
+    .dpad { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 4px; pointer-events: auto; }
+    .btn { background: rgba(30, 41, 59, 0.85); border: 1px solid #6366f1; border-radius: 10px; color: white; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
+    .btn:active { background: #4338ca; }
+    .btn-attack { width: 66px; height: 66px; border-radius: 50%; background: linear-gradient(135deg, #ef4444, #991b1b); border: 2px solid #f87171; font-size: 1.6rem; pointer-events: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
   </style>
 </head>
 <body>
 
-<div id="game-viewport">
-  <div class="hud-top">
-    <div class="status-panel">
-      <div style="font-size: 0.7rem; font-weight: bold; color: #a5b4fc;">🧙‍♂️ Mago da Torre</div>
-      <div class="bar-bg"><div id="hp-bar" class="bar-hp"></div></div>
-    </div>
-
-    <div class="inventory-bar">
-      <div class="item-slot">🪙 <span id="ui-gold">0</span></div>
-      <div class="item-slot">💎 <span id="ui-gems">0</span></div>
-      <div class="item-slot" style="border-color: #ef4444;">💀 <span id="ui-monsters" style="color:#f87171; font-weight:bold;">6</span></div>
-    </div>
+<div id="login-screen">
+  <div class="card">
+    <h2 style="color:#facc15; margin-bottom: 6px;">⚔️ Arena PvP 2D</h2>
+    <p style="font-size: 0.85rem; color:#94a3b8;">Digita o teu nome do Discord:</p>
+    <input type="text" id="username" placeholder="Seu Usuário" value="Player_1">
+    <button onclick="enterGame()">Entrar no PvP</button>
   </div>
+</div>
 
-  <div id="victory-modal">
-    <h1 style="color: #facc15; margin-bottom: 10px;">🏆 TORRE LIMPA COM SUCESSO!</h1>
-    <button style="padding: 10px 20px; font-weight: bold; background: #eab308; border: none; border-radius: 8px;" onclick="location.reload()">Jogar Novamente</button>
-  </div>
+<div id="game-container">
+  <canvas id="arena" width="800" height="600"></canvas>
 
-  <canvas id="view3d"></canvas>
-
-  <div class="controls-container">
-    <div class="dpad-grid">
-      <div class="btn-ctrl btn-fwd" id="btn-fwd">⬆️</div>
-      <div class="btn-ctrl btn-left" id="btn-left">⬅️</div>
-      <div class="btn-ctrl btn-right" id="btn-right">➡️</div>
-      <div class="btn-ctrl btn-bwd" id="btn-bwd">⬇️</div>
+  <div class="controls">
+    <div class="dpad">
+      <div class="btn" style="grid-column:2; grid-row:1" id="btn-up">⬆️</div>
+      <div class="btn" style="grid-column:1; grid-row:2" id="btn-left">⬅️</div>
+      <div class="btn" style="grid-column:3; grid-row:2" id="btn-right">➡️</div>
+      <div class="btn" style="grid-column:2; grid-row:3" id="btn-down">⬇️</div>
     </div>
-
-    <div class="action-grid">
-      <div class="btn-act btn-potion" id="btn-heal">🧪</div>
-      <div class="btn-act btn-lightning" id="btn-lightning">⚡</div>
-      <div class="btn-act btn-main" id="btn-fireball">🔥</div>
-    </div>
+    <div class="btn btn-attack" id="btn-attack">⚔️</div>
   </div>
 </div>
 
 <script>
-  // --- SETUP & CANVAS ---
-  const cvs = document.getElementById('view3d');
+  const socket = io();
+  const cvs = document.getElementById('arena');
   const ctx = cvs.getContext('2d');
 
-  function resize() { 
-    cvs.width = window.innerWidth; 
-    cvs.height = window.innerHeight; 
-  }
-  window.addEventListener('resize', resize);
-  resize();
+  let players = {};
 
-  // --- MAPA DO CASTELO & TEXTURAS ---
-  const MAP = [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
-    [1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
-    [1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
-    [1,1,2,1,1,0,0,0,1,1,2,2,1,1,1,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,2,1,1,0,0,0,1,1,1,1,1,1,1,0,0,0,0,1],
-    [1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
-    [1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
-    [1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
-    [1,1,1,1,1,2,2,1,1,1,1,2,2,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,1,1,1,1,0,0,0,0,0,0,1,1,1,1,0,0,1],
-    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
-    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
-    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
-    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
-    [1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-  ];
-  const MAP_W = 20, MAP_H = 20;
-
-  // Texturas
-  const wallTex = document.createElement('canvas');
-  wallTex.width = 64; wallTex.height = 64;
-  const wCtx = wallTex.getContext('2d');
-  wCtx.fillStyle = '#334155'; wCtx.fillRect(0, 0, 64, 64);
-  wCtx.strokeStyle = '#0f172a'; wCtx.lineWidth = 2;
-  for(let y = 0; y <= 64; y += 16) { wCtx.beginPath(); wCtx.moveTo(0, y); wCtx.lineTo(64, y); wCtx.stroke(); }
-  for(let r = 0; r < 4; r++) {
-    let y = r * 16, offset = (r % 2) * 16;
-    for(let x = offset; x <= 64; x += 32) { wCtx.beginPath(); wCtx.moveTo(x, y); wCtx.lineTo(x, y + 16); wCtx.stroke(); }
+  function enterGame() {
+    const name = document.getElementById('username').value.trim();
+    if (!name) return;
+    document.getElementById('login-screen').style.display = 'none';
+    socket.emit('joinGame', { username: name });
   }
 
-  const trapTex = document.createElement('canvas');
-  trapTex.width = 64; trapTex.height = 64;
-  const tCtx = trapTex.getContext('2d');
-  tCtx.fillStyle = '#1e293b'; tCtx.fillRect(0, 0, 64, 64);
-  tCtx.fillStyle = '#dc2626'; tCtx.beginPath(); tCtx.arc(32, 32, 16, 0, Math.PI * 2); tCtx.fill();
+  socket.on('updatePlayers', (serverPlayers) => { players = serverPlayers; });
+  socket.on('playerMoved', (p) => { if (players[p.id]) { players[p.id].x = p.x; players[p.id].y = p.y; } });
 
-  const ceilingTex = document.createElement('canvas');
-  ceilingTex.width = 64; ceilingTex.height = 64;
-  const cCtx = ceilingTex.getContext('2d');
-  cCtx.fillStyle = '#451a03'; cCtx.fillRect(0, 0, 64, 64);
-  cCtx.strokeStyle = '#270e02'; cCtx.lineWidth = 4;
-  for(let y = 0; y <= 64; y += 16) { cCtx.beginPath(); cCtx.moveTo(0, y); cCtx.lineTo(64, y); cCtx.stroke(); }
+  const keys = {};
+  window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+  window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-  // --- ENTIDADES ---
-  let entities = [
-    { type: 'chest', x: 2.5, y: 2.5, opened: false },
-    { type: 'chest', x: 6.5, y: 2.5, opened: false },
-    { type: 'chest', x: 17.5, y: 2.5, opened: false },
-    { type: 'chest', x: 10.5, y: 16.5, opened: false },
-    { type: 'chest', x: 11.5, y: 16.5, opened: false },
-    { type: 'goblin', x: 2.5, y: 7.5, hp: 80, maxHp: 80, alive: true },
-    { type: 'goblin', x: 3.5, y: 8.5, hp: 80, maxHp: 80, alive: true },
-    { type: 'goblin', x: 1.5, y: 9.5, hp: 80, maxHp: 80, alive: true },
-    { type: 'guardian', x: 17.5, y: 8.5, hp: 180, maxHp: 180, alive: true },
-    { type: 'boss', x: 10.5, y: 15.5, hp: 350, maxHp: 350, alive: true },
-    { type: 'goblin', x: 8.5, y: 15.5, hp: 90, maxHp: 90, alive: true },
-    { type: 'goblin', x: 12.5, y: 15.5, hp: 90, maxHp: 90, alive: true }
-  ];
-
-  function drawGoblin(ctx, size, hpRatio) {
-    ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(0, 0, size * 0.28, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#15803d';
-    ctx.beginPath(); ctx.moveTo(-size * 0.2, -size * 0.05); ctx.lineTo(-size * 0.48, -size * 0.2); ctx.lineTo(-size * 0.2, size * 0.1); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(size * 0.2, -size * 0.05); ctx.lineTo(size * 0.48, -size * 0.2); ctx.lineTo(size * 0.2, size * 0.1); ctx.fill();
-    ctx.fillStyle = '#facc15';
-    ctx.beginPath(); ctx.arc(-size * 0.09, -size * 0.05, size * 0.05, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(size * 0.09, -size * 0.05, size * 0.05, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#450a0a'; ctx.beginPath(); ctx.arc(0, size * 0.1, size * 0.1, 0, Math.PI); ctx.fill();
-    
-    let barW = size * 0.6, barH = Math.max(4, size * 0.05), barY = -size * 0.45;
-    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(-barW / 2, barY, barW, barH);
-    ctx.fillStyle = '#ef4444'; ctx.fillRect(-barW / 2, barY, barW * hpRatio, barH);
+  function handleInput() {
+    let dx = 0, dy = 0;
+    const speed = 4;
+    if (keys['w'] || keys['arrowup']) dy -= speed;
+    if (keys['s'] || keys['arrowdown']) dy += speed;
+    if (keys['a'] || keys['arrowleft']) dx -= speed;
+    if (keys['d'] || keys['arrowright']) dx += speed;
+    if (dx !== 0 || dy !== 0) socket.emit('move', { dx, dy });
   }
 
-  function drawGuardian(ctx, size, hpRatio) {
-    ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(0, 0, size * 0.35, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#cbd5e1'; ctx.beginPath(); ctx.arc(0, 0, size * 0.22, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(-size*0.1, -size*0.05, size*0.06, size*0.06);
-    ctx.fillRect(size*0.04, -size*0.05, size*0.06, size*0.06);
-
-    let barW = size * 0.7, barH = Math.max(5, size * 0.06), barY = -size * 0.5;
-    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(-barW / 2, barY, barW, barH);
-    ctx.fillStyle = '#38bdf8'; ctx.fillRect(-barW / 2, barY, barW * hpRatio, barH);
+  function bindTouch(id, dx, dy) {
+    const el = document.getElementById(id);
+    let timer = null;
+    const start = (e) => { e.preventDefault(); timer = setInterval(() => socket.emit('move', { dx, dy }), 30); };
+    const stop = () => clearInterval(timer);
+    el.addEventListener('touchstart', start); el.addEventListener('touchend', stop);
+    el.addEventListener('mousedown', start); el.addEventListener('mouseup', stop);
   }
 
-  function drawChest(ctx, size, opened) {
-    ctx.fillStyle = opened ? '#78350f' : '#b45309';
-    ctx.fillRect(-size * 0.25, -size * 0.15, size * 0.5, size * 0.35);
-    ctx.fillStyle = '#facc15';
-    ctx.fillRect(-size * 0.05, -size * 0.05, size * 0.1, size * 0.1);
-  }
+  bindTouch('btn-up', 0, -4); bindTouch('btn-down', 0, 4);
+  bindTouch('btn-left', -4, 0); bindTouch('btn-right', 4, 0);
 
-  function checkVictory() {
-    let remainingMonsters = entities.filter(e => e.alive && (e.type === 'goblin' || e.type === 'guardian' || e.type === 'boss')).length;
-    document.getElementById('ui-monsters').innerText = remainingMonsters;
-    document.getElementById('ui-gold').innerText = player.gold;
-    document.getElementById('ui-gems').innerText = player.gems;
-    if (remainingMonsters === 0) document.getElementById('victory-modal').style.display = 'flex';
-  }
+  document.getElementById('btn-attack').onclick = () => socket.emit('attack');
+  window.addEventListener('keydown', e => { if (e.code === 'Space') socket.emit('attack'); });
 
-  // --- JOGADOR & COMBATE ---
-  let player = { x: 1.5, y: 1.5, dir: 0, hp: 100, maxHp: 100, gold: 0, gems: 0, anim: 0, lightningAnim: 0 };
-  let damageTexts = [];
+  function draw() {
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
 
-  function fireballAttack() {
-    player.anim = 8;
-    entities.forEach(e => {
-      if (!e.alive || e.type === 'chest') return;
-      let dx = e.x - player.x, dy = e.y - player.y;
-      let dist = Math.hypot(dx, dy);
-      let angle = Math.atan2(dy, dx) - player.dir;
-      while (angle < -Math.PI) angle += Math.PI * 2;
-      while (angle > Math.PI) angle -= Math.PI * 2;
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+    for (let x = 0; x < cvs.width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cvs.height); ctx.stroke(); }
+    for (let y = 0; y < cvs.height; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cvs.width, y); ctx.stroke(); }
 
-      if (dist < 3.2 && Math.abs(angle) < Math.PI / 4) {
-        let dmg = Math.floor(Math.random() * 25) + 40;
-        e.hp -= dmg;
-        damageTexts.push({ txt: '🔥-' + dmg, color: '#f97316', x: cvs.width / 2 + (Math.random() - 0.5) * 40, y: cvs.height / 2, life: 30 });
-        if (e.hp <= 0) { e.alive = false; player.gold += 40; player.gems += 1; checkVictory(); }
-      }
-    });
-  }
-
-  function lightningAttack() {
-    player.lightningAnim = 10;
-    entities.forEach(e => {
-      if (!e.alive || e.type === 'chest') return;
-      let dist = Math.hypot(e.x - player.x, e.y - player.y);
-      if (dist < 5.0) {
-        let dmg = Math.floor(Math.random() * 20) + 35;
-        e.hp -= dmg;
-        damageTexts.push({ txt: '⚡-' + dmg, color: '#facc15', x: cvs.width / 2 + (Math.random() - 0.5) * 100, y: cvs.height / 2 + (Math.random() - 0.5) * 60, life: 30 });
-        if (e.hp <= 0) { e.alive = false; player.gold += 50; player.gems += 2; checkVictory(); }
-      }
-    });
-  }
-
-  function healPlayer() {
-    if (player.hp < player.maxHp) {
-      player.hp = Math.min(player.maxHp, player.hp + 40);
-      document.getElementById('hp-bar').style.width = (player.hp / player.maxHp * 100) + '%';
-    }
-  }
-
-  // --- CONTROLES ---
-  let keys = {};
-  let touchStartX = null;
-
-  function initControls() {
-    window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-    window.addEventListener('touchstart', e => {
-      if (!e.target.closest('.controls-container')) touchStartX = e.touches[0].clientX;
-    });
-    window.addEventListener('touchmove', e => {
-      if (touchStartX !== null && !e.target.closest('.controls-container')) {
-        let dx = e.touches[0].clientX - touchStartX;
-        player.dir += dx * 0.006;
-        touchStartX = e.touches[0].clientX;
-      }
-    });
-    window.addEventListener('touchend', () => touchStartX = null);
-
-    bindBtn('btn-fwd', 'fwd'); bindBtn('btn-bwd', 'bwd');
-    bindBtn('btn-left', 'left'); bindBtn('btn-right', 'right');
-  }
-
-  function bindBtn(id, key) {
-    let btn = document.getElementById(id);
-    if(!btn) return;
-    btn.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
-    btn.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
-    btn.addEventListener('mousedown', () => keys[key] = true);
-    btn.addEventListener('mouseup', () => keys[key] = false);
-  }
-
-  function updateMovement() {
-    let speed = 0.05;
-    let moveX = 0, moveY = 0;
-
-    if (keys['fwd']) { moveX += Math.cos(player.dir); moveY += Math.sin(player.dir); }
-    if (keys['bwd']) { moveX -= Math.cos(player.dir); moveY -= Math.sin(player.dir); }
-    if (keys['left']) { moveX += Math.cos(player.dir - Math.PI / 2); moveY += Math.sin(player.dir - Math.PI / 2); }
-    if (keys['right']) { moveX += Math.cos(player.dir + Math.PI / 2); moveY += Math.sin(player.dir + Math.PI / 2); }
-
-    if (moveX !== 0 || moveY !== 0) {
-      let newX = player.x + moveX * speed;
-      let newY = player.y + moveY * speed;
-      if (MAP[Math.floor(player.y)][Math.floor(newX)] !== 1) player.x = newX;
-      if (MAP[Math.floor(newY)][Math.floor(player.x)] !== 1) player.y = newY;
-    }
-
-    if (MAP[Math.floor(player.y)][Math.floor(player.x)] === 2) {
-      player.hp = Math.max(0, player.hp - 0.4);
-      document.getElementById('hp-bar').style.width = (player.hp / player.maxHp * 100) + '%';
-    }
-
-    entities.forEach(e => {
-      if (e.type === 'chest' && !e.opened && Math.hypot(e.x - player.x, e.y - player.y) < 1.2) {
-        e.opened = true; player.gold += 100; player.gems += 3; checkVictory();
-      } else if (e.alive && (e.type === 'goblin' || e.type === 'guardian' || e.type === 'boss')) {
-        if (Math.hypot(e.x - player.x, e.y - player.y) < 1.0) {
-          player.hp = Math.max(0, player.hp - 0.25);
-          document.getElementById('hp-bar').style.width = (player.hp / player.maxHp * 100) + '%';
-        }
-      }
-    });
-  }
-
-  // --- RENDERIZADOR 3D ---
-  function renderRaycast() {
-    const FOV = Math.PI / 3;
-    const NUM_RAYS = Math.floor(cvs.width / 2);
-    const RAY_WIDTH = cvs.width / NUM_RAYS;
-    const HALF_FOV = FOV / 2;
-
-    ctx.drawImage(ceilingTex, 0, 0, cvs.width, cvs.height / 2);
-    ctx.fillStyle = '#1c1917'; ctx.fillRect(0, cvs.height / 2, cvs.width, cvs.height / 2);
-
-    let depthBuffer = new Array(NUM_RAYS);
-
-    for (let i = 0; i < NUM_RAYS; i++) {
-      let rayAngle = (player.dir - HALF_FOV) + (i / NUM_RAYS) * FOV;
-      let distance = 0, hitWall = false;
-      let cos = Math.cos(rayAngle), sin = Math.sin(rayAngle);
-      let wallX = 0, tileType = 1;
-
-      while (!hitWall && distance < 18) {
-        distance += 0.03;
-        let checkX = Math.floor(player.x + cos * distance);
-        let checkY = Math.floor(player.y + sin * distance);
-
-        if (checkX < 0 || checkX >= MAP_W || checkY < 0 || checkY >= MAP_H) {
-          hitWall = true; tileType = 1;
-        } else if (MAP[checkY][checkX] > 0) {
-          hitWall = true; tileType = MAP[checkY][checkX];
-          let hitX = player.x + cos * distance, hitY = player.y + sin * distance;
-          let fx = hitX - Math.floor(hitX), fy = hitY - Math.floor(hitY);
-          wallX = Math.abs(fx - 0.5) > Math.abs(fy - 0.5) ? fy : fx;
-        }
-      }
-
-      let correctedDist = distance * Math.cos(rayAngle - player.dir);
-      depthBuffer[i] = correctedDist;
-
-      let wallHeight = Math.min(cvs.height, (cvs.height / correctedDist));
-      let wallTop = (cvs.height - wallHeight) / 2;
-
-      let activeTex = tileType === 2 ? trapTex : wallTex;
-      ctx.drawImage(activeTex, Math.floor(wallX * 64), 0, 1, 64, i * RAY_WIDTH, wallTop, RAY_WIDTH + 0.5, wallHeight);
-      ctx.fillStyle = `rgba(2, 6, 23, ${Math.min(1, correctedDist / 12)})`;
-      ctx.fillRect(i * RAY_WIDTH, wallTop, RAY_WIDTH + 0.5, wallHeight);
-    }
-
-    let spriteList = entities
-      .filter(e => e.type === 'chest' || e.alive)
-      .map(e => {
-        let dx = e.x - player.x, dy = e.y - player.y;
-        let dist = Math.hypot(dx, dy);
-        let angle = Math.atan2(dy, dx) - player.dir;
-        while (angle < -Math.PI) angle += Math.PI * 2;
-        while (angle > Math.PI) angle -= Math.PI * 2;
-        return { e, dist, angle };
-      })
-      .sort((a, b) => b.dist - a.dist);
-
-    spriteList.forEach(item => {
-      let { e, dist, angle } = item;
-      if (dist < 0.2 || Math.abs(angle) > FOV) return;
-
-      let screenX = (cvs.width / 2) + Math.tan(angle) * (cvs.width / 2);
-      let spriteSize = Math.min(cvs.height, (cvs.height / dist));
-      let spriteTop = (cvs.height - spriteSize) / 2;
-
-      let rayIdx = Math.floor(screenX / RAY_WIDTH);
-      if (rayIdx >= 0 && rayIdx < NUM_RAYS && depthBuffer[rayIdx] < dist) return;
-
+    Object.values(players).forEach(p => {
       ctx.save();
-      ctx.translate(screenX, spriteTop + spriteSize / 2);
+      ctx.translate(p.x, p.y);
 
-      if (e.type === 'goblin') drawGoblin(ctx, spriteSize, e.hp / e.maxHp);
-      else if (e.type === 'guardian' || e.type === 'boss') drawGuardian(ctx, spriteSize * (e.type === 'boss' ? 1.4 : 1.0), e.hp / e.maxHp);
-      else if (e.type === 'chest') drawChest(ctx, spriteSize, e.opened);
+      if (p.hp <= 0) {
+        ctx.fillStyle = '#f87171'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('💀 Morto', 0, 0);
+        ctx.restore(); return;
+      }
+
+      ctx.fillStyle = p.color || '#6366f1';
+      ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+
+      ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
+      ctx.fillText(p.username, 0, -28);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-25, -22, 50, 6);
+      ctx.fillStyle = '#ef4444'; ctx.fillRect(-25, -22, 50 * (p.hp / p.maxHp), 6);
+
+      ctx.font = '11px sans-serif'; ctx.fillStyle = '#facc15';
+      ctx.fillText(`Kills: ${p.score}`, 0, 36);
 
       ctx.restore();
     });
 
-    if (player.anim > 0) {
-      player.anim--;
-      ctx.fillStyle = '#f97316';
-      ctx.beginPath(); ctx.arc(cvs.width / 2, cvs.height / 2 + 20, 80 * (player.anim / 8), 0, Math.PI * 2); ctx.fill();
-    }
-
-    if (player.lightningAnim > 0) {
-      player.lightningAnim--;
-      ctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
-      ctx.fillRect(0, 0, cvs.width, cvs.height);
-    }
-
-    damageTexts.forEach((d, i) => {
-      ctx.font = '900 24px sans-serif'; ctx.fillStyle = d.color || '#ef4444'; ctx.fillText(d.txt, d.x, d.y);
-      d.y -= 1; d.life--; if (d.life <= 0) damageTexts.splice(i, 1);
-    });
+    handleInput();
+    requestAnimationFrame(draw);
   }
 
-  // --- LOOP PRINCIPAL ---
-  function initApp() {
-    initControls();
-    document.getElementById('btn-heal').onclick = healPlayer;
-    document.getElementById('btn-fireball').onclick = fireballAttack;
-    document.getElementById('btn-lightning').onclick = lightningAttack;
-    checkVictory();
-    gameLoop();
-  }
-
-  function gameLoop() {
-    updateMovement();
-    renderRaycast();
-    requestAnimationFrame(gameLoop);
-  }
-
-  window.addEventListener('DOMContentLoaded', initApp);
+  draw();
 </script>
 </body>
 </html>
