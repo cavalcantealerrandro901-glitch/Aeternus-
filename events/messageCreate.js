@@ -1,6 +1,6 @@
 const aeternusAI = require('../utils/aeternusAI');
 const { PermissionFlagsBits } = require('discord.js');
-const store = require('../utils/store'); // Importa o gerenciador de dados/store do bot
+const store = require('../utils/store');
 
 module.exports = {
     name: 'messageCreate',
@@ -63,6 +63,11 @@ module.exports = {
             } catch (_) {}
             return;
         }
+
+        // Ativa o indicador de "digitando..." no canal enquanto a IA processa
+        try {
+            await message.channel.sendTyping();
+        } catch (_) {}
 
         // Limpa a menção para processar a IA
         const cleanContent = message.content
