@@ -5,8 +5,8 @@ async function runChat(userId, text, client, guild, channel, respond) {
     const q = String(text || '').trim();
     if (!q) {
         return respond(
-            'Sou a **consciência do Aeternus** — nativa deste bot, sem IA de fora.\n' +
-                'Ex.: `O.aeternus meu saldo` · `O.ia explique arena` · `crie uma classe ninja`'
+            'Sou o **assistente do Aeternus** — fala natural, pode misturar assuntos.\n' +
+                'Ex.: `meu saldo e sonhos` · `explique arena` · `me atualiza` · `crie uma classe ninja`'
         );
     }
 
@@ -30,12 +30,12 @@ async function runChat(userId, text, client, guild, channel, respond) {
 module.exports = {
     name: 'aeternus',
     aliases: ['ia', 'ai', 'assistente', 'ask', 'consciencia', 'consciência'],
-    description: 'Consciência do Aeternus — saldos, comandos, RPG, servidores',
+    description: 'Assistente do Aeternus — conversa livre sobre o bot',
     data: new SlashCommandBuilder()
         .setName('aeternus')
-        .setDescription('Fale com a consciência do Aeternus')
+        .setDescription('Fale com o assistente do Aeternus')
         .addStringOption((o) =>
-            o.setName('mensagem').setDescription('Sua pergunta').setRequired(true)
+            o.setName('mensagem').setDescription('Pode falar solto, misturar assuntos').setRequired(true)
         ),
 
     async execute(message, args) {
