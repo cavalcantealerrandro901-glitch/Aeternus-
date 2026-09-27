@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.0 (Base de Conhecimento Universal & Resposta a Qualquer Pergunta)
+ * Aeternus Engine v7.1 (Correção de Exportação e Base Universal)
  */
 
 const fs = require('fs');
@@ -10,6 +10,7 @@ const LEARNED_FILE = path.join(DATA_DIR, 'learned_phrases.json');
 const USERS_FILE = path.join(DATA_DIR, 'users_db.json');
 const BOT_STATE_FILE = path.join(DATA_DIR, 'bot_state.json');
 
+const contexts = new Map();
 const tools = new Map();
 const sessionMemory = new Map(); 
 
@@ -83,8 +84,6 @@ function generateMarkovSentence(seedWord = null) {
     return sentence.join(' ');
 }
 
-// --- BASE DE CONHECIMENTO UNIVERSAL (RESPOSTAS A PERGUNTAS GERAIS) ---
-
 function handleGeneralQuestion(text) {
     const norm = normalizeText(text);
 
@@ -101,7 +100,7 @@ function handleGeneralQuestion(text) {
         return "Isso costuma variar bastante dependendo dos critérios que você adota, mas geralmente envolve eficiência, impacto e preferência pessoal.";
     }
 
-    return null; // Se não cair em nenhuma regra específica, o motor livre assume
+    return null;
 }
 
 function getUserProfile(userId, displayName) {
@@ -168,6 +167,16 @@ function updateContext(userId, intent) {
     if (history.length > 3) history.shift();
 }
 
+function registerContext(id, { description, get }) {
+    if (!id || typeof get !== 'function') return false;
+    contexts.set(String(id), { description: String(description || id), get });
+    return true;
+}
+
+function listContexts() {
+    return [...contexts.entries()].map(([id, c]) => ({ id, description: c.description }));
+}
+
 function registerTool(def) {
     if (!def?.name || typeof def.handler !== 'function') return false;
     tools.set(def.name, { ...def, ownerOnly: Boolean(def.ownerOnly) });
@@ -222,7 +231,6 @@ function detectIntents(text, userId) {
 
     if (norm.includes('meu nivel')) add('my_profile', 0.9);
 
-    // Detecção universal de perguntas (qualquer dúvida formulada)
     if (norm.match(/^(o que|quem|como|onde|quando|por que|qual|quanto|sabe)\b/)) {
         add('universal_question', 0.85);
     }
@@ -339,7 +347,13 @@ function loadTools() {
 loadTools();
 
 module.exports = {
-    configured, registerTool, listTools, chat, isOwner,
-    model: () => 'aeternus-v7-universal',
+    configured,
+    registerContext,
+    listContexts,
+    registerTool,
+    listTools,
+    chat,
+    isOwner,
+    model: () => 'aeternus-v7.1-universal',
     baseUrl: () => 'local'
 };
