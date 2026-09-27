@@ -335,6 +335,36 @@ module.exports = {
 
             if (!joined.ok) return message.reply('❌ ' + joined.error);
 
+            // Tenta fluxo oficial de solicitação (pagador confirma na Loritta)
+            let apiNote = '';
+            if (loritta.configured() && message.guild) {
+                try {
+                    const req = await loritta.requestSonhosTransfer({
+                        guildId: message.guild.id,
+                        channelId: message.channel.id,
+                        senderId: message.author.id,
+                        receiverId: o,
+                        quantity: sonhos,
+                        reason: 'Cambio Aeternus: vender sonhos por eter',
+                        expiresAfterMillis: 30 * 60 * 1000
+                    });
+                    if (req.ok) {
+                        const tid = req.data?.id || req.data?.sonhosTransferId || '';
+                        apiNote =
+                            '\n\n📬 **Solicitação enviada à Loritta**' +
+                            (tid ? ` (id \`' + tid + '\`)` : '') +
+                            '. Confirme o pagamento no canal se a Lori postar o pedido.';
+                    } else {
+                        apiNote =
+                            '\n\n⚠️ API solicitação: ' +
+                            req.error +
+                            ' — use `+pay` manualmente.';
+                    }
+                } catch (e) {
+                    apiNote = '\n\n⚠️ API: ' + (e.message || e) + ' — use `+pay` manualmente.';
+                }
+            }
+
             return message.reply({
                 embeds: [
                     new EmbedBuilder()
@@ -342,18 +372,18 @@ module.exports = {
                         .setTitle('✅ Entrou na fila de câmbio')
                         .setDescription(
                             [
-                                `**Posição:** #**${joined.position}**`,
-                                `**Tipo:** 💰 Vender sonhos`,
-                                `**Enviar:** 💤 **${fmt(sonhos)}** para <@${o}>`,
+                                '**Posição:** #**' + joined.position + '**',
+                                '**Tipo:** 💰 Vender sonhos',
+                                '**Enviar:** 💤 **' + fmt(sonhos) + '** para <@' + o + '>',
                                 '```',
-                                `+pay <@${o}> ${sonhos}`,
+                                '+pay <@' + o + '> ' + sonhos,
                                 '```',
-                                `**Recebe:** ✨ **${fmt(eterOut)}** (após staff confirmar)`,
+                                '**Recebe:** ✨ **' + fmt(eterOut) + '** (após staff confirmar)',
                                 '',
-                                'Aguarde `O.cambio proximo` da staff.'
+                                'Aguarde `O.cambio proximo` da staff.' + apiNote
                             ].join('\n')
                         )
-                        .setFooter({ text: `ID: ${joined.id}` })
+                        .setFooter({ text: 'ID: ' + joined.id })
                 ]
             });
         }
