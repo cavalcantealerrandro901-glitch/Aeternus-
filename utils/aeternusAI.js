@@ -20,8 +20,6 @@ let learnedPhrases = [];
 let markovChain = {};
 let botState = { globalMood: 0, interactionsSinceLastPrune: 0 };
 
-// --- PERSISTÊNCIA E PODA SINÁPTICA ---
-
 if (!fs.existsSync(DATA_DIR)) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
 }
@@ -42,7 +40,6 @@ function saveData() {
     } catch (_) {}
 }
 
-// "Poda" frases muito longas ou repetidas para o bot não enlouquecer com spam
 function pruneMemory() {
     const uniquePhrases = [...new Set(learnedPhrases)];
     learnedPhrases = uniquePhrases.filter(p => p.split(' ').length <= 15).slice(-3000);
@@ -50,8 +47,6 @@ function pruneMemory() {
     botState.interactionsSinceLastPrune = 0;
     saveData();
 }
-
-// --- MARKOV CHAINS COM FOCO EM TÓPICO ---
 
 function buildMarkovChain() {
     markovChain = {};
@@ -90,8 +85,6 @@ function generateMarkovSentence(seedWord = null) {
     return sentence.join(' ');
 }
 
-// --- HUMOR GLOBAL, PERFIS E XP ---
-
 function getUserProfile(userId, displayName) {
     if (!usersDb[userId]) usersDb[userId] = { name: displayName, interactions: 0, affinity: 50, xp: 0, level: 1 };
     usersDb[userId].interactions += 1;
@@ -105,14 +98,13 @@ function adjustAffinityAndMood(userId, sentiment) {
     if (sentiment === 'positive') {
         p.affinity = Math.min(100, p.affinity + 3);
         p.xp += 20;
-        botState.globalMood = Math.min(100, botState.globalMood + 2); // Servidor deixa o bot feliz
+        botState.globalMood = Math.min(100, botState.globalMood + 2);
     } else if (sentiment === 'negative') {
         p.affinity = Math.max(0, p.affinity - 5);
         p.xp += 2;
-        botState.globalMood = Math.max(-100, botState.globalMood - 5); // Servidor deixa o bot estressado
+        botState.globalMood = Math.max(-100, botState.globalMood - 5);
     } else {
         p.xp += 10;
-        // Se a conversa for neutra, o humor tende a voltar para o zero (calmo)
         if (botState.globalMood > 0) botState.globalMood -= 1;
         if (botState.globalMood < 0) botState.globalMood += 1;
     }
@@ -157,12 +149,18 @@ function updateContext(userId, intent) {
     if (history.length > 3) history.shift();
 }
 
-// --- FERRAMENTAS E INTENÇÕES ---
-
 function registerTool(def) {
     if (!def?.name || typeof def.handler !== 'function') return false;
     tools.set(def.name, { ...def, ownerOnly: Boolean(def.ownerOnly) });
     return true;
+}
+
+function listTools() {
+    return [...tools.values()].map((t) => ({
+        name: t.name,
+        description: t.description,
+        ownerOnly: t.ownerOnly
+    }));
 }
 
 async function runTool(name, args, runtime) {
@@ -202,8 +200,6 @@ function detectIntents(text, userId) {
     return intents.sort((a, b) => b.score - a.score)[0];
 }
 
-// --- RESPOSTAS COM CONSCIÊNCIA DE HUMOR GLOBAL ---
-
 async function runIntent(item, runtime, text, sentiment, profile) {
     updateContext(runtime.userId, item.intent);
 
@@ -220,7 +216,6 @@ async function runIntent(item, runtime, text, sentiment, profile) {
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
             return calcRes.ok ? `🧮 \`${calcRes.expression}\` = **${calcRes.result}**` : calcRes.error;
         case 'casual_chat':
-            // Se o bot estiver furioso, ele pode dar ghosting ou responder mal
             if (botState.globalMood < -80 && profile.affinity < 50) {
                 return pick(["Não enche.", "Hoje não.", "Tô afim de papo não."]);
             }
@@ -257,7 +252,7 @@ async function chat({ userId, message, client, guild, channel, messageId, author
         botState.interactionsSinceLastPrune += 1;
         
         if (botState.interactionsSinceLastPrune > 50) {
-            pruneMemory(); // Faz a limpeza da memória a cada 50 mensagens
+            pruneMemory();
         } else if (learnedPhrases.length % 5 === 0) {
             buildMarkovChain();
             saveData();
@@ -279,7 +274,7 @@ function loadTools() {
 loadTools();
 
 module.exports = {
-    configured, registerTool, chat, isOwner,
+    configured, registerTool, listTools, chat, isOwner,
     model: () => 'aeternus-v6-apex',
     baseUrl: () => 'local'
 };
