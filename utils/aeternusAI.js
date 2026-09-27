@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v6.1 (Com Suporte a Menção Obrigatória e Aprendizado Silencioso)
+ * Aeternus Engine v6.2 (Frases Maiores e Encorpadas)
  */
 
 const fs = require('fs');
@@ -40,7 +40,7 @@ function saveData() {
 
 function pruneMemory() {
     const uniquePhrases = [...new Set(learnedPhrases)];
-    learnedPhrases = uniquePhrases.filter(p => p.split(' ').length <= 15).slice(-3000);
+    learnedPhrases = uniquePhrases.filter(p => p.split(' ').length <= 25).slice(-3000);
     buildMarkovChain();
     botState.interactionsSinceLastPrune = 0;
     saveData();
@@ -66,13 +66,14 @@ function extractMainTopic(text) {
     return words.length > 0 ? pick(words) : null;
 }
 
+// Aumentado o tamanho mínimo e máximo para gerar frases de 1.5 a 2 linhas no Discord
 function generateMarkovSentence(seedWord = null) {
     const keys = Object.keys(markovChain);
     if (keys.length === 0) return null;
 
     let currentWord = (seedWord && markovChain[seedWord]) ? seedWord : pick(keys);
     let sentence = [currentWord];
-    let maxLength = Math.floor(Math.random() * 12) + 6; 
+    let maxLength = Math.floor(Math.random() * 12) + 14; // Entre 14 e 26 palavras
 
     while (markovChain[currentWord] && sentence.length < maxLength) {
         let nextWords = markovChain[currentWord];
@@ -203,35 +204,35 @@ async function runIntent(item, runtime, text, sentiment, profile) {
 
     switch (item.intent) {
         case 'bot_mood':
-            if (botState.globalMood > 50) return "Tô felizaço mano, a galera desse server é muito braba! 😎";
-            if (botState.globalMood < -50) return "Tô por um fio de estresse, geral me tratando mal hoje. Me erra. 🤬";
-            return "Tô de boa, levando a vida em bits. 🤖";
+            if (botState.globalMood > 50) return "Tô felizaço mano, a galera desse servidor tá agitando bastante hoje e o clima tá super bacana por aqui! 😎";
+            if (botState.globalMood < -50) return "Tô por um fio de estresse hoje, o pessoal não para de encher o saco e o clima tá pesado. Me erra um pouco. 🤬";
+            return "Tô de boa levando a vida em bits, administrando os sistemas e trocando ideia com a galera no chat. 🤖";
         case 'my_profile':
             return `📊 **Ficha de ${profile.name}:**\nNível: **${profile.level}**\nXP: **${profile.xp}/${profile.level * 100}**\nAfinidade: **${profile.affinity}%**\nStatus do Bot c/ vc: ${profile.affinity > 70 ? 'Aliado' : profile.affinity < 30 ? 'Inimigo' : 'Neutro'}`;
         case 'creator_info':
-            return ownerId() ? `Fui forjado pelo mestre <@${ownerId()}>.` : "Não sei quem é meu dono, erro 404 de pai.";
+            return ownerId() ? `Fui forjado com muito código pelo mestre <@${ownerId()}>, que cuida de toda a estrutura do projeto.` : "Ainda não registraram o ID do meu criador nas variáveis de ambiente.";
         case 'calculate':
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
-            return calcRes.ok ? `🧮 \`${calcRes.expression}\` = **${calcRes.result}**` : calcRes.error;
+            return calcRes.ok ? `🧮 O resultado da expressão \`${calcRes.expression}\` que você mandou é igual a **${calcRes.result}**.` : calcRes.error;
         case 'casual_chat':
             if (botState.globalMood < -80 && profile.affinity < 50) {
-                return pick(["Não enche.", "Hoje não.", "Tô afim de papo não."]);
+                return pick(["Não tô com paciência pra isso agora não, mano.", "Hoje o dia tá cheio e eu não tô afim de papo furado.", "Prefiro ficar na minha por enquanto, tenta mais tarde."]);
             }
 
             const topic = extractMainTopic(text);
             const generated = Object.keys(markovChain).length > 20 ? generateMarkovSentence(topic) : null;
 
-            if (profile.level >= 5 && Math.random() > 0.6) {
-                return `Diz aí mestre <@${runtime.userId}>! ${generated || 'tudo suave?'}`;
+            if (profile.level >= 5 && Math.random() > 0.5) {
+                return `Pode deixar comigo mestre <@${runtime.userId}>! ${generated || 'estou por aqui monitorando tudo e garantindo que o servidor continue fluindo perfeitamente.'}`;
             }
 
-            if (generated && Math.random() > 0.3) return generated;
+            if (generated && Math.random() > 0.2) return generated;
 
-            if (sentiment === 'positive') return pick(['Que massa!', 'Boto fé.', 'É isso.']);
-            if (sentiment === 'negative') return pick(['vish.', 'complicado.', 'pode crer.']);
-            return pick(['Saquei.', 'Hmm.', 'Dahora.']);
+            if (sentiment === 'positive') return pick(['Que massa ver essa energia toda por aqui, mano! Isso realmente anima o dia.', 'Boto muita fé nisso que tu falou, tem tudo pra dar super certo.', 'É exatamente por aí que o raciocínio tem que caminhar, concordo plenamente.']);
+            if (sentiment === 'negative') return pick(['Vish, que situação meio chata hein, mas relaxa que as coisas melhoram com o tempo.', 'Complicado demais quando isso acontece, dá até desanimada às vezes.', 'Pior que te entendo perfeitamente, às vezes o dia resolve testar a nossa paciência mesmo.']);
+            return pick(['Saquei qual é a sua ideia, faz total sentido pensado por esse lado.', 'Hmm, interessante parar para analisar por essa perspectiva aí.', 'Dahora demais, é sempre bom trocar uma ideia e ver novos pontos de vista por aqui.']);
         default:
-            return "...";
+            return "Fiquei meio perdido no que você quis dizer agora, tenta reformular a frase para eu conseguir entender melhor.";
     }
 }
 
@@ -257,7 +258,6 @@ async function chat({ userId, message, client, guild, channel, messageId, author
         }
     }
 
-    // Se a flag learnOnly for verdadeira, encerra aqui sem gerar texto de resposta
     if (learnOnly) {
         return { ok: true, text: null };
     }
@@ -278,6 +278,6 @@ loadTools();
 
 module.exports = {
     configured, registerTool, listTools, chat, isOwner,
-    model: () => 'aeternus-v6.1-mention',
+    model: () => 'aeternus-v6.2-longtext',
     baseUrl: () => 'local'
 };
