@@ -1,6 +1,6 @@
 /**
  * Consciência e Motor de PLN Local do Aeternus
- * Suporte a Cálculos Matemáticos, Edição de Interface (Restrito ao Dono) e Consultas Gerais.
+ * Reconhecimento do Criador/Dono, Cálculos, Edição de Interface e Interação Livre.
  */
 
 const fs = require('fs');
@@ -180,14 +180,12 @@ function extractEntities(text, catalog) {
     const raw = String(text || '').trim();
     const entities = {};
 
-    // Detecção de expressão matemática
     const mathMatch = raw.match(/(?:quanto e|calcula|calcule|quanto da|conta)\s+([0-9+\-*/%().^\s]+)/i) ||
                       raw.match(/^([0-9+\-*/%().^\s]{3,})$/);
     if (mathMatch) {
         entities.mathExpression = mathMatch[1] || mathMatch[0];
     }
 
-    // Detecção de edição de interface de comando
     const editMatch = raw.match(/(?:editar interface|edite interface|criar interface|interface do comando)\s+([a-zA-Z0-9_-]+)/i);
     if (editMatch) {
         entities.editCommandName = editMatch[1];
@@ -213,6 +211,20 @@ function detectIntents(text, userMem, entities) {
     const addIntent = (intent, score, extra = {}) => {
         intents.push({ intent, score, ...extra });
     };
+
+    // Identificação do Criador/Desenvolvedor
+    if (
+        norm.includes('quem te criou') ||
+        norm.includes('quem e seu criador') ||
+        norm.includes('quem te fez') ||
+        norm.includes('seu criador') ||
+        norm.includes('seu dono') ||
+        norm.includes('quem e seu dono') ||
+        norm.includes('seu desenvolvedor') ||
+        norm.includes('seu dev')
+    ) {
+        addIntent('creator_info', 0.98);
+    }
 
     if (entities.mathExpression) {
         addIntent('calculate', 0.98, { expression: entities.mathExpression });
@@ -241,8 +253,23 @@ function detectIntents(text, userMem, entities) {
     return intents.sort((a, b) => b.score - a.score);
 }
 
+async function respondCreator(runtime) {
+    const oId = ownerId();
+    if (!oId) {
+        return 'meu criador e o desenvolvedor do sistema, mas o `OWNER_ID` ainda nao foi definido nas variaveis de ambiente!';
+    }
+
+    return pick([
+        `meu criador e o <@${oId}> mano! foi ele que me programou e mantem tudo rodando por aqui.`,
+        `quem me criou e me gerencia e o <@${oId}>!`,
+        `o brabo que me desenvolveu foi o <@${oId}> mano!`
+    ]);
+}
+
 async function runIntent(item, runtime, text, entities) {
     switch (item.intent) {
+        case 'creator_info':
+            return respondCreator(runtime);
         case 'calculate': {
             const res = await runTool('calculate_math', { expression: item.expression }, runtime);
             if (!res.ok) return res.error;
