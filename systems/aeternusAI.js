@@ -1,18 +1,15 @@
 /**
- * Consciência nativa do Aeternus (sem API de IA externa).
+ * Aeternus System Engine v7.3 (Compatibilidade Total)
  */
+
 const ai = require('../utils/aeternusAI');
 
-function setup(client) {
-    const ready = () => {
-        console.log(
-            `🧠 [Aeternus] consciência nativa · tools=${ai.listTools().length} · contexts=${ai.listContexts().length}`
-        );
-    };
-    if (client.isReady?.()) ready();
-    else client.once('clientReady', ready);
-
-    return { stop() {} };
-}
-
-module.exports = { setup };
+module.exports = {
+    configured: () => typeof ai.configured === 'function' ? ai.configured() : true,
+    listContexts: () => typeof ai.listContexts === 'function' ? ai.listContexts() : [],
+    listTools: () => typeof ai.listTools === 'function' ? ai.listTools() : [],
+    chat: async (params) => await ai.chat(params),
+    isOwner: (userId) => typeof ai.isOwner === 'function' ? ai.isOwner(userId) : false,
+    model: () => typeof ai.model === 'function' ? ai.model() : 'aeternus-v7',
+    baseUrl: () => typeof ai.baseUrl === 'function' ? ai.baseUrl() : 'local'
+};
