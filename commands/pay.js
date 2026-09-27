@@ -86,16 +86,16 @@ function buildInviteText(from, to, amount, timeoutMs) {
     const toM = mention(to);
     const label = formatTimeout(timeoutMs || DEFAULT_TIMEOUT_MS).toUpperCase();
     return [
-        '✦ **AETERNUS • TRANSFERÊNCIA**',
+        '✦ **AETERNUS • PAGAMENTO**',
         '',
         '💸 ' + fromM + ' → ' + toM,
         '└─ ' + fromM + ' deseja enviar ✨ **' + fmt(amount) + '** éter para ' + toM,
         '',
-        '✅ Os dois usuários precisam aceitar para concluir a transferência.',
+        '✅ Os dois usuários precisam aceitar para concluir o pagamento.',
         '',
-        '⚠️ **ATENÇÃO:** Antes de aceitar, confira cuidadosamente quem está enviando, quem está recebendo e o valor da transferência. Não aceite caso você não reconheça a solicitação ou tenha qualquer dúvida sobre os dados apresentados.',
+        '⚠️ **ATENÇÃO:** Antes de aceitar, confira cuidadosamente quem está enviando, quem está recebendo e o valor. Não aceite caso você não reconheça a solicitação ou tenha qualquer dúvida sobre os dados apresentados.',
         '',
-        'Ao aceitar, você confirma que revisou todas as informações e autorizou a operação. Depois de concluída, a transferência **não poderá ser desfeita ou recuperada** pelo Aeternus.',
+        'Ao aceitar, você confirma que revisou todas as informações e autorizou a operação. Depois de concluída, o pagamento **não poderá ser desfeito ou recuperado** pelo Aeternus.',
         '',
         '━━━━━━━━━━━━━━━━━━',
         '⏳ **PRAZO PARA ACEITAR: ' + label + '**',
@@ -109,12 +109,12 @@ function buildInviteText(from, to, amount, timeoutMs) {
 
 function buildExpiredText(from, to, amount) {
     return [
-        '✦ **AETERNUS • TRANSFERÊNCIA**',
+        '✦ **AETERNUS • PAGAMENTO**',
         '',
         '⏳ Solicitação expirada.',
         mention(from) + ' → ' + mention(to) + ' · ✨ **' + fmt(amount) + '**',
         '',
-        'Nenhuma transferência foi feita.',
+        'Nenhum pagamento foi feito.',
         '',
         '───────────────',
         '✧ Aeternus Economy'
@@ -123,9 +123,9 @@ function buildExpiredText(from, to, amount) {
 
 function buildDoneText(fromId, toId, fromBal, toBal) {
     return [
-        '✦ **AETERNUS • TRANSFERÊNCIA CONCLUÍDA**',
+        '✦ **AETERNUS • PAGAMENTO CONCLUÍDO**',
         '',
-        '✅ Transferência concluída.',
+        '✅ Pagamento concluído.',
         '',
         mention(toId) + ' agora possui ✨ **' + fmt(toBal) + '**',
         rankLine(toId, mention(toId)),
@@ -271,7 +271,7 @@ async function finishTransfer(interaction, p) {
         await interaction.message
             .edit({
                 content: [
-                    '✦ **AETERNUS • TRANSFERÊNCIA**',
+                    '✦ **AETERNUS • PAGAMENTO**',
                     '',
                     '💸 Saldo insuficiente no momento da conclusão.',
                     mention(p.fromId) + ' → ' + mention(p.toId),
@@ -287,8 +287,8 @@ async function finishTransfer(interaction, p) {
         return;
     }
 
-    eter.remove(p.fromId, amount, { reason: 'transferência', to: p.toId });
-    eter.add(p.toId, amount, { reason: 'transferência', from: p.fromId });
+    eter.remove(p.fromId, amount, { reason: 'pay', to: p.toId });
+    eter.add(p.toId, amount, { reason: 'pay', from: p.fromId });
 
     const fromBal = eter.get(p.fromId);
     const toBal = eter.get(p.toId);
@@ -312,7 +312,7 @@ async function finishTransfer(interaction, p) {
 
 module.exports = {
     name: 'pay',
-    aliases: ['pix', 'enviar', 'transferir', 'pagar'],
+    aliases: ['pix'],
     description: 'Enviar éter para outro usuário (os dois precisam aceitar)',
     category: 'economia',
     data: new SlashCommandBuilder()
@@ -359,7 +359,9 @@ module.exports = {
             return message.reply(
                 '💸 Mencione alguém para enviar éter.\nUse: `' +
                     prefix +
-                    'pix @usuario <valor>`'
+                    'pix @usuario <valor>` ou `' +
+                    prefix +
+                    'pay @usuario <valor>`'
             );
         }
 
@@ -421,7 +423,7 @@ module.exports = {
 
         await i.reply({
             content:
-                '✦ Pedido de transferência: ' +
+                '✦ Pedido de pagamento: ' +
                 mention(i.user) +
                 ' → ' +
                 mention(to) +
