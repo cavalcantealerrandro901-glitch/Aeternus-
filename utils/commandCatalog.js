@@ -12,7 +12,6 @@ const CATEGORIES = {
             { name: 'banco', desc: 'Ver banco', usage: 'banco [@user]', example: 'O.banco', about: 'Mostra carteira, cofre e total de éter.' },
             { name: 'depositar', desc: 'Depositar no banco', usage: 'depositar <valor|all|half>', example: 'O.dep 1k', about: 'Guarda éter no cofre (protegido de roubos).' },
             { name: 'sacar', desc: 'Sacar do banco', usage: 'sacar <valor|all|half>', example: 'O.sacar 500', about: 'Retira éter do cofre para a carteira.' },
-            { name: 'cambio', desc: 'Câmbio Éter ⇄ Sonhos (Loritta)', usage: 'cambio [comprar|vender|saldo] <valor>', example: 'O.cambio comprar 100', about: 'Troca éter do Aeternus por sonhos da Loritta e vice-versa.' },
             { name: 'pay', desc: 'Transferir éter', usage: 'pay @user <valor>', example: 'O.pay @user 2k', about: 'Envia éter da sua carteira para outro membro.' },
             { name: 'transacoes', desc: 'Extrato', usage: 'transacoes', example: 'O.transacoes', about: 'Lista as últimas movimentações de éter.' },
             { name: 'work', desc: 'Trabalhar por éter', usage: 'work', example: 'O.work', about: 'Ganha éter trabalhando (com ranking de cargos).' },
@@ -101,6 +100,7 @@ const CATEGORIES = {
         emoji: '🛠️',
         description: 'Ferramentas do dia a dia',
         commands: [
+            { name: 'aeternus', desc: 'IA do Aeternus', usage: 'aeternus <pergunta>', example: 'O.aeternus qual meu saldo?', about: 'Assistente com saldos (éter/Loritta), comandos, RPG, servidores e ajuda ao dono.' },
             { name: 'wiki', desc: 'Wiki oficial', usage: 'wiki', example: 'O.wiki', about: 'Abre a wiki oficial do Aeternus (RPG, guildas, economia, jogos).' },
             { name: 'help', desc: 'Central de ajuda', usage: 'help [categoria|comando]', example: 'O.ajuda saldo', about: 'Lista categorias ou detalhes de um comando.' },
             { name: 'ping', desc: 'Latência', usage: 'ping', example: 'O.ping', about: 'Mostra latência da API e do round-trip.' },
@@ -193,7 +193,10 @@ function findCommand(query) {
         skills: 'habilidades',
         passiva: 'passivas',
         perfil: 'j',
-        jogador: 'j'
+        jogador: 'j',
+        ia: 'aeternus',
+        ai: 'aeternus',
+        assistente: 'aeternus'
     };
 
     const name = aliases[q] || q;
