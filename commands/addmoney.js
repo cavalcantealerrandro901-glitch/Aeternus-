@@ -1,6 +1,9 @@
-const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const { parseAmount, looksLikeAmount } = require('../utils/parseAmount');
+
+/** Cargo autorizado a adicionar éter */
+const ALLOWED_ROLE_ID = '1553858768708706404';
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -11,9 +14,18 @@ function pickAmount(args) {
     return raw || null;
 }
 
+function hasAllowedRole(member) {
+    if (!member) return false;
+    if (member.roles?.cache?.has(ALLOWED_ROLE_ID)) return true;
+    // fallback se roles vier como array de IDs (slash em alguns contextos)
+    const roles = member.roles?.cache || member._roles || [];
+    if (Array.isArray(roles)) return roles.map(String).includes(ALLOWED_ROLE_ID);
+    return false;
+}
+
 async function run(modMember, targets, amountRaw, reply) {
-    if (!modMember?.permissions?.has(PermissionFlagsBits.Administrator)) {
-        return reply('❌ Só administradores.');
+    if (!hasAllowedRole(modMember)) {
+        return reply('❌ Você não tem permissão para usar este comando.');
     }
     if (!targets.length) return reply('❌ Informe o usuário. Ex.: `O.addmoney @user 10k`');
     if (!amountRaw) {
@@ -49,7 +61,7 @@ async function run(modMember, targets, amountRaw, reply) {
                 .setColor(0x22c55e)
                 .setTitle('Éter adicionado')
                 .setDescription(lines.join('\n'))
-                .setFooter({ text: `Mod: ${modMember.user?.tag || modMember.displayName || 'admin'}` })
+                .setFooter({ text: `Mod: ${modMember.user?.tag || modMember.displayName || 'staff'}` })
                 .setTimestamp()
         ]
     });
@@ -58,7 +70,7 @@ async function run(modMember, targets, amountRaw, reply) {
 module.exports = {
     name: 'addmoney',
     aliases: ['addeter', 'givemoney', 'addéter', 'dar-eter'],
-    description: 'Adicionar éter (admin) — 1k, 1m, 1b…',
+    description: 'Adicionar éter (cargo autorizado) — 1k, 1m, 1b…',
     data: new SlashCommandBuilder()
         .setName('adicionar-eter')
         .setDescription('Adicionar éter a um usuário')
@@ -68,8 +80,7 @@ module.exports = {
                 .setName('valor')
                 .setDescription('Valor: 1000, 1k, 2.5k, 1m, 1b…')
                 .setRequired(true)
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        ),
 
     async execute(message, args) {
         const targets = [...message.mentions.users.values()];
