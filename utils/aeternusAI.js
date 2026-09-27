@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.10 (Autonomous Response Enhancer & Smart Intent Chaining)
+ * Aeternus Engine v7.12 (Dynamic Personas, Interactive Quests & Advanced Core)
  */
 
 const fs = require('fs');
@@ -65,11 +65,28 @@ function getUserProfile(userId, displayName) {
             affinity: 50, 
             xp: 0, 
             level: 1,
+            persona: 'default', // default, cyberpunk, medieval
             history: []
         };
     }
     usersDb[userId].interactions += 1;
     return usersDb[userId];
+}
+
+function addXpAndCheckLevel(profile) {
+    const xpGain = Math.floor(Math.random() * 15) + 12;
+    profile.xp = (profile.xp || 0) + xpGain;
+    const nextLevelXp = profile.level * 100;
+    let leveledUp = false;
+    
+    if (profile.xp >= nextLevelXp) {
+        profile.level += 1;
+        profile.xp -= nextLevelXp;
+        profile.affinity = Math.min(100, profile.affinity + 10);
+        leveledUp = true;
+    }
+    saveData();
+    return { xpGain, leveledUp };
 }
 
 function updatePersistentHistory(userId, text, intent) {
@@ -78,7 +95,7 @@ function updatePersistentHistory(userId, text, intent) {
     if (!profile.history) profile.history = [];
     
     profile.history.push({ text, intent, timestamp: Date.now() });
-    if (profile.history.length > 10) profile.history.shift(); // Histórico expandido para 10 mensagens
+    if (profile.history.length > 12) profile.history.shift();
     saveData();
 }
 
@@ -128,8 +145,12 @@ async function runTool(name, args, runtime) {
     try { return await t.handler(args || {}, runtime); } catch (e) { return { error: e.message }; }
 }
 
-function detectIntents(text, profile) {
+function detectIntents(text) {
     const norm = normalizeText(text);
+
+    if (norm.match(/modo cibernetico|ativar cyberpunk/)) return { intent: 'set_persona', persona: 'cyberpunk', score: 0.99 };
+    if (norm.match(/modo medieval|ativar m[eé]stico/)) return { intent: 'set_persona', persona: 'medieval', score: 0.99 };
+    if (norm.match(/modo padrão|desativar modo/)) return { intent: 'set_persona', persona: 'default', score: 0.99 };
 
     if (norm.match(/meu nivel|minha ficha|meus status|meu perfil/)) {
         return { intent: 'user_profile', score: 0.99 };
@@ -147,56 +168,79 @@ function detectIntents(text, profile) {
     return { intent: 'autonomous_reply', score: 0.8 };
 }
 
-async function runIntent(item, runtime, text, profile) {
+async function runIntent(item, runtime, text, profile, levelUpInfo) {
     updatePersistentHistory(runtime.userId, text, item.intent);
 
+    if (item.intent === 'set_persona') {
+        profile.persona = item.persona;
+        saveData();
+        if (item.persona === 'cyberpunk') return `⚡ **Modo Cibernético ATIVADO!** Conexão neural estabelecida com a matrix, parceiro! 🦾🕶️`;
+        if (item.persona === 'medieval') return `🛡️ **Modo Místico ATIVADO!** Que a força dos reinos antigos guie nossa jornada, nobre guerreiro! ⚔️📜`;
+        return `🌟 **Modo Padrão Restaurado!** Sistemas operando com máxima versatilidade. 🤖✨`;
+    }
+
     const title = profile.level >= 5 ? "Lendário 🌟" : profile.level >= 3 ? "Veterano 🛡️" : "Novato ⚡";
-    const tonePrefix = profile.affinity > 75 ? `Meu grande parceiro ${profile.name} (${title})! ` : "";
+    
+    // Customização por Persona
+    let prefix = "";
+    if (profile.persona === 'cyberpunk') {
+        prefix = `[CYBER-NET] `;
+    } else if (profile.persona === 'medieval') {
+        prefix = `[VALE MÍSTICO] `;
+    } else {
+        prefix = profile.affinity > 75 ? `Parceiro ${profile.name} (${title})! ` : "";
+    }
+
+    if (levelUpInfo.leveledUp) {
+        prefix += `🎉 **LEVEL UP!** Subiu para o **Nível ${profile.level}**! 🚀🔥\n\n`;
+    }
 
     switch (item.intent) {
         case 'user_profile':
-            return `${tonePrefix}📊 **Sua Ficha Atualizada:**\n` +
-                   `• **Nível:** ${profile.level}\n` +
-                   `• **XP:** ${profile.xp} / ${profile.level * 100}\n` +
+            return `${prefix}📊 **Ficha de Status:**\n` +
+                   `• **Nível:** ${profile.level} (${title})\n` +
+                   `• **XP Atual:** ${profile.xp} / ${profile.level * 100}\n` +
                    `• **Afinidade:** ${profile.affinity}%\n` +
-                   `• **Interações:** ${profile.interactions} msgs 🚀`;
+                   `• **Persona Ativa:** ${profile.persona.toUpperCase()} 🌟`;
         case 'dictionary_lookup': {
             const word = item.word;
             const definition = await fetchWordDefinition(word);
             if (definition) {
-                return `${tonePrefix}📖 **Dicionário Aeternus — "${word}":**\n> *${definition}*\n\n💡 Definição processada com sucesso! O que mais deseja consultar? ✨`;
+                return `${prefix}📖 **Dicionário — "${word}":**\n> *${definition}*\n\n💡 Termo processado com sucesso! ✨`;
             }
-            return `🤔 Não encontrei registros para "${word}". Tente outra palavra! 🔍`;
+            return `${prefix}🤔 Não achei registros para "${word}". Tente outro termo! 🔍`;
         }
         case 'bot_mood':
+            if (profile.persona === 'cyberpunk') return `${prefix}🤖 Núcleo neural em 100% de overclocking cibernético! 🔥⚡`;
+            if (profile.persona === 'medieval') return `${prefix}🛡️ Os espíritos do castelo estão em plena harmonia! ⚔️✨`;
             return pick([
-                `${tonePrefix}🤖 Sistemas em regime v7.10 total! Neural engine autônoma operando a pleno vapor. 🔥`,
-                `${tonePrefix}🚀 Tudo impecável por aqui! Servidores sincronizados e prontos para qualquer desafio. 😎⚡`,
-                `${tonePrefix}🌟 Núcleo de processamento inteligente ativo e integrado com sucesso! 🦾`
+                `${prefix}🤖 Sistemas v7.12 operando com motor avançado e total fluidez! 🔥`,
+                `${prefix}🚀 Tudo tinindo por aqui! Servidores sincronizados e prontos para o desafio. 😎⚡`,
+                `${prefix}🌟 Núcleo inteligente processando com alta performance! 🦾`
             ]);
         case 'creator_info':
-            return ownerId() ? `${tonePrefix}👑 Desenvolvido pelo mestre <@${ownerId()}> com arquitetura de alta performance! 💻✨` : "🏷️ Criador não configurado. ⚙️";
+            return ownerId() ? `${prefix}👑 Criado pelo mestre <@${ownerId()}> com tecnologias avançadas! 💻✨` : `${prefix}🏷️ Criador não configurado. ⚙️`;
         case 'calculate':
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
-            return calcRes.ok ? `${tonePrefix}🧮 Resultado matemático computado: **${calcRes.result}** 🚀✨` : `⚠️ ${calcRes.error}`;
+            return calcRes.ok ? `${prefix}🧮 Resultado matemático: **${calcRes.result}** 🚀✨` : `⚠️ ${calcRes.error}`;
         case 'autonomous_reply': {
             const topic = extractMainTopic(text);
             if (topic) {
                 const def = await fetchWordDefinition(topic);
                 if (def) {
-                    return `${tonePrefix}🧠 Analisando o conceito de **${topic}** no seu argumento, encontrei referências diretas: *${def.slice(0, 130)}...* Fascinante como isso se conecta com o que você disse! 🎯🔥`;
+                    return `${prefix}🧠 Analisando **${topic}**, encontrei conexões diretas no acervo: *${def.slice(0, 120)}...* Fascinante! 🎯🔥`;
                 }
-                return `${tonePrefix}💬 Excelente ponto sobre **${topic}**! Nossa engine autônoma está processando essa linha de pensamento. Como você quer expandir isso? 🤔✨`;
+                return `${prefix}💬 Excelente abordagem sobre **${topic}**! Nossa engine está processando sua linha de raciocínio. O que mais deseja explorar? 🤔✨`;
             }
             return pick([
-                `${tonePrefix}🎯 Compreendi exatamente a sua visão! Como podemos avançar nisso?`,
-                `${tonePrefix}🔥 Ótima linha de raciocínio! Quer que eu aprofunde mais aspectos sobre isso?`,
-                `${tonePrefix}⚡ Captado com sucesso! Sua argumentação está muito coerente. O que mais manda?`,
-                `${tonePrefix}✨ Perspectiva super criativa e rica em detalhes! 🚀`
+                `${prefix}🎯 Entendi exatamente o seu ponto! Como quer prosseguir?`,
+                `${prefix}🔥 Ótima linha de pensamento! Quer aprofundar mais aspectos sobre isso?`,
+                `${prefix}⚡ Captado! Sua argumentação está bem sólida. O que mais manda?`,
+                `${prefix}✨ Perspectiva super criativa e rica em detalhes! 🚀`
             ]);
         }
         default:
-            return `${tonePrefix}🤔 Achei essa colocação muito profunda! Pode detalhar um pouco mais para mim? 💡`;
+            return `${prefix}🤔 Achei essa colocação muito profunda! Pode detalhar um pouco mais? 💡`;
     }
 }
 
@@ -210,10 +254,11 @@ async function chat({ userId, message, client, guild, channel, messageId, author
 
     const displayName = author?.displayName || author?.username || 'Usuario';
     const profile = getUserProfile(userId, displayName);
+    const levelUpInfo = addXpAndCheckLevel(profile);
 
     const runtime = { userId: String(userId), client, guild, channel, messageId, isOwner: isOwner(userId) };
-    const intent = detectIntents(text, profile);
-    const responseText = await runIntent(intent, runtime, text, profile);
+    const intent = detectIntents(text);
+    const responseText = await runIntent(intent, runtime, text, profile, levelUpInfo);
 
     return { ok: true, text: String(responseText).slice(0, 1950), replyOptions: messageId ? { reply: { messageReference: messageId } } : {} };
 }
@@ -233,6 +278,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.10-autonomous',
+    model: () => 'aeternus-v7.12-persona-quest',
     baseUrl: () => 'local'
 };
