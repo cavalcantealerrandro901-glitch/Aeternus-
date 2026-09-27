@@ -1,7 +1,7 @@
 /**
- * Consciência e Motor de PLN Local do Aeternus (v3.0 - Aprimorado)
- * Arquitetura Nativa: Aprendizado Social, Reconhecimento do Criador, 
- * Cálculos Matemáticos, Administração de Interface e Memória de Contexto.
+ * Consciência e Motor de PLN Local do Aeternus (v3.1)
+ * Suporte a Mapeamento Dinâmico de Comandos, Aprendizado Social,
+ * Reconhecimento do Criador, Cálculos e Administração.
  */
 
 const fs = require('fs');
@@ -12,10 +12,7 @@ const LEARNED_FILE = path.join(DATA_DIR, 'learned_phrases.json');
 
 const contexts = new Map();
 const tools = new Map();
-/** @type {Map<string, { lastIntents: string[], lastEntities: Record<string, any>, turns: number, updatedAt: number }> } */
 const memory = new Map();
-
-// --- PERSISTÊNCIA E APRENDIZADO SOCIAL ---
 
 if (!fs.existsSync(DATA_DIR)) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
@@ -48,8 +45,6 @@ function learnFromMessage(text) {
         saveLearnedPhrases();
     }
 }
-
-// --- UTILITÁRIOS DE AMBIENTE & PLN ---
 
 function ownerId() {
     return String(process.env.OWNER_ID || '').trim();
@@ -114,8 +109,6 @@ function fmt(n) {
 function pick(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
-
-// --- GERENCIAMENTO DE FERRAMENTAS E CONTEXTO ---
 
 function registerContext(id, { description, get }) {
     if (!id || typeof get !== 'function') return false;
@@ -183,27 +176,22 @@ async function runTool(name, args, runtime) {
     }
 }
 
-// --- EXTRAÇÃO DE ENTIDADES & RECONHECIMENTO DE INTENÇÕES ---
-
 function extractEntities(text, catalog) {
     const tokens = tokenize(text);
     const raw = String(text || '').trim();
     const entities = {};
 
-    // Expressões matemáticas avançadas
     const mathMatch = raw.match(/(?:quanto e|calcula|calcule|quanto da|conta|resultado de)\s+([0-9+\-*/%().^\s]+)/i) ||
                       raw.match(/^([0-9+\-*/%().^\s]{3,})$/);
     if (mathMatch) {
         entities.mathExpression = mathMatch[1] || mathMatch[0];
     }
 
-    // Edição de interface/comandos
     const editMatch = raw.match(/(?:editar interface|edite interface|criar interface|interface do comando)\s+([a-zA-Z0-9_-]+)/i);
     if (editMatch) {
         entities.editCommandName = editMatch[1];
     }
 
-    // Marcação e busca de membros
     const mentionMatch = raw.match(/<@!?(\d+)>/);
     if (mentionMatch) {
         entities.targetUserId = mentionMatch[1];
@@ -211,23 +199,6 @@ function extractEntities(text, catalog) {
         const idMatch = raw.match(/\b\d{17,19}\b/);
         if (idMatch) {
             entities.targetUserId = idMatch[0];
-        }
-    }
-
-    const memberQueryMatch = raw.match(/(?:quem e|quem e o|quem e a|membro|usuario|sobre o|sobre a|user)\s+([a-zA-Z0-9_\.\-]{2,32})/i);
-    if (memberQueryMatch && !entities.targetUserId) {
-        entities.targetQuery = memberQueryMatch[1];
-    }
-
-    if (catalog) {
-        for (const cat of catalog.listCategories()) {
-            for (const cmd of cat.commands) {
-                if (tokens.some((token) => fuzzyMatchWord(token, cmd.name, 1))) {
-                    entities.commandName = cmd.name;
-                    break;
-                }
-            }
-            if (entities.commandName) break;
         }
     }
 
@@ -243,76 +214,51 @@ function detectIntents(text, userMem, entities) {
         intents.push({ intent, score, ...extra });
     };
 
-    // Criador/Desenvolvedor
+    // Mapeamento completo dos comandos
+    if (
+        norm.includes('mapear comandos') ||
+        norm.includes('mapeie os comandos') ||
+        norm.includes('todos os comandos com descricao') ||
+        norm.includes('quais sao todos os comandos') ||
+        norm.includes('lista completa de comandos') ||
+        norm.includes('para que serve cada comando')
+    ) {
+        addIntent('map_commands', 0.99);
+    }
+
     if (
         norm.includes('quem te criou') ||
         norm.includes('quem e seu criador') ||
         norm.includes('quem te fez') ||
         norm.includes('seu criador') ||
         norm.includes('seu dono') ||
-        norm.includes('quem e seu dono') ||
-        norm.includes('seu desenvolvedor') ||
-        norm.includes('seu dev')
+        norm.includes('seu desenvolvedor')
     ) {
         addIntent('creator_info', 0.99);
     }
 
-    // Cálculos
     if (entities.mathExpression) {
         addIntent('calculate', 0.98, { expression: entities.mathExpression });
     }
 
-    // Edição de Interface (Exclusivo Dono)
     if (entities.editCommandName || norm.includes('editar interface')) {
         addIntent('edit_interface', 0.95, { commandName: entities.editCommandName });
     }
 
-    // Servidor
-    if (
-        norm.includes('info do servidor') ||
-        norm.includes('info do server') ||
-        norm.includes('sobre o servidor') ||
-        norm.includes('detalhes do server') ||
-        norm.includes('membros do server')
-    ) {
+    if (norm.includes('info do servidor') || norm.includes('info do server')) {
         addIntent('server_info', 0.95);
     }
 
-    // Membro
-    if (
-        entities.targetUserId ||
-        norm.includes('quem e') ||
-        norm.includes('info de') ||
-        norm.includes('perfil de') ||
-        norm.includes('sobre o usuario')
-    ) {
+    if (entities.targetUserId || norm.includes('quem e') || norm.includes('info de')) {
         addIntent('member_info', 0.9);
     }
 
-    // Economia & RPG
-    if (tokens.some((t) => ['saldo', 'carteira', 'eter', 'dinheiro', 'banco'].includes(t))) {
+    if (tokens.some((t) => ['saldo', 'carteira', 'eter', 'dinheiro'].includes(t))) {
         addIntent('balance', 0.88);
     }
 
-    if (tokens.some((t) => fuzzyMatchWord('sonho', t) || fuzzyMatchWord('sonhos', t) || t === 'loritta')) {
+    if (tokens.some((t) => fuzzyMatchWord('sonho', t) || t === 'loritta')) {
         addIntent('loritta', 0.88);
-    }
-
-    if (tokens.some((t) => ['perfil', 'personagem', 'atributo', 'nivel', 'level'].includes(t))) {
-        addIntent('player', 0.85);
-    }
-
-    // Saudações e Despedidas
-    if (tokens.some((t) => ['oi', 'ola', 'hey', 'eae', 'eai', 'salve', 'opa', 'suave', 'sussa'].includes(t))) {
-        addIntent('greet', 0.92);
-    }
-
-    if (tokens.some((t) => ['obrigado', 'valeu', 'vlw', 'thanks', 'tmj'].includes(t))) {
-        addIntent('thanks', 0.9);
-    }
-
-    if (tokens.some((t) => ['tchau', 'flw', 'bye', 'fui'].includes(t))) {
-        addIntent('bye', 0.9);
     }
 
     if (intents.length === 0) {
@@ -321,8 +267,6 @@ function detectIntents(text, userMem, entities) {
 
     return intents.sort((a, b) => b.score - a.score);
 }
-
-// --- RESPOSTAS CONVERSACIONAIS ---
 
 function respondCasualChat(text) {
     const norm = normalizeText(text);
@@ -342,29 +286,42 @@ function respondCasualChat(text) {
         'boto fe demais',
         'slk, pior ne',
         'tmj mano, precisar tamo ai',
-        'dahora dms',
-        'po mano kkkk',
         'tranquilo por aqui, e com vc?'
     ]);
 }
 
-async function respondCreator(runtime) {
-    const oId = ownerId();
-    if (!oId) {
-        return 'meu criador e o desenvolvedor do sistema, mas o `OWNER_ID` ainda nao foi configurado no arquivo .env!';
+async function respondMappedCommands(runtime) {
+    const res = await runTool('map_all_commands', {}, runtime);
+    if (!res?.ok) return `❌ ${res.error || 'Erro ao mapear os comandos.'}`;
+
+    const lines = [`📚 **Mapeamento de Comandos Encontrados (${res.count}):**\n`];
+    for (const c of res.commands) {
+        if (c.error) {
+            lines.push(`• **${c.name}:** *${c.error}*`);
+        } else {
+            lines.push(
+                `• **\`${c.name}\`**\n` +
+                `  - **Uso:** \`${c.usage}\`\n` +
+                `  - **Descrição:** ${c.description}\n` +
+                `  - **Pra que serve:** ${c.purpose}\n` +
+                `  - **Atalhos:** ${c.aliases}`
+            );
+        }
     }
 
-    return pick([
-        `meu criador e o <@${oId}> mano! foi ele que me programou e mantem tudo rodando por aqui.`,
-        `quem me criou e me gerencia e o <@${oId}>!`,
-        `o brabo que me desenvolveu foi o <@${oId}> mano!`
-    ]);
+    return lines.join('\n');
 }
 
 async function runIntent(item, runtime, text, entities) {
     switch (item.intent) {
-        case 'creator_info':
-            return respondCreator(runtime);
+        case 'map_commands':
+            return respondMappedCommands(runtime);
+        case 'creator_info': {
+            const oId = ownerId();
+            return oId 
+                ? `meu criador e o <@${oId}> mano! foi ele que me programou e mantem tudo rodando por aqui.`
+                : 'meu criador e o desenvolvedor do sistema, mas o `OWNER_ID` ainda nao foi configurado no arquivo .env!';
+        }
         case 'calculate': {
             const res = await runTool('calculate_math', { expression: item.expression }, runtime);
             if (!res.ok) return res.error;
@@ -399,15 +356,6 @@ async function runIntent(item, runtime, text, entities) {
             const res = await runTool('get_loritta_sonhos', {}, runtime);
             if (!res?.ok) return `não consegui consultar os sonhos: ${res?.error || 'erro na API'}`;
             return `💤 tu tem **${fmt(res.sonhos)}** sonhos na Loritta!`;
-        }
-        case 'greet': {
-            return pick(['salve mano! suave?', 'eae, de boa?', 'opa! suaveee?']);
-        }
-        case 'thanks': {
-            return pick(['tmj mano!', 'valeuuu', 'nois!', 'de nada bro!']);
-        }
-        case 'bye': {
-            return pick(['flw mano!', 'ate mais!', 'fui, ate dps!']);
         }
         default:
             return respondCasualChat(text);
@@ -447,7 +395,7 @@ async function chat({ userId, message, client, guild, channel, messageId }) {
 }
 
 function loadTools() {
-    const toolFiles = ['serverTools', 'economyTools', 'rpgTools', 'mathTools', 'adminTools'];
+    const toolFiles = ['serverTools', 'economyTools', 'rpgTools', 'mathTools', 'adminTools', 'commandMapperTools'];
     for (const file of toolFiles) {
         try {
             const registerFn = require(`../tools/${file}`);
@@ -467,6 +415,6 @@ module.exports = {
     chat,
     clearHistory,
     isOwner,
-    model: () => 'aeternus-native-v3',
+    model: () => 'aeternus-native-v3.1',
     baseUrl: () => 'local'
 };
