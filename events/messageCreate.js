@@ -97,7 +97,6 @@ module.exports = {
             } catch (e) {
                 console.error('[guild dm]', e.message);
             }
-            // Continua para permitir O.guild / outros comandos no PV
             try {
                 const pre = resolvePrefixMatch(message, client);
                 if (pre) {
@@ -270,9 +269,10 @@ module.exports = {
                             .setTitle(`Olá, ${message.author.username}`)
                             .setDescription(
                                 [
-                                    `Eu sou o **${client.user.username}** — economia, jogos e utilidades.`,
+                                    `Eu sou o **${client.user.username}** — economia, RPG, jogos e IA.`,
                                     '',
                                     `**Prefixo:** \`${prefix}\``,
+                                    `**IA:** \`${prefix}aeternus <pergunta>\` · \`${prefix}ia\` · me mencione com uma pergunta`,
                                     `**Exemplos:** \`${prefix}ajuda\` · \`${prefix}saldo\` · \`${prefix}daily\``,
                                     '',
                                     `Digite \`${prefix}ajuda\` para a central completa.`
@@ -284,6 +284,19 @@ module.exports = {
 
                         await message.reply({ embeds: [embed] }).catch(() => {});
                         return;
+                    }
+
+                    // Menção + texto → IA
+                    const aiCmd =
+                        client.commands.get('aeternus') ||
+                        client.commands.get('ia');
+                    if (aiCmd?.handleMention) {
+                        try {
+                            await aiCmd.handleMention(message, stripped);
+                            return;
+                        } catch (e) {
+                            console.error('[aeternus ai mention]', e.message);
+                        }
                     }
                 }
             }
