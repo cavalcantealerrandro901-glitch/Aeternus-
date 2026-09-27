@@ -477,6 +477,47 @@ try {
     }
 } catch (_) {}
 
+
+/**
+ * Garante donos de classes exclusivas (boundUserId / maxHolders=1).
+ * Chamado no boot pelo systems/exclusiveClass.js
+ */
+function enforceExclusiveOwners() {
+    try {
+        const player = require('./player');
+        const all = player.all ? player.all() : {};
+        const list = listClasses();
+        for (const cls of list) {
+            if (!cls || !(cls.exclusive || cls.maxHolders === 1 || cls.boundUserId)) continue;
+            const id = cls.id;
+            const holders = holdersOf(id, all);
+            // Se tem boundUserId, remove a classe de quem não for o dono
+            if (cls.boundUserId) {
+                for (const uid of holders) {
+                    if (String(uid) !== String(cls.boundUserId)) {
+                        try {
+                            const p = all[uid];
+                            if (p && p.classId === id) {
+                                p.classId = null;
+                            }
+                        } catch (_) {}
+                    }
+                }
+                // Persist if player has save
+                try {
+                    if (player.saveAll) player.saveAll(all);
+                    else if (player.save) {
+                        const store = require('./store');
+                        store.save('players.json', all);
+                    }
+                } catch (_) {}
+            }
+        }
+    } catch (e) {
+        console.error('[enforceExclusiveOwners]', e.message);
+    }
+}
+
 module.exports = {
     BASE_CLASSES,
     LEGACY_MAP,
@@ -485,6 +526,7 @@ module.exports = {
     resolveClassId,
     listClasses,
     listSelectableClasses,
+    enforceExclusiveOwners,
     createClass,
     deleteCustomClass,
     clearAllCustom,

@@ -101,7 +101,7 @@ module.exports = {
     category: 'moderacao',
 
     data: new SlashCommandBuilder()
-        .setName('fazer parceria')
+        .setName('fazer-parceria')
         .setDescription('Registra parceria: texto + representante, em qualquer canal')
         .addUserOption(function (o) {
             return o

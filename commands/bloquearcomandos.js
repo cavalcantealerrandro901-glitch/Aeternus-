@@ -15,7 +15,7 @@ module.exports = {
     aliases: ['cmdlock', 'lockcmds', 'bloquearcmds', 'blockcmds'],
     description: 'Bloqueia ou libera comandos em um canal',
     data: new SlashCommandBuilder()
-        .setName('bloquear comandos')
+        .setName('bloquear-comandos')
         .setDescription('true = bloqueia comandos · false = libera · canal opcional')
         .addBooleanOption((o) =>
             o

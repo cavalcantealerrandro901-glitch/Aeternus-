@@ -1,7 +1,13 @@
 /**
  * Sistema de música — Shoukaku endurecido (reconnect, failover, sem spam).
  */
-const { Shoukaku, Connectors } = require('shoukaku');
+let Shoukaku, Connectors;
+try {
+    ({ Shoukaku, Connectors } = require('shoukaku'));
+} catch (e) {
+    console.warn('[music] shoukaku não instalado — música desativada. npm i shoukaku');
+}
+
 const { getNodes } = require('../utils/musicNodes');
 const musicManager = require('../utils/musicManager');
 const youtubeOauth = require('../utils/youtubeOauth');
@@ -18,6 +24,10 @@ function throttledLog(key, fn, ms = 90_000) {
 }
 
 function setup(client) {
+    if (!Shoukaku) {
+        console.warn('[music] desativado (sem shoukaku)');
+        return;
+    }
     const nodes = getNodes();
     if (!nodes.length) {
         console.warn('[music] Nenhum node — música desativada.');
