@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v6.2 (Frases Maiores e Encorpadas)
+ * Aeternus Engine v6.3 (Com Informações Detalhadas do Servidor Atual e Outros)
  */
 
 const fs = require('fs');
@@ -66,14 +66,13 @@ function extractMainTopic(text) {
     return words.length > 0 ? pick(words) : null;
 }
 
-// Aumentado o tamanho mínimo e máximo para gerar frases de 1.5 a 2 linhas no Discord
 function generateMarkovSentence(seedWord = null) {
     const keys = Object.keys(markovChain);
     if (keys.length === 0) return null;
 
     let currentWord = (seedWord && markovChain[seedWord]) ? seedWord : pick(keys);
     let sentence = [currentWord];
-    let maxLength = Math.floor(Math.random() * 12) + 14; // Entre 14 e 26 palavras
+    let maxLength = Math.floor(Math.random() * 12) + 14; 
 
     while (markovChain[currentWord] && sentence.length < maxLength) {
         let nextWords = markovChain[currentWord];
@@ -181,17 +180,26 @@ function detectIntents(text, userId) {
         if (lastIntent === 'bot_mood') add('bot_mood', 1.0);
     }
 
+    if (norm.includes('info do servidor') || norm.includes('sobre o servidor') || norm.includes('dados do servidor') || norm.includes('informacoes do server')) {
+        // Verifica se menciona outro servidor específico ou ID
+        const otherServerMatch = norm.match(/(?:outro|outros|servidor|server)\s+([a-zA-Z0-9\s_-]+)/);
+        if (otherServerMatch && !norm.includes('atual') && !norm.includes('este')) {
+            add('other_server_info', 0.98, { query: otherServerMatch[1] });
+        } else {
+            add('server_info', 0.98);
+        }
+    }
+
     if (norm.match(/como vc ta|como voce esta|seu humor|seu estado/)) add('bot_mood', 0.99);
     if (norm.includes('mapear comandos')) add('map_commands', 0.99);
     if (norm.match(/quem te (criou|fez)|seu (criador|dono)/)) add('creator_info', 0.99);
     
-    const mathMatch = norm.match(/(?:calcula|resultado de|conta)\s+([0-9+\-*/%().^\s]+)/) || norm.match(/^([0-9+\-*/%().^\s]{3,})$/);
+    const mathMatch = norm.match(/(?:calcula|resultado de|conta)\s+([0-9+\-*/%().^\s]+/) || norm.match(/^([0-9+\-*/%().^\s]{3,})$/);
     if (mathMatch) add('calculate', 0.98, { expression: mathMatch[1] });
     
     const editMatch = norm.match(/(?:editar interface|criar interface)\s+([a-z0-9_-]+)/);
     if (editMatch) add('edit_interface', 0.95, { commandName: editMatch[1] });
 
-    if (norm.includes('info do servidor')) add('server_info', 0.95);
     if (norm.includes('meu nivel')) add('my_profile', 0.9);
 
     if (intents.length === 0) add('casual_chat', 0.5);
@@ -203,6 +211,28 @@ async function runIntent(item, runtime, text, sentiment, profile) {
     updateContext(runtime.userId, item.intent);
 
     switch (item.intent) {
+        case 'server_info': {
+            const res = await runTool('get_server_info', {}, runtime);
+            if (!res?.ok) return "Não consegui carregar os dados deste servidor no momento, tente novamente daqui a pouco.";
+            const s = res.server;
+            return `🏰 **Informações Completas do Servidor:**\n` +
+                   `• **Nome:** ${s.name} (\`${s.id}\`)\n` +
+                   `• **Dono(a):** <@${s.ownerId}>\n` +
+                   `• **Membros Totais:** ${Number(s.memberCount).toLocaleString('pt-BR')}\n` +
+                   `• **Canais:** ${s.channelCount} | **Cargos:** ${s.roleCount}\n` +
+                   `• **Nível de Impulso:** Nível ${s.premiumTier} (${s.premiumSubscriptionCount} boosts)\n` +
+                   `• **Criado em:** ${s.createdAt}`;
+        }
+        case 'other_server_info': {
+            const guildsRes = await runTool('list_bot_guilds', { limit: 20 }, runtime);
+            const query = normalizeText(item.query || '');
+            const found = guildsRes?.guilds?.find(g => normalizeText(g.name).includes(query) || g.id === query);
+            
+            if (!found) {
+                return `Não consegui encontrar nenhum outro servidor cadastrado com esse nome ou ID "${item.query}". Poderia especificar melhor ou me passar o ID correto?`;
+            }
+            return `🌐 Encontrei este outro servidor onde estou presente:\n• **Nome:** ${found.name} (\`${found.id}\`)\n• **Membros:** ${Number(found.members).toLocaleString('pt-BR')}`;
+        }
         case 'bot_mood':
             if (botState.globalMood > 50) return "Tô felizaço mano, a galera desse servidor tá agitando bastante hoje e o clima tá super bacana por aqui! 😎";
             if (botState.globalMood < -50) return "Tô por um fio de estresse hoje, o pessoal não para de encher o saco e o clima tá pesado. Me erra um pouco. 🤬";
@@ -278,6 +308,6 @@ loadTools();
 
 module.exports = {
     configured, registerTool, listTools, chat, isOwner,
-    model: () => 'aeternus-v6.2-longtext',
+    model: () => 'aeternus-v6.3-serverinfo',
     baseUrl: () => 'local'
 };
