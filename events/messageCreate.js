@@ -1,7 +1,6 @@
 const aeternusAI = require('../utils/aeternusAI');
 const { PermissionFlagsBits } = require('discord.js');
 
-// Defina o prefixo padrão do seu bot (ajuste se necessário)
 const DEFAULT_PREFIX = '!';
 
 module.exports = {
@@ -18,17 +17,30 @@ module.exports = {
             }
         }
 
-        // 1. Se a mensagem começa com o prefixo (comandos tradicionais)
+        // 1. Tratamento de Comandos por Prefixo (ex: !ajuda, !trabalhar)
         if (message.content.startsWith(DEFAULT_PREFIX)) {
-            // Aqui o seu gerenciador de comandos por prefixo (se houver) pode agir, 
-            // ou se o seu projeto usa um handler separado para prefixos, certifique-se de chamá-lo aqui.
-            return; 
+            const args = message.content.slice(DEFAULT_PREFIX.length).trim().split(/ +/);
+            const commandName = args.shift().toLowerCase();
+
+            // Se o bot armazena os comandos em client.commands (padrão comum em handlers)
+            const command = message.client.commands?.get(commandName) || message.client.commands?.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
+
+            if (command) {
+                try {
+                    await command.execute(message, args, message.client);
+                } catch (err) {
+                    console.error(`Erro ao executar o comando ${commandName}:`, err);
+                    try {
+                        await message.reply({ content: '❌ Ocorreu um erro ao executar este comando.' });
+                    } catch (_) {}
+                }
+            }
+            return; // Encerra para não misturar comando com IA
         }
 
-        // 2. Verifica se o bot foi mencionado na mensagem
+        // 2. Verifica se o bot foi mencionado na mensagem para conversar com a IA
         const isMentioned = message.mentions.has(message.client.user);
 
-        // Se NÃO foi mencionado e não é comando, apenas aprende com o texto enviado
         if (!isMentioned) {
             try {
                 await aeternusAI.chat({
@@ -45,7 +57,7 @@ module.exports = {
             return;
         }
 
-        // Se foi mencionado, limpa a menção do texto para processar a inteligência artificial
+        // Limpa a menção para processar a IA
         const cleanContent = message.content
             .replace(new RegExp(`<@!?${message.client.user.id}>`, 'g'), '')
             .trim();
