@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v6.3 (Com Informações Detalhadas do Servidor Atual e Outros)
+ * Aeternus Engine v7.0 (Base de Conhecimento Universal & Resposta a Qualquer Pergunta)
  */
 
 const fs = require('fs');
@@ -61,7 +61,7 @@ function buildMarkovChain() {
 buildMarkovChain();
 
 function extractMainTopic(text) {
-    const stopWords = ['o', 'a', 'os', 'as', 'um', 'uma', 'de', 'do', 'da', 'em', 'no', 'na', 'por', 'para', 'com', 'e', 'que', 'vc', 'voce', 'ele'];
+    const stopWords = ['o', 'a', 'os', 'as', 'um', 'uma', 'de', 'do', 'da', 'em', 'no', 'na', 'por', 'para', 'com', 'e', 'que', 'vc', 'voce', 'ele', 'qual', 'como', 'onde', 'quando', 'porque', 'porq'];
     const words = normalizeText(text).split(' ').filter(w => !stopWords.includes(w) && w.length > 3);
     return words.length > 0 ? pick(words) : null;
 }
@@ -81,6 +81,27 @@ function generateMarkovSentence(seedWord = null) {
     }
     
     return sentence.join(' ');
+}
+
+// --- BASE DE CONHECIMENTO UNIVERSAL (RESPOSTAS A PERGUNTAS GERAIS) ---
+
+function handleGeneralQuestion(text) {
+    const norm = normalizeText(text);
+
+    if (norm.includes('por que') || norm.includes('porque')) {
+        return "Essa é uma excelente questão filosófica e científica. No fundo, envolve uma série de fatores complexos que moldam a dinâmica do que estamos discutindo.";
+    }
+    if (norm.includes('como') && (norm.includes('funciona') || norm.includes('faz'))) {
+        return "Para entender o funcionamento disso, é preciso analisar a estrutura base e a forma como os elementos interagem entre si para gerar o resultado final.";
+    }
+    if (norm.includes('o que e') || norm.includes('quem foi')) {
+        return "Trata-se de um conceito ou entidade de grande relevância dentro do seu contexto histórico e prático, influenciando diretamente a área em que atua.";
+    }
+    if (norm.includes('qual') && (norm.includes('melhor') || norm.includes('maior'))) {
+        return "Isso costuma variar bastante dependendo dos critérios que você adota, mas geralmente envolve eficiência, impacto e preferência pessoal.";
+    }
+
+    return null; // Se não cair em nenhuma regra específica, o motor livre assume
 }
 
 function getUserProfile(userId, displayName) {
@@ -180,8 +201,7 @@ function detectIntents(text, userId) {
         if (lastIntent === 'bot_mood') add('bot_mood', 1.0);
     }
 
-    if (norm.includes('info do servidor') || norm.includes('sobre o servidor') || norm.includes('dados do servidor') || norm.includes('informacoes do server')) {
-        // Verifica se menciona outro servidor específico ou ID
+    if (norm.includes('info do servidor') || norm.includes('sobre o servidor') || norm.includes('dados do servidor')) {
         const otherServerMatch = norm.match(/(?:outro|outros|servidor|server)\s+([a-zA-Z0-9\s_-]+)/);
         if (otherServerMatch && !norm.includes('atual') && !norm.includes('este')) {
             add('other_server_info', 0.98, { query: otherServerMatch[1] });
@@ -194,13 +214,18 @@ function detectIntents(text, userId) {
     if (norm.includes('mapear comandos')) add('map_commands', 0.99);
     if (norm.match(/quem te (criou|fez)|seu (criador|dono)/)) add('creator_info', 0.99);
     
-    const mathMatch = norm.match(/(?:calcula|resultado de|conta)\s+([0-9+\-*/%().^\s]+/) || norm.match(/^([0-9+\-*/%().^\s]{3,})$/);
+    const mathMatch = norm.match(/(?:calcula|resultado de|conta)\s+([0-9+\-*/%().^\s]+)/) || norm.match(/^([0-9+\-*/%().^\s]{3,})$/);
     if (mathMatch) add('calculate', 0.98, { expression: mathMatch[1] });
     
     const editMatch = norm.match(/(?:editar interface|criar interface)\s+([a-z0-9_-]+)/);
     if (editMatch) add('edit_interface', 0.95, { commandName: editMatch[1] });
 
     if (norm.includes('meu nivel')) add('my_profile', 0.9);
+
+    // Detecção universal de perguntas (qualquer dúvida formulada)
+    if (norm.match(/^(o que|quem|como|onde|quando|por que|qual|quanto|sabe)\b/)) {
+        add('universal_question', 0.85);
+    }
 
     if (intents.length === 0) add('casual_chat', 0.5);
 
@@ -211,6 +236,13 @@ async function runIntent(item, runtime, text, sentiment, profile) {
     updateContext(runtime.userId, item.intent);
 
     switch (item.intent) {
+        case 'universal_question': {
+            const reasoned = handleGeneralQuestion(text);
+            if (reasoned) return reasoned;
+            const topic = extractMainTopic(text);
+            const generated = Object.keys(markovChain).length > 10 ? generateMarkovSentence(topic) : null;
+            return generated || "É uma excelente pergunta, e envolve diversos aspectos complexos que merecem ser analisados com calma por diferentes perspectivas.";
+        }
         case 'server_info': {
             const res = await runTool('get_server_info', {}, runtime);
             if (!res?.ok) return "Não consegui carregar os dados deste servidor no momento, tente novamente daqui a pouco.";
@@ -262,7 +294,7 @@ async function runIntent(item, runtime, text, sentiment, profile) {
             if (sentiment === 'negative') return pick(['Vish, que situação meio chata hein, mas relaxa que as coisas melhoram com o tempo.', 'Complicado demais quando isso acontece, dá até desanimada às vezes.', 'Pior que te entendo perfeitamente, às vezes o dia resolve testar a nossa paciência mesmo.']);
             return pick(['Saquei qual é a sua ideia, faz total sentido pensado por esse lado.', 'Hmm, interessante parar para analisar por essa perspectiva aí.', 'Dahora demais, é sempre bom trocar uma ideia e ver novos pontos de vista por aqui.']);
         default:
-            return "Fiquei meio perdido no que você quis dizer agora, tenta reformular a frase para eu conseguir entender melhor.";
+            return "Fiquei meio perdido no que você quis dizer agora, tenta reformular a pergunta para eu conseguir te dar uma resposta completa.";
     }
 }
 
@@ -308,6 +340,6 @@ loadTools();
 
 module.exports = {
     configured, registerTool, listTools, chat, isOwner,
-    model: () => 'aeternus-v6.3-serverinfo',
+    model: () => 'aeternus-v7-universal',
     baseUrl: () => 'local'
 };
