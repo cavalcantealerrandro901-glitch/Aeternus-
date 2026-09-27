@@ -1,6 +1,9 @@
-const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const { parseAmount, resolveBet, looksLikeAmount } = require('../utils/parseAmount');
+
+/** Cargo autorizado a remover éter */
+const ALLOWED_ROLE_ID = '1553858768708706404';
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -10,9 +13,17 @@ function pickAmount(args) {
     return args.find((a) => !a.startsWith('<@') && looksLikeAmount(a)) || null;
 }
 
+function hasAllowedRole(member) {
+    if (!member) return false;
+    if (member.roles?.cache?.has(ALLOWED_ROLE_ID)) return true;
+    const roles = member.roles?.cache || member._roles || [];
+    if (Array.isArray(roles)) return roles.map(String).includes(ALLOWED_ROLE_ID);
+    return false;
+}
+
 async function run(modMember, target, amountRaw, reply) {
-    if (!modMember?.permissions?.has(PermissionFlagsBits.Administrator)) {
-        return reply('❌ Só administradores.');
+    if (!hasAllowedRole(modMember)) {
+        return reply('❌ Você não tem permissão para usar este comando.');
     }
     if (!target) return reply('❌ Informe o usuário. Ex.: `O.removemoney @user half`');
     if (!amountRaw) {
@@ -40,7 +51,7 @@ async function run(modMember, target, amountRaw, reply) {
                             `**${target.tag || target.username}** · ✨ **-${fmt(take)}**\n` +
                                 `Saldo: **${fmt(eter.get(target.id))}**`
                         )
-                        .setFooter({ text: `Mod: ${modMember.user?.tag || 'admin'}` })
+                        .setFooter({ text: `Mod: ${modMember.user?.tag || 'staff'}` })
                         .setTimestamp()
                 ]
             });
@@ -58,7 +69,7 @@ async function run(modMember, target, amountRaw, reply) {
                     `**${target.tag || target.username}** · ✨ **-${fmt(bet.amount)}**\n` +
                         `Saldo: **${fmt(eter.get(target.id))}**`
                 )
-                .setFooter({ text: `Mod: ${modMember.user?.tag || 'admin'}` })
+                .setFooter({ text: `Mod: ${modMember.user?.tag || 'staff'}` })
                 .setTimestamp()
         ]
     });
@@ -67,7 +78,7 @@ async function run(modMember, target, amountRaw, reply) {
 module.exports = {
     name: 'removemoney',
     aliases: ['removeeter', 'takemoney', 'remover-eter'],
-    description: 'Remover éter (admin) — all/half/k/m…',
+    description: 'Remover éter (cargo autorizado) — all/half/k/m…',
     data: new SlashCommandBuilder()
         .setName('remover-eter')
         .setDescription('Remover éter de um usuário')
@@ -77,8 +88,7 @@ module.exports = {
                 .setName('valor')
                 .setDescription('Valor: 1k, all, half, 50%…')
                 .setRequired(true)
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        ),
 
     async execute(message, args) {
         const target = message.mentions.users.first();
