@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.9 (Context Awareness & Deep History Engine)
+ * Aeternus Engine v7.10 (Autonomous Response Enhancer & Smart Intent Chaining)
  */
 
 const fs = require('fs');
@@ -78,7 +78,7 @@ function updatePersistentHistory(userId, text, intent) {
     if (!profile.history) profile.history = [];
     
     profile.history.push({ text, intent, timestamp: Date.now() });
-    if (profile.history.length > 8) profile.history.shift(); // Histórico expandido para 8 mensagens
+    if (profile.history.length > 10) profile.history.shift(); // Histórico expandido para 10 mensagens
     saveData();
 }
 
@@ -130,12 +130,9 @@ async function runTool(name, args, runtime) {
 
 function detectIntents(text, profile) {
     const norm = normalizeText(text);
-    const history = profile?.history || [];
-    const lastIntent = history.length > 0 ? history[history.length - 1].intent : null;
 
-    // Se a mensagem for curta e houver histórico recente, herda o contexto anterior se fizer sentido
-    if (norm.length < 10 && lastIntent && ['dictionary_lookup', 'calculate'].includes(lastIntent)) {
-        if (lastIntent === 'dictionary_lookup') return { intent: 'dictionary_lookup', score: 0.95, word: norm };
+    if (norm.match(/meu nivel|minha ficha|meus status|meu perfil/)) {
+        return { intent: 'user_profile', score: 0.99 };
     }
 
     const dictMatch = norm.match(/(?:significa|significado de|defina|definicao de|o que e|pesquise a palavra|pesquisar)\s+([a-zà-ú]+)/);
@@ -144,58 +141,62 @@ function detectIntents(text, profile) {
     if (norm.match(/como vc ta|como voce esta|seu humor/)) return { intent: 'bot_mood', score: 0.95 };
     if (norm.match(/quem te (criou|fez)|seu (criador|dono)/)) return { intent: 'creator_info', score: 0.95 };
 
-    const mathMatch = norm.match(/(?:calcula|resultado de|conta)\s+([0-9+\-*/%().^\s]+)/);
-    if (mathMatch) return { intent: 'calculate', score: 0.95, expression: mathMatch[1] };
+    const mathMatch = norm.match(/(?:calcula|resultado de|conta)\s+([0-9+\-*/%().^\s]+)/) || norm.match(/^([0-9+\-*/%().^\s]{3,})$/);
+    if (mathMatch) return { intent: 'calculate', score: 0.95, expression: mathMatch[1] || mathMatch[0] };
 
-    return { intent: 'contextual_reply', score: 0.8 };
+    return { intent: 'autonomous_reply', score: 0.8 };
 }
 
 async function runIntent(item, runtime, text, profile) {
     updatePersistentHistory(runtime.userId, text, item.intent);
 
-    const title = profile.level >= 5 ? "Lendário" : profile.level >= 3 ? "Veterano" : "Novato";
-    const tonePrefix = profile.affinity > 75 ? `Meu parceiro ${profile.name} (${title})! ` : "";
+    const title = profile.level >= 5 ? "Lendário 🌟" : profile.level >= 3 ? "Veterano 🛡️" : "Novato ⚡";
+    const tonePrefix = profile.affinity > 75 ? `Meu grande parceiro ${profile.name} (${title})! ` : "";
 
     switch (item.intent) {
+        case 'user_profile':
+            return `${tonePrefix}📊 **Sua Ficha Atualizada:**\n` +
+                   `• **Nível:** ${profile.level}\n` +
+                   `• **XP:** ${profile.xp} / ${profile.level * 100}\n` +
+                   `• **Afinidade:** ${profile.affinity}%\n` +
+                   `• **Interações:** ${profile.interactions} msgs 🚀`;
         case 'dictionary_lookup': {
             const word = item.word;
             const definition = await fetchWordDefinition(word);
             if (definition) {
-                return `${tonePrefix}📖 **Significado de "${word}":**\n> *${definition}*\n\n💡 Analisado com sucesso! Quer pesquisar mais algum termo? ✨`;
+                return `${tonePrefix}📖 **Dicionário Aeternus — "${word}":**\n> *${definition}*\n\n💡 Definição processada com sucesso! O que mais deseja consultar? ✨`;
             }
-            return `🤔 Poxa, não encontrei a definição exata de "${word}". Tenta outra palavra parecida! 🔍`;
+            return `🤔 Não encontrei registros para "${word}". Tente outra palavra! 🔍`;
         }
         case 'bot_mood':
             return pick([
-                `${tonePrefix}🤖 Sistemas operando a 100%, com inteligência contextual ativa e prontos para a ação! 🔥`,
-                `${tonePrefix}🚀 Tudo nos trinques por aqui! Servidores conectados e energia lá em cima! 😎⚡`,
-                `${tonePrefix}🌟 Neural engine estável e processando com total fluidez! 🦾`
+                `${tonePrefix}🤖 Sistemas em regime v7.10 total! Neural engine autônoma operando a pleno vapor. 🔥`,
+                `${tonePrefix}🚀 Tudo impecável por aqui! Servidores sincronizados e prontos para qualquer desafio. 😎⚡`,
+                `${tonePrefix}🌟 Núcleo de processamento inteligente ativo e integrado com sucesso! 🦾`
             ]);
         case 'creator_info':
-            return ownerId() ? `${tonePrefix}👑 Desenvolvido pelo mestre <@${ownerId()}> com tecnologias de ponta! 💻✨` : "🏷️ Criador não configurado. ⚙️";
+            return ownerId() ? `${tonePrefix}👑 Desenvolvido pelo mestre <@${ownerId()}> com arquitetura de alta performance! 💻✨` : "🏷️ Criador não configurado. ⚙️";
         case 'calculate':
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
-            return calcRes.ok ? `${tonePrefix}🧮 O resultado matemático é **${calcRes.result}**! 🚀✨` : `⚠️ ${calcRes.error}`;
-        case 'contextual_reply': {
+            return calcRes.ok ? `${tonePrefix}🧮 Resultado matemático computado: **${calcRes.result}** 🚀✨` : `⚠️ ${calcRes.error}`;
+        case 'autonomous_reply': {
             const topic = extractMainTopic(text);
-            const recentHistory = profile.history.slice(-3).map(h => h.text).join(' ');
-            
             if (topic) {
                 const def = await fetchWordDefinition(topic);
                 if (def) {
-                    return `${tonePrefix}🧠 Pelo que você comentou sobre **${topic}**, notei conexão com nossa conversa anterior. No dicionário: *${def.slice(0, 140)}...* Faz todo sentido! 🎯🔥`;
+                    return `${tonePrefix}🧠 Analisando o conceito de **${topic}** no seu argumento, encontrei referências diretas: *${def.slice(0, 130)}...* Fascinante como isso se conecta com o que você disse! 🎯🔥`;
                 }
-                return `${tonePrefix}💬 Capturado o contexto sobre **${topic}** considerando suas últimas mensagens ("*${recentHistory.slice(0, 60)}...*"). É um ponto fortíssimo! O que acha de explorarmos mais? 🤔✨`;
+                return `${tonePrefix}💬 Excelente ponto sobre **${topic}**! Nossa engine autônoma está processando essa linha de pensamento. Como você quer expandir isso? 🤔✨`;
             }
             return pick([
-                `${tonePrefix}🎯 Entendi exatamente onde você quer chegar! Como deseja prosseguir?`,
-                `${tonePrefix}🔥 Excelente linha de raciocínio! Quer aprofundar mais esse ponto?`,
-                `${tonePrefix}⚡ Captado! Com base no que conversamos, sua visão faz todo sentido. O que mais manda?`,
-                `${tonePrefix}✨ Perspectiva fantástica e muito bem estruturada! 🚀`
+                `${tonePrefix}🎯 Compreendi exatamente a sua visão! Como podemos avançar nisso?`,
+                `${tonePrefix}🔥 Ótima linha de raciocínio! Quer que eu aprofunde mais aspectos sobre isso?`,
+                `${tonePrefix}⚡ Captado com sucesso! Sua argumentação está muito coerente. O que mais manda?`,
+                `${tonePrefix}✨ Perspectiva super criativa e rica em detalhes! 🚀`
             ]);
         }
         default:
-            return `${tonePrefix}🤔 Achei essa colocação bem interessante! Pode detalhar um pouco mais? 💡`;
+            return `${tonePrefix}🤔 Achei essa colocação muito profunda! Pode detalhar um pouco mais para mim? 💡`;
     }
 }
 
@@ -232,6 +233,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.9-deep-context',
+    model: () => 'aeternus-v7.10-autonomous',
     baseUrl: () => 'local'
 };
