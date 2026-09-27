@@ -108,7 +108,7 @@ const CATEGORIES = {
             { name: 'avatar', desc: 'Ver avatar', usage: 'avatar [@user]', example: 'O.avatar @user', about: 'Mostra o avatar em alta resolução.' },
             { name: 'userinfo', desc: 'Info do usuário', usage: 'userinfo [@user]', example: 'O.userinfo @user', about: 'ID, data da conta, entrada e cargos.' },
             { name: 'serverinfo', desc: 'Info do servidor', usage: 'serverinfo', example: 'O.serverinfo', about: 'Resumo do servidor (membros, canais, etc.).' },
-            { name: 'rank', desc: 'Ranking', usage: 'rank [global|local|xp|xp global]', example: 'O.rank xp global', about: 'Ranking de éter global/local ou XP do servidor/global.' },
+            { name: 'rank', desc: 'Ranking', usage: 'rank [global|local|xp|xp global]', example: 'O.rank xp global', about: 'Ranking de éter global/local ou XP do servidor/global (O.topxp).' },
             { name: 'msg', desc: 'Contagem de mensagens', usage: 'msg [@user]', example: 'O.msg', about: 'Mensagens de hoje, semana, mês e total.' },
             { name: 'contagem', desc: 'Definir contagem', usage: 'contagem [número]', example: 'O.contagem 10', about: 'Define o próximo número do canal de contagem (staff).' }
         ]
@@ -176,6 +176,9 @@ function findCommand(query) {
         ui: 'userinfo',
         si: 'serverinfo',
         top: 'rank',
+        topxp: 'rank',
+        rankxp: 'rank',
+        xpglobal: 'rank',
         lb: 'rank',
         roubar: 'rob',
         steal: 'rob',
