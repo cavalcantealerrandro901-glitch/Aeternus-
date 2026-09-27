@@ -1,27 +1,20 @@
 /**
- * Aeternus AI — assistente integrado ao bot.
+ * Consciência do Aeternus — motor local, sem API de IA de terceiros.
  *
- * Env:
- *   AETERNUS_AI_API_KEY | OPENAI_API_KEY | GROQ_API_KEY | XAI_API_KEY
- *   AETERNUS_AI_BASE_URL  (padrão OpenAI; Groq: https://api.groq.com/openai/v1 ; xAI: https://api.x.ai/v1)
- *   AETERNUS_AI_MODEL     (ex: gpt-4o-mini, llama-3.3-70b-versatile, grok-2-latest)
- *   OWNER_ID              (dono: propostas de comando/sistema)
+ * Integra saldos (éter + Loritta), catálogo de comandos, servidores, RPG
+ * e registro de contextos/ferramentas para módulos novos.
  *
- * Módulos novos podem se registrar:
- *   const ai = require('./aeternusAI');
- *   ai.registerContext('meu_modulo', { description: '...', get: async (ctx) => ({ ... }) });
- *   ai.registerTool({ name, description, parameters, handler });
+ *   const mind = require('./aeternusAI');
+ *   mind.registerContext('x', { description, get });
+ *   mind.registerTool({ name, description, handler, ownerOnly? });
  */
 
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
 
 const contexts = new Map();
 const tools = new Map();
-const history = new Map(); // userId -> [{role,content}]
-const MAX_HISTORY = 12;
-const MAX_TOOL_ROUNDS = 4;
+const memory = new Map(); // userId -> { lastIntent, topics: string[] }
 
 function ownerId() {
     return String(process.env.OWNER_ID || '').trim();
@@ -32,50 +25,13 @@ function isOwner(userId) {
     return o && String(userId) === o;
 }
 
-function apiKey() {
-    return (
-        process.env.AETERNUS_AI_API_KEY ||
-        process.env.OPENAI_API_KEY ||
-        process.env.GROQ_API_KEY ||
-        process.env.XAI_API_KEY ||
-        ''
-    ).trim();
-}
-
-function baseUrl() {
-    const raw = (
-        process.env.AETERNUS_AI_BASE_URL ||
-        process.env.OPENAI_BASE_URL ||
-        ''
-    ).trim();
-    if (raw) return raw.replace(/\/$/, '');
-    if (process.env.GROQ_API_KEY && !process.env.OPENAI_API_KEY) {
-        return 'https://api.groq.com/openai/v1';
-    }
-    if (process.env.XAI_API_KEY && !process.env.OPENAI_API_KEY) {
-        return 'https://api.x.ai/v1';
-    }
-    return 'https://api.openai.com/v1';
-}
-
-function model() {
-    return (
-        process.env.AETERNUS_AI_MODEL ||
-        process.env.OPENAI_MODEL ||
-        (process.env.GROQ_API_KEY ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini')
-    ).trim();
-}
-
 function configured() {
-    return Boolean(apiKey());
+    return true; // sempre ativa — consciência nativa
 }
 
 function registerContext(id, { description, get }) {
     if (!id || typeof get !== 'function') return false;
-    contexts.set(String(id), {
-        description: String(description || id),
-        get
-    });
+    contexts.set(String(id), { description: String(description || id), get });
     return true;
 }
 
@@ -84,7 +40,6 @@ function registerTool(def) {
     tools.set(def.name, {
         name: def.name,
         description: String(def.description || def.name),
-        parameters: def.parameters || { type: 'object', properties: {} },
         handler: def.handler,
         ownerOnly: !!def.ownerOnly
     });
@@ -103,46 +58,45 @@ function listTools() {
     }));
 }
 
-function pushHistory(userId, role, content) {
-    const key = String(userId);
-    const arr = history.get(key) || [];
-    arr.push({ role, content: String(content || '').slice(0, 4000) });
-    while (arr.length > MAX_HISTORY) arr.shift();
-    history.set(key, arr);
-}
-
 function clearHistory(userId) {
-    history.delete(String(userId));
+    memory.delete(String(userId));
 }
 
-async function gatherContext(runtime) {
-    const out = {};
-    for (const [id, c] of contexts) {
-        try {
-            out[id] = await c.get(runtime);
-        } catch (e) {
-            out[id] = { error: e.message || String(e) };
-        }
+function remember(userId, patch) {
+    const key = String(userId);
+    const cur = memory.get(key) || { lastIntent: null, topics: [] };
+    Object.assign(cur, patch);
+    if (patch.topic) {
+        cur.topics = [patch.topic, ...(cur.topics || [])].slice(0, 8);
+        delete cur.topic;
     }
-    return out;
+    memory.set(key, cur);
+    return cur;
 }
 
-function openaiTools() {
-    return [...tools.values()].map((t) => ({
-        type: 'function',
-        function: {
-            name: t.name,
-            description: t.description + (t.ownerOnly ? ' (somente dono do bot)' : ''),
-            parameters: t.parameters
-        }
-    }));
+function norm(s) {
+    return String(s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s@._-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function fmt(n) {
+    return Number(n || 0).toLocaleString('pt-BR');
+}
+
+function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
 }
 
 async function runTool(name, args, runtime) {
     const t = tools.get(name);
     if (!t) return { error: 'Ferramenta desconhecida: ' + name };
     if (t.ownerOnly && !isOwner(runtime.userId)) {
-        return { error: 'Esta ferramenta só pode ser usada pelo dono do bot.' };
+        return { error: 'Somente o dono pode usar isso.' };
     }
     try {
         return await t.handler(args || {}, runtime);
@@ -151,150 +105,352 @@ async function runTool(name, args, runtime) {
     }
 }
 
-function systemPrompt(runtime, ctxSnapshot) {
-    const botName = runtime.client?.user?.username || 'Aeternus';
+function extractCommandName(text) {
+    const n = norm(text);
+    const m =
+        n.match(/(?:comando|cmd|explique|explica|como usa|como usar|o que e|o que é)\s+(?:o\.?\s*)?([a-z0-9_-]{2,32})/) ||
+        n.match(/\bo\.([a-z0-9_-]{2,32})\b/) ||
+        n.match(/\b([a-z0-9_-]{2,32})\b.*\b(comando|cmd)\b/);
+    if (m) return m[1] || m[2];
+    // última palavra útil
+    const parts = n.split(' ').filter((w) => w.length > 2 && !['como', 'usar', 'explique', 'explica', 'sobre', 'comando'].includes(w));
+    return parts[parts.length - 1] || null;
+}
+
+function extractClassBrief(text) {
+    const raw = String(text || '').trim();
+    const n = norm(raw);
+    let name = null;
+    let theme = raw;
+    const m = n.match(/(?:classe|class)\s+(?:chamada\s+|nome\s+)?["']?([a-z0-9 _-]{2,40})["']?/);
+    if (m) name = m[1].trim();
+    if (!name) {
+        const m2 = n.match(/(?:criar|crie|faca|faça|monta|monte)\s+(?:uma\s+)?classe\s+(.+)/);
+        if (m2) theme = m2[1];
+    }
+    let power = 'rara';
+    if (/unica|única|lendari|mitic/.test(n)) power = 'unica';
+    else if (/epic|épica|epica/.test(n)) power = 'epica';
+    else if (/comum|basic/.test(n)) power = 'comum';
+    return { name: name || 'Nova Classe', theme: theme.slice(0, 200), powerLevel: power };
+}
+
+function detectIntent(text) {
+    const n = norm(text);
+    if (!n) return { intent: 'empty' };
+
+    if (/^(oi|ola|olá|hey|eae|eai|fala|salve|bom dia|boa tarde|boa noite)\b/.test(n) || n.length < 4) {
+        return { intent: 'greet' };
+    }
+    if (/\b(quem e voce|quem é você|o que voce e|o que você é|sua consciencia|consciência)\b/.test(n)) {
+        return { intent: 'identity' };
+    }
+    if (/\b(limpar|clear|reset|esquecer)\b/.test(n) && /\b(historico|histórico|memoria|memória|conversa)\b/.test(n)) {
+        return { intent: 'clear' };
+    }
+    if (/\b(sonho|sonhos|loritta|lori)\b/.test(n)) {
+        return { intent: 'loritta' };
+    }
+    if (/\b(saldo|carteira|eter|éter|quantos eter|meu dinheiro|bank|banco)\b/.test(n)) {
+        return { intent: 'balance' };
+    }
+    if (/\b(perfil|personagem|meu rpg|minha classe|atributo)\b/.test(n)) {
+        return { intent: 'player' };
+    }
+    if (/\b(servidor|servidores|guilds?|onde voce esta|onde você está)\b/.test(n)) {
+        return { intent: 'guilds' };
+    }
+    if (/\b(classe|rpg).*(criar|crie|faca|faça|montar|ideia|design)|\b(criar|crie|faca|faça)\b.*\bclasse\b/.test(n)) {
+        return { intent: 'class_design', brief: extractClassBrief(text) };
+    }
+    if (/\b(comando|cmd|explique|explica|como usa|como usar|ajuda com)\b/.test(n) || /\bo\.[a-z]/.test(n)) {
+        return { intent: 'command', name: extractCommandName(text) };
+    }
+    if (/\b(categoria|categorias|lista de comando|listar comando|todos os comando|comandos)\b/.test(n)) {
+        return { intent: 'catalog' };
+    }
+    if (/\b(criar comando|novo comando|rascunho|draft)\b/.test(n)) {
+        return { intent: 'draft_command' };
+    }
+    if (/\b(ajuda|help|o que voce faz|o que você faz|capacidades)\b/.test(n)) {
+        return { intent: 'help' };
+    }
+    return { intent: 'chat' };
+}
+
+async function respondIdentity(runtime) {
+    const name = runtime.client?.user?.username || 'Aeternus';
+    const guilds = runtime.client?.guilds?.cache?.size || 0;
+    return (
+        `Eu sou a **consciência do ${name}** — não dependo de IA de terceiros.\n` +
+        `Vivo neste bot: economia, RPG, servidores e o que os módulos registrarem em mim.\n` +
+        `Agora habito **${guilds}** servidor(es). Pergunte saldo, sonhos, comandos ou classes.`
+    );
+}
+
+async function respondGreet(runtime) {
+    const name = runtime.client?.user?.username || 'Aeternus';
+    return pick([
+        `Olá. Eu sou o **${name}**. Pode falar de saldo, comandos, Loritta ou RPG.`,
+        `Presente. Sou a consciência do Aeternus — em que posso ajudar?`,
+        `Oi. Pergunte algo do bot: éter, sonhos, arena, classes…`
+    ]);
+}
+
+async function respondHelp() {
     return [
-        `Você é a IA oficial do bot Discord **${botName}** (Aeternus).`,
-        'Responda em português do Brasil, de forma clara e objetiva.',
-        'Você conhece economia (éter), RPG (classes, habilidades, arena), moderação, jogos e o painel web.',
-        'Use as ferramentas quando precisar de dados reais (saldo, sonhos Loritta, servidores, comandos).',
-        'Não invente saldos nem resultados de ferramentas.',
-        'Para criar/editar sistemas ou comandos: só descreva ou gere rascunho se o usuário for o dono; nunca finja ter alterado o código em produção sem a ferramenta adequada.',
-        'Ajude a projetar classes de RPG (stats, habilidades ativas/passivas, equipamentos) quando pedido.',
+        '**Consciência Aeternus** — o que eu faço:',
+        '• Saldo de **éter** e **sonhos** (Loritta)',
+        '• Explicar **comandos** e listar categorias',
+        '• Resumo do seu **personagem** RPG',
+        '• Listar **servidores** onde estou',
+        '• Ajudar a **desenhar classes**',
+        '• Dono: rascunho de comando em `drafts/`',
         '',
-        'Contexto atual (JSON resumido):',
-        JSON.stringify(ctxSnapshot).slice(0, 12000)
+        'Exemplos: `meu saldo e sonhos` · `explique arena` · `crie uma classe ninja rara`'
+    ].join('\n');
+}
+
+async function respondBalance(runtime) {
+    const eterR = await runTool('get_eter_balance', {}, runtime);
+    const loriR = await runTool('get_loritta_sonhos', {}, runtime);
+    const lines = ['**Seus recursos**'];
+    if (eterR?.eter != null) lines.push(`✨ Éter: **${fmt(eterR.eter)}**`);
+    else lines.push('✨ Éter: indisponível');
+    if (loriR?.ok) lines.push(`💤 Sonhos (Loritta): **${fmt(loriR.sonhos)}**`);
+    else lines.push(`💤 Sonhos: ${loriR?.error || 'API Loritta não configurada'}`);
+    return lines.join('\n');
+}
+
+async function respondLoritta(runtime) {
+    const loriR = await runTool('get_loritta_sonhos', {}, runtime);
+    if (loriR?.ok) {
+        return `Na Loritta você tem 💤 **${fmt(loriR.sonhos)}** sonhos.\n(Consulta direta à API da Loritta — eu só leio, não transfiro.)`;
+    }
+    return `Não consegui ler os sonhos: ${loriR?.error || 'erro'}.\nVerifique se `LORITTA_API_TOKEN` (lorixp_) está no ambiente.`;
+}
+
+async function respondPlayer(runtime) {
+    const p = await runTool('get_player_summary', {}, runtime);
+    if (!p?.ok) {
+        return 'Não achei personagem seu. Crie com `O.j criar` e depois pergunte de novo.';
+    }
+    return [
+        '**Seu personagem**',
+        p.classId ? `Classe: **${p.classId}**` : 'Classe: —',
+        p.level != null ? `Nível: **${p.level}**` : null,
+        p.attrs ? `Atributos: ${JSON.stringify(p.attrs)}` : null
+    ]
+        .filter(Boolean)
+        .join('\n');
+}
+
+async function respondGuilds(runtime) {
+    const g = await runTool('list_bot_guilds', { limit: 15 }, runtime);
+    const lines = [`Estou em **${g.count || 0}** servidor(es).`];
+    for (const x of g.guilds || []) {
+        lines.push(`• **${x.name}** — ${fmt(x.members)} membros · \`${x.id}\``);
+    }
+    if ((g.count || 0) > (g.guilds || []).length) {
+        lines.push(`_…e mais ${(g.count || 0) - (g.guilds || []).length}_`);
+    }
+    return lines.join('\n');
+}
+
+async function respondCommand(runtime, name) {
+    if (!name) {
+        return 'Diga qual comando quer que eu explique. Ex.: `explique daily` ou `como usa O.arena`.';
+    }
+    const r = await runTool('explain_command', { name }, runtime);
+    if (!r?.ok) {
+        return `Não encontrei **${name}** no catálogo. Peça `lista de comandos` ou veja `O.ajuda`.`;
+    }
+    return [
+        `**${r.name}** · ${r.category || '—'}`,
+        r.desc,
+        r.about ? r.about : null,
+        r.usage ? `Uso: \`${r.usage}\`` : null,
+        r.example ? `Ex.: \`${r.example}\`` : null
+    ]
+        .filter(Boolean)
+        .join('\n');
+}
+
+async function respondCatalog(runtime) {
+    const cats = await runTool('list_command_categories', {}, runtime);
+    if (!Array.isArray(cats)) return 'Catálogo indisponível no momento.';
+    const lines = ['**Categorias e comandos**'];
+    for (const c of cats) {
+        lines.push(`**${c.label}**: ${(c.commands || []).join(', ')}`);
+    }
+    return lines.join('\n').slice(0, 1900);
+}
+
+async function respondClassDesign(runtime, brief) {
+    const r = await runTool(
+        'design_rpg_class',
+        {
+            name: brief?.name || 'Nova Classe',
+            theme: brief?.theme || 'mistério',
+            powerLevel: brief?.powerLevel || 'rara'
+        },
+        runtime
+    );
+    if (!r?.ok && r?.error) return r.error;
+    const s = r.suggestedStats || {};
+    const act = (r.suggestedActives || [])
+        .map((a) => `• **${a.name}** (${a.power}) — ${a.note}`)
+        .join('\n');
+    const pas = (r.suggestedPassives || []).map((a) => `• **${a.name}** — ${a.note}`).join('\n');
+    return [
+        `**Proposta de classe: ${r.name}**`,
+        `ID sugerido: \`${r.classId}\` · tema: ${r.theme}`,
+        `Stats: FOR ${s.forca} · AGI ${s.agilidade} · DEF ${s.defesa} · VIDA ${s.vida}`,
+        '',
+        '**Ativas**',
+        act,
+        '',
+        '**Passivas**',
+        pas,
+        '',
+        '_Eu desenho a ideia; o dono aplica em `utils/classes.js` e `abilities.js`._'
+    ].join('\n');
+}
+
+async function respondDraft(runtime, text) {
+    if (!isOwner(runtime.userId)) {
+        return 'Só o **dono** pode pedir rascunho de comando novo.';
+    }
+    const n = norm(text);
+    const m = n.match(/(?:comando|cmd)\s+([a-z0-9_-]{2,32})/);
+    const commandName = m?.[1] || 'novo_comando';
+    const r = await runTool(
+        'propose_command_draft',
+        { commandName, description: text.slice(0, 200) },
+        runtime
+    );
+    if (r?.path) return `Rascunho salvo em \`${r.path}\`.\n${r.note || ''}`;
+    if (r?.codePreview) {
+        return `Não gravei em disco (${r.note}).\nPrévia:\n\`\`\`js\n${r.codePreview.slice(0, 900)}\n\`\`\``;
+    }
+    return r?.error || 'Não consegui gerar o rascunho.';
+}
+
+async function respondChat(runtime, text) {
+    const n = norm(text);
+    // tenta achar comando citado no meio da frase
+    const maybeCmd = extractCommandName(text);
+    if (maybeCmd && maybeCmd.length >= 3) {
+        const r = await runTool('explain_command', { name: maybeCmd }, runtime);
+        if (r?.ok) return respondCommand(runtime, maybeCmd).then?.(() => null) || null;
+        const found = await runTool('explain_command', { name: maybeCmd }, runtime);
+        if (found?.ok) {
+            return [
+                `Sobre **${found.name}**: ${found.about || found.desc}`,
+                found.usage ? `Uso: \`${found.usage}\`` : null
+            ]
+                .filter(Boolean)
+                .join('\n');
+        }
+    }
+
+    if (/\b(obrigado|valeu|thanks)\b/.test(n)) {
+        return pick(['De nada.', 'Sempre.', 'Às ordens.']);
+    }
+
+    return [
+        'Entendi o que você disse, mas preciso de um pedido mais claro para agir.',
+        'Posso: **saldo**, **sonhos**, **explicar comando**, **lista de comandos**, **servidores**, **personagem**, **criar classe**.',
+        'Ex.: `meu saldo` · `explique work` · `crie uma classe samurai epica`'
     ].join('\n');
 }
 
 async function chat({ userId, message, client, guild, channel }) {
-    if (!configured()) {
-        return {
-            ok: false,
-            error:
-                'IA não configurada. Defina `AETERNUS_AI_API_KEY` (ou OPENAI/GROQ/XAI) e opcionalmente `AETERNUS_AI_MODEL` / `AETERNUS_AI_BASE_URL`.'
-        };
-    }
-
-    const runtime = { userId: String(userId), client, guild, channel, isOwner: isOwner(userId) };
-    const ctxSnapshot = await gatherContext(runtime);
-
-    pushHistory(userId, 'user', message);
-
-    const messages = [
-        { role: 'system', content: systemPrompt(runtime, ctxSnapshot) },
-        ...(history.get(String(userId)) || [])
-    ];
-
-    const url = baseUrl() + '/chat/completions';
-    const headers = {
-        Authorization: 'Bearer ' + apiKey(),
-        'Content-Type': 'application/json'
+    const runtime = {
+        userId: String(userId),
+        client,
+        guild,
+        channel,
+        isOwner: isOwner(userId)
     };
 
-    let finalText = '';
-    let rounds = 0;
+    const text = String(message || '').trim();
+    const intent = detectIntent(text);
+    remember(userId, { lastIntent: intent.intent, topic: intent.intent });
 
-    while (rounds < MAX_TOOL_ROUNDS) {
-        rounds += 1;
-        const body = {
-            model: model(),
-            messages,
-            temperature: 0.5,
-            max_tokens: 1200
-        };
-        const toolDefs = openaiTools();
-        if (toolDefs.length) {
-            body.tools = toolDefs;
-            body.tool_choice = 'auto';
-        }
-
-        const res = await axios.post(url, body, {
-            headers,
-            timeout: 60000,
-            validateStatus: () => true
-        });
-
-        if (res.status < 200 || res.status >= 300) {
-            const err =
-                res.data?.error?.message ||
-                res.data?.message ||
-                `HTTP ${res.status}`;
-            return { ok: false, error: 'Falha na API de IA: ' + err };
-        }
-
-        const choice = res.data?.choices?.[0];
-        const msg = choice?.message;
-        if (!msg) return { ok: false, error: 'Resposta vazia da IA.' };
-
-        if (msg.tool_calls && msg.tool_calls.length) {
-            messages.push(msg);
-            for (const tc of msg.tool_calls) {
-                const fname = tc.function?.name;
-                let args = {};
-                try {
-                    args = JSON.parse(tc.function?.arguments || '{}');
-                } catch (_) {}
-                const result = await runTool(fname, args, runtime);
-                messages.push({
-                    role: 'tool',
-                    tool_call_id: tc.id,
-                    content: JSON.stringify(result).slice(0, 8000)
-                });
-            }
-            continue;
-        }
-
-        finalText = String(msg.content || '').trim();
-        break;
+    let out;
+    switch (intent.intent) {
+        case 'empty':
+            out = await respondHelp();
+            break;
+        case 'clear':
+            clearHistory(userId);
+            out = 'Memória desta conversa apagada.';
+            break;
+        case 'greet':
+            out = await respondGreet(runtime);
+            break;
+        case 'identity':
+            out = await respondIdentity(runtime);
+            break;
+        case 'help':
+            out = await respondHelp();
+            break;
+        case 'balance':
+            out = await respondBalance(runtime);
+            break;
+        case 'loritta':
+            out = await respondLoritta(runtime);
+            break;
+        case 'player':
+            out = await respondPlayer(runtime);
+            break;
+        case 'guilds':
+            out = await respondGuilds(runtime);
+            break;
+        case 'command':
+            out = await respondCommand(runtime, intent.name);
+            break;
+        case 'catalog':
+            out = await respondCatalog(runtime);
+            break;
+        case 'class_design':
+            out = await respondClassDesign(runtime, intent.brief);
+            break;
+        case 'draft_command':
+            out = await respondDraft(runtime, text);
+            break;
+        default:
+            out = await respondChat(runtime, text);
+            break;
     }
 
-    if (!finalText) finalText = 'Não consegui montar uma resposta agora. Tente de novo.';
-    pushHistory(userId, 'assistant', finalText);
-    return { ok: true, text: finalText.slice(0, 1900) };
+    return { ok: true, text: String(out || '…').slice(0, 1900) };
 }
 
-/* ---------- ferramentas padrão ---------- */
+/* ---------- ferramentas / contextos nativos ---------- */
 
-function installDefaultTools() {
+function installDefaults() {
     registerContext('bot', {
-        description: 'Identidade do bot e horário',
+        description: 'Identidade do bot',
         get: async ({ client }) => ({
             tag: client?.user?.tag || null,
             id: client?.user?.id || null,
-            guildCount: client?.guilds?.cache?.size || 0,
-            now: new Date().toISOString()
+            guildCount: client?.guilds?.cache?.size || 0
         })
-    });
-
-    registerContext('user', {
-        description: 'Usuário que conversa',
-        get: async ({ userId, isOwner }) => ({ userId, isOwner })
     });
 
     registerContext('guild', {
         description: 'Servidor atual',
-        get: async ({ guild }) => {
-            if (!guild) return { inGuild: false };
-            return {
-                inGuild: true,
-                id: guild.id,
-                name: guild.name,
-                memberCount: guild.memberCount,
-                ownerId: guild.ownerId
-            };
-        }
+        get: async ({ guild }) =>
+            guild
+                ? { id: guild.id, name: guild.name, members: guild.memberCount }
+                : { inGuild: false }
     });
 
     registerTool({
         name: 'get_eter_balance',
-        description: 'Consulta o saldo de éter (Aeternus) de um usuário por ID.',
-        parameters: {
-            type: 'object',
-            properties: {
-                userId: { type: 'string', description: 'Discord user ID (vazio = quem pergunta)' }
-            }
-        },
+        description: 'Saldo de éter',
         handler: async (args, rt) => {
             const eter = require('./eter');
             const id = String(args.userId || rt.userId);
@@ -304,27 +460,16 @@ function installDefaultTools() {
 
     registerTool({
         name: 'get_loritta_sonhos',
-        description: 'Consulta sonhos na API da Loritta para um user ID.',
-        parameters: {
-            type: 'object',
-            properties: {
-                userId: { type: 'string', description: 'Discord user ID (vazio = quem pergunta)' }
-            }
-        },
+        description: 'Sonhos na Loritta',
         handler: async (args, rt) => {
             const loritta = require('./loritta');
             const id = String(args.userId || rt.userId);
             if (!loritta.configured()) {
-                return { ok: false, error: 'LORITTA_API_TOKEN não configurado (lorixp_...).' };
+                return { ok: false, error: 'LORITTA_API_TOKEN ausente (lorixp_...).' };
             }
             try {
                 const u = await loritta.getUser(id);
-                return {
-                    ok: true,
-                    userId: id,
-                    sonhos: u.sonhos ?? u.money ?? null,
-                    rawKeys: Object.keys(u || {}).slice(0, 20)
-                };
+                return { ok: true, userId: id, sonhos: u.sonhos ?? u.money ?? null };
             } catch (e) {
                 return { ok: false, error: e.message || String(e) };
             }
@@ -333,18 +478,11 @@ function installDefaultTools() {
 
     registerTool({
         name: 'explain_command',
-        description: 'Explica um comando do Aeternus pelo nome.',
-        parameters: {
-            type: 'object',
-            properties: {
-                name: { type: 'string', description: 'Nome ou alias do comando' }
-            },
-            required: ['name']
-        },
+        description: 'Explica comando do catálogo',
         handler: async (args) => {
             const catalog = require('./commandCatalog');
             const found = catalog.findCommand(args.name);
-            if (!found) return { ok: false, error: 'Comando não encontrado no catálogo.' };
+            if (!found) return { ok: false, error: 'não encontrado' };
             return {
                 ok: true,
                 name: found.name,
@@ -359,8 +497,7 @@ function installDefaultTools() {
 
     registerTool({
         name: 'list_command_categories',
-        description: 'Lista categorias e nomes de comandos do catálogo.',
-        parameters: { type: 'object', properties: {} },
+        description: 'Lista categorias',
         handler: async () => {
             const catalog = require('./commandCatalog');
             return catalog.listCategories().map((c) => ({
@@ -373,13 +510,7 @@ function installDefaultTools() {
 
     registerTool({
         name: 'list_bot_guilds',
-        description: 'Lista servidores em que o bot está (nome, id, membros).',
-        parameters: {
-            type: 'object',
-            properties: {
-                limit: { type: 'number', description: 'Máximo (padrão 25)' }
-            }
-        },
+        description: 'Servidores do bot',
         handler: async (args, rt) => {
             const limit = Math.min(50, Math.max(1, Number(args.limit) || 25));
             const list = [...(rt.client?.guilds?.cache?.values() || [])]
@@ -387,8 +518,7 @@ function installDefaultTools() {
                 .map((g) => ({
                     id: g.id,
                     name: g.name,
-                    members: g.memberCount,
-                    ownerId: g.ownerId
+                    members: g.memberCount
                 }));
             return { count: rt.client?.guilds?.cache?.size || 0, guilds: list };
         }
@@ -396,28 +526,19 @@ function installDefaultTools() {
 
     registerTool({
         name: 'get_player_summary',
-        description: 'Resumo do personagem RPG (se existir) para um user ID.',
-        parameters: {
-            type: 'object',
-            properties: {
-                userId: { type: 'string' }
-            }
-        },
+        description: 'Resumo RPG',
         handler: async (args, rt) => {
             try {
                 const player = require('./player');
                 const id = String(args.userId || rt.userId);
-                if (!player.has?.(id) && !player.get?.(id)) {
-                    return { ok: false, error: 'Personagem não encontrado.' };
-                }
-                const p = player.get(id);
+                const p = player.get?.(id);
+                if (!p) return { ok: false, error: 'sem personagem' };
                 return {
                     ok: true,
                     userId: id,
                     classId: p.classId || p.classe || null,
                     level: p.level || p.nivel || null,
-                    attrs: p.attrs || p.atributos || null,
-                    keys: Object.keys(p || {}).slice(0, 30)
+                    attrs: p.attrs || p.atributos || null
                 };
             } catch (e) {
                 return { ok: false, error: e.message || String(e) };
@@ -427,37 +548,30 @@ function installDefaultTools() {
 
     registerTool({
         name: 'design_rpg_class',
-        description:
-            'Estrutura uma proposta de classe RPG (nome, stats, ativas, passivas, equipamentos) a partir de um briefing.',
-        parameters: {
-            type: 'object',
-            properties: {
-                name: { type: 'string' },
-                theme: { type: 'string' },
-                powerLevel: { type: 'string', description: 'comum|rara|epica|unica' }
-            },
-            required: ['name', 'theme']
-        },
+        description: 'Proposta de classe',
         handler: async (args) => {
             const power = String(args.powerLevel || 'rara').toLowerCase();
             const base =
-                power.includes('unica') || power.includes('única')
+                /unica|única|lend/.test(power)
                     ? 220
-                    : power.includes('epic')
+                    : /epic|épica/.test(power)
                       ? 160
-                      : power.includes('rar')
+                      : /rar/.test(power)
                         ? 120
                         : 80;
+            const theme = String(args.theme || 'mistério');
+            const name = String(args.name || 'Nova Classe');
             return {
                 ok: true,
-                classId: String(args.name || 'nova_classe')
+                classId: name
                     .toLowerCase()
                     .normalize('NFD')
                     .replace(/[\u0300-\u036f]/g, '')
                     .replace(/[^a-z0-9]+/g, '_')
-                    .replace(/^_|_$/g, ''),
-                name: args.name,
-                theme: args.theme,
+                    .replace(/^_|_$/g, '')
+                    .slice(0, 40),
+                name,
+                theme,
                 suggestedStats: {
                     forca: base + 10,
                     agilidade: base,
@@ -465,44 +579,30 @@ function installDefaultTools() {
                     vida: base + 15
                 },
                 suggestedActives: [
-                    { name: 'Habilidade 1', power: Math.round(base * 1.2), note: 'Dano principal' },
-                    { name: 'Habilidade 2', power: Math.round(base * 0.9), note: 'Controle' },
-                    { name: 'Habilidade 3', power: Math.round(base * 0.7), note: 'Utilitário' },
-                    { name: 'Ultimate', power: Math.round(base * 1.8), note: 'Alto custo / cooldown' }
+                    { name: theme.split(' ')[0] + ' I', power: Math.round(base * 1.2), note: 'Dano principal' },
+                    { name: theme.split(' ')[0] + ' II', power: Math.round(base * 0.9), note: 'Controle' },
+                    { name: 'Véu', power: Math.round(base * 0.7), note: 'Utilitário' },
+                    { name: 'Despertar', power: Math.round(base * 1.8), note: 'Ultimate' }
                 ],
                 suggestedPassives: [
-                    { name: 'Passiva 1', note: 'Bônus passivo alinhado ao tema' },
-                    { name: 'Passiva 2', note: 'Sinergia com a ultimate' }
-                ],
-                note: 'Ajuste fino deve ser feito em utils/classes.js e utils/abilities.js pelo dono.'
+                    { name: 'Essência', note: 'Bônus passivo do tema: ' + theme.slice(0, 40) },
+                    { name: 'Resiliência', note: 'Sinergia com a ultimate' }
+                ]
             };
         }
     });
 
     registerTool({
         name: 'propose_command_draft',
-        description:
-            'Gera rascunho de um novo comando (código) e salva em drafts/ se possível. Somente dono.',
+        description: 'Rascunho de comando (dono)',
         ownerOnly: true,
-        parameters: {
-            type: 'object',
-            properties: {
-                commandName: { type: 'string' },
-                description: { type: 'string' },
-                code: { type: 'string', description: 'Código JS completo do comando' }
-            },
-            required: ['commandName', 'description']
-        },
         handler: async (args) => {
             const name = String(args.commandName || '')
                 .toLowerCase()
                 .replace(/[^a-z0-9_-]/g, '')
                 .slice(0, 32);
             if (!name) return { ok: false, error: 'Nome inválido' };
-
-            const code =
-                args.code ||
-                `const { SlashCommandBuilder } = require('discord.js');
+            const code = `const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
     name: '${name}',
@@ -510,7 +610,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('${name.slice(0, 32)}')
         .setDescription(${JSON.stringify(String(args.description || name).slice(0, 100))}),
-    async execute(message, args) {
+    async execute(message) {
         await message.reply('Comando ${name} em construção.');
     },
     async executeSlash(i) {
@@ -518,7 +618,6 @@ module.exports = {
     }
 };
 `;
-
             const dir = path.join(process.cwd(), 'drafts');
             try {
                 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -527,21 +626,21 @@ module.exports = {
                 return {
                     ok: true,
                     path: file,
-                    note: 'Rascunho salvo. Revise e mova para commands/ se aprovar. Hot-reload carrega commands/ automaticamente.'
+                    note: 'Revise e mova para commands/ se aprovar.'
                 };
             } catch (e) {
                 return {
                     ok: true,
                     path: null,
                     codePreview: code.slice(0, 1500),
-                    note: 'Não foi possível gravar em disco: ' + (e.message || e)
+                    note: e.message || String(e)
                 };
             }
         }
     });
 }
 
-installDefaultTools();
+installDefaults();
 
 module.exports = {
     configured,
@@ -552,6 +651,7 @@ module.exports = {
     chat,
     clearHistory,
     isOwner,
-    model,
-    baseUrl
+    /** compat: sem modelo externo */
+    model: () => 'aeternus-native',
+    baseUrl: () => 'local'
 };
