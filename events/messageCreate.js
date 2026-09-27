@@ -1,5 +1,6 @@
 const aeternusAI = require('../utils/aeternusAI');
 const { PermissionFlagsBits } = require('discord.js');
+const store = require('../utils/store'); // Importa o gerenciador de dados/store do bot
 
 module.exports = {
     name: 'messageCreate',
@@ -15,9 +16,18 @@ module.exports = {
             }
         }
 
-        const prefix = message.client.prefixDefault || 'O.';
+        // Obtém o prefixo personalizado do servidor (ou usa 'O.' como padrão global)
+        let prefix = message.client.prefixDefault || 'O.';
+        try {
+            if (store && typeof store.get === 'function') {
+                const guildConfig = await store.get(`guild_config_${message.guild.id}`);
+                if (guildConfig && guildConfig.prefix) {
+                    prefix = guildConfig.prefix;
+                }
+            }
+        } catch (_) {}
 
-        // 1. Se a mensagem começa com o prefixo do bot, deixa o handler de comandos original processar
+        // 1. Se a mensagem começa com o prefixo do servidor, processa o comando
         if (message.content.startsWith(prefix)) {
             const args = message.content.slice(prefix.length).trim().split(/ +/);
             const commandName = args.shift().toLowerCase();
