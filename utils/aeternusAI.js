@@ -1,7 +1,5 @@
 /**
- * Aeternus Engine v6.0 (O Ápice da Consciência)
- * Recursos: Humor Global Autônomo, Poda Sináptica (Forgetting), 
- * Extração Dinâmica de Tópicos e Geração Contextual Avançada.
+ * Aeternus Engine v6.1 (Com Suporte a Menção Obrigatória e Aprendizado Silencioso)
  */
 
 const fs = require('fs');
@@ -237,7 +235,7 @@ async function runIntent(item, runtime, text, sentiment, profile) {
     }
 }
 
-async function chat({ userId, message, client, guild, channel, messageId, author }) {
+async function chat({ userId, message, client, guild, channel, messageId, author, learnOnly }) {
     const text = String(message || '').trim();
     if (text.length < 3) return { ok: true, text: '?' };
 
@@ -259,6 +257,11 @@ async function chat({ userId, message, client, guild, channel, messageId, author
         }
     }
 
+    // Se a flag learnOnly for verdadeira, encerra aqui sem gerar texto de resposta
+    if (learnOnly) {
+        return { ok: true, text: null };
+    }
+
     const runtime = { userId: String(userId), client, guild, channel, messageId, isOwner: isOwner(userId) };
     const intent = detectIntents(text, userId);
     const responseText = await runIntent(intent, runtime, text, sentiment, profile);
@@ -275,6 +278,6 @@ loadTools();
 
 module.exports = {
     configured, registerTool, listTools, chat, isOwner,
-    model: () => 'aeternus-v6-apex',
+    model: () => 'aeternus-v6.1-mention',
     baseUrl: () => 'local'
 };
