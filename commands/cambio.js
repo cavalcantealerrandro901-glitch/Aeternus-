@@ -10,6 +10,8 @@ const { resolveBet } = require('../utils/parseAmount');
 const queue = require('../utils/waitQueue');
 
 const Q = 'cambio';
+/** ID oficial da Loritta no Discord */
+const LORITTA_BOT_ID = '297153970613387264';
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -28,39 +30,50 @@ function isStaff(userId) {
     return extra.includes(String(userId));
 }
 
-function rateEmbed() {
+/** Conta que recebe/envia sonhos no câmbio = o próprio bot Aeternus */
+function treasuryUserId(client) {
+    const env =
+        String(process.env.CAMBIO_BOT_ID || process.env.LORITTA_TREASURY_ID || '').trim();
+    if (env) return env;
+    return client?.user?.id ? String(client.user.id) : '';
+}
+
+function rateEmbed(client) {
     const rate = loritta.sonhosPerEter();
     const st = queue.stats(Q);
+    const botId = treasuryUserId(client);
     return new EmbedBuilder()
         .setColor(0xf472b6)
-        .setTitle('💱 Câmbio · Éter ⇄ Sonhos (Loritta)')
+        .setTitle('💱 Câmbio · Éter ⇄ Sonhos')
         .setDescription(
             [
-                'Câmbio por **fila de espera** + aprovação da staff.',
-                `(API da Loritta não transfere sonhos com token de usuário.)`,
+                'Troca entre **Éter (Aeternus)** e **Sonhos (Loritta)**.',
+                'Os sonhos vão para / vêm do **bot Aeternus** via Loritta — sem pagamento manual da staff.',
                 '',
                 `**Taxa:** \`1\` ✨ = **${fmt(rate)}** 💤`,
-                `**Fila agora:** **${st.waiting}** aguardando · **${st.serving}** em atendimento`,
+                `**Fila:** **${st.waiting}** aguardando · **${st.serving}** em atendimento`,
+                botId ? `**Tesouraria (bot):** <@${botId}>` : '',
+                `**Loritta:** <@${LORITTA_BOT_ID}>`,
                 '',
-                '**Usuário**',
-                '`O.cambio comprar <éter>` — entra na fila (Éter retido)',
-                '`O.cambio vender <sonhos>` — entra na fila (você envia +pay)',
-                '`O.cambio fila` — ver a fila e sua posição',
-                '`O.cambio sair` — sair da fila (reembolsa se compra)',
-                '`O.cambio saldo` — Éter + Sonhos',
+                '**Comandos**',
+                '`O.cambio comprar <éter>` — retém éter e solicita sonhos pela Loritta',
+                '`O.cambio vender <sonhos>` — você paga sonhos ao bot pela Loritta',
+                '`O.cambio fila` — posição na fila',
+                '`O.cambio sair` — sair (reembolsa compra)',
+                '`O.cambio saldo` — éter + sonhos',
                 '',
                 '**Staff**',
-                '`O.cambio proximo` — chama o próximo da fila',
-                '`O.cambio pedidos` — lista completa',
-                '',
-                '_Botões na mensagem do pedido para concluir/recusar._'
-            ].join('\n')
+                '`O.cambio proximo` — atende o próximo (processa transferência Loritta)',
+                '`O.cambio pedidos` — lista a fila'
+            ]
+                .filter(Boolean)
+                .join('\n')
         )
-        .setFooter({ text: 'Aeternus × Loritta · fila FIFO' })
+        .setFooter({ text: 'Aeternus × Loritta · transfer bot' })
         .setTimestamp();
 }
 
-function filaEmbed(client) {
+function filaEmbed() {
     const waiting = queue.listWaiting(Q);
     const st = queue.stats(Q);
     const lines = waiting.slice(0, 20).map((item, i) => {
@@ -88,8 +101,8 @@ function staffRow(id, type) {
     if (type === 'buy') {
         return new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('cambio:staff_paid:' + id)
-                .setLabel('Já enviei os sonhos')
+                .setCustomId('cambio:staff_done_buy:' + id)
+                .setLabel('Confirmar sonhos enviados (API)')
                 .setStyle(ButtonStyle.Success),
             new ButtonBuilder()
                 .setCustomId('cambio:staff_reject:' + id)
@@ -100,7 +113,7 @@ function staffRow(id, type) {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('cambio:staff_credit:' + id)
-            .setLabel('Creditar éter')
+            .setLabel('Creditar éter (sonhos no bot)')
             .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
             .setCustomId('cambio:staff_reject:' + id)
@@ -109,20 +122,82 @@ function staffRow(id, type) {
     );
 }
 
+/**
+ * Tenta enviar sonhos ao usuário via API Loritta (transfer do token / request).
+ * Destino de tesouraria nas vendas = bot Aeternus.
+ */
+async function trySendSonhosToUser(message, userId, sonhos) {
+    if (!loritta.configured() || !message.guild) {
+        return { ok: false, error: 'API Loritta não configurada ou fora de servidor.' };
+    }
+    const reason = 'Cambio Aeternus: compra de sonhos com eter';
+    // 1) transferência direta (só funciona com token de bot oficial)
+    try {
+        const tr = await loritta.transferSonhos({
+            guildId: message.guild.id,
+            channelId: message.channel.id,
+            receiverId: userId,
+            quantity: sonhos,
+            reason,
+            expiresAfterMillis: 30 * 60 * 1000
+        });
+        if (tr.ok) return { ok: true, mode: 'transfer', data: tr.data };
+    } catch (_) {}
+
+    // 2) solicitação (pagador = conta do token confirma na Loritta)
+    try {
+        const req = await loritta.requestSonhosTransfer({
+            guildId: message.guild.id,
+            channelId: message.channel.id,
+            senderId: treasuryUserId(message.client) || ownerId(),
+            receiverId: userId,
+            quantity: sonhos,
+            reason,
+            expiresAfterMillis: 30 * 60 * 1000
+        });
+        if (req.ok) return { ok: true, mode: 'request', data: req.data };
+        return { ok: false, error: req.error || 'Falha na solicitação' };
+    } catch (e) {
+        return { ok: false, error: e.message || String(e) };
+    }
+}
+
+async function tryRequestUserPayBot(message, userId, botId, sonhos) {
+    if (!loritta.configured() || !message.guild) {
+        return { ok: false, error: 'API Loritta não configurada.' };
+    }
+    try {
+        const req = await loritta.requestSonhosTransfer({
+            guildId: message.guild.id,
+            channelId: message.channel.id,
+            senderId: userId,
+            receiverId: botId,
+            quantity: sonhos,
+            reason: 'Cambio Aeternus: venda de sonhos por eter',
+            expiresAfterMillis: 30 * 60 * 1000
+        });
+        if (req.ok) return { ok: true, data: req.data };
+        return { ok: false, error: req.error || 'Falha na solicitação' };
+    } catch (e) {
+        return { ok: false, error: e.message || String(e) };
+    }
+}
+
 module.exports = {
     name: 'cambio',
     aliases: ['câmbio', 'loritta', 'sonhos', 'exchange'],
-    description: 'Câmbio Éter ↔ Sonhos com fila de espera',
+    description: 'Câmbio Éter ↔ Sonhos (transferência Loritta ↔ bot)',
 
     async execute(message, args) {
         const sub = String(args[0] || 'ajuda').toLowerCase();
+        const botId = treasuryUserId(message.client);
 
         if (['ajuda', 'help', 'taxa', 'info', 'rate'].includes(sub) || !args.length) {
-            return message.reply({ embeds: [rateEmbed()] });
+            return message.reply({ embeds: [rateEmbed(message.client)] });
         }
 
         if (sub === 'fila' || sub === 'queue' || sub === 'lista') {
-            const emb = filaEmbed(message.client);
+            const emb = filaEmbed();
             const mine = queue.positionOf(Q, message.author.id);
             if (mine) {
                 emb.addFields({
@@ -168,8 +243,12 @@ module.exports = {
                             [
                                 `✨ **${fmt(et)}** éter`,
                                 sonhosLine,
-                                `Taxa: 1✨ = **${fmt(loritta.sonhosPerEter())}**💤`
-                            ].join('\n')
+                                `Taxa: 1✨ = **${fmt(loritta.sonhosPerEter())}**💤`,
+                                botId ? `Bot (tesouraria): <@${botId}>` : '',
+                                `Loritta: <@${LORITTA_BOT_ID}>`
+                            ]
+                                .filter(Boolean)
+                                .join('\n')
                         )
                 ]
             });
@@ -184,46 +263,68 @@ module.exports = {
 
             const item = res.item;
             const p = item.payload || {};
-            const o = ownerId();
 
-            let desc;
             if (p.type === 'buy') {
-                desc = [
-                    `**#1 da fila → atendimento**`,
-                    `**Tipo:** 🛒 Comprar sonhos`,
-                    `**User:** <@${item.userId}>`,
-                    `**Retido:** ✨ **${fmt(p.eter)}**`,
-                    `**Enviar:** 💤 **${fmt(p.sonhos)}**`,
-                    '',
-                    'Na Loritta:',
-                    '```',
-                    `+pay <@${item.userId}> ${p.sonhos}`,
-                    '```',
-                    'Depois use os botões abaixo.'
-                ].join('\n');
-            } else {
-                desc = [
-                    `**#1 da fila → atendimento**`,
-                    `**Tipo:** 💰 Vender sonhos`,
-                    `**User:** <@${item.userId}>`,
-                    `**Deve ter enviado:** 💤 **${fmt(p.sonhos)}** para <@${o}>`,
-                    `**Creditar:** ✨ **${fmt(p.eter)}**`,
-                    '',
-                    'Confira o `+pay` e clique em **Creditar éter**.'
-                ].join('\n');
+                const api = await trySendSonhosToUser(message, item.userId, p.sonhos);
+                let apiLine;
+                if (api.ok) {
+                    apiLine =
+                        api.mode === 'transfer'
+                            ? '✅ **Transferência Loritta enviada** ao usuário.'
+                            : '📬 **Solicitação Loritta criada** — confirme na Lori se pedido aparecer.';
+                } else {
+                    apiLine =
+                        '⚠️ Não foi possível enviar pela API: `' +
+                        (api.error || 'erro') +
+                        '`. Use o botão para confirmar depois que a Loritta processar, ou recuse.';
+                }
+
+                return message.reply({
+                    content: `<@${item.userId}> — sua vez na fila de câmbio!`,
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(0xfbbf24)
+                            .setTitle('🔔 Próximo · compra de sonhos')
+                            .setDescription(
+                                [
+                                    '**Tipo:** 🛒 Comprar sonhos',
+                                    `**User:** <@${item.userId}>`,
+                                    `**Éter retido:** ✨ **${fmt(p.eter)}**`,
+                                    `**Sonhos:** 💤 **${fmt(p.sonhos)}**`,
+                                    `**Via:** <@${LORITTA_BOT_ID}> → usuário`,
+                                    '',
+                                    apiLine
+                                ].join('\n')
+                            )
+                            .setFooter({ text: `ID: ${item.id}` })
+                            .setTimestamp()
+                    ],
+                    components: [staffRow(item.id, 'buy')]
+                });
             }
 
+            // sell
             return message.reply({
                 content: `<@${item.userId}> — sua vez na fila de câmbio!`,
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xfbbf24)
-                        .setTitle('🔔 Próximo da fila')
-                        .setDescription(desc)
+                        .setTitle('🔔 Próximo · venda de sonhos')
+                        .setDescription(
+                            [
+                                '**Tipo:** 💰 Vender sonhos',
+                                `**User:** <@${item.userId}>`,
+                                `**Sonhos → bot:** 💤 **${fmt(p.sonhos)}** para <@${botId}>`,
+                                `**Creditar:** ✨ **${fmt(p.eter)}**`,
+                                '',
+                                'O usuário deve transferir sonhos ao **bot Aeternus** pela Loritta.',
+                                'Quando os sonhos estiverem na conta do bot, clique em **Creditar éter**.'
+                            ].join('\n')
+                        )
                         .setFooter({ text: `ID: ${item.id}` })
                         .setTimestamp()
                 ],
-                components: [staffRow(item.id, p.type)]
+                components: [staffRow(item.id, 'sell')]
             });
         }
 
@@ -231,11 +332,11 @@ module.exports = {
             if (!isStaff(message.author.id)) {
                 return message.reply('❌ Só staff.');
             }
-            return message.reply({ embeds: [filaEmbed(message.client)] });
+            return message.reply({ embeds: [filaEmbed()] });
         }
 
         // COMPRAR
-        if (['comprar', 'buy', 'pedir', 'apelar', 'apelacao', 'apelação'].includes(sub)) {
+        if (['comprar', 'buy', 'pedir'].includes(sub)) {
             const already = queue.positionOf(Q, message.author.id);
             if (already) {
                 return message.reply(
@@ -245,9 +346,7 @@ module.exports = {
 
             const raw = args.slice(1).join(' ').trim();
             if (!raw) {
-                return message.reply(
-                    'Uso: `O.cambio comprar <éter>`\nEx.: `O.cambio comprar 100`'
-                );
+                return message.reply('Uso: `O.cambio comprar <éter>`\nEx.: `O.cambio comprar 100`');
             }
 
             const bal = eter.get(message.author.id);
@@ -285,11 +384,11 @@ module.exports = {
                         .setDescription(
                             [
                                 `**Posição:** #**${joined.position}**`,
-                                `**Tipo:** 🛒 Comprar sonhos`,
+                                '**Tipo:** 🛒 Comprar sonhos',
                                 `**Retido:** ✨ **${fmt(bet.amount)}**`,
-                                `**Você recebe:** 💤 **${fmt(sonhos)}** (quando for atendido)`,
+                                `**Você recebe:** 💤 **${fmt(sonhos)}** via <@${LORITTA_BOT_ID}>`,
                                 '',
-                                'Aguarde a staff chamar com `O.cambio proximo`.',
+                                'Quando for sua vez, a staff processa a transferência Loritta → você.',
                                 'Sair: `O.cambio sair` (reembolsa o éter).'
                             ].join('\n')
                         )
@@ -307,19 +406,19 @@ module.exports = {
                 );
             }
 
+            if (!botId) {
+                return message.reply('❌ Bot ainda não está pronto (sem ID de tesouraria).');
+            }
+
             const raw = args.slice(1).join(' ').trim();
             if (!raw) {
                 return message.reply('Uso: `O.cambio vender <sonhos>`');
             }
             const sonhos = Math.floor(Number(String(raw).replace(/[^\d]/g, '')) || 0);
             if (sonhos < loritta.sonhosPerEter()) {
-                return message.reply(
-                    '❌ Mínimo **' + fmt(loritta.sonhosPerEter()) + '** sonhos.'
-                );
+                return message.reply('❌ Mínimo **' + fmt(loritta.sonhosPerEter()) + '** sonhos.');
             }
             const eterOut = Math.floor(sonhos / loritta.sonhosPerEter());
-            const o = ownerId();
-            if (!o) return message.reply('❌ `OWNER_ID` não configurado.');
 
             const joined = queue.join(Q, {
                 userId: message.author.id,
@@ -327,7 +426,7 @@ module.exports = {
                     type: 'sell',
                     eter: eterOut,
                     sonhos,
-                    ownerId: o,
+                    botId,
                     userTag: message.author.tag,
                     channelId: message.channel.id
                 }
@@ -335,34 +434,21 @@ module.exports = {
 
             if (!joined.ok) return message.reply('❌ ' + joined.error);
 
-            // Tenta fluxo oficial de solicitação (pagador confirma na Loritta)
+            // Solicita transferência Loritta: usuário → bot Aeternus
             let apiNote = '';
-            if (loritta.configured() && message.guild) {
-                try {
-                    const req = await loritta.requestSonhosTransfer({
-                        guildId: message.guild.id,
-                        channelId: message.channel.id,
-                        senderId: message.author.id,
-                        receiverId: o,
-                        quantity: sonhos,
-                        reason: 'Cambio Aeternus: vender sonhos por eter',
-                        expiresAfterMillis: 30 * 60 * 1000
-                    });
-                    if (req.ok) {
-                        const tid = req.data?.id || req.data?.sonhosTransferId || '';
-                        apiNote =
-                            '\n\n📬 **Solicitação enviada à Loritta**' +
-                            (tid ? ` (id \`' + tid + '\`)` : '') +
-                            '. Confirme o pagamento no canal se a Lori postar o pedido.';
-                    } else {
-                        apiNote =
-                            '\n\n⚠️ API solicitação: ' +
-                            req.error +
-                            ' — use `+pay` manualmente.';
-                    }
-                } catch (e) {
-                    apiNote = '\n\n⚠️ API: ' + (e.message || e) + ' — use `+pay` manualmente.';
-                }
+            const api = await tryRequestUserPayBot(message, message.author.id, botId, sonhos);
+            if (api.ok) {
+                const tid = api.data?.id || api.data?.sonhosTransferId || '';
+                apiNote =
+                    '\n\n📬 **Pedido de transferência criado na Loritta**' +
+                    (tid ? ` (id \`${tid}\`)` : '') +
+                    `.\nConfirme o pagamento na <@${LORITTA_BOT_ID}> para enviar 💤 ao bot <@${botId}>.`;
+            } else {
+                apiNote =
+                    '\n\n⚠️ API: `' +
+                    (api.error || 'indisponível') +
+                    ``.\nTransfira **pela Loritta** os sonhos para o bot:\n` +
+                    `Mencione <@${LORITTA_BOT_ID}> e envie **${fmt(sonhos)}** 💤 para <@${botId}>.`;
             }
 
             return message.reply({
@@ -374,13 +460,11 @@ module.exports = {
                             [
                                 '**Posição:** #**' + joined.position + '**',
                                 '**Tipo:** 💰 Vender sonhos',
-                                '**Enviar:** 💤 **' + fmt(sonhos) + '** para <@' + o + '>',
-                                '```',
-                                '+pay <@' + o + '> ' + sonhos,
-                                '```',
-                                '**Recebe:** ✨ **' + fmt(eterOut) + '** (após staff confirmar)',
+                                `**Enviar:** 💤 **${fmt(sonhos)}** → <@${botId}> (via <@${LORITTA_BOT_ID}>)`,
+                                `**Recebe:** ✨ **${fmt(eterOut)}** após confirmação`,
                                 '',
-                                'Aguarde `O.cambio proximo` da staff.' + apiNote
+                                'Não use pagamento manual para staff. Só transferência **Loritta → bot Aeternus**.' +
+                                    apiNote
                             ].join('\n')
                         )
                         .setFooter({ text: 'ID: ' + joined.id })
@@ -388,7 +472,7 @@ module.exports = {
             });
         }
 
-        return message.reply({ embeds: [rateEmbed()] });
+        return message.reply({ embeds: [rateEmbed(message.client)] });
     },
 
     async handleComponent(interaction) {
@@ -407,13 +491,13 @@ module.exports = {
 
         const p = item.payload || {};
 
-        if (action === 'staff_paid') {
+        if (action === 'staff_done_buy') {
             if (!isStaff(interaction.user.id)) {
                 return interaction.reply({ content: 'Só staff.', ephemeral: true });
             }
             queue.complete(Q, id);
             return interaction.update({
-                content: `✅ <@${item.userId}> — **💤 ${fmt(p.sonhos)}** enviados. Fila: pedido concluído.`,
+                content: `✅ <@${item.userId}> — compra concluída (**💤 ${fmt(p.sonhos)}** via Loritta).`,
                 embeds: [],
                 components: []
             });
@@ -429,7 +513,7 @@ module.exports = {
             eter.add(item.userId, p.eter, { reason: 'cambio_queue_sell_credit' });
             queue.complete(Q, id);
             return interaction.update({
-                content: `✅ <@${item.userId}> recebeu **✨ ${fmt(p.eter)}**.`,
+                content: `✅ <@${item.userId}> recebeu **✨ ${fmt(p.eter)}** (sonhos creditados no bot).`,
                 embeds: [],
                 components: []
             });
