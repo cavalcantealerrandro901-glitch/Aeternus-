@@ -6,7 +6,6 @@ const {
 } = require('discord.js');
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
-
 const PAGE_SIZE = 6;
 
 function fmt(n) {
@@ -21,7 +20,6 @@ function medal(i) {
 function displayTag(user, fallbackId) {
     if (!user) return `@usuário-${String(fallbackId).slice(-4)}`;
     const name = user.globalName || user.username || `id-${fallbackId}`;
-    // texto plano — Discord não notifica
     return `@${name}`;
 }
 
@@ -38,7 +36,6 @@ function parseMode(args) {
         .trim();
     const joined = `${a} ${b}`.trim();
 
-    // XP global (todos os servidores onde o bot está)
     if (
         a === 'xpglobal' ||
         a === 'rankxp' ||
@@ -106,6 +103,37 @@ function modeMeta(mode) {
 }
 
 async function buildList(mode, guild, client) {
+    let memberIds = new Set();
+    const isLocal = mode === 'xp' || mode === 'local';
+
+    if (isLocal && guild) {
+        try {
+            const members = await guild.members.fetch().catch(() => null);
+            if (members) {
+                members.forEach((m) => {
+                    if (m.user && !m.user.bot) memberIds.add(m.id);
+                });
+            }
+        } catch (_) {}
+    } else if (client?.guilds?.cache?.size) {
+        for (const g of client.guilds.cache.values()) {
+            try {
+                if (g.members.cache.size > 1) {
+                    g.members.cache.forEach((m) => {
+                        if (m.user && !m.user.bot) memberIds.add(m.id);
+                    });
+                } else {
+                    const members = await g.members.fetch().catch(() => null);
+                    if (members) {
+                        members.forEach((m) => {
+                            if (m.user && !m.user.bot) memberIds.add(m.id);
+                        });
+                    }
+                }
+            } catch (_) {}
+        }
+    }
+
     if (mode === 'xp' || mode === 'xpglobal') {
         const data = xp.all() || {};
         let entries = Object.entries(data).map(([id, v]) => ({
@@ -114,36 +142,15 @@ async function buildList(mode, guild, client) {
             level: Number(v?.level || 0)
         }));
 
-        if (mode === 'xp' && guild) {
-            // XP só deste servidor
-            const memberIds = new Set();
-            try {
-                const members = await guild.members.fetch().catch(() => null);
-                if (members) members.forEach((m) => memberIds.add(m.id));
-            } catch (_) {}
-            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
-        } else if (mode === 'xpglobal' && client?.guilds?.cache?.size) {
-            // XP de quem está em algum servidor onde o bot está
-            const memberIds = new Set();
-            for (const g of client.guilds.cache.values()) {
-                try {
-                    // cache primeiro (rápido); fetch só se vazio
-                    if (g.members.cache.size > 1) {
-                        g.members.cache.forEach((m) => {
-                            if (m.user && !m.user.bot) memberIds.add(m.id);
-                        });
-                    } else {
-                        const members = await g.members.fetch().catch(() => null);
-                        if (members) {
-                            members.forEach((m) => {
-                                if (m.user && !m.user.bot) memberIds.add(m.id);
-                            });
-                        }
-                    }
-                } catch (_) {}
-            }
-            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
+        if (memberIds.size) {
+            entries = entries.filter((e) => memberIds.has(e.id));
         }
+
+        entries = entries.filter((e) => {
+            const user = client?.users?.cache?.get(e.id);
+            if (user && user.bot) return false;
+            return true;
+        });
 
         return entries
             .filter((e) => e.value > 0)
@@ -156,14 +163,15 @@ async function buildList(mode, guild, client) {
         value: Number(v || 0)
     }));
 
-    if (mode === 'local' && guild) {
-        const memberIds = new Set();
-        try {
-            const members = await guild.members.fetch().catch(() => null);
-            if (members) members.forEach((m) => memberIds.add(m.id));
-        } catch (_) {}
-        if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
+    if (memberIds.size) {
+        entries = entries.filter((e) => memberIds.has(e.id));
     }
+
+    entries = entries.filter((e) => {
+        const user = client?.users?.cache?.get(e.id);
+        if (user && user.bot) return false;
+        return true;
+    });
 
     return entries.filter((e) => e.value > 0).sort((a, b) => b.value - a.value);
 }
@@ -192,12 +200,12 @@ async function pageEmbed(client, list, mode, page, guildName) {
         const u = await client.users.fetch(e.id).catch(() => null);
         const tag = displayTag(u, e.id);
         const extra =
-            (mode === 'xp' || mode === 'xpglobal') && e.level != null ? `\n   Nv. **${e.level}**` : '';
+            (mode === 'xp' || mode === 'xpglobal') && e.level != null ? `\n   Nv. **${e.level}**` : '';
 
         blocks.push(
             [
                 `${medal(pos)}  **${tag}**`,
-                `   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+                `   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
             ].join('\n')
         );
     }
