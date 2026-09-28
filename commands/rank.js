@@ -316,4 +316,3 @@ module.exports = {
         return interaction.deferUpdate().catch(() => {});
     }
 };
-};
