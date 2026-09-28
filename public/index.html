@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeternus — Universo RPG</title>
+    <title>Aeternus — O Reino Espera por Você</title>
     <link rel="stylesheet" href="dashboard.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="landing-body">
+    <!-- Efeito de Iluminação / Fundo -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
     <header class="header">
         <nav class="navbar">
             <div class="logo">
@@ -44,24 +48,30 @@
         </nav>
     </header>
 
-    <main class="container">
-        <section class="hero">
-            <div class="badge">⚔️ Domine o Reino Supremo</div>
-            <h1>Moldado pela Glória, Guiado pelo <span class="text-gradient">Aeternus</span></h1>
-            <p>Trilhe o seu caminho rumo ao topo.</p>
-            <p>Desafie rivais na arena e forje alianças lendárias.</p>
-            <p>Liberte o verdadeiro poder do seu herói.</p>
+    <main class="container hero-container">
+        <section class="hero hero-redesigned">
+            <div class="badge badge-glow">✨ UMA NOVA ERA RPG NO DISCORD ✨</div>
+            
+            <h1 class="hero-title">
+                FORJE SEU DESTINO.<br>
+                DOMINE O <span class="text-gradient">AETERNUS</span>.
+            </h1>
+            
+            <p class="hero-subtitle">
+                Embarque em uma jornada épica de batalhas, conquistas e relíquias ancestrais. 
+                Construa seu legado e prove seu valor nos reinos do Discord.
+            </p>
             
             <div class="hero-buttons">
-                <a href="dashboard.html" class="btn btn-primary">Painel</a>
-                <a href="#" class="btn btn-secondary">Adicione-me</a>
-                <a href="#" class="btn btn-discord">Suporte Discord</a>
+                <a href="dashboard.html" class="btn btn-primary btn-glow">⚡ Painel</a>
+                <a href="#" class="btn btn-secondary">➕ Adicione-me</a>
+                <a href="#" class="btn btn-discord">💬 Suporte Discord</a>
             </div>
         </section>
     </main>
 
     <footer>
-        <p>&copy; 2026 <strong>Aeternus</strong>. Todos os direitos reservados.</p>
+        <p>&copy; 2026 <strong>Aeternus RPG</strong>. Todos os direitos reservados.</p>
     </footer>
 
     <script src="dashboard-app.js"></script>
