@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.18 (Staff-Exclusive Security & Moderation Core)
+ * Aeternus Engine v7.19 (Controlled Dictionary & Autonomous Core)
  */
 
 const fs = require('fs');
@@ -138,12 +138,6 @@ function normalizeText(text) {
 }
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-function extractMainTopic(text) {
-    const stopWords = ['o', 'a', 'os', 'as', 'um', 'uma', 'de', 'do', 'da', 'em', 'no', 'na', 'por', 'para', 'com', 'e', 'que', 'vc', 'voce', 'ele', 'qual', 'como', 'onde', 'quando', 'porque', 'me', 'fala', 'sobre'];
-    const words = normalizeText(text).split(' ').filter(w => !stopWords.includes(w) && w.length > 3);
-    return words.length > 0 ? words[words.length - 1] : null;
-}
-
 function registerContext(id, { description, get }) {
     if (!id || typeof get !== 'function') return false;
     contexts.set(String(id), { description: String(description || id), get });
@@ -244,7 +238,6 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
     const guild = runtime.guild;
     const guilds = client && client.guilds ? Array.from(client.guilds.cache.values()) : [];
 
-    // 🔒 Proteção: Comandos exclusivos para Staff/Admins ou Criador
     const restrictedIntents = ['guild_invite', 'message_guild_owner', 'mod_ban', 'mod_kick', 'mod_mute', 'mod_clear'];
     if (restrictedIntents.includes(item.intent)) {
         if (!isStaffOrAdmin(guild, runtime.userId)) {
@@ -434,7 +427,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         }
         case 'bot_mood':
             return pick([
-                `${prefix}🤖 Sistemas v7.18 operando com segurança Staff-Exclusive rigorosa! 🔥`,
+                `${prefix}🤖 Sistemas v7.19 operando com conversação natural limpa! 🔥`,
                 `${prefix}🚀 Tudo tinindo por aqui! Servidores sincronizados e prontos para o desafio. 😎⚡`,
                 `${prefix}🌟 Núcleo inteligente processando com alta performance! 🦾`
             ]);
@@ -444,14 +437,6 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
             return calcRes.ok ? `${prefix}🧮 Resultado matemático: **${calcRes.result}** 🚀✨` : `⚠️ ${calcRes.error}`;
         case 'autonomous_reply': {
-            const topic = extractMainTopic(text);
-            if (topic) {
-                const def = await fetchWordDefinition(topic);
-                if (def) {
-                    return `${prefix}🧠 Analisando **${topic}**, encontrei conexões diretas no acervo: *${def.slice(0, 120)}...* Fascinante! 🎯🔥`;
-                }
-                return `${prefix}💬 Excelente abordagem sobre **${topic}**! Nossa engine está processando sua linha de raciocínio. Mande um **"desafio"** para testar sua mente! 🤔✨`;
-            }
             return pick([
                 `${prefix}🎯 Entendi exatamente o seu ponto! Como quer prosseguir?`,
                 `${prefix}🔥 Ótima linha de pensamento! Quer aprofundar mais aspectos sobre isso?`,
@@ -498,6 +483,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.18-staff-exclusive',
+    model: () => 'aeternus-v7.19-controlled-dict',
     baseUrl: () => 'local'
 };
