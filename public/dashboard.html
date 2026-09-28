@@ -294,18 +294,9 @@
     </div>
 
     <script>
-        // Substitua pelo seu ID real do Discord
-        const DISCORD_ID = "SEU_DISCORD_ID_AQUI";
-
         async function loadDiscordUser() {
-            if (DISCORD_ID === "SEU_DISCORD_ID_AQUI") {
-                document.getElementById('userName').textContent = "Comandante";
-                document.getElementById('welcomeName').textContent = "Comandante";
-                return;
-            }
-
             try {
-                const response = await fetch(`/api/user/${DISCORD_ID}`);
+                const response = await fetch('/api/me');
                 const data = await response.json();
                 
                 if (data.username) {

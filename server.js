@@ -77,3 +77,38 @@ io.on('connection', (socket) => {
 server.listen(3000, () => {
   console.log('\n⚔️ ARENA PVP 2D ONLINE em: http://localhost:3000\n');
 });
+
+// Rota para buscar dados do utilizador do Discord via ID
+app.get('/api/user/:id', async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const user = await client.users.fetch(userId);
+        
+        res.json({
+            username: user.globalName || user.username,
+            avatar: user.displayAvatarURL({ dynamic: true, size: 256 })
+        });
+    } catch (error) {
+        console.error('Erro ao buscar utilizador:', error);
+        res.status(500).json({ error: 'Não foi possível buscar o utilizador do Discord.' });
+    }
+});
+
+// Rota para buscar os dados do dono/utilizador através das variáveis de ambiente
+app.get('/api/me', async (req, res) => {
+    try {
+        const ownerId = process.env.OWNER_ID || process.env.DISCORD_ID;
+        if (!ownerId) {
+            return res.status(400).json({ error: 'ID do utilizador não configurado nas variáveis de ambiente.' });
+        }
+        
+        const user = await client.users.fetch(ownerId);
+        res.json({
+            username: user.globalName || user.username,
+            avatar: user.displayAvatarURL({ dynamic: true, size: 256 })
+        });
+    } catch (error) {
+        console.error('Erro ao buscar utilizador:', error);
+        res.status(500).json({ error: 'Não foi possível buscar o utilizador do Discord.' });
+    }
+});
