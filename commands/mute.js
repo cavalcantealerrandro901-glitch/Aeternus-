@@ -9,12 +9,12 @@ function resolveMember(message, args) {
 }
 
 function parseDuration(str) {
-    if (!str) return 10 * 60 * 1000; // Padrão: 10 minutos
+    if (!str) return 10 * 60 * 1000;
     const num = parseInt(str);
     if (isNaN(num)) return 10 * 60 * 1000;
     if (str.includes('h')) return num * 60 * 60 * 1000;
     if (str.includes('d')) return num * 24 * 60 * 60 * 1000;
-    return num * 60 * 1000; // minutos por padrão
+    return num * 60 * 1000;
 }
 
 async function handleMuteProcess(context, moderator, targetMember, durationMs, reason, isSlash = false) {
@@ -25,7 +25,7 @@ async function handleMuteProcess(context, moderator, targetMember, durationMs, r
         new ButtonBuilder()
             .setCustomId(normalBtnId)
             .setLabel('Confirmar silêncio')
-            .setEmoji('✅️')
+            .setEmoji('✅')
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(silentBtnId)
@@ -63,7 +63,7 @@ async function handleMuteProcess(context, moderator, targetMember, durationMs, r
             
             const isSilent = i.customId === silentBtnId;
             const successText = isSilent
-                ? `---------- 🤫 O usuário <@${targetMember.id}> foi silenciado silenciosamente, mas quem manda quebrar as regras né!!`
+                ? `---------- 🤫 O usuário <@${targetMember.id}> foi silenciado silenciosamente, mas quem manda quebrar las regras né!!`
                 : `---------- 🔇 O usuário <@${targetMember.id}> foi silenciado com sucesso, mas quem manda quebrar as regras né!!`;
             
             await i.update({

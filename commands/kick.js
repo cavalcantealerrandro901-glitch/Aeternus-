@@ -20,11 +20,11 @@ async function handleKickProcess(context, moderator, targetMember, reason, isSla
         new ButtonBuilder()
             .setCustomId(customId)
             .setLabel('Aceitar expulsão')
-            .setEmoji('✅️')
+            .setEmoji('✅')
             .setStyle(ButtonStyle.Danger)
     );
 
-    const content = `Nossa, você <@${moderator.id}> vai expulsar <@${targetMember.id}> mesmo? Uh... Sendo assim, clique no botão ✅️ aceitar expulsão, você tem 6 minutos para decidir.`;
+    const content = `Nossa, você <@${moderator.id}> vai expulsar <@${targetMember.id}> mesmo? Uh... Sendo assim, clique no botão ✅ aceitar expulsão, você tem 6 minutos para decidir.`;
 
     let sentMsg;
     if (isSlash) {
