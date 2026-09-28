@@ -1,157 +1,300 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Aeternus · Painel</title>
-  <link rel="stylesheet" href="/dashboard.css"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aeternus · Selecionar Servidor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            color: #ffffff;
+            overflow-x: hidden;
+            background-color: #0b0f19;
+        }
+
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e),
+                        url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            animation: moveBackground 20s ease infinite alternate;
+            filter: brightness(0.4);
+        }
+
+        @keyframes moveBackground {
+            0% { transform: scale(1) translate(0, 0); }
+            50% { transform: scale(1.05) translate(-10px, -15px); }
+            100% { transform: scale(1.1) translate(10px, 15px); }
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 50px;
+            background: rgba(15, 15, 25, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #a78bfa;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 8px 16px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .user-profile img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .user-profile span {
+            font-weight: 500;
+            font-size: 14px;
+            color: #e2e8f0;
+        }
+
+        .dashboard-container {
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 0 20px;
+        }
+
+        .welcome-box {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 35px;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .welcome-text h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 8px;
+        }
+
+        .welcome-text p {
+            color: #94a3b8;
+            font-size: 15px;
+        }
+
+        .bot-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .bot-status i {
+            font-size: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        .servers-section h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #c084fc;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .servers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .server-card {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+        }
+
+        .server-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(167, 139, 250, 0.4);
+            background: rgba(30, 41, 59, 0.8);
+        }
+
+        .server-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .server-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .server-details h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 4px;
+        }
+
+        .server-details span {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .btn-manage {
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            color: #c084fc;
+            padding: 8px 16px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn-manage:hover {
+            background: #8b5cf6;
+            color: white;
+        }
+    </style>
 </head>
 <body>
-  <aside class="side">
-    <div class="brand"><span></span> Aeternus</div>
-    <button class="nb on" data-p="servers">🏠 Servidores</button>
-    <button class="nb" data-p="overview" disabled>📊 Visão geral</button>
-    <button class="nb" data-p="prefix" disabled>⌨️ Prefixo</button>
-    <button class="nb" data-p="welcome" disabled>👋 Entrada / Saída</button>
-    <button class="nb" data-p="mod" disabled>🛡️ Automod</button>
-    <button class="nb" data-p="drops" disabled>🎁 Drops</button>
-    <button class="nb" data-p="partnership" disabled>🤝 Parcerias</button>
-    <button class="nb" data-p="economy" disabled>✨ Economia</button>
-    <button class="nb" data-p="me">❄️ Conta</button>
-    <a class="nb" href="/wiki" style="display:block;text-decoration:none;color:inherit;border:0;background:transparent;width:100%;text-align:left;cursor:pointer;padding:inherit;font:inherit">📚 Wiki oficial</a>
-    <div class="side-foot">Painel web · Aeternus</div>
-  </aside>
 
-  <main class="main">
-    <section class="panel on" id="servers">
-      <h2>Servidores</h2>
-      <p class="sub">Escolha um servidor onde o bot está para configurar.</p>
-      <div class="card"><div class="grid" id="guildList"></div></div>
-    </section>
+    <div class="animated-bg"></div>
 
-    <section class="panel" id="overview">
-      <h2>Visão geral</h2>
-      <p class="sub" id="ovName">—</p>
-      <div class="card"><div class="stats" id="ovStats"></div></div>
-    </section>
-
-    <section class="panel" id="prefix">
-      <h2>Prefixo dos comandos</h2>
-      <p class="sub">Define o texto usado antes dos comandos de prefixo neste servidor (ex.: <code>O.</code>, <code>!</code>, <code>a!</code>).</p>
-      <div class="card">
-        <h3>⌨️ Prefixo atual</h3>
-        <p class="hint" id="prefixCurrent">Prefixo: <b>O.</b></p>
-        <label class="f">Novo prefixo</label>
-        <input type="text" id="prefixInput" maxlength="5" placeholder="Ex.: O. ou !" style="max-width:220px"/>
-        <p class="hint">Entre 1 e 5 caracteres. Sem espaços no início/fim. O padrão é <code>O.</code>.</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
-          <button class="btn ok" type="button" onclick="savePrefix()">Salvar prefixo</button>
-          <button class="btn" type="button" onclick="resetPrefix()">Restaurar O.</button>
+    <header>
+        <a href="index.html" class="logo">
+            <i class="fa-solid fa-cube"></i> Aeternus
+        </a>
+        <div class="user-profile">
+            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" alt="Avatar">
+            <span>Comandante</span>
         </div>
-        <p class="hint" style="margin-top:14px">Exemplos com o prefixo configurado:</p>
-        <ul class="hint" id="prefixExamples" style="margin:6px 0 0 18px">
-          <li><code>O.ajuda</code></li>
-          <li><code>O.saldo</code></li>
-          <li><code>O.daily</code></li>
-        </ul>
-      </div>
-    </section>
+    </header>
 
-    <section class="panel" id="welcome">
-      <h2>Entrada e saída</h2>
-      <p class="sub">Mensagens quando alguém entra ou sai do servidor.</p>
-      <div class="card">
-        <h3>👋 Boas-vindas</h3>
-        <div class="tg"><span>Ativo</span><label class="switch"><input type="checkbox" id="welEnabled"/><span class="slider"></span></label></div>
-        <label class="f">Canal</label><select id="welChannel"></select>
-        <label class="f">Mensagem</label><textarea id="welMsg" rows="3"></textarea>
-        <button class="btn ok" type="button" onclick="saveWelcome()">Salvar</button>
-      </div>
-      <div class="card">
-        <h3>🚪 Saída</h3>
-        <div class="tg"><span>Ativo</span><label class="switch"><input type="checkbox" id="leaveEnabled"/><span class="slider"></span></label></div>
-        <label class="f">Canal</label><select id="leaveChannel"></select>
-        <label class="f">Mensagem</label><textarea id="leaveMsg" rows="2"></textarea>
-        <button class="btn ok" type="button" onclick="saveLeave()">Salvar</button>
-      </div>
-    </section>
-
-    <section class="panel" id="mod">
-      <h2>Automod</h2>
-      <p class="sub">Filtros básicos de proteção do chat.</p>
-      <div class="card">
-        <div class="tg"><span>Automod ativo</span><label class="switch"><input type="checkbox" id="amEnabled"/><span class="slider"></span></label></div>
-        <div class="tg"><span>Anti-spam</span><label class="switch"><input type="checkbox" id="amSpam"/><span class="slider"></span></label></div>
-        <div class="tg"><span>Anti-convite</span><label class="switch"><input type="checkbox" id="amInvite"/><span class="slider"></span></label></div>
-        <button class="btn ok" type="button" onclick="saveAutomod()">Salvar</button>
-      </div>
-    </section>
-
-    <section class="panel" id="drops">
-      <h2>Drops</h2>
-      <p class="sub">Configuração de requisitos e entradas extras dos drops.</p>
-      <div class="card">
-        <div class="tg"><span>Drops ativos</span><label class="switch"><input type="checkbox" id="dropEnabled" checked/><span class="slider"></span></label></div>
-        <label class="f">Canal padrão</label><select id="dropChannel"></select>
-        <label class="f">Nível mínimo</label><input type="number" id="dropMinLevel" min="0" value="0"/>
-        <h3>Entradas extras (VIP)</h3>
-        <div class="row">
-          <select id="dropVipRole"></select>
-          <input type="number" id="dropVipEntries" min="0" value="1" style="max-width:100px"/>
-          <button class="btn" type="button" onclick="addDropVip()">Add</button>
+    <div class="dashboard-container">
+        <div class="welcome-box">
+            <div class="welcome-text">
+                <h1>Central de Comando, Comandante!</h1>
+                <p>O núcleo do Aeternus está online e pronto para gerenciar suas comunidades. Selecione abaixo o servidor que deseja configurar.</p>
+            </div>
+            <div class="bot-status">
+                <i class="fa-solid fa-circle"></i> Sistema Operacional 100%
+            </div>
         </div>
-        <div id="dropVipList" class="list"></div>
-        <h3>Cargos bloqueados</h3>
-        <div class="row">
-          <select id="dropBlockedRole"></select>
-          <button class="btn" type="button" onclick="addDropBlocked()">Add</button>
+
+        <div class="servers-section">
+            <h2><i class="fa-solid fa-server"></i> Servidores Disponíveis</h2>
+            <div class="servers-grid">
+                
+                <!-- Servidor Exemplo 1 -->
+                <div class="server-card">
+                    <div class="server-info">
+                        <div class="server-icon">VC</div>
+                        <div class="server-details">
+                            <h3>Valhalla Community</h3>
+                            <span>1.240 Membros</span>
+                        </div>
+                    </div>
+                    <a href="#" class="btn-manage">Gerenciar</a>
+                </div>
+
+                <!-- Servidor Exemplo 2 -->
+                <div class="server-card">
+                    <div class="server-info">
+                        <div class="server-icon" style="background: linear-gradient(135deg, #ec4899, #8b5cf6);">AG</div>
+                        <div class="server-details">
+                            <h3>Aeternus Gaming</h3>
+                            <span>180 Membros</span>
+                        </div>
+                    </div>
+                    <a href="#" class="btn-manage">Gerenciar</a>
+                </div>
+
+                <!-- Servidor Exemplo 3 -->
+                <div class="server-card">
+                    <div class="server-info">
+                        <div class="server-icon" style="background: linear-gradient(135deg, #10b981, #3b82f6);">CC</div>
+                        <div class="server-details">
+                            <h3>CyberCafe Hub</h3>
+                            <span>450 Membros</span>
+                        </div>
+                    </div>
+                    <a href="#" class="btn-manage">Gerenciar</a>
+                </div>
+
+            </div>
         </div>
-        <div id="dropBlockedList" class="list"></div>
-        <h3>Cargos que ignoram requisitos</h3>
-        <div class="row">
-          <select id="dropBypassRole"></select>
-          <button class="btn" type="button" onclick="addDropBypass()">Add</button>
-        </div>
-        <div id="dropBypassList" class="list"></div>
-        <button class="btn ok" type="button" onclick="saveDrops()">Salvar drops</button>
-      </div>
-    </section>
+    </div>
 
-    <section class="panel" id="partnership">
-      <h2>Parcerias</h2>
-      <p class="sub">Canal, cargos e texto usados no sistema de parceria.</p>
-      <div class="card">
-        <div class="tg"><span>Sistema ativo</span><label class="switch"><input type="checkbox" id="partEnabled" checked/><span class="slider"></span></label></div>
-        <label class="f">Canal de postagem</label><select id="partChannel"></select>
-        <label class="f">Cargo do representante</label><select id="partRole"></select>
-        <label class="f">Cargo de notificação</label><select id="partNotifyRole"></select>
-        <label class="f">Frase / template</label><textarea id="partPhrase" rows="4"></textarea>
-        <label class="f">Imagem (URL)</label><input type="text" id="partImage" placeholder="https://..."/>
-        <button class="btn ok" type="button" onclick="partSave()">Salvar parcerias</button>
-      </div>
-    </section>
-
-    <section class="panel" id="economy">
-      <h2>Economia</h2>
-      <p class="sub">Faixa do daily (valores base do servidor).</p>
-      <div class="card">
-        <label class="f">Daily mínimo</label><input type="number" id="ecoMin" value="5000"/>
-        <label class="f">Daily máximo</label><input type="number" id="ecoMax" value="50000"/>
-        <button class="btn ok" type="button" onclick="saveEconomy()">Salvar</button>
-      </div>
-    </section>
-
-    <section class="panel" id="me">
-      <h2>Conta</h2>
-      <div class="card">
-        <p id="meInfo">—</p>
-        <a class="btn" href="/logout">Sair</a>
-        <a class="btn" href="/wiki" style="margin-left:8px">Abrir wiki</a>
-      </div>
-    </section>
-  </main>
-
-  <div id="toast"></div>
-  <script src="/dashboard-app.js"></script>
 </body>
 </html>
