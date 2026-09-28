@@ -362,6 +362,7 @@ module.exports = {
             const list = await buildList(mode, guild, interaction.client);
             const mine = findMyRank(list, interaction.user.id);
             const meta = modeMeta(mode);
+            const foot = 'Aeternus rank • ' + (guild?.name || 'Global') + ' • hoje as ' + clockNow();
 
             if (!mine.rank) {
                 return interaction.reply({
@@ -370,15 +371,16 @@ module.exports = {
                             .setColor(0x64748b)
                             .setTitle(meta.title)
                             .setDescription(
-                                `<@${interaction.user.id}> ainda não aparece no ranking.
-Ganhe éter/XP para entrar na lista!`
+                                '<@' + interaction.user.id + '> ainda não aparece no ranking.\nGanhe éter/XP para entrar na lista!'
                             )
-                            .setFooter({
-                                text: `Aeternus rank • ${guild?.name || 'Global'} • hoje as ${clockNow()}`
-                            })
+                            .setFooter({ text: foot })
                     ]
                 }).catch(() => {});
             }
+
+            const saldoLine = meta.economy
+                ? 'saldo:  ✨ **' + fmt(mine.value) + '** éter'
+                : meta.emoji + ' **' + fmt(mine.value) + '** ' + meta.unit;
 
             return interaction.reply({
                 embeds: [
@@ -386,19 +388,11 @@ Ganhe éter/XP para entrar na lista!`
                         .setColor(meta.color)
                         .setTitle(meta.title)
                         .setDescription(
-                            [
-                                `<@${interaction.user.id}>`,
-                                `Sua posição no rank: **${mine.rank}** posição.`,
-                                '',
-                                meta.economy
-                                    ? `saldo:  ✨ **${fmt(mine.value)}** éter`
-                                    : `${meta.emoji} **${fmt(mine.value)}** ${meta.unit}`
-                            ].join('
-')
+                            '<@' + interaction.user.id + '>\n' +
+                            'Sua posição no rank: **' + mine.rank + '** posição.\n\n' +
+                            saldoLine
                         )
-                        .setFooter({
-                            text: `Aeternus rank • ${guild?.name || 'Global'} • hoje as ${clockNow()}`
-                        })
+                        .setFooter({ text: foot })
                         .setTimestamp()
                 ]
             }).catch(() => {});
