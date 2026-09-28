@@ -1,65 +1,427 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Aeternus — Control Center</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'DM Sans',system-ui,sans-serif;background:#03030a;color:#f8fafc;min-height:100vh;overflow-x:hidden}
-.mesh{position:fixed;inset:0;z-index:0;background:
-  radial-gradient(at 20% 20%,rgba(124,58,237,.45) 0,transparent 42%),
-  radial-gradient(at 80% 10%,rgba(6,182,212,.28) 0,transparent 38%),
-  radial-gradient(at 50% 80%,rgba(236,72,153,.18) 0,transparent 42%),
-  #03030a}
-.noise{position:fixed;inset:0;z-index:1;opacity:.045;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-nav{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;padding:1.4rem 7vw;max-width:1100px;margin:0 auto}
-.logo{font-family:Syne,sans-serif;font-weight:800;font-size:1.45rem;letter-spacing:-.03em}
-.logo b{background:linear-gradient(135deg,#a78bfa,#22d3ee,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-a.lk{color:#94a3b8;text-decoration:none;margin-left:1.4rem;font-weight:600;font-size:.92rem;transition:.2s}
-a.lk:hover{color:#fff}
-.hero{position:relative;z-index:2;text-align:center;padding:9vh 6vw 2.5rem;max-width:900px;margin:0 auto}
-.pill{display:inline-block;padding:.42rem 1.05rem;border-radius:999px;border:1px solid rgba(167,139,250,.45);background:rgba(124,58,237,.18);color:#c4b5fd;font-size:.78rem;font-weight:700;letter-spacing:.05em;margin-bottom:1.5rem}
-h1{font-family:Syne,sans-serif;font-size:clamp(2.7rem,7.2vw,4.6rem);font-weight:800;line-height:1.05;letter-spacing:-.04em}
-h1 span{background:linear-gradient(100deg,#e9d5ff,#67e8f9,#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.lead{color:#94a3b8;font-size:1.14rem;margin:1.25rem auto 2.1rem;max-width:540px;line-height:1.7}
-.cta{display:flex;gap:.85rem;justify-content:center;flex-wrap:wrap}
-.b{padding:.95rem 1.8rem;border-radius:999px;font-weight:700;text-decoration:none;font-size:.95rem;transition:.25s}
-.bp{background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;box-shadow:0 0 44px rgba(124,58,237,.5)}
-.bp:hover{transform:translateY(-3px);box-shadow:0 0 70px rgba(124,58,237,.65)}
-.bg{border:1px solid rgba(255,255,255,.14);color:#e2e8f0;background:rgba(255,255,255,.04)}
-.bg:hover{background:rgba(255,255,255,.09)}
-.feat{position:relative;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.05rem;max-width:1040px;margin:0 auto;padding:2.2rem 6vw 5rem}
-.fc{padding:1.55rem;border-radius:1.3rem;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(18px);transition:.3s}
-.fc:hover{border-color:rgba(167,139,250,.45);transform:translateY(-5px);box-shadow:0 12px 40px rgba(0,0,0,.35)}
-.fc i{font-style:normal;font-size:1.55rem;display:block;margin-bottom:.65rem}
-.fc h3{font-family:Syne,sans-serif;font-size:1.02rem;margin-bottom:.4rem}
-.fc p{color:#94a3b8;font-size:.88rem;line-height:1.55}
-footer{position:relative;z-index:2;text-align:center;padding:2rem;color:#475569;font-size:.8rem}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aeternus · Painel de Controle</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            color: #ffffff;
+            overflow-x: hidden;
+            background-color: #0b0f19;
+        }
+
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e),
+                        url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            animation: moveBackground 20s ease infinite alternate;
+            filter: brightness(0.4);
+        }
+
+        @keyframes moveBackground {
+            0% {
+                transform: scale(1) translate(0, 0);
+            }
+            50% {
+                transform: scale(1.05) translate(-10px, -15px);
+            }
+            100% {
+                transform: scale(1.1) translate(10px, 15px);
+            }
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 50px;
+            background: rgba(15, 15, 25, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #a78bfa;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-container {
+            position: relative;
+        }
+
+        .menu-btn {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #cbd5e1;
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .menu-btn:hover {
+            background: rgba(167, 139, 250, 0.2);
+            border-color: rgba(167, 139, 250, 0.4);
+            color: #a78bfa;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 60px;
+            right: 0;
+            width: 240px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            animation: fadeIn 0.2s ease forwards;
+        }
+
+        .dropdown-menu.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: #cbd5e1;
+            text-decoration: none;
+            font-weight: 500;
+            border-radius: 10px;
+            transition: all 0.2s;
+        }
+
+        .dropdown-item i {
+            color: #a78bfa;
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(139, 92, 246, 0.15);
+            color: #ffffff;
+            transform: translateX(3px);
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.08);
+            margin: 6px 0;
+        }
+
+        .hero {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 70px 20px 40px 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 46px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #ffffff, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: #94a3b8;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .hero-btns {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4);
+            transition: transform 0.2s, opacity 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.03);
+            opacity: 0.95;
+        }
+
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(167, 139, 250, 0.2);
+            border-color: rgba(167, 139, 250, 0.4);
+            transform: scale(1.03);
+            color: #c084fc;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto 50px auto;
+            padding: 0 20px;
+        }
+
+        .stat-card {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(167, 139, 250, 0.4);
+        }
+
+        .stat-card i {
+            font-size: 28px;
+            color: #a78bfa;
+            margin-bottom: 12px;
+        }
+
+        .stat-card h3 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: #f8fafc;
+        }
+
+        .stat-card span {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .content-container {
+            max-width: 900px;
+            margin: 0 auto 80px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .content-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .info-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 30px;
+        }
+
+        .info-card h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #c084fc;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-card ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .info-card li {
+            color: #cbd5e1;
+            font-size: 14px;
+            line-height: 1.5;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .info-card li i {
+            color: #a78bfa;
+            margin-top: 3px;
+        }
+    </style>
 </head>
 <body>
-<div class="mesh"></div><div class="noise"></div>
-<nav>
-  <div class="logo">Ae<b>ternus</b></div>
-  <div><a class="lk" href="/wiki">Wiki</a><a class="lk" href="/dashboard">Painel</a><a class="lk" href="/login">Entrar</a></div>
-</nav>
-<section class="hero">
-  <div class="pill">CONTROL CENTER</div>
-  <h1>Poder total.<br/><span>Uma interface.</span></h1>
-  <p class="lead">Economia, RPG, arena, música e moderação — configuração centralizada no painel e documentação oficial na wiki.</p>
-  <div class="cta">
-    <a class="b bp" href="/login">Entrar com Discord</a>
-    <a class="b bg" href="/wiki">Wiki oficial</a>
-  </div>
-</section>
-<section class="feat">
-  <div class="fc"><i>🎰</i><h3>Economia e jogos</h3><p>Daily, trabalho, loja, troca e cassino com regras por servidor.</p></div>
-  <div class="fc"><i>⚔️</i><h3>RPG e arena</h3><p>Classes, habilidades, equipamentos e combates na interface web.</p></div>
-  <div class="fc"><i>🎵</i><h3>Música</h3><p>Fila, volume e controle em canal de voz via Lavalink.</p></div>
-  <div class="fc"><i>🛡️</i><h3>Moderação e painel</h3><p>Automod, parcerias, drops e ajustes sem depender só do chat.</p></div>
-</section>
-<footer>Aeternus · painel e wiki oficial</footer>
+
+    <div class="animated-bg"></div>
+
+    <header>
+        <div class="logo">
+            <i class="fa-solid fa-cube"></i> Aeternus
+        </div>
+        
+        <div class="menu-container">
+            <button class="menu-btn" id="menuToggle" aria-label="Menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <div class="dropdown-menu" id="dropdownMenu">
+                <a href="#" class="dropdown-item"><i class="fa-solid fa-gauge-high"></i> Painel</a>
+                <a href="#" class="dropdown-item"><i class="fa-solid fa-server"></i> Servidores</a>
+                <a href="#" class="dropdown-item"><i class="fa-solid fa-book-open"></i> Wiki</a>
+                <a href="#" class="dropdown-item"><i class="fa-solid fa-terminal"></i> Comandos</a>
+                <a href="#" class="dropdown-item"><i class="fa-solid fa-gift"></i> Daily</a>
+                <a href="#" class="dropdown-item"><i class="fa-solid fa-palette"></i> Tema</a>
+                <div class="dropdown-divider"></div>
+                <a href="#" class="dropdown-item"><i class="fa-solid fa-chart-pie"></i> Estatísticas</a>
+                <a href="#" class="dropdown-item"><i class="fa-solid fa-headset"></i> Suporte</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <h1>O Futuro da Autonomia & RPG no Discord</h1>
+        <p>Aeternus é um bot de inteligência artificial de ponta equipado com sistemas dinâmicos de Éter e XP, mini-games, moderação autônoma avançada e controle total para administradores.</p>
+        <div class="hero-btns">
+            <a href="#" class="btn-primary"><i class="fa-brands fa-discord"></i> Adicionar o Bot</a>
+            <a href="#" class="btn-secondary"><i class="fa-solid fa-headset"></i> Servidor de Suporte</a>
+            <a href="#" class="btn-secondary"><i class="fa-solid fa-gauge-high"></i> Painel de Controle</a>
+        </div>
+    </section>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <i class="fa-solid fa-server"></i>
+            <h3>12</h3>
+            <span>Servidores Conectados</span>
+        </div>
+        <div class="stat-card">
+            <i class="fa-solid fa-users"></i>
+            <h3>1.420</h3>
+            <span>Usuários Registrados</span>
+        </div>
+        <div class="stat-card">
+            <i class="fa-solid fa-trophy"></i>
+            <h3>Ranking Ativo</h3>
+            <span>Éter & XP Global</span>
+        </div>
+    </div>
+
+    <div class="content-container">
+        <div class="info-card">
+            <h2><i class="fa-solid fa-shield-halved"></i> Regras do Bot</h2>
+            <ul>
+                <li><i class="fa-solid fa-check"></i> <strong>Uso Justo:</strong> É terminantemente proibido o uso de automações (macro/scripts) para farmar Éter, XP ou vencer mini-games de forma desleal.</li>
+                <li><i class="fa-solid fa-check"></i> <strong>Moderação Respeitosa:</strong> Comandos de moderação autônoma e ferramentas de staff devem ser utilizados com responsabilidade e ética nos servidores.</li>
+                <li><i class="fa-solid fa-check"></i> <strong>Termos do Discord:</strong> Todas as interações devem seguir rigorosamente os Termos de Serviço e as Diretrizes da Comunidade do Discord.</li>
+                <li><i class="fa-solid fa-check"></i> <strong>Bypassing:</strong> Tentar explorar falhas, bugs ou vulnerabilidades do núcleo de IA resultará no banimento permanente do usuário e do servidor infrator.</li>
+            </ul>
+        </div>
+
+        <div class="info-card">
+            <h2><i class="fa-solid fa-lock"></i> Política de Privacidade</h2>
+            <ul>
+                <li><i class="fa-solid fa-check"></i> <strong>Coleta Mínima:</strong> Armazenamos apenas dados essenciais para o funcionamento do bot (IDs de usuários, saldos de Éter, níveis de XP e configurações do servidor).</li>
+                <li><i class="fa-solid fa-check"></i> <strong>Armazenamento Seguro:</strong> Os dados persistentes são salvos localmente em estruturas JSON criptografadas e protegidas contra acessos não autorizados.</li>
+                <li><i class="fa-solid fa-check"></i> <strong>Privacidade de Mensagens:</strong> O conteúdo de mensagens privadas e canais de texto não é armazenado permanentemente além do cache de moderação e dicionário.</li>
+                <li><i class="fa-solid fa-check"></i> <strong>Controle Total:</strong> Administradores podem solicitar a limpeza de dados do servidor ou redefinições de economia a qualquer momento via comandos de staff.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const menuToggle = document.getElementById('menuToggle');
+        const dropdownMenu = document.getElementById('dropdownMenu');
+
+        menuToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownMenu.classList.toggle('active');
+        });
+
+        window.addEventListener('click', () => {
+            if (dropdownMenu.classList.contains('active')) {
+                dropdownMenu.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>
