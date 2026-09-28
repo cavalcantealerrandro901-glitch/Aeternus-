@@ -30,19 +30,29 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: -1;
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e),
-                        url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop');
+            z-index: -2;
+            background-image: url('anime-girl-grey_hair-long_hair-blue_eyes-1409476.jpg');
             background-size: cover;
             background-position: center;
-            animation: moveBackground 20s ease infinite alternate;
-            filter: brightness(0.4);
+            animation: slowZoomPan 25s ease-in-out infinite alternate;
+            filter: brightness(0.65) contrast(1.05);
         }
 
-        @keyframes moveBackground {
+        .bg-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at center, rgba(11, 15, 25, 0.4) 0%, rgba(11, 15, 25, 0.85) 100%);
+            backdrop-filter: blur(3px);
+        }
+
+        @keyframes slowZoomPan {
             0% { transform: scale(1) translate(0, 0); }
-            50% { transform: scale(1.05) translate(-10px, -15px); }
-            100% { transform: scale(1.1) translate(10px, 15px); }
+            50% { transform: scale(1.08) translate(-15px, -10px); }
+            100% { transform: scale(1.12) translate(15px, 10px); }
         }
 
         header {
@@ -50,8 +60,8 @@
             justify-content: space-between;
             align-items: center;
             padding: 20px 50px;
-            background: rgba(15, 15, 25, 0.3);
-            backdrop-filter: blur(10px);
+            background: rgba(15, 15, 25, 0.4);
+            backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             position: relative;
             z-index: 100;
@@ -65,6 +75,7 @@
             align-items: center;
             gap: 10px;
             text-decoration: none;
+            text-shadow: 0 2px 10px rgba(167, 139, 250, 0.4);
         }
 
         .menu-container {
@@ -72,8 +83,8 @@
         }
 
         .menu-btn {
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             color: #cbd5e1;
             width: 45px;
             height: 45px;
@@ -87,9 +98,10 @@
         }
 
         .menu-btn:hover {
-            background: rgba(167, 139, 250, 0.2);
-            border-color: rgba(167, 139, 250, 0.4);
+            background: rgba(167, 139, 250, 0.3);
+            border-color: rgba(167, 139, 250, 0.6);
             color: #a78bfa;
+            box-shadow: 0 0 15px rgba(167, 139, 250, 0.3);
         }
 
         .dropdown-menu {
@@ -97,11 +109,11 @@
             top: 60px;
             right: 0;
             width: 240px;
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(15, 23, 42, 0.92);
             backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 16px;
-            box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.7);
             padding: 10px;
             display: none;
             flex-direction: column;
@@ -138,7 +150,7 @@
         }
 
         .dropdown-item:hover {
-            background: rgba(139, 92, 246, 0.15);
+            background: rgba(139, 92, 246, 0.2);
             color: #ffffff;
             transform: translateX(3px);
         }
@@ -164,16 +176,18 @@
             font-size: 46px;
             font-weight: 700;
             margin-bottom: 20px;
-            background: linear-gradient(to right, #ffffff, #c084fc);
+            background: linear-gradient(to right, #ffffff, #c084fc, #a78bfa);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         }
 
         .hero p {
             font-size: 18px;
-            color: #94a3b8;
+            color: #cbd5e1;
             margin-bottom: 35px;
             line-height: 1.6;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
         }
 
         .hero-btns {
@@ -194,21 +208,22 @@
             border-radius: 12px;
             text-decoration: none;
             font-weight: 600;
-            box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.4);
-            transition: transform 0.2s, opacity 0.2s;
+            box-shadow: 0 10px 25px -5px rgba(139, 92, 246, 0.5);
+            transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s;
         }
 
         .btn-primary:hover {
             transform: scale(1.03);
             opacity: 0.95;
+            box-shadow: 0 15px 30px -5px rgba(139, 92, 246, 0.7);
         }
 
         .btn-secondary {
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            background: rgba(30, 41, 59, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             color: #ffffff;
             padding: 14px 28px;
             border-radius: 12px;
@@ -219,15 +234,14 @@
         }
 
         .btn-secondary:hover {
-            background: rgba(167, 139, 250, 0.2);
-            border-color: rgba(167, 139, 250, 0.4);
+            background: rgba(167, 139, 250, 0.25);
+            border-color: rgba(167, 139, 250, 0.5);
             transform: scale(1.03);
             color: #c084fc;
         }
 
-        /* Footer & Links Modais */
         footer {
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(15, 23, 42, 0.85);
             backdrop-filter: blur(16px);
             border-top: 1px solid rgba(255, 255, 255, 0.08);
             padding: 30px 50px;
@@ -271,11 +285,10 @@
             font-weight: 600;
         }
 
-        /* Modal Styles */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.75);
             backdrop-filter: blur(8px);
             display: none;
             align-items: center;
@@ -295,7 +308,7 @@
             max-width: 650px;
             width: 100%;
             padding: 35px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
             position: relative;
             animation: modalIn 0.3s ease;
         }
@@ -366,6 +379,7 @@
 <body>
 
     <div class="animated-bg"></div>
+    <div class="bg-overlay"></div>
 
     <header>
         <a href="index.html" class="logo">
@@ -398,7 +412,6 @@
         </div>
     </section>
 
-    <!-- Footer com Links Modais e Informações -->
     <footer>
         <div class="footer-links">
             <a class="footer-link" id="openRules"><i class="fa-solid fa-shield-halved"></i> Regras de Uso</a>
@@ -410,73 +423,50 @@
         </div>
     </footer>
 
-    <!-- Modal Regras -->
     <div class="modal-overlay" id="rulesModal">
         <div class="modal-card">
             <button class="modal-close" id="closeRules"><i class="fa-solid fa-xmark"></i></button>
             <h2><i class="fa-solid fa-shield-halved"></i> Regras e Termos de Uso</h2>
             <div class="modal-body">
                 <ul>
-                    <li><i class="fa-solid fa-check"></i> <strong>Uso Justo:</strong> É terminantemente proibido o uso de automações (macro/scripts) para farmar Éter, XP ou vencer mini-games de forma desleal.</li>
-                    <li><i class="fa-solid fa-check"></i> <strong>Moderação Respeitosa:</strong> Comandos de moderação autônoma e ferramentas de staff devem ser utilizados com responsabilidade e ética nos servidores.</li>
-                    <li><i class="fa-solid fa-check"></i> <strong>Termos do Discord:</strong> Todas as interações devem seguir rigorosamente os Termos de Serviço e as Diretrizes da Comunidade do Discord.</li>
-                    <li><i class="fa-solid fa-check"></i> <strong>Bypassing:</strong> Tentar explorar falhas, bugs ou vulnerabilidades do núcleo de IA resultará no banimento permanente do usuário e do servidor infrator.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Uso Justo:</strong> É terminantemente proibido o uso de automações para farmar Éter ou XP de forma desleal.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Moderação Respeitosa:</strong> Ferramentas de staff devem ser usadas com ética.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Termos do Discord:</strong> Siga rigorosamente as diretrizes da plataforma.</li>
                 </ul>
             </div>
         </div>
     </div>
 
-    <!-- Modal Privacidade -->
     <div class="modal-overlay" id="privacyModal">
         <div class="modal-card">
             <button class="modal-close" id="closePrivacy"><i class="fa-solid fa-xmark"></i></button>
             <h2><i class="fa-solid fa-lock"></i> Política de Privacidade</h2>
             <div class="modal-body">
                 <ul>
-                    <li><i class="fa-solid fa-check"></i> <strong>Coleta Mínima:</strong> Armazenamos apenas dados essenciais para o funcionamento do bot (IDs de usuários, saldos de Éter, níveis de XP e configurações do servidor).</li>
-                    <li><i class="fa-solid fa-check"></i> <strong>Armazenamento Seguro:</strong> Os dados persistentes são salvos localmente em estruturas JSON criptografadas e protegidas contra acessos não autorizados.</li>
-                    <li><i class="fa-solid fa-check"></i> <strong>Privacidade de Mensagens:</strong> O conteúdo de mensagens privadas e canais de texto não é armazenado permanentemente além do cache de moderação e dicionário.</li>
-                    <li><i class="fa-solid fa-check"></i> <strong>Controle Total:</strong> Administradores podem solicitar a limpeza de dados do servidor ou redefinições de economia a qualquer momento via comandos de staff.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Coleta Mínima:</strong> Apenas dados essenciais para o funcionamento do bot.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Segurança:</strong> Dados salvos de forma segura e protegida.</li>
                 </ul>
             </div>
         </div>
     </div>
 
     <script>
-        // Menu Hamburguer
         const menuToggle = document.getElementById('menuToggle');
         const dropdownMenu = document.getElementById('dropdownMenu');
-
         menuToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             dropdownMenu.classList.toggle('active');
         });
-
         window.addEventListener('click', () => {
-            if (dropdownMenu.classList.contains('active')) {
-                dropdownMenu.classList.remove('active');
-            }
+            if (dropdownMenu.classList.contains('active')) dropdownMenu.classList.remove('active');
         });
 
-        // Modais de Regras e Privacidade
         const rulesModal = document.getElementById('rulesModal');
         const privacyModal = document.getElementById('privacyModal');
-
-        document.getElementById('openRules').addEventListener('click', () => {
-            rulesModal.classList.add('active');
-        });
-        document.getElementById('closeRules').addEventListener('click', () => {
-            rulesModal.classList.remove('active');
-        });
-
-        document.getElementById('openPrivacy').addEventListener('click', () => {
-            privacyModal.classList.add('active');
-        });
-        document.getElementById('closePrivacy').addEventListener('click', () => {
-            privacyModal.classList.remove('active');
-        });
-
-        // Fechar modal clicando fora do card
+        document.getElementById('openRules').addEventListener('click', () => rulesModal.classList.add('active'));
+        document.getElementById('closeRules').addEventListener('click', () => rulesModal.classList.remove('active'));
+        document.getElementById('openPrivacy').addEventListener('click', () => privacyModal.classList.add('active'));
+        document.getElementById('closePrivacy').addEventListener('click', () => privacyModal.classList.remove('active'));
         window.addEventListener('click', (e) => {
             if (e.target === rulesModal) rulesModal.classList.remove('active');
             if (e.target === privacyModal) privacyModal.classList.remove('active');
