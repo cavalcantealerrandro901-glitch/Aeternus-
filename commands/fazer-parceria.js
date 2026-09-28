@@ -2,6 +2,9 @@ const {
     SlashCommandBuilder,
     PermissionFlagsBits,
     EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
     ChannelType,
     MessageFlags
 } = require('discord.js');
@@ -29,7 +32,7 @@ async function resolveInvite(client, textOrUrl) {
     if (!code) {
         return {
             ok: false,
-            error: 'Não achei um convite `discord.gg/...` dentro do texto. Coloque o link na mensagem da parceria.'
+            error: 'Não foi encontrado um convite `discord.gg/...` válido no texto.'
         };
     }
     try {
@@ -38,7 +41,7 @@ async function resolveInvite(client, textOrUrl) {
         if (!name && !inv.guild) {
             return {
                 ok: false,
-                error: 'Não consegui confirmar este convite (expirado, inválido ou privado).'
+                error: 'Não foi possível validar este convite (expirado ou sem permissão).'
             };
         }
         const url = normalizeInviteUrl(inv.code || code);
@@ -47,12 +50,12 @@ async function resolveInvite(client, textOrUrl) {
             code: inv.code || code,
             url: url,
             serverName: name || 'Servidor (' + code + ')',
-            memberCount: inv.memberCount != null ? inv.memberCount : null
+            memberCount: inv.memberCount != null ? inv.memberCount : 'N/A'
         };
     } catch (_) {
         return {
             ok: false,
-            error: 'Convite **não encontrado** ou expirado. Confira o link no texto.'
+            error: 'Convite **inválido ou expirado**. Verifique o link no texto.'
         };
     }
 }
@@ -63,10 +66,11 @@ async function postAnywhere(channel, payload, serverName) {
     if (channel.type === ChannelType.GuildForum) {
         try {
             const thread = await channel.threads.create({
-                name: 'Parceria · ' + String(serverName || 'Parceiro').slice(0, 80),
+                name: '🤝 Parceria · ' + String(serverName || 'Parceiro').slice(0, 80),
                 message: {
                     content: payload.content,
                     embeds: payload.embeds,
+                    components: payload.components,
                     allowedMentions: payload.allowedMentions
                 },
                 reason: 'Parceria Aeternus'
@@ -95,45 +99,46 @@ async function postAnywhere(channel, payload, serverName) {
 }
 
 module.exports = {
-    name: 'fazer parceria',
-    aliases: ['parceria', 'addparceria', 'nova parceria'],
-    description: 'Registra parceria com texto personalizado (link dentro do texto)',
+    name: 'parceria',
+    aliases: ['fazer-parceria', 'fazerparceria', 'parceria', 'addparceria'],
+    description: 'Registra uma nova parceria no servidor',
     category: 'moderacao',
 
     data: new SlashCommandBuilder()
-        .setName('fazer-parceria')
-        .setDescription('Registra parceria: texto + representante, em qualquer canal')
-        .addUserOption(function (o) {
-            return o
-                .setName('representante')
-                .setDescription('Membro que representa a parceria neste servidor')
-                .setRequired(true);
-        })
-        .addStringOption(function (o) {
-            return o
-                .setName('texto')
-                .setDescription('Texto da parceria (formatação + link discord.gg dentro)')
-                .setRequired(true)
-                .setMaxLength(4000);
-        })
-        .addChannelOption(function (o) {
-            return o
-                .setName('canal')
-                .setDescription('Destino: texto, anúncio, call, fórum… (padrão: canal atual)')
-                .setRequired(false);
-        })
-        .addRoleOption(function (o) {
-            return o
-                .setName('notificar')
-                .setDescription('Cargo para notificar no anúncio (opcional)')
-                .setRequired(false);
-        })
+        .setName('parceria')
+        .setDescription('Gerenciamento de parcerias do servidor')
+        .addSubcommand(sub =>
+            sub
+                .setName('fazer')
+                .setDescription('Registra uma nova parceria com um servidor')
+                .addUserOption(o =>
+                    o.setName('representante')
+                        .setDescription('Membro que representa a parceria')
+                        .setRequired(true)
+                )
+                .addStringOption(o =>
+                    o.setName('texto')
+                        .setDescription('Texto da parceria (com link de convite do Discord)')
+                        .setRequired(true)
+                        .setMaxLength(4000)
+                )
+                .addChannelOption(o =>
+                    o.setName('canal')
+                        .setDescription('Canal de destino (padrão: canal atual)')
+                        .setRequired(false)
+                )
+                .addRoleOption(o =>
+                    o.setName('notificar')
+                        .setDescription('Cargo para mencionar no anúncio (opcional)')
+                        .setRequired(false)
+                )
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
 
     async execute(message, args) {
         if (!message.member || !message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-            return message.reply('❌ Precisa de **Gerenciar Servidor**.');
+            return message.reply('❌ Requer permissão de **Gerenciar Servidor**.');
         }
         const rep =
             message.mentions.members.first() ||
@@ -144,7 +149,7 @@ module.exports = {
 
         let texto = message.content
             .replace(
-                /^(?:<@!?\d+>\s*)?(?:O\.)?(?:fazer-parceria|parceria|addparceria|novaparceria)\s*/i,
+                /^(?:<@!?\d+>\s*)?(?:O\.)?(?:parceria\s+fazer|fazerparceria|fazer-parceria|parceria|addparceria)\s*/i,
                 ''
             )
             .replace(/<@!?\d+>/g, '')
@@ -161,10 +166,9 @@ module.exports = {
 
         if (!rep || !texto) {
             return message.reply(
-                'Uso:\n' +
-                    '`O.fazer-parceria @representante [#canal] [@cargo-notificar]` + texto\n' +
-                    'Ou responda à mensagem do texto com o comando.\n' +
-                    '_Canal e cargo de notificação são opcionais._'
+                '❌ **Uso do comando:**\n' +
+                    '`O.parceria fazer @representante [#canal] [@cargo]` + texto\n' +
+                    '_Também pode responder à mensagem que contém o texto da parceria._'
             );
         }
 
@@ -182,26 +186,30 @@ module.exports = {
     async executeSlash(i) {
         if (!i.memberPermissions || !i.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
             return i.reply({
-                content: '❌ Precisa de **Gerenciar Servidor**.',
+                content: '❌ Requer permissão de **Gerenciar Servidor**.',
                 flags: MessageFlags.Ephemeral
             });
         }
         await i.deferReply({ flags: MessageFlags.Ephemeral });
-        const user = i.options.getUser('representante', true);
-        const texto = i.options.getString('texto', true).trim();
-        const targetChannel = i.options.getChannel('canal') || i.channel;
-        const notifyRole = i.options.getRole('notificar');
-        const member = await i.guild.members.fetch(user.id).catch(function () { return null; });
 
-        return run(i, {
-            repUser: user,
-            member: member,
-            texto: texto,
-            targetChannel: targetChannel,
-            client: i.client,
-            isSlash: true,
-            notifyRoleId: notifyRole ? notifyRole.id : null
-        });
+        const sub = i.options.getSubcommand();
+        if (sub === 'fazer') {
+            const user = i.options.getUser('representante', true);
+            const texto = i.options.getString('texto', true).trim();
+            const targetChannel = i.options.getChannel('canal') || i.channel;
+            const notifyRole = i.options.getRole('notificar');
+            const member = await i.guild.members.fetch(user.id).catch(function () { return null; });
+
+            return run(i, {
+                repUser: user,
+                member: member,
+                texto: texto,
+                targetChannel: targetChannel,
+                client: i.client,
+                isSlash: true,
+                notifyRoleId: notifyRole ? notifyRole.id : null
+            });
+        }
     }
 };
 
@@ -215,9 +223,10 @@ async function run(ctx, opts) {
     const notifyRoleId = opts.notifyRoleId;
 
     const guild = ctx.guild;
-    const conf = partnerships.getConfig(guild.id);
+    
+    const conf = (await partnerships.getConfig(guild.id)) || {};
     if (conf.enabled === false) {
-        return reply(ctx, isSlash, '❌ Sistema de parcerias desativado no painel.');
+        return reply(ctx, isSlash, '❌ O sistema de parcerias está desativado nas configurações.');
     }
 
     const resolved = await resolveInvite(client, texto);
@@ -234,23 +243,49 @@ async function run(ctx, opts) {
     }
 
     const name = resolved.serverName;
-    const inviteMd = '[Entrar em ' + name + '](' + resolved.url + ')';
+    
+    const repRoleId = conf.roleId || conf.repRoleId || null;
+    const pingRoleId = notifyRoleId || conf.notifyRoleId || conf.pingRoleId || null;
 
-    const repRoleId = conf.roleId || null;
-    const pingRoleId = notifyRoleId || conf.notifyRoleId || null;
+    const mentionsText = [];
+    if (pingRoleId) mentionsText.push('<@&' + pingRoleId + '>');
+    mentionsText.push(`${repUser}`);
 
-    const footerPings = [];
-    footerPings.push('**Rep:** <@' + repUser.id + '>');
-    if (pingRoleId) {
-        footerPings.push('**Notificação:** <@&' + pingRoleId + '>');
+    const partnerEmbed = new EmbedBuilder()
+        .setColor(0x8b5cf6)
+        .setTitle(`🤝 PARCERIA OFICIAL · ${name.toUpperCase()}`)
+        .setDescription(
+            `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
+            `${texto}\n\n` +
+            `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`
+        )
+        .addFields(
+            { name: '👑 Representante', value: `${repUser}`, inline: true },
+            { name: '🏰 Servidor', value: `**${name}**`, inline: true },
+            { name: '👥 Membros Est.', value: `\`${resolved.memberCount}\``, inline: true }
+        )
+        .setFooter({
+            text: `Aeternus RPG • Parcerias • Staff: ` + ((ctx.user && ctx.user.tag) || (ctx.author && ctx.author.tag) || 'Staff'),
+            iconURL: guild.iconURL({ dynamic: true })
+        })
+        .setTimestamp();
+
+    if (conf.image && /^https?:\/\//i.test(conf.image)) {
+        partnerEmbed.setImage(conf.image);
     }
-    const pingBlock = '\n\n' + footerPings.join(' · ');
-    const body = String(texto).trim();
-    const maxBody = Math.max(0, 2000 - pingBlock.length);
-    const finalContent = body.slice(0, maxBody) + pingBlock;
+
+    const mainRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setLabel(`Entrar em ${name.slice(0, 25)}`)
+            .setStyle(ButtonStyle.Link)
+            .setURL(resolved.url)
+            .setEmoji('🌐')
+    );
 
     const payload = {
-        content: finalContent,
+        content: mentionsText.join(' '),
+        embeds: [partnerEmbed],
+        components: [mainRow],
         allowedMentions: {
             users: [repUser.id],
             roles: pingRoleId ? [String(pingRoleId)] : [],
@@ -258,34 +293,19 @@ async function run(ctx, opts) {
         }
     };
 
-    if (conf.image && /^https?:\/\//i.test(conf.image)) {
-        payload.embeds = [
-            new EmbedBuilder()
-                .setColor(0xa78bfa)
-                .setImage(conf.image)
-                .setFooter({
-                    text:
-                        'Parceria · ' +
-                        name +
-                        ' · por ' +
-                        ((ctx.user && ctx.user.tag) || (ctx.author && ctx.author.tag) || 'staff')
-                })
-        ];
-    }
-
     const posted = await postAnywhere(ch, payload, name);
     if (!posted.ok) {
         return reply(
             ctx,
             isSlash,
-            '❌ Não consegui enviar em ' + ch + ': ' + (posted.error || 'erro desconhecido')
+            '❌ Não foi possível enviar no canal ' + ch + ': ' + (posted.error || 'erro desconhecido')
         );
     }
 
     const msg = posted.msg;
     const dest = posted.channel || ch;
 
-    const entry = partnerships.create(guild.id, {
+    const entry = await partnerships.create(guild.id, {
         repId: repUser.id,
         repTag: repUser.tag,
         inviteUrl: resolved.url,
@@ -311,44 +331,61 @@ async function run(ctx, opts) {
     }
 
     try {
-        await repUser.send(
-            partnerships.fixedDmPayload({
-                host: guild.name,
-                server: name,
-                invite: inviteMd
+        const dmEmbed = new EmbedBuilder()
+            .setColor(0x8b5cf6)
+            .setTitle('✦ PARCERIA OFICIAL')
+            .setDescription(
+                `É com satisfação que anunciamos o **${name}** como novo parceiro oficial do **Aeternus**.\n\n` +
+                `Agradecemos pela confiança e esperamos construir uma parceria sólida e duradoura entre nossas comunidades. ♡\n\n` +
+                `◇ ───────────────── ◇\n\n` +
+                `**INFORMAÇÃO IMPORTANTE**\n\n` +
+                `O representante do **${name}** deverá permanecer no servidor durante toda a parceria. Caso saia, a parceria será cancelada imediatamente.`
+            )
+            .setFooter({
+                text: 'Aeternus RPG • Parcerias',
+                iconURL: guild.iconURL({ dynamic: true })
             })
+            .setTimestamp();
+
+        const dmRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel(`Entrar em ${guild.name}`)
+                .setStyle(ButtonStyle.Link)
+                .setURL(resolved.url)
+                .setEmoji('🏰')
         );
+
+        await repUser.send({ embeds: [dmEmbed], components: [dmRow] });
     } catch (_) {}
 
-    const ok = new EmbedBuilder()
-        .setColor(0x22c55e)
-        .setTitle('✅ Parceria registrada')
-        .setDescription(
-            '**Representante:** ' +
-                repUser +
-                '\n' +
-                '**Servidor confirmado:** **' +
-                name +
-                '**\n' +
-                '**Convite (do texto):** ' +
-                inviteMd +
-                '\n' +
-                '**Canal:** ' +
-                dest +
-                '\n' +
-                '**ID:** `' +
-                entry.id +
-                '`\n' +
-                (roleGiven && repRoleId
-                    ? '**Cargo do representante:** <@&' + repRoleId + '>\n'
-                    : repRoleId
-                      ? '**Cargo do representante:** configurado, mas não foi possível aplicar.\n'
-                      : '') +
-                (pingRoleId ? '**Notificação:** <@&' + pingRoleId + '>\n' : '') +
-                '\n_Se o representante sair, a parceria e a mensagem são removidas._'
-        );
+    const okEmbed = new EmbedBuilder()
+        .setColor(0x10b981)
+        .setTitle('✅ Parceria Registrada com Sucesso!')
+        .setDescription(`A parceria com **${name}** está ativa e publicada em ${dest}.`)
+        .addFields(
+            { name: '👤 Representante', value: `${repUser} (\`${repUser.id}\`)`, inline: true },
+            { name: '🏰 Servidor', value: `**${name}**`, inline: true },
+            { name: '📍 Canal', value: `${dest}`, inline: true },
+            { name: '🆔 ID Registro', value: `\`${entry?.id || 'OK'}\``, inline: true },
+            { 
+                name: '🎭 Cargo Rep. (MongoDB)', 
+                value: roleGiven && repRoleId 
+                    ? `<@&${repRoleId}> (Atribuído)` 
+                    : repRoleId 
+                    ? `<@&${repRoleId}> (Erro ao atribuir)` 
+                    : '_Não configurado no painel_', 
+                inline: true 
+            },
+            {
+                name: '🔔 Cargo Notificação',
+                value: pingRoleId ? `<@&${pingRoleId}>` : '_Sem cargo de notificação_',
+                inline: true
+            }
+        )
+        .setFooter({ text: 'Aeternus Parcerias' })
+        .setTimestamp();
 
-    return reply(ctx, isSlash, { embeds: [ok] });
+    return reply(ctx, isSlash, { embeds: [okEmbed] });
 }
 
 async function reply(ctx, isSlash, content) {
