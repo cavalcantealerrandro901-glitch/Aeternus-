@@ -155,7 +155,7 @@
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 60px 20px 40px 20px;
+            padding: 80px 20px;
             max-width: 900px;
             margin: 0 auto;
         }
@@ -223,49 +223,6 @@
             border-color: rgba(167, 139, 250, 0.4);
             transform: scale(1.03);
             color: #c084fc;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            width: 100%;
-            max-width: 1000px;
-            margin: 0 auto 50px auto;
-            padding: 0 20px;
-        }
-
-        .stat-card {
-            background: rgba(30, 41, 59, 0.5);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 16px;
-            padding: 25px;
-            text-align: center;
-            transition: transform 0.3s, border-color 0.3s;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(167, 139, 250, 0.4);
-        }
-
-        .stat-card i {
-            font-size: 28px;
-            color: #a78bfa;
-            margin-bottom: 12px;
-        }
-
-        .stat-card h3 {
-            font-size: 26px;
-            font-weight: 700;
-            margin-bottom: 5px;
-            color: #f8fafc;
-        }
-
-        .stat-card span {
-            font-size: 13px;
-            color: #94a3b8;
         }
 
         /* Footer & Links Modais */
@@ -440,30 +397,6 @@
             <a href="dashboard.html" class="btn-secondary"><i class="fa-solid fa-gauge-high"></i> Painel de Controle</a>
         </div>
     </section>
-
-    <!-- Estatísticas Atualizadas com 4 Cards -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <i class="fa-solid fa-server"></i>
-            <h3>25</h3>
-            <span>Servidores Conectados</span>
-        </div>
-        <div class="stat-card">
-            <i class="fa-solid fa-users"></i>
-            <h3>3.450</h3>
-            <span>Membros Totais</span>
-        </div>
-        <div class="stat-card">
-            <i class="fa-solid fa-coins"></i>
-            <h3>85.400</h3>
-            <span>Éter em Circulação</span>
-        </div>
-        <div class="stat-card">
-            <i class="fa-solid fa-shield-halved"></i>
-            <h3>99.9%</h3>
-            <span>Moderação IA Ativa</span>
-        </div>
-    </div>
 
     <!-- Footer com Links Modais e Informações -->
     <footer>
