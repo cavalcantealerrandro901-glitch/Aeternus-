@@ -301,3 +301,16 @@ footer {
 footer strong {
     color: var(--text-primary);
 }
+
+/* Botão Suporte Discord */
+.btn-discord {
+    background: #5865F2;
+    color: #ffffff;
+    border: 1px solid #4752C4;
+}
+
+.btn-discord:hover {
+    background: #4752C4;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(88, 101, 242, 0.4);
+}
