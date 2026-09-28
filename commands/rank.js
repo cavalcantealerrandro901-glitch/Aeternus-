@@ -161,9 +161,15 @@ async function buildList(mode, guild, client) {
             if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
         }
 
-        return entries
-            .filter((e) => e.value > 0)
-            .sort((a, b) => b.value - a.value || b.level - a.level);
+        const out = [];
+        for (const e of entries) {
+            if (e.value <= 0) continue;
+            let u = client?.users?.cache?.get(e.id) || null;
+            if (!u && client) u = await client.users.fetch(e.id).catch(() => null);
+            if (u?.bot) continue;
+            out.push(e);
+        }
+        return out.sort((a, b) => b.value - a.value || b.level - a.level);
     }
 
     // Economia: saldos no MongoDB via utils/eter (store)
@@ -177,12 +183,30 @@ async function buildList(mode, guild, client) {
         const memberIds = new Set();
         try {
             const members = await guild.members.fetch().catch(() => null);
-            if (members) members.forEach((m) => memberIds.add(m.id));
+            if (members) {
+                members.forEach((m) => {
+                    if (m.user && !m.user.bot) memberIds.add(m.id);
+                });
+            }
         } catch (_) {}
         if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
     }
 
-    return entries.filter((e) => e.value > 0).sort((a, b) => b.value - a.value);
+    // Remove bots: cache + fetch sob demanda
+    const humans = [];
+    for (const e of entries) {
+        if (e.value <= 0) continue;
+        let u = client?.users?.cache?.get(e.id) || null;
+        if (!u && client) {
+            u = await client.users.fetch(e.id).catch(() => null);
+        }
+        if (u?.bot) continue;
+        // IDs de bot do Discord terminam com padrões; se não achou user, ainda inclui (pode ser user offline)
+        // Se client ausente, filtra só por value
+        humans.push(e);
+    }
+
+    return humans.sort((a, b) => b.value - a.value);
 }
 
 function findMyRank(list, userId) {
@@ -208,18 +232,21 @@ async function pageEmbed(client, list, mode, page, guildName, viewerId) {
         const e = slice[i];
         const pos = start + i;
         const u = await client.users.fetch(e.id).catch(() => null);
-        const tag = displayTag(u, e.id);
+        // Pula bots (garantia extra na página)
+        if (u?.bot) continue;
+
+        // <@id> no embed aparece marcado e NÃO notifica (só content notifica)
+        const mention = `<@${e.id}>`;
 
         if (meta.economy) {
-            // Formato: 🥇 @user = ID [id] | saldo: ✨ X éter  (não usar || = spoiler no Discord)
             blocks.push(
-                `${medal(pos)} ${tag} = ID [\`${e.id}\`] | saldo:  ✨ **${fmt(e.value)}** éter`
+                `${medal(pos)} ${mention} = ID [\`${e.id}\`] | saldo:  ✨ **${fmt(e.value)}** éter`
             );
         } else {
             const extra =
                 e.level != null ? `\n   Nv. **${e.level}**` : '';
             blocks.push(
-                `${medal(pos)} ${tag}\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+                `${medal(pos)} ${mention}\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
             );
         }
     }
