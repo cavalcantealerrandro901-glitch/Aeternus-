@@ -235,18 +235,21 @@ async function pageEmbed(client, list, mode, page, guildName, viewerId) {
         // Pula bots (garantia extra na página)
         if (u?.bot) continue;
 
-        // <@id> no embed aparece marcado e NÃO notifica (só content notifica)
-        const mention = `<@${e.id}>`;
+        // Nome real em texto (@Nome) — não notifica; <@id> às vezes só mostra o ID
+        const name = u
+            ? u.globalName || u.username || e.id
+            : e.id;
+        const tag = `@${name}`;
 
         if (meta.economy) {
             blocks.push(
-                `${medal(pos)} ${mention} = ID [\`${e.id}\`] | saldo:  ✨ **${fmt(e.value)}** éter`
+                `${medal(pos)} **${tag}** = ID [\`${e.id}\`] | saldo:  ✨ **${fmt(e.value)}** éter`
             );
         } else {
             const extra =
                 e.level != null ? `\n   Nv. **${e.level}**` : '';
             blocks.push(
-                `${medal(pos)} ${mention}\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+                `${medal(pos)} **${tag}**\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
             );
         }
     }
