@@ -3,316 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeternus · Selecionar Servidor</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Outfit', sans-serif;
-        }
-
-        body {
-            min-height: 100vh;
-            color: #ffffff;
-            overflow-x: hidden;
-            background-color: #0b0f19;
-        }
-
-        .animated-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e),
-                        url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1920&auto=format&fit=crop');
-            background-size: cover;
-            background-position: center;
-            animation: moveBackground 20s ease infinite alternate;
-            filter: brightness(0.4);
-        }
-
-        @keyframes moveBackground {
-            0% { transform: scale(1) translate(0, 0); }
-            50% { transform: scale(1.05) translate(-10px, -15px); }
-            100% { transform: scale(1.1) translate(10px, 15px); }
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 50px;
-            background: rgba(15, 15, 25, 0.3);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            position: relative;
-            z-index: 100;
-        }
-
-        .logo {
-            font-size: 24px;
-            font-weight: 700;
-            color: #a78bfa;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-        }
-
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            padding: 8px 16px;
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-        }
-
-        .user-profile img {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .user-profile span {
-            font-weight: 500;
-            font-size: 14px;
-            color: #e2e8f0;
-        }
-
-        .dashboard-container {
-            max-width: 1000px;
-            margin: 50px auto;
-            padding: 0 20px;
-        }
-
-        .welcome-box {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
-            padding: 35px;
-            margin-bottom: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .welcome-text h1 {
-            font-size: 28px;
-            font-weight: 700;
-            color: #f8fafc;
-            margin-bottom: 8px;
-        }
-
-        .welcome-text p {
-            color: #94a3b8;
-            font-size: 15px;
-        }
-
-        .bot-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(16, 185, 129, 0.15);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #34d399;
-            padding: 8px 16px;
-            border-radius: 30px;
-            font-weight: 500;
-            font-size: 13px;
-        }
-
-        .bot-status i {
-            font-size: 8px;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
-        }
-
-        .servers-section h2 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #c084fc;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .servers-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-        }
-
-        .server-card {
-            background: rgba(30, 41, 59, 0.5);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 16px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            transition: all 0.3s ease;
-        }
-
-        .server-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(167, 139, 250, 0.4);
-            background: rgba(30, 41, 59, 0.8);
-        }
-
-        .server-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .server-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 14px;
-            background: linear-gradient(135deg, #8b5cf6, #3b82f6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            font-weight: 700;
-            color: white;
-        }
-
-        .server-details h3 {
-            font-size: 16px;
-            font-weight: 600;
-            color: #f8fafc;
-            margin-bottom: 4px;
-        }
-
-        .server-details span {
-            font-size: 13px;
-            color: #94a3b8;
-        }
-
-        .btn-manage {
-            background: rgba(139, 92, 246, 0.2);
-            border: 1px solid rgba(139, 92, 246, 0.4);
-            color: #c084fc;
-            padding: 8px 16px;
-            border-radius: 10px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 13px;
-            transition: all 0.2s;
-        }
-
-        .btn-manage:hover {
-            background: #8b5cf6;
-            color: white;
-        }
-    </style>
+    <title>Painel — Aeternus</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-
-    <div class="animated-bg"></div>
-
-    <header>
-        <a href="index.html" class="logo">
-            <i class="fa-solid fa-cube"></i> Aeternus
-        </a>
-        <div class="user-profile">
-            <img id="userAvatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" alt="Avatar">
-            <span id="userName">Carregando...</span>
-        </div>
+    <header class="header">
+        <nav class="navbar">
+            <div class="logo"><a href="index.html"><span class="logo-accent">AET</span>ERNUS</a></div>
+            <a href="index.html" class="btn btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">← Início</a>
+        </nav>
     </header>
 
-    <div class="dashboard-container">
-        <div class="welcome-box">
-            <div class="welcome-text">
-                <h1>Central de Comando, <span id="welcomeName">Comandante</span>!</h1>
-                <p>O núcleo do Aeternus está online e pronto para gerenciar suas comunidades. Selecione abaixo o servidor que deseja configurar.</p>
-            </div>
-            <div class="bot-status">
-                <i class="fa-solid fa-circle"></i> Sistema Operacional 100%
-            </div>
-        </div>
+    <main class="container">
+        <section class="hero" style="margin-bottom: 2rem;">
+            <h1>📊 Painel do Herói</h1>
+            <p>Acompanhe o seu progresso, nível e recursos acumulados.</p>
+        </section>
 
-        <div class="servers-section">
-            <h2><i class="fa-solid fa-server"></i> Servidores Disponíveis</h2>
-            <div class="servers-grid">
-                
-                <div class="server-card">
-                    <div class="server-info">
-                        <div class="server-icon">VC</div>
-                        <div class="server-details">
-                            <h3>Valhalla Community</h3>
-                            <span>1.240 Membros</span>
-                        </div>
-                    </div>
-                    <a href="server.html" class="btn-manage">Gerenciar</a>
+        <section class="features">
+            <div class="feature-card">
+                <div class="card-icon">⚡</div>
+                <h3>Nível & XP</h3>
+                <div class="card-description">
+                    <p>Nível Atual: <strong>42</strong></p>
+                    <p>XP: 8.450 / 10.000</p>
+                    <p>Próximo Raste: Guardião Astral</p>
                 </div>
-
-                <div class="server-card">
-                    <div class="server-info">
-                        <div class="server-icon" style="background: linear-gradient(135deg, #ec4899, #8b5cf6);">AG</div>
-                        <div class="server-details">
-                            <h3>Aeternus Gaming</h3>
-                            <span>180 Membros</span>
-                        </div>
-                    </div>
-                    <a href="server.html" class="btn-manage">Gerenciar</a>
-                </div>
-
-                <div class="server-card">
-                    <div class="server-info">
-                        <div class="server-icon" style="background: linear-gradient(135deg, #10b981, #3b82f6);">CC</div>
-                        <div class="server-details">
-                            <h3>CyberCafe Hub</h3>
-                            <span>450 Membros</span>
-                        </div>
-                    </div>
-                    <a href="server.html" class="btn-manage">Gerenciar</a>
-                </div>
-
             </div>
-        </div>
-    </div>
 
-    <script>
-        async function loadDiscordUser() {
-            try {
-                const response = await fetch('/api/me');
-                const data = await response.json();
-                
-                if (data.username) {
-                    document.getElementById('userName').textContent = data.username;
-                    document.getElementById('welcomeName').textContent = data.username;
-                    if (data.avatar) {
-                        document.getElementById('userAvatar').src = data.avatar;
-                    }
-                }
-            } catch (error) {
-                console.error('Erro ao carregar perfil do Discord:', error);
-                document.getElementById('userName').textContent = "Comandante";
-            }
-        }
+            <div class="feature-card">
+                <div class="card-icon">💰</div>
+                <h3>Recursos</h3>
+                <div class="card-description">
+                    <p>Moedas de Ouro: <strong>12.500</strong></p>
+                    <p>Gemas Divinas: <strong>320</strong></p>
+                    <p>Fragmentos de Alma: <strong>45</strong></p>
+                </div>
+            </div>
 
-        loadDiscordUser();
-    </script>
+            <div class="feature-card">
+                <div class="card-icon">🏆</div>
+                <h3>Estatísticas de Batalha</h3>
+                <div class="card-description">
+                    <p>Vitórias na Arena: <strong>128</strong></p>
+                    <p>Derrotas: <strong>19</strong></p>
+                    <p>Taxa de Vitórias: <strong>87.1%</strong></p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 <strong>Aeternus</strong>. Todos os direitos reservados.</p>
+    </footer>
+    <script src="dashboard-app.js"></script>
 </body>
 </html>
