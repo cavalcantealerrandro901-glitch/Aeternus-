@@ -1,4 +1,4 @@
-const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 function resolveMember(message, args) {
     const m = message.mentions.members.first();
@@ -8,22 +8,91 @@ function resolveMember(message, args) {
     return null;
 }
 
+function parseDuration(str) {
+    if (!str) return 10 * 60 * 1000; // Padrão: 10 minutos
+    const num = parseInt(str);
+    if (isNaN(num)) return 10 * 60 * 1000;
+    if (str.includes('h')) return num * 60 * 60 * 1000;
+    if (str.includes('d')) return num * 24 * 60 * 60 * 1000;
+    return num * 60 * 1000; // minutos por padrão
+}
+
+async function handleMuteProcess(context, moderator, targetMember, durationMs, reason, isSlash = false) {
+    const normalBtnId = `mute_normal_${moderator.id}_${Date.now()}`;
+    const silentBtnId = `mute_silent_${moderator.id}_${Date.now()}`;
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(normalBtnId)
+            .setLabel('Confirmar silêncio')
+            .setEmoji('✅️')
+            .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+            .setCustomId(silentBtnId)
+            .setLabel('Silêncio silencioso')
+            .setEmoji('🤫')
+            .setStyle(ButtonStyle.Secondary)
+    );
+
+    const content = `Nossa, você <@${moderator.id}> vai mutar <@${targetMember.id}> mesmo? Uh... Sendo assim, escolha uma das opções abaixo. Você tem 6 minutos para decidir.`;
+
+    let sentMsg;
+    if (isSlash) {
+        sentMsg = await context.reply({
+            content,
+            components: [row],
+            fetchReply: true
+        });
+    } else {
+        sentMsg = await context.reply({
+            content,
+            components: [row]
+        });
+    }
+
+    const filter = i => (i.customId === normalBtnId || i.customId === silentBtnId) && i.user.id === moderator.id;
+    const collector = sentMsg.createMessageComponentCollector({ filter, time: 6 * 60 * 1000, max: 1 });
+
+    collector.on('collect', async i => {
+        if (!targetMember.moderatable) {
+            return i.update({ content: '❌ Não consigo silenciar este membro (cargo mais alto).', components: [] });
+        }
+        
+        try {
+            await targetMember.timeout(durationMs, `${reason} · por ${moderator.tag}`);
+            
+            const isSilent = i.customId === silentBtnId;
+            const successText = isSilent
+                ? `---------- 🤫 O usuário <@${targetMember.id}> foi silenciado silenciosamente, mas quem manda quebrar as regras né!!`
+                : `---------- 🔇 O usuário <@${targetMember.id}> foi silenciado com sucesso, mas quem manda quebrar as regras né!!`;
+            
+            await i.update({
+                content: successText,
+                components: []
+            });
+        } catch (e) {
+            await i.update({ content: '❌ Não consegui silenciar o usuário.', components: [] });
+        }
+    });
+
+    collector.on('end', async (collected, reasonCollected) => {
+        if (reasonCollected === 'time') {
+            try {
+                await sentMsg.edit({ content: '⏳ Tempo esgotado para confirmar o silenciamento.', components: [] });
+            } catch (_) {}
+        }
+    });
+}
+
 module.exports = {
     name: 'mute',
-    aliases: ['timeout', 'silenciar'],
-    description: 'Silenciar membro (timeout)',
+    aliases: ['mutar', 'timeout', 'silenciar'],
+    description: 'Silenciar membro',
     data: new SlashCommandBuilder()
-        .setName('silenciar')
+        .setName('mutar-membro')
         .setDescription('Silenciar membro')
         .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
-        .addIntegerOption((o) =>
-            o
-                .setName('minutos')
-                .setDescription('Duração em minutos')
-                .setRequired(true)
-                .setMinValue(1)
-                .setMaxValue(10080)
-        )
+        .addStringOption((o) => o.setName('tempo').setDescription('Duração (ex: 10m, 1h)').setRequired(false))
         .addStringOption((o) => o.setName('motivo').setDescription('Motivo').setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
@@ -33,50 +102,35 @@ module.exports = {
         }
         const member = resolveMember(message, args);
         if (!member) return message.reply('❌ Mencione o membro ou informe o ID.');
+        if (member.id === message.author.id) return message.reply('❌ Você não pode se mutar.');
+        if (member.id === message.client.user.id) return message.reply('❌ Não posso me mutar.');
         if (!member.moderatable) return message.reply('❌ Não consigo silenciar este membro (cargo mais alto).');
-        const mins = parseInt(args[1], 10);
-        if (!mins || mins < 1) return message.reply('❌ Uso: `O.mute @user <minutos> [motivo]`');
-        const reason = args.slice(2).join(' ').trim() || 'Sem motivo';
-        try {
-            await member.timeout(mins * 60 * 1000, `${reason} · por ${message.author.tag}`);
-            await message.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0x6366f1)
-                        .setTitle('Mute')
-                        .setDescription(`**${member.user.tag}**\n⏱ **${mins}** min\n${reason}`)
-                        .setFooter({ text: `Mod: ${message.author.tag}` })
-                        .setTimestamp()
-                ]
-            });
-        } catch {
-            await message.reply('❌ Não consegui silenciar.');
-        }
+
+        const hasMention = !!message.mentions.members.first();
+        const timeArg = args[hasMention ? 1 : 1];
+        const durationMs = parseDuration(timeArg);
+        const reason = args.slice(hasMention ? 2 : 2).join(' ').trim() || 'Sem motivo';
+
+        await handleMuteProcess(message, message.author, member, durationMs, reason, false);
     },
 
     async executeSlash(i) {
+        if (!i.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+            return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
+        }
         const user = i.options.getUser('usuario', true);
-        const mins = i.options.getInteger('minutos', true);
+        const timeStr = i.options.getString('tempo');
         const reason = i.options.getString('motivo') || 'Sem motivo';
+        
         const member = await i.guild.members.fetch(user.id).catch(() => null);
         if (!member) return i.reply({ content: '❌ Membro não encontrado.', ephemeral: true });
+        if (member.id === i.user.id) return i.reply({ content: '❌ Você não pode se mutar.', ephemeral: true });
+        if (member.id === i.client.user.id) return i.reply({ content: '❌ Não posso me mutar.', ephemeral: true });
         if (!member.moderatable) {
             return i.reply({ content: '❌ Não consigo silenciar este membro (cargo mais alto).', ephemeral: true });
         }
-        try {
-            await member.timeout(mins * 60 * 1000, `${reason} · por ${i.user.tag}`);
-            await i.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0x6366f1)
-                        .setTitle('Mute')
-                        .setDescription(`**${user.tag}**\n⏱ **${mins}** min\n${reason}`)
-                        .setFooter({ text: `Mod: ${i.user.tag}` })
-                        .setTimestamp()
-                ]
-            });
-        } catch {
-            await i.reply({ content: '❌ Não consegui silenciar.', ephemeral: true });
-        }
+
+        const durationMs = parseDuration(timeStr);
+        await handleMuteProcess(i, i.user, member, durationMs, reason, true);
     }
 };
