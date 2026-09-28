@@ -12,6 +12,7 @@ const CATEGORIES = {
             { name: 'banco', desc: 'Ver banco', usage: 'banco [@user]', example: 'O.banco', about: 'Mostra carteira, cofre e total de éter.' },
             { name: 'depositar', desc: 'Depositar no banco', usage: 'depositar <valor|all|half>', example: 'O.dep 1k', about: 'Guarda éter no cofre (protegido de roubos).' },
             { name: 'sacar', desc: 'Sacar do banco', usage: 'sacar <valor|all|half>', example: 'O.sacar 500', about: 'Retira éter do cofre para a carteira.' },
+            { name: 'cambio', desc: 'Câmbio Éter ⇄ Sonhos (Loritta)', usage: 'cambio [comprar|vender|saldo] <valor>', example: 'O.cambio comprar 100', about: 'Troca éter do Aeternus por sonhos da Loritta e vice-versa.' },
             { name: 'pay', desc: 'Transferir éter', usage: 'pay @user <valor>', example: 'O.pay @user 2k', about: 'Envia éter da sua carteira para outro membro.' },
             { name: 'transacoes', desc: 'Extrato', usage: 'transacoes', example: 'O.transacoes', about: 'Lista as últimas movimentações de éter.' },
             { name: 'work', desc: 'Trabalhar por éter', usage: 'work', example: 'O.work', about: 'Ganha éter trabalhando (com ranking de cargos).' },
@@ -100,7 +101,6 @@ const CATEGORIES = {
         emoji: '🛠️',
         description: 'Ferramentas do dia a dia',
         commands: [
-            { name: 'aeternus', desc: 'IA do Aeternus', usage: 'aeternus <pergunta>', example: 'O.aeternus qual meu saldo?', about: 'Assistente com saldos (éter/Loritta), comandos, RPG, servidores e ajuda ao dono.' },
             { name: 'wiki', desc: 'Wiki oficial', usage: 'wiki', example: 'O.wiki', about: 'Abre a wiki oficial do Aeternus (RPG, guildas, economia, jogos).' },
             { name: 'help', desc: 'Central de ajuda', usage: 'help [categoria|comando]', example: 'O.ajuda saldo', about: 'Lista categorias ou detalhes de um comando.' },
             { name: 'ping', desc: 'Latência', usage: 'ping', example: 'O.ping', about: 'Mostra latência da API e do round-trip.' },
@@ -109,7 +109,7 @@ const CATEGORIES = {
             { name: 'avatar', desc: 'Ver avatar', usage: 'avatar [@user]', example: 'O.avatar @user', about: 'Mostra o avatar em alta resolução.' },
             { name: 'userinfo', desc: 'Info do usuário', usage: 'userinfo [@user]', example: 'O.userinfo @user', about: 'ID, data da conta, entrada e cargos.' },
             { name: 'serverinfo', desc: 'Info do servidor', usage: 'serverinfo', example: 'O.serverinfo', about: 'Resumo do servidor (membros, canais, etc.).' },
-            { name: 'rank', desc: 'Ranking', usage: 'rank [global|local|xp|xp global]', example: 'O.rank xp global', about: 'Ranking de éter global/local ou XP do servidor/global (O.topxp).' },
+            { name: 'rank', desc: 'Rank economia (éter)', usage: 'rank [global|local|xp|xp global]', example: 'O.rank', about: 'AETERNUS RANK GERAL — saldos de éter no MongoDB; local/xp opcionais.' },
             { name: 'msg', desc: 'Contagem de mensagens', usage: 'msg [@user]', example: 'O.msg', about: 'Mensagens de hoje, semana, mês e total.' },
             { name: 'contagem', desc: 'Definir contagem', usage: 'contagem [número]', example: 'O.contagem 10', about: 'Define o próximo número do canal de contagem (staff).' }
         ]
@@ -193,10 +193,7 @@ function findCommand(query) {
         skills: 'habilidades',
         passiva: 'passivas',
         perfil: 'j',
-        jogador: 'j',
-        ia: 'aeternus',
-        ai: 'aeternus',
-        assistente: 'aeternus'
+        jogador: 'j'
     };
 
     const name = aliases[q] || q;

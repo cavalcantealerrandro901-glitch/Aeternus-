@@ -6,7 +6,8 @@ const {
 } = require('discord.js');
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
-const PAGE_SIZE = 6;
+
+const PAGE_SIZE = 8;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -16,7 +17,15 @@ function medal(i) {
     return ['🥇', '🥈', '🥉'][i] || `**#${i + 1}**`;
 }
 
-/** Nome visual @user sem ping real */
+function clockNow() {
+    return new Date().toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo'
+    });
+}
+
+/** Nome visual sem ping real */
 function displayTag(user, fallbackId) {
     if (!user) return `@usuário-${String(fallbackId).slice(-4)}`;
     const name = user.globalName || user.username || `id-${fallbackId}`;
@@ -56,84 +65,73 @@ function parseMode(args) {
         a === 'servidor' ||
         a === 'server' ||
         a === 'eterlocal' ||
-        (a === 'eter' && (b === 'local' || b === 'servidor' || b === 'server' || !b))
+        (a === 'eter' && (b === 'local' || b === 'servidor' || b === 'server'))
     ) {
         return 'local';
     }
 
-    if (a === 'global' || a === 'mundo' || a === 'all') return 'global';
+    // padrão e aliases de economia
+    if (
+        a === 'global' ||
+        a === 'mundo' ||
+        a === 'all' ||
+        a === 'geral' ||
+        a === 'eter' ||
+        a === 'economia' ||
+        a === 'saldo' ||
+        !a
+    ) {
+        return 'global';
+    }
+
     return 'global';
 }
 
 function modeMeta(mode) {
     if (mode === 'xpglobal') {
         return {
-            title: '🏆 Ranking XP · Global',
+            title: 'AETERNUS RANK XP · GLOBAL',
             emoji: '⭐',
             unit: 'XP',
             color: 0xc084fc,
-            scope: 'global'
+            scope: 'global',
+            economy: false
         };
     }
     if (mode === 'xp') {
         return {
-            title: '🏆 Ranking XP · Servidor',
+            title: 'AETERNUS RANK XP · SERVIDOR',
             emoji: '⭐',
             unit: 'XP',
             color: 0xa78bfa,
-            scope: 'local'
+            scope: 'local',
+            economy: false
         };
     }
     if (mode === 'local') {
         return {
-            title: '🏆 Ranking Éter · Servidor',
+            title: 'AETERNUS RANK · SERVIDOR',
             emoji: '✨',
             unit: 'éter',
             color: 0x22d3ee,
-            scope: 'local'
+            scope: 'local',
+            economy: true
         };
     }
     return {
-        title: '🏆 Ranking Éter · Global',
+        title: 'AETERNUS RANK GERAL',
         emoji: '✨',
         unit: 'éter',
         color: 0xfbbf24,
-        scope: 'global'
+        scope: 'global',
+        economy: true
     };
 }
 
+/**
+ * Lista do ranking — saldos de Éter vêm do Mongo (store → eter.json).
+ */
 async function buildList(mode, guild, client) {
-    let memberIds = new Set();
-    const isLocal = mode === 'xp' || mode === 'local';
-
-    if (isLocal && guild) {
-        try {
-            const members = await guild.members.fetch().catch(() => null);
-            if (members) {
-                members.forEach((m) => {
-                    if (m.user && !m.user.bot) memberIds.add(m.id);
-                });
-            }
-        } catch (_) {}
-    } else if (client?.guilds?.cache?.size) {
-        for (const g of client.guilds.cache.values()) {
-            try {
-                if (g.members.cache.size > 1) {
-                    g.members.cache.forEach((m) => {
-                        if (m.user && !m.user.bot) memberIds.add(m.id);
-                    });
-                } else {
-                    const members = await g.members.fetch().catch(() => null);
-                    if (members) {
-                        members.forEach((m) => {
-                            if (m.user && !m.user.bot) memberIds.add(m.id);
-                        });
-                    }
-                }
-            } catch (_) {}
-        }
-    }
-
     if (mode === 'xp' || mode === 'xpglobal') {
         const data = xp.all() || {};
         let entries = Object.entries(data).map(([id, v]) => ({
@@ -142,42 +140,53 @@ async function buildList(mode, guild, client) {
             level: Number(v?.level || 0)
         }));
 
-        if (memberIds.size) {
-            entries = entries.filter((e) => memberIds.has(e.id));
+        if (mode === 'xp' && guild) {
+            const memberIds = new Set();
+            try {
+                const members = await guild.members.fetch().catch(() => null);
+                if (members) members.forEach((m) => memberIds.add(m.id));
+            } catch (_) {}
+            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
+        } else if (mode === 'xpglobal' && client?.guilds?.cache?.size) {
+            const memberIds = new Set();
+            for (const g of client.guilds.cache.values()) {
+                try {
+                    if (g.members.cache.size > 1) {
+                        g.members.cache.forEach((m) => {
+                            if (m.user && !m.user.bot) memberIds.add(m.id);
+                        });
+                    }
+                } catch (_) {}
+            }
+            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
         }
-
-        entries = entries.filter((e) => {
-            const user = client?.users?.cache?.get(e.id);
-            if (user && user.bot) return false;
-            return true;
-        });
 
         return entries
             .filter((e) => e.value > 0)
             .sort((a, b) => b.value - a.value || b.level - a.level);
     }
 
+    // Economia: saldos no MongoDB via utils/eter (store)
     const data = eter.all() || {};
     let entries = Object.entries(data).map(([id, v]) => ({
-        id,
+        id: String(id),
         value: Number(v || 0)
     }));
 
-    if (memberIds.size) {
-        entries = entries.filter((e) => memberIds.has(e.id));
+    if (mode === 'local' && guild) {
+        const memberIds = new Set();
+        try {
+            const members = await guild.members.fetch().catch(() => null);
+            if (members) members.forEach((m) => memberIds.add(m.id));
+        } catch (_) {}
+        if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
     }
-
-    entries = entries.filter((e) => {
-        const user = client?.users?.cache?.get(e.id);
-        if (user && user.bot) return false;
-        return true;
-    });
 
     return entries.filter((e) => e.value > 0).sort((a, b) => b.value - a.value);
 }
 
 function findMyRank(list, userId) {
-    const idx = list.findIndex((e) => e.id === userId);
+    const idx = list.findIndex((e) => e.id === String(userId));
     if (idx < 0) return { rank: null, value: 0, level: 0 };
     return {
         rank: idx + 1,
@@ -186,12 +195,13 @@ function findMyRank(list, userId) {
     };
 }
 
-async function pageEmbed(client, list, mode, page, guildName) {
+async function pageEmbed(client, list, mode, page, guildName, viewerId) {
     const meta = modeMeta(mode);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     const p = Math.min(Math.max(0, page), totalPages - 1);
     const start = p * PAGE_SIZE;
     const slice = list.slice(start, start + PAGE_SIZE);
+    const mine = findMyRank(list, viewerId);
 
     const blocks = [];
     for (let i = 0; i < slice.length; i++) {
@@ -199,39 +209,37 @@ async function pageEmbed(client, list, mode, page, guildName) {
         const pos = start + i;
         const u = await client.users.fetch(e.id).catch(() => null);
         const tag = displayTag(u, e.id);
-        const extra =
-            (mode === 'xp' || mode === 'xpglobal') && e.level != null ? `\n   Nv. **${e.level}**` : '';
 
-        blocks.push(
-            [
-                `${medal(pos)}  **${tag}**`,
-                `   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
-            ].join('\n')
-        );
+        if (meta.economy) {
+            // Formato pedido: 🥇 @user = ID [id] || saldo: ✨ X éter
+            blocks.push(
+                `${medal(pos)} ${tag} = ID [\`${e.id}\`] || saldo:  ✨ **${fmt(e.value)}** éter`
+            );
+        } else {
+            const extra =
+                e.level != null ? `\n   Nv. **${e.level}**` : '';
+            blocks.push(
+                `${medal(pos)} ${tag}\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+            );
+        }
     }
 
-    const body = blocks.length
-        ? blocks.join('\n\n──────────────────\n\n')
-        : '_Ninguém no ranking ainda._';
+    const body = blocks.length ? blocks.join('\n\n') : '_Ninguém no ranking ainda._';
 
-    const scopeLine =
-        meta.scope === 'local'
-            ? `Servidor: **${guildName || 'este servidor'}**`
-            : 'Todos os servidores do bot';
+    const posLine =
+        mine.rank != null
+            ? `Sua posição no rank: **${mine.rank}** posição.`
+            : 'Sua posição no rank: _você ainda não está no ranking._';
+
+    const serverLabel = guildName || 'Global';
+    const hora = clockNow();
 
     return new EmbedBuilder()
         .setColor(meta.color)
         .setTitle(meta.title)
-        .setDescription(
-            [
-                scopeLine,
-                `Total no ranking: **${fmt(list.length)}** · **${PAGE_SIZE}** por página`,
-                '',
-                body
-            ].join('\n')
-        )
+        .setDescription([posLine, '', body].join('\n'))
         .setFooter({
-            text: `Página ${p + 1}/${totalPages} · O.rank · O.rank xp · O.rank xp global`
+            text: `Aeternus rank • ${serverLabel} • hoje as ${hora}`
         })
         .setTimestamp();
 }
@@ -261,20 +269,19 @@ function navRow(mode, page, totalPages) {
 
 function helpEmbed() {
     return new EmbedBuilder()
-        .setColor(0xa78bfa)
-        .setTitle('🏆 Rankings Aeternus')
+        .setColor(0xfbbf24)
+        .setTitle('🏆 Rankings · Economia Aeternus')
         .setDescription(
             [
+                'Saldos lidos do **MongoDB** (éter).',
+                '',
                 '**Comandos**',
-                '`O.rank` — ranking **global** de Éter',
-                '`O.rank eter` / `O.rank local` — Éter **deste servidor**',
-                '`O.rank xp` — XP **deste servidor**',
-                '`O.rank xp global` — XP **global** (todos os servidores do bot)',
+                '`O.rank` — **AETERNUS RANK GERAL** (éter global)',
+                '`O.rank local` — éter deste servidor',
+                '`O.rank xp` — XP deste servidor',
+                '`O.rank xp global` — XP global',
                 '',
-                '**Navegação**',
-                '⬅️ Voltar · 👤 Ver meu rank · ➡️ Próximo',
-                '',
-                `${PAGE_SIZE} membros por página.`
+                '⬅️ Voltar · 👤 Meu rank · ➡️ Próximo'
             ].join('\n')
         )
         .setFooter({ text: 'Aeternus · Rank' });
@@ -292,7 +299,15 @@ async function sendRank(ctx, mode, page = 0) {
     const list = await buildList(mode, guild, ctx.client);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     const p = Math.min(Math.max(0, page), totalPages - 1);
-    const emb = await pageEmbed(ctx.client, list, mode, p, guild?.name);
+    const viewerId = ctx.user?.id || ctx.author?.id;
+    const emb = await pageEmbed(
+        ctx.client,
+        list,
+        mode,
+        p,
+        guild?.name || 'Global',
+        viewerId
+    );
 
     return {
         embeds: [emb],
@@ -303,15 +318,22 @@ async function sendRank(ctx, mode, page = 0) {
 module.exports = {
     name: 'rank',
     aliases: ['top', 'leaderboard', 'lb', 'ranking', 'rankxp', 'topxp', 'xpglobal'],
-    description: 'Ranking global/local de Éter e XP (servidor e global)',
+    description: 'Ranking de economia (éter) e XP — dados do MongoDB',
 
     async execute(message, args) {
-        const raw = String(args?.[0] || '').toLowerCase();
-        if (['help', 'ajuda', '?'].includes(raw)) {
+        if (['ajuda', 'help', '?'].includes(String(args[0] || '').toLowerCase())) {
             return message.reply({ embeds: [helpEmbed()] });
         }
-
-        const mode = parseMode(args);
+        let mode = parseMode(args);
+        const invoked = String(message.content || '')
+            .trim()
+            .split(/\s+/)[0]
+            .toLowerCase()
+            .replace(/^[oO]\./, '')
+            .replace(/^!/, '');
+        if (['topxp', 'rankxp', 'xpglobal'].includes(invoked) && !args[0]) {
+            mode = 'xpglobal';
+        }
         const payload = await sendRank(message, mode, 0);
         return message.reply(payload);
     },
@@ -346,38 +368,32 @@ module.exports = {
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x64748b)
-                            .setTitle(`${meta.emoji} Seu rank`)
+                            .setTitle(meta.title)
                             .setDescription(
-                                `Você ainda não aparece no **${meta.title}**.\nGanhe ${meta.unit} para entrar na lista!`
+                                'Você ainda não aparece no ranking.\nGanhe éter/XP para entrar na lista!'
                             )
                     ],
                     ephemeral: true
                 });
             }
 
-            const pageOfMe = Math.floor((mine.rank - 1) / PAGE_SIZE);
-            const extra = mode === 'xp' || mode === 'xpglobal' ? ` · Nível **${mine.level}**` : '';
-
             return interaction.reply({
                 embeds: [
                     new EmbedBuilder()
                         .setColor(meta.color)
-                        .setAuthor({
-                            name: interaction.user.username,
-                            iconURL: interaction.user.displayAvatarURL({ size: 64 })
-                        })
-                        .setTitle(`${meta.emoji} Seu rank`)
+                        .setTitle(meta.title)
                         .setDescription(
                             [
-                                `**${meta.title}**`,
+                                `Sua posição no rank: **${mine.rank}** posição.`,
                                 '',
-                                `🏆 Posição: **#${mine.rank}** de **${fmt(list.length)}**`,
-                                `${meta.emoji} **${fmt(mine.value)}** ${meta.unit}${extra}`,
-                                '',
-                                `_Você está na página ${pageOfMe + 1}._`
+                                meta.economy
+                                    ? `saldo:  ✨ **${fmt(mine.value)}** éter`
+                                    : `${meta.emoji} **${fmt(mine.value)}** ${meta.unit}`
                             ].join('\n')
                         )
-                        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
+                        .setFooter({
+                            text: `Aeternus rank • ${guild?.name || 'Global'} • hoje as ${clockNow()}`
+                        })
                         .setTimestamp()
                 ],
                 ephemeral: true
