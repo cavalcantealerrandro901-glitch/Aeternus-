@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.19 (Controlled Dictionary & Autonomous Core)
+ * Aeternus Engine v7.20 (Public AI API Integration & Staff Core)
  */
 
 const fs = require('fs');
@@ -63,6 +63,23 @@ async function fetchWordDefinition(word) {
         }
     } catch (e) {}
     return null;
+}
+
+// 🌐 Integração com API Pública de IA (Pollinations AI) gratuita e sem chave
+async function fetchPublicAIResponse(promptText, persona = 'default') {
+    try {
+        let systemPrompt = "Você é o Aeternus, um assistente de Discord inteligente, amigável e prestativo em português.";
+        if (persona === 'cyberpunk') systemPrompt = "Você é o Aeternus em modo cibernético, usa gírias de hacker e tecnologia com tom futurista.";
+        if (persona === 'medieval') systemPrompt = "Você é o Aeternus em modo místico/medieval, fala como um cavaleiro ou mago dos reinos antigos.";
+
+        const fullPrompt = `${systemPrompt}\nUsuário: ${promptText}\nResposta curta e direta para Discord:`;
+        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(fullPrompt)}`);
+        if (!res.ok) return null;
+        const text = await res.text();
+        return text ? text.trim() : null;
+    } catch (e) {
+        return null;
+    }
 }
 
 function getUserProfile(userId, displayName) {
@@ -427,7 +444,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         }
         case 'bot_mood':
             return pick([
-                `${prefix}🤖 Sistemas v7.19 operando com conversação natural limpa! 🔥`,
+                `${prefix}🤖 Sistemas v7.20 integrados com IA Pública online! 🔥`,
                 `${prefix}🚀 Tudo tinindo por aqui! Servidores sincronizados e prontos para o desafio. 😎⚡`,
                 `${prefix}🌟 Núcleo inteligente processando com alta performance! 🦾`
             ]);
@@ -437,6 +454,12 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
             const calcRes = await runTool('calculate_math', { expression: item.expression }, runtime);
             return calcRes.ok ? `${prefix}🧮 Resultado matemático: **${calcRes.result}** 🚀✨` : `⚠️ ${calcRes.error}`;
         case 'autonomous_reply': {
+            // Tenta buscar resposta da API Pública de IA
+            const aiReply = await fetchPublicAIResponse(text, profile.persona);
+            if (aiReply) {
+                return `${prefix}${aiReply}`;
+            }
+            // Fallback caso a API pública esteja indisponível momentaneamente
             return pick([
                 `${prefix}🎯 Entendi exatamente o seu ponto! Como quer prosseguir?`,
                 `${prefix}🔥 Ótima linha de pensamento! Quer aprofundar mais aspectos sobre isso?`,
@@ -483,6 +506,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.19-controlled-dict',
+    model: () => 'aeternus-v7.20-public-ai',
     baseUrl: () => 'local'
 };
