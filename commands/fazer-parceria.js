@@ -96,7 +96,7 @@ async function postAnywhere(channel, payload, serverName) {
 
 module.exports = {
     name: 'fazer parceria',
-    aliases: ['parceria', 'addparceria', 'novaparceria'],
+    aliases: ['parceria', 'addparceria', 'nova parceria'],
     description: 'Registra parceria com texto personalizado (link dentro do texto)',
     category: 'moderacao',
 
