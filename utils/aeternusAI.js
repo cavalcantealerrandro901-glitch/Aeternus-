@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.17 (Invite Generator & Autonomous Moderation Suite)
+ * Aeternus Engine v7.18 (Staff-Exclusive Security & Moderation Core)
  */
 
 const fs = require('fs');
@@ -120,6 +120,17 @@ function updatePersistentHistory(userId, text, intent) {
 
 function ownerId() { return String(process.env.OWNER_ID || '').trim(); }
 function isOwner(userId) { return Boolean(ownerId() && String(userId) === ownerId()); }
+
+function isStaffOrAdmin(guild, userId) {
+    if (isOwner(userId)) return true;
+    if (!guild) return false;
+    const member = guild.members.cache.get(userId);
+    if (!member) return false;
+    return member.permissions.has('Administrator') || 
+           member.permissions.has('ManageGuild') || 
+           member.permissions.has('ModerateMembers');
+}
+
 function configured() { return true; }
 
 function normalizeText(text) {
@@ -167,13 +178,11 @@ async function runTool(name, args, runtime) {
 function detectIntents(text) {
     const norm = normalizeText(text);
 
-    // 🔗 Server Invite Intent
     const inviteMatch = norm.match(/(?:link de convite|convite|gerar convite)\s+(?:do\s+servidor\s+)?([0-9]+|[a-z0-9\s]+)/);
     if (inviteMatch) {
         return { intent: 'guild_invite', query: inviteMatch[1].trim(), score: 0.99 };
     }
 
-    // 🛡️ Moderation Intents
     const banMatch = norm.match(/(?:banir|ban)\s+([@0-9a-z\s#]+)/i);
     if (banMatch) return { intent: 'mod_ban', target: banMatch[1].trim(), score: 0.99 };
 
@@ -186,7 +195,6 @@ function detectIntents(text) {
     const clearMatch = norm.match(/(?:limpar|purge|apagar)\s+([0-9]+)\s+mensagens?/i);
     if (clearMatch) return { intent: 'mod_clear', count: parseInt(clearMatch[1]), score: 0.99 };
 
-    // 🌐 Guild Navigator Intents
     if (norm.match(/quais servidores|listar servidores|servidores que voce esta|meus servidores/)) {
         return { intent: 'list_guilds', score: 0.99 };
     }
@@ -233,9 +241,17 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
     updatePersistentHistory(runtime.userId, text, item.intent);
 
     const client = runtime.client;
+    const guild = runtime.guild;
     const guilds = client && client.guilds ? Array.from(client.guilds.cache.values()) : [];
 
-    // 🔗 Handler para gerar convite do servidor
+    // 🔒 Proteção: Comandos exclusivos para Staff/Admins ou Criador
+    const restrictedIntents = ['guild_invite', 'message_guild_owner', 'mod_ban', 'mod_kick', 'mod_mute', 'mod_clear'];
+    if (restrictedIntents.includes(item.intent)) {
+        if (!isStaffOrAdmin(guild, runtime.userId)) {
+            return "❌ **Acesso Negado!** Apenas administradores e membros da staff podem executar comandos de moderação e gestão de servidores.";
+        }
+    }
+
     if (item.intent === 'guild_invite') {
         let targetGuild = null;
         const q = item.query;
@@ -252,23 +268,15 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
             const channel = targetGuild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(targetGuild.members.me)?.has('CreateInstantInvite'));
             if (!channel) return `❌ Não tenho permissão para criar convites no servidor **${targetGuild.name}**.`;
 
-            const invite = await channel.createInvite({ maxAge: 86400, maxUses: 1, reason: `Solicitado por ${profile.name}` });
+            const invite = await channel.createInvite({ maxAge: 86400, maxUses: 1, reason: `Solicitado pela Staff (${profile.name})` });
             return `🔗 **Link de Convite para [${targetGuild.name}]:**\n> https://discord.gg/${invite.code}\n\n⏱️ *Este convite expira em 24 horas (uso único).*`;
         } catch (e) {
             return `❌ Falha ao gerar convite: ${e.message}`;
         }
     }
 
-    // 🛡️ Handlers de Moderação
     if (item.intent.startsWith('mod_')) {
-        const guild = runtime.guild;
         if (!guild) return "⚠️ Este comando de moderação só pode ser executado dentro de um servidor.";
-
-        const member = guild.members.cache.get(runtime.userId);
-        if (!member || (!member.permissions.has('Administrator') && !isOwner(runtime.userId))) {
-            return "❌ Você não tem permissão para executar comandos de moderação!";
-        }
-
         const channel = runtime.channel;
 
         if (item.intent === 'mod_clear') {
@@ -276,13 +284,12 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
                 if (!channel || typeof channel.bulkDelete !== 'function') return "❌ Não foi possível limpar mensagens neste canal.";
                 const fetched = await channel.messages.fetch({ limit: Math.min(item.count + 1, 100) });
                 await channel.bulkDelete(fetched, true);
-                return `🧹 Sucesso! ${item.count} mensagens apagadas por ordem de moderação. ✨`;
+                return `🧹 Sucesso! ${item.count} mensagens apagadas pela staff. ✨`;
             } catch (e) {
                 return `❌ Erro ao limpar mensagens: ${e.message}`;
             }
         }
 
-        // Para ban, kick, mute precisamos achar o membro alvo
         const targetQuery = normalizeText(item.target);
         const targetMember = guild.members.cache.find(m => 
             m.id === targetQuery.replace(/[^0-9]/g, '') || 
@@ -294,15 +301,15 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
 
         try {
             if (item.intent === 'mod_ban') {
-                await targetMember.ban({ reason: `Ação solicitada por ${profile.name}` });
+                await targetMember.ban({ reason: `Ação solicitada pela Staff (${profile.name})` });
                 return `🔨 **Banimento Executado:** O usuário **${targetMember.user.tag}** foi banido com sucesso. 🚀`;
             }
             if (item.intent === 'mod_kick') {
-                await targetMember.kick(`Ação solicitada por ${profile.name}`);
+                await targetMember.kick(`Ação solicitada pela Staff (${profile.name})`);
                 return `👢 **Expulsão Executada:** O usuário **${targetMember.user.tag}** foi expulso do servidor. ⚡`;
             }
             if (item.intent === 'mod_mute') {
-                await targetMember.timeout(10 * 60 * 1000, `Mutado por 10 minutos a pedido de ${profile.name}`);
+                await targetMember.timeout(10 * 60 * 1000, `Mutado por 10 minutos a pedido da Staff (${profile.name})`);
                 return `🔇 **Silenciamento Aplicado:** **${targetMember.user.tag}** recebeu timeout de 10 minutos. 🛑`;
             }
         } catch (e) {
@@ -316,7 +323,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         guilds.forEach((g, idx) => {
             listStr += `**${idx + 1}.** ${g.name} *(ID: ${g.id} | Membros: ${g.memberCount})*\n`;
         });
-        listStr += "\n💡 *Dica: Peça 'link de convite do servidor [número]' ou 'informações do servidor [número]'!*";
+        listStr += "\n💡 *Dica: Admins podem pedir 'link de convite do servidor [número]' ou informações detalhadas.*";
         return listStr;
     }
 
@@ -330,7 +337,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
             targetGuild = guilds.find(g => normalizeText(g.name).includes(normalizeText(q)));
         }
 
-        if (!targetGuild) return `⚠️ Servidor "${q}" não encontrado na lista. Use o comando de listar servidores para conferir os números!`;
+        if (!targetGuild) return `⚠️ Servidor "${q}" não encontrado na lista.`;
 
         let ownerTag = "Desconhecido";
         try {
@@ -347,8 +354,6 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
     }
 
     if (item.intent === 'message_guild_owner') {
-        if (!isOwner(runtime.userId)) return "❌ Apenas o meu criador mexe com comandos de envio global para donos de servidores.";
-        
         let targetGuild = null;
         const t = item.target;
         if (!isNaN(t)) {
@@ -364,7 +369,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
             const owner = await targetGuild.fetchOwner();
             if (!owner) return `⚠️ Não foi possível encontrar o dono do servidor ${targetGuild.name}.`;
             
-            await owner.send(`📩 **Mensagem do Criador do Bot (${runtime.userId}):**\n> ${item.content}`);
+            await owner.send(`📩 **Mensagem da Staff / Criador (${runtime.userId}):**\n> ${item.content}`);
             return `✅ Mensagem enviada com sucesso para o dono do servidor **${targetGuild.name}** (${owner.user.tag})! 🚀`;
         } catch (e) {
             return `❌ Falha ao enviar mensagem para o dono: ${e.message}`;
@@ -429,7 +434,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         }
         case 'bot_mood':
             return pick([
-                `${prefix}🤖 Sistemas v7.17 operando com Moderação Autônoma e Gestão de Convites! 🔥`,
+                `${prefix}🤖 Sistemas v7.18 operando com segurança Staff-Exclusive rigorosa! 🔥`,
                 `${prefix}🚀 Tudo tinindo por aqui! Servidores sincronizados e prontos para o desafio. 😎⚡`,
                 `${prefix}🌟 Núcleo inteligente processando com alta performance! 🦾`
             ]);
@@ -493,6 +498,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.17-moderation-invites',
+    model: () => 'aeternus-v7.18-staff-exclusive',
     baseUrl: () => 'local'
 };
