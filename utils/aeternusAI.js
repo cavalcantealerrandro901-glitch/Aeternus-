@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.16 (Guild Navigator & Owner Communicator Core)
+ * Aeternus Engine v7.17 (Invite Generator & Autonomous Moderation Suite)
  */
 
 const fs = require('fs');
@@ -167,6 +167,25 @@ async function runTool(name, args, runtime) {
 function detectIntents(text) {
     const norm = normalizeText(text);
 
+    // 🔗 Server Invite Intent
+    const inviteMatch = norm.match(/(?:link de convite|convite|gerar convite)\s+(?:do\s+servidor\s+)?([0-9]+|[a-z0-9\s]+)/);
+    if (inviteMatch) {
+        return { intent: 'guild_invite', query: inviteMatch[1].trim(), score: 0.99 };
+    }
+
+    // 🛡️ Moderation Intents
+    const banMatch = norm.match(/(?:banir|ban)\s+([@0-9a-z\s#]+)/i);
+    if (banMatch) return { intent: 'mod_ban', target: banMatch[1].trim(), score: 0.99 };
+
+    const kickMatch = norm.match(/(?:expulsar|kick)\s+([@0-9a-z\s#]+)/i);
+    if (kickMatch) return { intent: 'mod_kick', target: kickMatch[1].trim(), score: 0.99 };
+
+    const muteMatch = norm.match(/(?:mutar|timeout|silenciar)\s+([@0-9a-z\s#]+)/i);
+    if (muteMatch) return { intent: 'mod_mute', target: muteMatch[1].trim(), score: 0.99 };
+
+    const clearMatch = norm.match(/(?:limpar|purge|apagar)\s+([0-9]+)\s+mensagens?/i);
+    if (clearMatch) return { intent: 'mod_clear', count: parseInt(clearMatch[1]), score: 0.99 };
+
     // 🌐 Guild Navigator Intents
     if (norm.match(/quais servidores|listar servidores|servidores que voce esta|meus servidores/)) {
         return { intent: 'list_guilds', score: 0.99 };
@@ -216,13 +235,88 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
     const client = runtime.client;
     const guilds = client && client.guilds ? Array.from(client.guilds.cache.values()) : [];
 
+    // 🔗 Handler para gerar convite do servidor
+    if (item.intent === 'guild_invite') {
+        let targetGuild = null;
+        const q = item.query;
+        if (!isNaN(q)) {
+            const index = parseInt(q) - 1;
+            targetGuild = guilds[index];
+        } else {
+            targetGuild = guilds.find(g => normalizeText(g.name).includes(normalizeText(q)));
+        }
+
+        if (!targetGuild) return `⚠️ Servidor "${q}" não encontrado na minha lista.`;
+
+        try {
+            const channel = targetGuild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(targetGuild.members.me)?.has('CreateInstantInvite'));
+            if (!channel) return `❌ Não tenho permissão para criar convites no servidor **${targetGuild.name}**.`;
+
+            const invite = await channel.createInvite({ maxAge: 86400, maxUses: 1, reason: `Solicitado por ${profile.name}` });
+            return `🔗 **Link de Convite para [${targetGuild.name}]:**\n> https://discord.gg/${invite.code}\n\n⏱️ *Este convite expira em 24 horas (uso único).*`;
+        } catch (e) {
+            return `❌ Falha ao gerar convite: ${e.message}`;
+        }
+    }
+
+    // 🛡️ Handlers de Moderação
+    if (item.intent.startsWith('mod_')) {
+        const guild = runtime.guild;
+        if (!guild) return "⚠️ Este comando de moderação só pode ser executado dentro de um servidor.";
+
+        const member = guild.members.cache.get(runtime.userId);
+        if (!member || (!member.permissions.has('Administrator') && !isOwner(runtime.userId))) {
+            return "❌ Você não tem permissão para executar comandos de moderação!";
+        }
+
+        const channel = runtime.channel;
+
+        if (item.intent === 'mod_clear') {
+            try {
+                if (!channel || typeof channel.bulkDelete !== 'function') return "❌ Não foi possível limpar mensagens neste canal.";
+                const fetched = await channel.messages.fetch({ limit: Math.min(item.count + 1, 100) });
+                await channel.bulkDelete(fetched, true);
+                return `🧹 Sucesso! ${item.count} mensagens apagadas por ordem de moderação. ✨`;
+            } catch (e) {
+                return `❌ Erro ao limpar mensagens: ${e.message}`;
+            }
+        }
+
+        // Para ban, kick, mute precisamos achar o membro alvo
+        const targetQuery = normalizeText(item.target);
+        const targetMember = guild.members.cache.find(m => 
+            m.id === targetQuery.replace(/[^0-9]/g, '') || 
+            normalizeText(m.user.username).includes(targetQuery) ||
+            normalizeText(m.displayName).includes(targetQuery)
+        );
+
+        if (!targetMember) return `⚠️ Usuário "${item.target}" não foi encontrado neste servidor.`;
+
+        try {
+            if (item.intent === 'mod_ban') {
+                await targetMember.ban({ reason: `Ação solicitada por ${profile.name}` });
+                return `🔨 **Banimento Executado:** O usuário **${targetMember.user.tag}** foi banido com sucesso. 🚀`;
+            }
+            if (item.intent === 'mod_kick') {
+                await targetMember.kick(`Ação solicitada por ${profile.name}`);
+                return `👢 **Expulsão Executada:** O usuário **${targetMember.user.tag}** foi expulso do servidor. ⚡`;
+            }
+            if (item.intent === 'mod_mute') {
+                await targetMember.timeout(10 * 60 * 1000, `Mutado por 10 minutos a pedido de ${profile.name}`);
+                return `🔇 **Silenciamento Aplicado:** **${targetMember.user.tag}** recebeu timeout de 10 minutos. 🛑`;
+            }
+        } catch (e) {
+            return `❌ Erro na execução de moderação: ${e.message}`;
+        }
+    }
+
     if (item.intent === 'list_guilds') {
         if (guilds.length === 0) return "🌐 No momento não estou conectado a nenhum servidor.";
         let listStr = "🌐 **Servidores Conectados (Guild Navigator):**\n";
         guilds.forEach((g, idx) => {
             listStr += `**${idx + 1}.** ${g.name} *(ID: ${g.id} | Membros: ${g.memberCount})*\n`;
         });
-        listStr += "\n💡 *Dica: Peça 'informações do servidor [número]' para ver detalhes ou mandar mensagem para o dono!*";
+        listStr += "\n💡 *Dica: Peça 'link de convite do servidor [número]' ou 'informações do servidor [número]'!*";
         return listStr;
     }
 
@@ -302,7 +396,6 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         return `⚠️ Erro ao executar a tool **${item.toolName}**: ${toolRes?.error || 'Retorno inválido.'}`;
     }
 
-    let triviaBonus = 0;
     if (profile.activeTrivia) {
         const cleanAns = normalizeText(text);
         if (cleanAns.includes(profile.activeTrivia)) {
@@ -336,7 +429,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         }
         case 'bot_mood':
             return pick([
-                `${prefix}🤖 Sistemas v7.16 operando com Guild Navigator e total fluidez! 🔥`,
+                `${prefix}🤖 Sistemas v7.17 operando com Moderação Autônoma e Gestão de Convites! 🔥`,
                 `${prefix}🚀 Tudo tinindo por aqui! Servidores sincronizados e prontos para o desafio. 😎⚡`,
                 `${prefix}🌟 Núcleo inteligente processando com alta performance! 🦾`
             ]);
@@ -400,6 +493,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.16-guild-navigator',
+    model: () => 'aeternus-v7.17-moderation-invites',
     baseUrl: () => 'local'
 };
