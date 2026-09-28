@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeternus · Painel de Controle</title>
+    <title>Aeternus · Início</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -19,6 +19,9 @@
             color: #ffffff;
             overflow-x: hidden;
             background-color: #0b0f19;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .animated-bg {
@@ -37,15 +40,9 @@
         }
 
         @keyframes moveBackground {
-            0% {
-                transform: scale(1) translate(0, 0);
-            }
-            50% {
-                transform: scale(1.05) translate(-10px, -15px);
-            }
-            100% {
-                transform: scale(1.1) translate(10px, 15px);
-            }
+            0% { transform: scale(1) translate(0, 0); }
+            50% { transform: scale(1.05) translate(-10px, -15px); }
+            100% { transform: scale(1.1) translate(10px, 15px); }
         }
 
         header {
@@ -67,6 +64,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            text-decoration: none;
         }
 
         .menu-container {
@@ -116,14 +114,8 @@
         }
 
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .dropdown-item {
@@ -163,7 +155,7 @@
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 70px 20px 40px 20px;
+            padding: 60px 20px 40px 20px;
             max-width: 900px;
             margin: 0 auto;
         }
@@ -180,7 +172,7 @@
         .hero p {
             font-size: 18px;
             color: #94a3b8;
-            margin-bottom: 30px;
+            margin-bottom: 35px;
             line-height: 1.6;
         }
 
@@ -276,56 +268,139 @@
             color: #94a3b8;
         }
 
-        .content-container {
-            max-width: 900px;
-            margin: 0 auto 80px auto;
-            padding: 0 20px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
+        /* Footer & Links Modais */
+        footer {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 30px 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            text-align: center;
+            margin-top: auto;
         }
 
-        @media (max-width: 768px) {
-            .content-container {
-                grid-template-columns: 1fr;
-            }
+        .footer-links {
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
-        .info-card {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 16px;
-            padding: 30px;
-        }
-
-        .info-card h2 {
-            font-size: 20px;
-            font-weight: 600;
+        .footer-link {
             color: #c084fc;
-            margin-bottom: 15px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .footer-link:hover {
+            color: #ffffff;
+            text-decoration: underline;
+        }
+
+        .footer-info {
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .footer-info span {
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            max-width: 650px;
+            width: 100%;
+            padding: 35px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            position: relative;
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px; right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 35px; height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .modal-close:hover {
+            background: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .modal-card h2 {
+            font-size: 22px;
+            color: #c084fc;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .info-card ul {
+        .modal-body {
+            max-height: 400px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            color: #cbd5e1;
+            font-size: 14px;
+            line-height: 1.6;
+            padding-right: 5px;
+        }
+
+        .modal-body ul {
             list-style: none;
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
 
-        .info-card li {
-            color: #cbd5e1;
-            font-size: 14px;
-            line-height: 1.5;
+        .modal-body li {
             display: flex;
             align-items: flex-start;
             gap: 10px;
         }
 
-        .info-card li i {
+        .modal-body li i {
             color: #a78bfa;
             margin-top: 3px;
         }
@@ -336,9 +411,9 @@
     <div class="animated-bg"></div>
 
     <header>
-        <div class="logo">
+        <a href="index.html" class="logo">
             <i class="fa-solid fa-cube"></i> Aeternus
-        </div>
+        </a>
         
         <div class="menu-container">
             <button class="menu-btn" id="menuToggle" aria-label="Menu">
@@ -346,14 +421,12 @@
             </button>
             <div class="dropdown-menu" id="dropdownMenu">
                 <a href="dashboard.html" class="dropdown-item"><i class="fa-solid fa-gauge-high"></i> Painel</a>
-                <a href="#" class="dropdown-item"><i class="fa-solid fa-server"></i> Servidores</a>
+                <a href="dashboard.html" class="dropdown-item"><i class="fa-solid fa-server"></i> Servidores</a>
                 <a href="#" class="dropdown-item"><i class="fa-solid fa-book-open"></i> Wiki</a>
                 <a href="#" class="dropdown-item"><i class="fa-solid fa-terminal"></i> Comandos</a>
                 <a href="#" class="dropdown-item"><i class="fa-solid fa-gift"></i> Daily</a>
-                <a href="#" class="dropdown-item"><i class="fa-solid fa-palette"></i> Tema</a>
                 <div class="dropdown-divider"></div>
-                <a href="#" class="dropdown-item"><i class="fa-solid fa-chart-pie"></i> Estatísticas</a>
-                <a href="#" class="dropdown-item"><i class="fa-solid fa-headset"></i> Suporte</a>
+                <a href="https://discord.gg/suporte" target="_blank" class="dropdown-item"><i class="fa-solid fa-headset"></i> Suporte</a>
             </div>
         </div>
     </header>
@@ -362,8 +435,8 @@
         <h1>O Futuro da Autonomia & RPG no Discord</h1>
         <p>Aeternus é um bot de inteligência artificial de ponta equipado com sistemas dinâmicos de Éter e XP, mini-games, moderação autônoma avançada e controle total para administradores.</p>
         <div class="hero-btns">
-            <a href="#" class="btn-primary"><i class="fa-brands fa-discord"></i> Adicionar o Bot</a>
-            <a href="#" class="btn-secondary"><i class="fa-solid fa-headset"></i> Servidor de Suporte</a>
+            <a href="https://discord.com/oauth2/authorize?client_id=SEU_CLIENT_ID&scope=bot&permissions=8" target="_blank" class="btn-primary"><i class="fa-brands fa-discord"></i> Adicionar o Bot</a>
+            <a href="https://discord.gg/suporte" target="_blank" class="btn-secondary"><i class="fa-solid fa-headset"></i> Servidor de Suporte</a>
             <a href="dashboard.html" class="btn-secondary"><i class="fa-solid fa-gauge-high"></i> Painel de Controle</a>
         </div>
     </section>
@@ -386,29 +459,52 @@
         </div>
     </div>
 
-    <div class="content-container">
-        <div class="info-card">
-            <h2><i class="fa-solid fa-shield-halved"></i> Regras do Bot</h2>
-            <ul>
-                <li><i class="fa-solid fa-check"></i> <strong>Uso Justo:</strong> É terminantemente proibido o uso de automações (macro/scripts) para farmar Éter, XP ou vencer mini-games de forma desleal.</li>
-                <li><i class="fa-solid fa-check"></i> <strong>Moderação Respeitosa:</strong> Comandos de moderação autônoma e ferramentas de staff devem ser utilizados com responsabilidade e ética nos servidores.</li>
-                <li><i class="fa-solid fa-check"></i> <strong>Termos do Discord:</strong> Todas as interações devem seguir rigorosamente os Termos de Serviço e as Diretrizes da Comunidade do Discord.</li>
-                <li><i class="fa-solid fa-check"></i> <strong>Bypassing:</strong> Tentar explorar falhas, bugs ou vulnerabilidades do núcleo de IA resultará no banimento permanente do usuário e do servidor infrator.</li>
-            </ul>
+    <!-- Footer com Links Modais e Informações -->
+    <footer>
+        <div class="footer-links">
+            <a class="footer-link" id="openRules"><i class="fa-solid fa-shield-halved"></i> Regras de Uso</a>
+            <a class="footer-link" id="openPrivacy"><i class="fa-solid fa-lock"></i> Política de Privacidade</a>
+            <a href="https://discord.gg/suporte" target="_blank" class="footer-link"><i class="fa-solid fa-headset"></i> Comunidade Discord</a>
         </div>
+        <div class="footer-info">
+            Criado com dedicação por <span>Seu Nome / Equipe Aeternus</span> &bull; <span>2026</span> &bull; Todos os direitos reservados.
+        </div>
+    </footer>
 
-        <div class="info-card">
+    <!-- Modal Regras -->
+    <div class="modal-overlay" id="rulesModal">
+        <div class="modal-card">
+            <button class="modal-close" id="closeRules"><i class="fa-solid fa-xmark"></i></button>
+            <h2><i class="fa-solid fa-shield-halved"></i> Regras e Termos de Uso</h2>
+            <div class="modal-body">
+                <ul>
+                    <li><i class="fa-solid fa-check"></i> <strong>Uso Justo:</strong> É terminantemente proibido o uso de automações (macro/scripts) para farmar Éter, XP ou vencer mini-games de forma desleal.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Moderação Respeitosa:</strong> Comandos de moderação autônoma e ferramentas de staff devem ser utilizados com responsabilidade e ética nos servidores.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Termos do Discord:</strong> Todas as interações devem seguir rigorosamente os Termos de Serviço e as Diretrizes da Comunidade do Discord.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Bypassing:</strong> Tentar explorar falhas, bugs ou vulnerabilidades do núcleo de IA resultará no banimento permanente do usuário e do servidor infrator.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Privacidade -->
+    <div class="modal-overlay" id="privacyModal">
+        <div class="modal-card">
+            <button class="modal-close" id="closePrivacy"><i class="fa-solid fa-xmark"></i></button>
             <h2><i class="fa-solid fa-lock"></i> Política de Privacidade</h2>
-            <ul>
-                <li><i class="fa-solid fa-check"></i> <strong>Coleta Mínima:</strong> Armazenamos apenas dados essenciais para o funcionamento do bot (IDs de usuários, saldos de Éter, níveis de XP e configurações do servidor).</li>
-                <li><i class="fa-solid fa-check"></i> <strong>Armazenamento Seguro:</strong> Os dados persistentes são salvos localmente em estruturas JSON criptografadas e protegidas contra acessos não autorizados.</li>
-                <li><i class="fa-solid fa-check"></i> <strong>Privacidade de Mensagens:</strong> O conteúdo de mensagens privadas e canais de texto não é armazenado permanentemente além do cache de moderação e dicionário.</li>
-                <li><i class="fa-solid fa-check"></i> <strong>Controle Total:</strong> Administradores podem solicitar a limpeza de dados do servidor ou redefinições de economia a qualquer momento via comandos de staff.</li>
-            </ul>
+            <div class="modal-body">
+                <ul>
+                    <li><i class="fa-solid fa-check"></i> <strong>Coleta Mínima:</strong> Armazenamos apenas dados essenciais para o funcionamento do bot (IDs de usuários, saldos de Éter, níveis de XP e configurações do servidor).</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Armazenamento Seguro:</strong> Os dados persistentes são salvos localmente em estruturas JSON criptografadas e protegidas contra acessos não autorizados.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Privacidade de Mensagens:</strong> O conteúdo de mensagens privadas e canais de texto não é armazenado permanentemente além do cache de moderação e dicionário.</li>
+                    <li><i class="fa-solid fa-check"></i> <strong>Controle Total:</strong> Administradores podem solicitar a limpeza de dados do servidor ou redefinições de economia a qualquer momento via comandos de staff.</li>
+                </ul>
+            </div>
         </div>
     </div>
 
     <script>
+        // Menu Hamburguer
         const menuToggle = document.getElementById('menuToggle');
         const dropdownMenu = document.getElementById('dropdownMenu');
 
@@ -421,6 +517,30 @@
             if (dropdownMenu.classList.contains('active')) {
                 dropdownMenu.classList.remove('active');
             }
+        });
+
+        // Modais de Regras e Privacidade
+        const rulesModal = document.getElementById('rulesModal');
+        const privacyModal = document.getElementById('privacyModal');
+
+        document.getElementById('openRules').addEventListener('click', () => {
+            rulesModal.classList.add('active');
+        });
+        document.getElementById('closeRules').addEventListener('click', () => {
+            rulesModal.classList.remove('active');
+        });
+
+        document.getElementById('openPrivacy').addEventListener('click', () => {
+            privacyModal.classList.add('active');
+        });
+        document.getElementById('closePrivacy').addEventListener('click', () => {
+            privacyModal.classList.remove('active');
+        });
+
+        // Fechar modal clicando fora do card
+        window.addEventListener('click', (e) => {
+            if (e.target === rulesModal) rulesModal.classList.remove('active');
+            if (e.target === privacyModal) privacyModal.classList.remove('active');
         });
     </script>
 </body>
