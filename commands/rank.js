@@ -1,4 +1,9 @@
-const { EmbedBuilder } = require('discord.js');
+const {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} = require('discord.js');
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
 
@@ -253,10 +258,34 @@ function helpEmbed() {
                 '`O.rank xp` — XP deste servidor',
                 '`O.rank xp global` — XP global',
                 '',
-                '_Sem botões — use `O.rank`, `O.rank local`, `O.rank xp`_'
+                '⬅️ Voltar · 👤 Meu rank · ➡️ Próximo'
             ].join('\n')
         )
         .setFooter({ text: 'Aeternus · Rank' });
+}
+
+
+function navRow(mode, page, totalPages) {
+    const maxPage = Math.max(0, totalPages - 1);
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`rank:prev:${mode}:${page}`)
+            .setLabel('Voltar')
+            .setEmoji('⬅️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page <= 0),
+        new ButtonBuilder()
+            .setCustomId(`rank:me:${mode}:${page}`)
+            .setLabel('Meu rank')
+            .setEmoji('👤')
+            .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+            .setCustomId(`rank:next:${mode}:${page}`)
+            .setLabel('Próximo')
+            .setEmoji('➡️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page >= maxPage)
+    );
 }
 
 async function sendRank(ctx, mode, page = 0) {
@@ -283,7 +312,7 @@ async function sendRank(ctx, mode, page = 0) {
 
     return {
         embeds: [emb],
-        components: []
+        components: [navRow(mode, p, totalPages)]
     };
 }
 
@@ -312,7 +341,73 @@ module.exports = {
 
     async handleComponent(interaction) {
         if (!String(interaction.customId || '').startsWith('rank:')) return;
-        // Botões removidos do rank
-        return interaction.deferUpdate().catch(() => {});
+
+        const parts = interaction.customId.split(':');
+        const action = parts[1];
+        const mode = parts[2] || 'global';
+        let page = parseInt(parts[3], 10) || 0;
+
+        if (!['global', 'local', 'xp', 'xpglobal'].includes(mode)) {
+            return interaction.reply({ content: 'Modo inválido.' }).catch(() => {});
+        }
+
+        if (action === 'me') {
+            const guild = interaction.guild;
+            if ((mode === 'local' || mode === 'xp') && !guild) {
+                return interaction.reply({
+                    content: '❌ Ranking local só funciona em servidor.'
+                }).catch(() => {});
+            }
+
+            const list = await buildList(mode, guild, interaction.client);
+            const mine = findMyRank(list, interaction.user.id);
+            const meta = modeMeta(mode);
+
+            if (!mine.rank) {
+                return interaction.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(0x64748b)
+                            .setTitle(meta.title)
+                            .setDescription(
+                                `<@${interaction.user.id}> ainda não aparece no ranking.
+Ganhe éter/XP para entrar na lista!`
+                            )
+                            .setFooter({
+                                text: `Aeternus rank • ${guild?.name || 'Global'} • hoje as ${clockNow()}`
+                            })
+                    ]
+                }).catch(() => {});
+            }
+
+            return interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(meta.color)
+                        .setTitle(meta.title)
+                        .setDescription(
+                            [
+                                `<@${interaction.user.id}>`,
+                                `Sua posição no rank: **${mine.rank}** posição.`,
+                                '',
+                                meta.economy
+                                    ? `saldo:  ✨ **${fmt(mine.value)}** éter`
+                                    : `${meta.emoji} **${fmt(mine.value)}** ${meta.unit}`
+                            ].join('
+')
+                        )
+                        .setFooter({
+                            text: `Aeternus rank • ${guild?.name || 'Global'} • hoje as ${clockNow()}`
+                        })
+                        .setTimestamp()
+                ]
+            }).catch(() => {});
+        }
+
+        if (action === 'prev') page = Math.max(0, page - 1);
+        if (action === 'next') page = page + 1;
+
+        const payload = await sendRank(interaction, mode, page);
+        return interaction.update(payload).catch(() => {});
     }
 };
