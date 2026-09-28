@@ -3,34 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aeternus</title>
+    <title>Aeternus — Universo RPG</title>
     <link rel="stylesheet" href="dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header>
+    <header class="header">
         <nav class="navbar">
             <div class="logo">
-                <a href="index.html">Aeternus</a>
+                <a href="index.html"><span class="logo-accent">AET</span>ERNUS</a>
             </div>
             
             <div class="menu-container">
-                <button class="menu-btn" aria-label="Abrir Menu">
-                    ☰ Menu
+                <button class="menu-btn">
+                    <span>Navegação</span>
+                    <span class="menu-icon">☰</span>
                 </button>
                 <ul class="dropdown-menu">
-                    <li><a href="dashboard.html">Painel</a></li>
-                    <li><a href="daily.html">Daily</a></li>
-                    <li><a href="itens.html">Loja / Itens</a></li>
-                    <li><a href="arena.html">Arena</a></li>
-                    <li><a href="avatar.html">Avatar</a></li>
-                    <li><a href="decoracoes.html">Decorações</a></li>
-                    <li><a href="efeitos.html">Efeitos</a></li>
-                    <li><a href="troca.html">Trocas</a></li>
-                    <li><a href="server.html">Servidores</a></li>
-                    <li><a href="wiki.html">Wiki</a></li>
-                    <li><a href="#">Comandos</a></li>
-                    <li><a href="#">Tema</a></li>
-                    <li><a href="#">Idioma</a></li>
+                    <li class="menu-label">Principal</li>
+                    <li><a href="dashboard.html">📊 Painel</a></li>
+                    <li><a href="daily.html">🎁 Daily</a></li>
+                    <li><a href="itens.html">🛒 Loja / Itens</a></li>
+                    <li><a href="arena.html">⚔️ Arena</a></li>
+                    <li class="menu-divider"></li>
+                    <li class="menu-label">Personalização</li>
+                    <li><a href="avatar.html">👤 Avatar</a></li>
+                    <li><a href="decoracoes.html">🎨 Decorações</a></li>
+                    <li><a href="efeitos.html">✨ Efeitos</a></li>
+                    <li class="menu-divider"></li>
+                    <li class="menu-label">Comunidade & Mais</li>
+                    <li><a href="troca.html">🔄 Trocas</a></li>
+                    <li><a href="server.html">🌐 Servidores</a></li>
+                    <li><a href="wiki.html">📖 Wiki</a></li>
+                    <li><a href="#">📜 Comandos</a></li>
+                    <li><a href="#">🌓 Tema</a></li>
+                    <li><a href="#">🌍 Idioma</a></li>
                 </ul>
             </div>
         </nav>
@@ -38,17 +47,37 @@
 
     <main class="container">
         <section class="hero">
-            <h1>Bem-vindo ao Aeternus</h1>
-            <p>Sua jornada começa aqui. Explore, conquiste e evolua no universo Aeternus.</p>
+            <div class="badge">🚀 Versão 2.0 Ativa</div>
+            <h1>A Sua Jornada Começa no <span class="text-gradient">Aeternus</span></h1>
+            <p>Explore masmorras, enfrente batalhas na arena, colecione itens lendários e personalize a sua identidade no universo definitivo.</p>
+            
             <div class="hero-buttons">
                 <a href="dashboard.html" class="btn btn-primary">Acessar Painel</a>
-                <a href="wiki.html" class="btn btn-secondary">Ver Wiki</a>
+                <a href="wiki.html" class="btn btn-secondary">Explorar Wiki</a>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="feature-card">
+                <div class="card-icon">⚔️</div>
+                <h3>Arena & Batalhas</h3>
+                <p>Enfrente outros jogadores e chefes para subir no ranking global.</p>
+            </div>
+            <div class="feature-card">
+                <div class="card-icon">🎁</div>
+                <h3>Recompensas Diárias</h3>
+                <p>Resgate os seus prémios no Daily e receba recursos valiosos.</p>
+            </div>
+            <div class="feature-card">
+                <div class="card-icon">🎨</div>
+                <h3>Customização Total</h3>
+                <p>Equipe avatares, efeitos e decorações exclusivas no seu perfil.</p>
             </div>
         </section>
     </main>
 
     <footer>
-        <p>&copy; 2026 Aeternus. Todos os direitos reservados.</p>
+        <p>&copy; 2026 <strong>Aeternus</strong>. Todos os direitos reservados.</p>
     </footer>
 
     <script src="dashboard-app.js"></script>
