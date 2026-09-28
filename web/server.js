@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const cookieParser = require('cookie-parser');
 const { getSettings, setSettings, getPrefix } = require('../utils/settings');
 const player = require('../utils/player');
@@ -11,7 +12,37 @@ function startWeb(client) {
     app.use(express.json({ limit: '6mb' }));
     app.use(express.urlencoded({ extended: true }));
     app.use(cookieParser());
-    app.use(express.static(path.join(__dirname, '..', 'public')));
+
+    const publicDir = path.join(__dirname, '..', 'public');
+
+    // Middleware: Injeta automaticamente o CSS e o JS das brasas em qualquer HTML acessado
+    app.use((req, res, next) => {
+        if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || !path.extname(req.path))) {
+            let fileName = req.path === '/' ? 'index.html' : req.path;
+            if (!fileName.endsWith('.html')) fileName += '.html';
+            let filePath = path.join(publicDir, fileName);
+
+            if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                let content = fs.readFileSync(filePath, 'utf8');
+
+                // Injeta CSS se não houver
+                if (!content.includes('dashboard.css')) {
+                    content = content.replace('</head>', '    <link rel="stylesheet" href="dashboard.css">\n</head>');
+                }
+
+                // Injeta JS de Brasas/Animação se não houver
+                if (!content.includes('dashboard-app.js')) {
+                    content = content.replace('</body>', '    <script src="dashboard-app.js"></script>\n</body>');
+                }
+
+                res.setHeader('Content-Type', 'text/html');
+                return res.send(content);
+            }
+        }
+        next();
+    });
+
+    app.use(express.static(publicDir));
 
     const CLIENT_ID = process.env.CLIENT_ID || process.env.DISCORD_CLIENT_ID;
     const CLIENT_SECRET = process.env.CLIENT_SECRET || process.env.DISCORD_CLIENT_SECRET;
@@ -237,7 +268,7 @@ function startWeb(client) {
 
     app.get('/', (req, res) => res.redirect('/dashboard'));
 
-        app.get('/health', (req, res) => {
+    app.get('/health', (req, res) => {
         const mongo = (() => {
             try {
                 const { isConnected } = require('../utils/mongo');
@@ -254,7 +285,7 @@ function startWeb(client) {
         });
     });
 
-const port = process.env.PORT || 10000;
+    const port = process.env.PORT || 10000;
     const host = process.env.HOST || '0.0.0.0';
     const server = app.listen(port, host, () => {
         console.log('Painel em http://' + host + ':' + port);
