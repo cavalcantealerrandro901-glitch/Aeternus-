@@ -8,7 +8,9 @@
     "slash": "node scripts/deploy-slash.js",
     "slash:wipe": "node scripts/deploy-slash.js --wipe",
     "termux": "node index.js",
-    "termux:setup": "bash scripts/termux-setup.sh"
+    "termux:setup": "bash scripts/termux-setup.sh",
+    "build": "node inject.js",
+    "postinstall": "node inject.js"
   },
   "dependencies": {
     "axios": "^1.7.7",
