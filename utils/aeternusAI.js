@@ -1,5 +1,5 @@
 /**
- * Aeternus Engine v7.14 (Achievement Badges & Interactive Core)
+ * Aeternus Engine v7.16 (Guild Navigator & Owner Communicator Core)
  */
 
 const fs = require('fs');
@@ -21,7 +21,7 @@ const triviaQuestions = [
     { q: "Qual é a velocidade aproximada da luz no vácuo? (Dica: cerca de 300 mil km/s)", a: "300000" },
     { q: "Quantos bits formam 1 byte?", a: "8" },
     { q: "Qual linguagem de programação deu origem a este bot?", a: "javascript" },
-    { q: "Qual é o planeta mais próximo do Sol?", a: "mercurio" },
+    { q: "Qual é a estrela mais próxima da Terra além do Sol?", a: "proxima centauri" },
     { q: "Em que ano o homem pisou na Lua pela primeira vez?", a: "1969" }
 ];
 
@@ -85,18 +85,10 @@ function getUserProfile(userId, displayName) {
 function checkAndAwardBadges(profile) {
     if (!profile.badges) profile.badges = ['Iniciante ⚡'];
     
-    if (profile.level >= 3 && !profile.badges.includes('Veterano 🛡️')) {
-        profile.badges.push('Veterano 🛡️');
-    }
-    if (profile.level >= 5 && !profile.badges.includes('Lendário 🌟')) {
-        profile.badges.push('Lendário 🌟');
-    }
-    if (profile.persona === 'cyberpunk' && !profile.badges.includes('Ciber-Hacker 🦾')) {
-        profile.badges.push('Ciber-Hacker 🦾');
-    }
-    if (profile.persona === 'medieval' && !profile.badges.includes('Cavaleiro Místico ⚔️')) {
-        profile.badges.push('Cavaleiro Místico ⚔️');
-    }
+    if (profile.level >= 3 && !profile.badges.includes('Veterano 🛡️')) profile.badges.push('Veterano 🛡️');
+    if (profile.level >= 5 && !profile.badges.includes('Lendário 🌟')) profile.badges.push('Lendário 🌟');
+    if (profile.persona === 'cyberpunk' && !profile.badges.includes('Ciber-Hacker 🦾')) profile.badges.push('Ciber-Hacker 🦾');
+    if (profile.persona === 'medieval' && !profile.badges.includes('Cavaleiro Místico ⚔️')) profile.badges.push('Cavaleiro Místico ⚔️');
 }
 
 function addXpAndCheckLevel(profile, bonus = 0) {
@@ -175,14 +167,35 @@ async function runTool(name, args, runtime) {
 function detectIntents(text) {
     const norm = normalizeText(text);
 
-    if (norm.match(/desafio|trivia|quiz|pergunta/)) return { intent: 'start_trivia', score: 0.99 };
+    // 🌐 Guild Navigator Intents
+    if (norm.match(/quais servidores|listar servidores|servidores que voce esta|meus servidores/)) {
+        return { intent: 'list_guilds', score: 0.99 };
+    }
 
+    const serverInfoMatch = norm.match(/(?:informacoes|info|sobre)\s+do\s+servidor\s+([0-9]+|[a-z0-9\s]+)/) || norm.match(/servidor\s+([0-9]+)/);
+    if (serverInfoMatch) {
+        return { intent: 'guild_info', query: serverInfoMatch[1].trim(), score: 0.99 };
+    }
+
+    const msgOwnerMatch = norm.match(/(?:mandar mensagem|enviar mensagem)\s+(?:para\s+)?o\s+dono\s+do\s+servidor\s+([0-9]+|[a-z0-9\s]+)(?::\s*|\s+dizendo\s+)(.+)/i);
+    if (msgOwnerMatch) {
+        return { intent: 'message_guild_owner', target: msgOwnerMatch[1].trim(), content: msgOwnerMatch[2].trim(), score: 0.99 };
+    }
+
+    if (norm.match(/desafio|trivia|quiz|pergunta/)) return { intent: 'start_trivia', score: 0.99 };
     if (norm.match(/modo cibernetico|ativar cyberpunk/)) return { intent: 'set_persona', persona: 'cyberpunk', score: 0.99 };
     if (norm.match(/modo medieval|ativar m[eé]stico/)) return { intent: 'set_persona', persona: 'medieval', score: 0.99 };
     if (norm.match(/modo padrão|desativar modo/)) return { intent: 'set_persona', persona: 'default', score: 0.99 };
 
     if (norm.match(/meu nivel|minha ficha|meus status|meu perfil/)) {
         return { intent: 'user_profile', score: 0.99 };
+    }
+
+    for (const [name, tool] of tools.entries()) {
+        const toolNameNorm = normalizeText(name);
+        if (norm.includes(toolNameNorm) || (toolNameNorm.length > 4 && norm.includes(toolNameNorm.replace(/_/g, ' ')))) {
+            return { intent: 'execute_dynamic_tool', toolName: name, score: 0.95 };
+        }
     }
 
     const dictMatch = norm.match(/(?:significa|significado de|defina|definicao de|o que e|pesquise a palavra|pesquisar)\s+([a-zà-ú]+)/);
@@ -200,6 +213,70 @@ function detectIntents(text) {
 async function runIntent(item, runtime, text, profile, levelUpInfo) {
     updatePersistentHistory(runtime.userId, text, item.intent);
 
+    const client = runtime.client;
+    const guilds = client && client.guilds ? Array.from(client.guilds.cache.values()) : [];
+
+    if (item.intent === 'list_guilds') {
+        if (guilds.length === 0) return "🌐 No momento não estou conectado a nenhum servidor.";
+        let listStr = "🌐 **Servidores Conectados (Guild Navigator):**\n";
+        guilds.forEach((g, idx) => {
+            listStr += `**${idx + 1}.** ${g.name} *(ID: ${g.id} | Membros: ${g.memberCount})*\n`;
+        });
+        listStr += "\n💡 *Dica: Peça 'informações do servidor [número]' para ver detalhes ou mandar mensagem para o dono!*";
+        return listStr;
+    }
+
+    if (item.intent === 'guild_info') {
+        let targetGuild = null;
+        const q = item.query;
+        if (!isNaN(q)) {
+            const index = parseInt(q) - 1;
+            targetGuild = guilds[index];
+        } else {
+            targetGuild = guilds.find(g => normalizeText(g.name).includes(normalizeText(q)));
+        }
+
+        if (!targetGuild) return `⚠️ Servidor "${q}" não encontrado na lista. Use o comando de listar servidores para conferir os números!`;
+
+        let ownerTag = "Desconhecido";
+        try {
+            const owner = await targetGuild.fetchOwner();
+            ownerTag = owner ? owner.user.tag : "Desconhecido";
+        } catch (_) {}
+
+        return `📊 **Informações do Servidor:**\n` +
+               `• **Nome:** ${targetGuild.name}\n` +
+               `• **ID:** ${targetGuild.id}\n` +
+               `• **Membros:** ${targetGuild.memberCount}\n` +
+               `• **Dono:** ${ownerTag}\n` +
+               `• **Criado em:** <t:${Math.floor(targetGuild.createdTimestamp / 1000)}:R>`;
+    }
+
+    if (item.intent === 'message_guild_owner') {
+        if (!isOwner(runtime.userId)) return "❌ Apenas o meu criador mexe com comandos de envio global para donos de servidores.";
+        
+        let targetGuild = null;
+        const t = item.target;
+        if (!isNaN(t)) {
+            const index = parseInt(t) - 1;
+            targetGuild = guilds[index];
+        } else {
+            targetGuild = guilds.find(g => normalizeText(g.name).includes(normalizeText(t)));
+        }
+
+        if (!targetGuild) return `⚠️ Servidor "${t}" não encontrado.`;
+
+        try {
+            const owner = await targetGuild.fetchOwner();
+            if (!owner) return `⚠️ Não foi possível encontrar o dono do servidor ${targetGuild.name}.`;
+            
+            await owner.send(`📩 **Mensagem do Criador do Bot (${runtime.userId}):**\n> ${item.content}`);
+            return `✅ Mensagem enviada com sucesso para o dono do servidor **${targetGuild.name}** (${owner.user.tag})! 🚀`;
+        } catch (e) {
+            return `❌ Falha ao enviar mensagem para o dono: ${e.message}`;
+        }
+    }
+
     if (item.intent === 'set_persona') {
         profile.persona = item.persona;
         checkAndAwardBadges(profile);
@@ -216,14 +293,21 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         return `🧠 **DESAFIO TRIVIA AETERNUS:**\n> *${randomQ.q}*\n\n💡 Responda com o valor ou palavra correta para faturar um bônus de **+50 XP**! 🚀🎯`;
     }
 
+    if (item.intent === 'execute_dynamic_tool') {
+        const toolRes = await runTool(item.toolName, { query: text }, runtime);
+        if (toolRes && !toolRes.error) {
+            const formattedRes = typeof toolRes === 'object' ? JSON.stringify(toolRes, null, 2) : toolRes;
+            return `⚙️ **Execução Dinâmica da Tool [${item.toolName}]:**\n> ${formattedRes}\n\n🚀 Comando processado com sucesso pelo roteador da IA!`;
+        }
+        return `⚠️ Erro ao executar a tool **${item.toolName}**: ${toolRes?.error || 'Retorno inválido.'}`;
+    }
+
     let triviaBonus = 0;
     if (profile.activeTrivia) {
         const cleanAns = normalizeText(text);
         if (cleanAns.includes(profile.activeTrivia)) {
             profile.activeTrivia = null;
-            if (!profile.badges.includes('Mestre do Saber 🏆')) {
-                profile.badges.push('Mestre do Saber 🏆');
-            }
+            if (!profile.badges.includes('Mestre do Saber 🏆')) profile.badges.push('Mestre do Saber 🏆');
             saveData();
             return `🎉 **RESPOSTA CORRETA!** Você gabaritou o desafio, ganhou **+50 XP** e desbloqueou a insígnia **Mestre do Saber 🏆**! 🔥`;
         }
@@ -252,7 +336,7 @@ async function runIntent(item, runtime, text, profile, levelUpInfo) {
         }
         case 'bot_mood':
             return pick([
-                `${prefix}🤖 Sistemas v7.14 operando com o motor de badges e total fluidez! 🔥`,
+                `${prefix}🤖 Sistemas v7.16 operando com Guild Navigator e total fluidez! 🔥`,
                 `${prefix}🚀 Tudo tinindo por aqui! Servidores sincronizados e prontos para o desafio. 😎⚡`,
                 `${prefix}🌟 Núcleo inteligente processando com alta performance! 🦾`
             ]);
@@ -316,6 +400,6 @@ module.exports = {
     listTools,
     chat,
     isOwner,
-    model: () => 'aeternus-v7.14-achievements',
+    model: () => 'aeternus-v7.16-guild-navigator',
     baseUrl: () => 'local'
 };
