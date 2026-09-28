@@ -448,3 +448,101 @@ footer strong {
         font-size: 1rem;
     }
 }
+
+/* ===== ESTILOS DA PÁGINA DE COMANDOS ===== */
+.commands-grid {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.command-card {
+    background: #12131d;
+    border: 1px solid #232438;
+    border-radius: 14px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    transition: all 0.25s ease-in-out;
+}
+
+.command-card:hover {
+    border-color: #6366f1;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.2);
+}
+
+.command-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.command-badges {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.badge-tag {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-family: monospace;
+}
+
+.badge-tag.slash {
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.badge-tag.prefix {
+    background: rgba(244, 63, 94, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(244, 63, 94, 0.4);
+}
+
+.support-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    background: #1e1f30;
+    color: #94a3b8;
+}
+
+.support-badge.admin {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+
+.command-card h3 {
+    font-size: 1.2rem;
+    color: #ffffff;
+    margin: 0;
+}
+
+.command-usage {
+    background: #0a0b12;
+    padding: 0.6rem 0.8rem;
+    border-radius: 8px;
+    border: 1px solid #1a1b2b;
+    font-size: 0.85rem;
+    color: #cbd5e1;
+}
+
+.command-usage code {
+    color: #38bdf8;
+    font-family: monospace;
+}
+
+.command-description {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    line-height: 1.5;
+    margin: 0;
+}

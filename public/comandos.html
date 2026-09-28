@@ -5,38 +5,169 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comandos — Aeternus</title>
     <link rel="stylesheet" href="dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="landing-body">
+    <div class="bg-glow bg-glow-1"></div>
+
     <header class="header">
         <nav class="navbar">
-            <div class="logo"><a href="index.html"><span class="logo-accent">AET</span>ERNUS</a></div>
-            <a href="index.html" class="btn btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">← Início</a>
+            <div class="logo">
+                <a href="index.html"><span class="logo-accent">AET</span>ERNUS</a>
+            </div>
+            
+            <div class="menu-container">
+                <button class="menu-btn">
+                    <span>Navegação</span>
+                    <span class="menu-icon">☰</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li class="menu-label">Principal</li>
+                    <li><a href="dashboard.html">📊 Painel</a></li>
+                    <li><a href="daily.html">🎁 Daily</a></li>
+                    <li><a href="itens.html">🛒 Loja / Itens</a></li>
+                    <li><a href="arena.html">⚔️ Arena</a></li>
+                    <li class="menu-divider"></li>
+                    <li class="menu-label">Personalização</li>
+                    <li><a href="avatar.html">👤 Avatar</a></li>
+                    <li><a href="decoracoes.html">🎨 Decorações</a></li>
+                    <li><a href="efeitos.html">✨ Efeitos</a></li>
+                    <li class="menu-divider"></li>
+                    <li class="menu-label">Comunidade & Mais</li>
+                    <li><a href="troca.html">🔄 Trocas</a></li>
+                    <li><a href="server.html">🌐 Servidores</a></li>
+                    <li><a href="wiki.html">📖 Wiki</a></li>
+                    <li><a href="comandos.html">📜 Comandos</a></li>
+                    <li><a href="configuracoes.html">⚙️ Configurações</a></li>
+                </ul>
+            </div>
         </nav>
     </header>
 
     <main class="container">
-        <section class="hero">
-            <h1>📜 Lista de Comandos</h1>
-            <p>Utilize estes comandos no bot para interagir diretamente com o sistema Aeternus.</p>
+        <section class="hero hero-redesigned" style="padding-bottom: 1.5rem;">
+            <div class="badge badge-glow">📜 CENTRAL DE COMANDOS</div>
+            <h1 class="hero-title" style="font-size: 2.5rem;">Guia de Comandos do <span class="text-gradient">Aeternus</span></h1>
+            <p class="hero-subtitle">Confira a lista completa de comandos disponíveis por Slash (/) e Prefixo (!).</p>
         </section>
 
-        <section class="features">
-            <div class="feature-card">
-                <h3>/daily</h3>
-                <p style="color: var(--text-secondary); margin-top: 0.5rem;">Resgata a recompensa diária.</p>
+        <section class="features commands-grid">
+            <!-- Card: Banir -->
+            <div class="feature-card command-card">
+                <div class="command-header">
+                    <div class="command-badges">
+                        <span class="badge-tag slash">/ban</span>
+                        <span class="badge-tag prefix">!ban</span>
+                    </div>
+                    <span class="support-badge admin">🛡️ Moderação</span>
+                </div>
+                <h3>Banir Membro</h3>
+                <div class="command-usage">
+                    <strong>Uso:</strong> <code>/ban @usuario [motivo]</code> ou <code>!ban @usuario [motivo]</code>
+                </div>
+                <p class="command-description">
+                    Remove e bane permanentemente um usuário do servidor com registro opcional do motivo.
+                </p>
             </div>
-            <div class="feature-card">
-                <h3>/profile</h3>
-                <p style="color: var(--text-secondary); margin-top: 0.5rem;">Exibe o seu perfil e status.</p>
+
+            <!-- Card: Kick / Expulsar -->
+            <div class="feature-card command-card">
+                <div class="command-header">
+                    <div class="command-badges">
+                        <span class="badge-tag slash">/kick</span>
+                        <span class="badge-tag prefix">!kick</span>
+                    </div>
+                    <span class="support-badge admin">🛡️ Moderação</span>
+                </div>
+                <h3>Expulsar Membro</h3>
+                <div class="command-usage">
+                    <strong>Uso:</strong> <code>/kick @usuario [motivo]</code> ou <code>!kick @usuario [motivo]</code>
+                </div>
+                <p class="command-description">
+                    Expulsa um infrator do servidor, permitindo que ele retorne via novo convite.
+                </p>
             </div>
-            <div class="feature-card">
-                <h3>/arena duel</h3>
-                <p style="color: var(--text-secondary); margin-top: 0.5rem;">Inicia um duelo contra outro jogador.</p>
+
+            <!-- Card: Daily -->
+            <div class="feature-card command-card">
+                <div class="command-header">
+                    <div class="command-badges">
+                        <span class="badge-tag slash">/daily</span>
+                        <span class="badge-tag prefix">!daily</span>
+                    </div>
+                    <span class="support-badge user">🎁 Economia</span>
+                </div>
+                <h3>Recompensa Diária</h3>
+                <div class="command-usage">
+                    <strong>Uso:</strong> <code>/daily</code> ou <code>!daily</code>
+                </div>
+                <p class="command-description">
+                    Resgata moedas de ouro e experiência diárias para fortalecer o seu personagem.
+                </p>
+            </div>
+
+            <!-- Card: Arena / Duelo -->
+            <div class="feature-card command-card">
+                <div class="command-header">
+                    <div class="command-badges">
+                        <span class="badge-tag slash">/arena duel</span>
+                        <span class="badge-tag prefix">!duel</span>
+                    </div>
+                    <span class="support-badge user">⚔️ RPG / Batalha</span>
+                </div>
+                <h3>Desafiar para Arena</h3>
+                <div class="command-usage">
+                    <strong>Uso:</strong> <code>/arena duel @oponente</code> ou <code>!duel @oponente</code>
+                </div>
+                <p class="command-description">
+                    Inicia um duelo PvP em tempo real contra outro jogador valendo pontos de ranking.
+                </p>
+            </div>
+
+            <!-- Card: Perfil -->
+            <div class="feature-card command-card">
+                <div class="command-header">
+                    <div class="command-badges">
+                        <span class="badge-tag slash">/profile</span>
+                        <span class="badge-tag prefix">!profile</span>
+                    </div>
+                    <span class="support-badge user">👤 Geral</span>
+                </div>
+                <h3>Ver Perfil</h3>
+                <div class="command-usage">
+                    <strong>Uso:</strong> <code>/profile [@usuario]</code> ou <code>!profile [@usuario]</code>
+                </div>
+                <p class="command-description">
+                    Exibe a ficha completa do herói, incluindo nível, equipamentos, conquistas e aura.
+                </p>
+            </div>
+
+            <!-- Card: Loja -->
+            <div class="feature-card command-card">
+                <div class="command-header">
+                    <div class="command-badges">
+                        <span class="badge-tag slash">/shop</span>
+                        <span class="badge-tag prefix">!loja</span>
+                    </div>
+                    <span class="support-badge user">🛒 Mercado</span>
+                </div>
+                <h3>Loja de Itens</h3>
+                <div class="command-usage">
+                    <strong>Uso:</strong> <code>/shop [categoria]</code> ou <code>!loja [categoria]</code>
+                </div>
+                <p class="command-description">
+                    Abre o catálogo de itens, avatares, efeitos visuais e poções disponíveis para compra.
+                </p>
             </div>
         </section>
     </main>
-    <footer><p>&copy; 2026 <strong>Aeternus</strong>.</p></footer>
+
+    <footer>
+        <p>&copy; 2026 <strong>Aeternus RPG</strong>. Todos os direitos reservados.</p>
+    </footer>
+
     <script src="dashboard-app.js"></script>
 </body>
 </html>
