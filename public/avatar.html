@@ -45,6 +45,7 @@ textarea{min-height:72px;resize:vertical}
 .step{font-size:.72rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);opacity:.7}
 .step.on{opacity:1;background:rgba(124,58,237,.3);border-color:#a78bfa}
 </style>
+    <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
 <div class="app">
@@ -119,5 +120,6 @@ el('btnSave').onclick=async()=>{const userId=el('userId').value.trim();if(!userI
 (async()=>{const userId=el('userId').value.trim();if(!userId)return;try{const r=await fetch('/api/avatar/'+encodeURIComponent(userId));if(!r.ok)return;const data=await r.json();const av=data.avatar;if(av&&av.imageUrl){currentUrl=av.imageUrl;currentDesc=av.description||'';if(currentDesc)el('desc').value=currentDesc;showImage(currentUrl);el('status').textContent='Avatar atual.';setStep(4)}}catch(_){}})();
 })();
 </script>
+    <script src="dashboard-app.js"></script>
 </body>
 </html>
