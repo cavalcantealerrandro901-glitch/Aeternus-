@@ -211,9 +211,9 @@ async function pageEmbed(client, list, mode, page, guildName, viewerId) {
         const tag = displayTag(u, e.id);
 
         if (meta.economy) {
-            // Formato pedido: 🥇 @user = ID [id] || saldo: ✨ X éter
+            // Formato: 🥇 @user = ID [id] | saldo: ✨ X éter  (não usar || = spoiler no Discord)
             blocks.push(
-                `${medal(pos)} ${tag} = ID [\`${e.id}\`] || saldo:  ✨ **${fmt(e.value)}** éter`
+                `${medal(pos)} ${tag} = ID [\`${e.id}\`] | saldo:  ✨ **${fmt(e.value)}** éter`
             );
         } else {
             const extra =
