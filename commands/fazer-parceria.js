@@ -69,7 +69,7 @@ async function postAnywhere(channel, payload, serverName) {
                 name: '🤝 Parceria · ' + String(serverName || 'Parceiro').slice(0, 80),
                 message: {
                     content: payload.content,
-                    embeds: payload.embeds,
+                    embeds: payload.embeds || [],
                     components: payload.components,
                     allowedMentions: payload.allowedMentions
                 },
@@ -100,7 +100,7 @@ async function postAnywhere(channel, payload, serverName) {
 
 module.exports = {
     name: 'parceria',
-    aliases: ['fazer-parceria', 'fazerparceria', 'parceria', 'addparceria'],
+    aliases: ['fazer-parceria', 'fazerparceria', 'addparceria'],
     description: 'Registra uma nova parceria no servidor',
     category: 'moderacao',
 
@@ -247,33 +247,14 @@ async function run(ctx, opts) {
     const repRoleId = conf.roleId || conf.repRoleId || null;
     const pingRoleId = notifyRoleId || conf.notifyRoleId || conf.pingRoleId || null;
 
-    const mentionsText = [];
-    if (pingRoleId) mentionsText.push('<@&' + pingRoleId + '>');
-    mentionsText.push(`${repUser}`);
+    // --- MONTAGEM DO CONTEÚDO EM TEXTO PURISTA ---
+    const headerMentions = [];
+    if (pingRoleId) headerMentions.push('<@&' + pingRoleId + '>');
+    headerMentions.push(`${repUser}`);
 
-    const partnerEmbed = new EmbedBuilder()
-        .setColor(0x8b5cf6)
-        .setTitle(`🤝 PARCERIA OFICIAL · ${name.toUpperCase()}`)
-        .setDescription(
-            `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n` +
-            `${texto}\n\n` +
-            `▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬`
-        )
-        .addFields(
-            { name: '👑 Representante', value: `${repUser}`, inline: true },
-            { name: '🏰 Servidor', value: `**${name}**`, inline: true },
-            { name: '👥 Membros Est.', value: `\`${resolved.memberCount}\``, inline: true }
-        )
-        .setFooter({
-            text: `Aeternus RPG • Parcerias • Staff: ` + ((ctx.user && ctx.user.tag) || (ctx.author && ctx.author.tag) || 'Staff'),
-            iconURL: guild.iconURL({ dynamic: true })
-        })
-        .setTimestamp();
+    const messageContent = `${headerMentions.join(' ')}\n\n${texto}`;
 
-    if (conf.image && /^https?:\/\//i.test(conf.image)) {
-        partnerEmbed.setImage(conf.image);
-    }
-
+    // Botão com o link de entrada para o servidor parceiro
     const mainRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setLabel(`Entrar em ${name.slice(0, 25)}`)
@@ -283,8 +264,7 @@ async function run(ctx, opts) {
     );
 
     const payload = {
-        content: mentionsText.join(' '),
-        embeds: [partnerEmbed],
+        content: messageContent,
         components: [mainRow],
         allowedMentions: {
             users: [repUser.id],
@@ -330,6 +310,7 @@ async function run(ctx, opts) {
         } catch (_) {}
     }
 
+    // --- DM PRIVADA PARA O REPRESENTANTE (MANTIDA COM EMBED) ---
     try {
         const dmEmbed = new EmbedBuilder()
             .setColor(0x8b5cf6)
@@ -358,6 +339,7 @@ async function run(ctx, opts) {
         await repUser.send({ embeds: [dmEmbed], components: [dmRow] });
     } catch (_) {}
 
+    // --- RESPOSTA DE CONFIRMAÇÃO PARA A STAFF ---
     const okEmbed = new EmbedBuilder()
         .setColor(0x10b981)
         .setTitle('✅ Parceria Registrada com Sucesso!')
@@ -368,7 +350,7 @@ async function run(ctx, opts) {
             { name: '📍 Canal', value: `${dest}`, inline: true },
             { name: '🆔 ID Registro', value: `\`${entry?.id || 'OK'}\``, inline: true },
             { 
-                name: '🎭 Cargo Rep. (MongoDB)', 
+                name: '🎭 Cargo Rep.', 
                 value: roleGiven && repRoleId 
                     ? `<@&${repRoleId}> (Atribuído)` 
                     : repRoleId 
