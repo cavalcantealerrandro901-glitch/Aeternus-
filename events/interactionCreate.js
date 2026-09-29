@@ -119,11 +119,18 @@ module.exports = {
                 }
 
                 if (cmd?.handleComponent) {
-                    await cmd.handleComponent(interaction, client);
+                    try {
+                        await cmd.handleComponent(interaction, client);
+                    } catch (err) {
+                        // 10062 Unknown interaction / 40060 already acknowledged
+                        if (err && (err.code === 10062 || err.code === 40060)) return;
+                        throw err;
+                    }
                     return;
                 }
             }
         } catch (e) {
+            if (e && (e.code === 10062 || e.code === 40060)) return;
             const id = interaction.customId || interaction.commandName || '?';
             const cmdHint = String(id).split(':')[0];
             await autoRepair.handleCommandError({

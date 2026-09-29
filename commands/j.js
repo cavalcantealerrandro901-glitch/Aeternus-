@@ -1,3 +1,42 @@
+
+async function safeUpdate(interaction, payload) {
+    try {
+        if (interaction.deferred || interaction.replied) {
+            return await interaction.editReply(payload);
+        }
+        return await interaction.update(payload);
+    } catch (e) {
+        if (e && (e.code === 10062 || e.code === 40060)) return null;
+        // tenta followUp se update falhar por outro motivo
+        try {
+            if (!interaction.replied && !interaction.deferred) {
+                return await interaction.reply(
+                    typeof payload === 'object'
+                        ? { ...payload, ephemeral: true }
+                        : { content: String(payload), ephemeral: true }
+                );
+            }
+        } catch (_) {}
+        return null;
+    }
+}
+
+async function safeReply(interaction, payload) {
+    try {
+        const data =
+            typeof payload === 'string'
+                ? { content: payload, ephemeral: true }
+                : { ephemeral: true, ...payload };
+        if (interaction.deferred || interaction.replied) {
+            return await interaction.followUp(data);
+        }
+        return await interaction.reply(data);
+    } catch (e) {
+        if (e && (e.code === 10062 || e.code === 40060)) return null;
+        return null;
+    }
+}
+
 const {
     EmbedBuilder,
     ActionRowBuilder,
@@ -488,6 +527,17 @@ module.exports = {
     },
 
     async handleComponent(interaction) {
+        // Ack rápido evita DiscordAPIError 10062 (Unknown interaction)
+        const id0 = String(interaction.customId || '');
+        const needsDefer =
+            id0.startsWith('j:attr') ||
+            id0.startsWith('j:photo') ||
+            id0.startsWith('j:class') ||
+            id0.startsWith('j:edit');
+        if (needsDefer && !interaction.deferred && !interaction.replied) {
+            await interaction.deferUpdate().catch(() => {});
+        }
+
         const id = interaction.customId || '';
         if (!id.startsWith('j:')) return;
 
@@ -507,14 +557,14 @@ module.exports = {
             const eph = MessageFlags.Ephemeral;
 
             if (!meta) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content:
                         '⚠️ Este botão é antigo. Use `O.j atributos` de novo para abrir a ficha atualizada.',
                     flags: eph
                 });
             }
             if (String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Só o dono do perfil pode usar estes botões.',
                     flags: eph
                 });
@@ -525,12 +575,12 @@ module.exports = {
                     String(
                         (spent && spent.error) || 'Não foi possível gastar o ponto de atributo.'
                     ).trim() || 'Não foi possível gastar o ponto de atributo.';
-                return interaction.reply({ content: msg, flags: eph });
+                return safeReply(interaction, { content: msg, flags: eph });
             }
             const payload = atributosPayload(interaction.user);
             if (payload.content === null) delete payload.content;
             try {
-                await interaction.update(payload);
+                await safeUpdate(interaction, payload);
             } catch (err) {
                 await interaction
                     .reply({
@@ -548,14 +598,14 @@ module.exports = {
         if (id.startsWith('j:attrdist:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Só o dono do perfil pode usar estes botões.',
                     flags: MessageFlags.Ephemeral
                 });
             }
             const pts = Number(xp.get(ownerId).attrPoints || 0);
             if (pts <= 0) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Você não tem pontos para distribuir. Suba de nível para ganhar mais.',
                     flags: MessageFlags.Ephemeral
                 });
@@ -581,7 +631,7 @@ module.exports = {
                         .setStyle(ButtonStyle.Secondary)
                 )
             );
-            return interaction.update({
+            return safeUpdate(interaction, {
                 content:
                     '⚖️ **Depositar pontos** · **' +
                     pts +
@@ -598,20 +648,20 @@ module.exports = {
             if (attrKey === 'vida' || attrKey === 'defesa') attrKey = 'constituicao';
             const meta = ATTR_META.find((a) => a.key === attrKey);
             if (!meta) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Atributo inválido.',
                     flags: MessageFlags.Ephemeral
                 });
             }
             if (String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Só o dono do perfil pode usar estes botões.',
                     flags: MessageFlags.Ephemeral
                 });
             }
             const pts = Number(xp.get(ownerId).attrPoints || 0);
             if (pts <= 0) {
-                return interaction.update(atributosPayload(interaction.user));
+                return safeUpdate(interaction, atributosPayload(interaction.user));
             }
             const opts = [];
             for (const n of [1, 2, 3, 5, 10]) {
@@ -655,7 +705,7 @@ module.exports = {
                         .setStyle(ButtonStyle.Secondary)
                 )
             );
-            return interaction.update({
+            return safeUpdate(interaction, {
                 content:
                     '⚖️ **' +
                     meta.emoji +
@@ -677,19 +727,19 @@ module.exports = {
             if (attrKey === 'vida' || attrKey === 'defesa') attrKey = 'constituicao';
             const meta = ATTR_META.find((a) => a.key === attrKey);
             if (!meta) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Atributo inválido.',
                     flags: MessageFlags.Ephemeral
                 });
             }
             if (String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Só o dono do perfil pode usar estes botões.',
                     flags: MessageFlags.Ephemeral
                 });
             }
             if (amount <= 0) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Quantidade inválida.',
                     flags: MessageFlags.Ephemeral
                 });
@@ -699,7 +749,7 @@ module.exports = {
                 : null;
             if (!spent || !spent.ok) {
                 const msg = String((spent && spent.error) || 'Falha ao depositar.').trim();
-                return interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
+                return safeReply(interaction, { content: msg, flags: MessageFlags.Ephemeral });
             }
             const payload = atributosPayload(interaction.user);
             payload.content =
@@ -710,37 +760,37 @@ module.exports = {
                 ' ' +
                 meta.label +
                 '**.';
-            return interaction.update(payload);
+            return safeUpdate(interaction, payload);
         }
 
         if (id.startsWith('j:attrcancel:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Só o dono do perfil pode usar estes botões.',
                     flags: MessageFlags.Ephemeral
                 });
             }
-            return interaction.update(atributosPayload(interaction.user));
+            return safeUpdate(interaction, atributosPayload(interaction.user));
         }
 
         if (id.startsWith('j:attrredis:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Só o dono do perfil pode usar estes botões.',
                     flags: MessageFlags.Ephemeral
                 });
             }
             const res = xp.redistribuirAttrs(ownerId);
             if (!res || !res.ok) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Não foi possível redistribuir agora.',
                     flags: MessageFlags.Ephemeral
                 });
             }
             const payload = atributosPayload(interaction.user);
-            await interaction.update(payload);
+            await safeUpdate(interaction, payload);
             return interaction
                 .followUp({
                     content:
@@ -757,14 +807,14 @@ module.exports = {
         if (id === 'j:class' && interaction.isStringSelectMenu()) {
             const draft = drafts.get(interaction.user.id);
             if (!draft || !draft.name) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Sessão expirada. Clique em **Criar meu perfil** de novo.',
                     flags: MessageFlags.Ephemeral
                 });
             }
             const classId = interaction.values[0];
             if (!player.getClass(classId) && !player.CLASSES[classId]) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Classe inválida.',
                     flags: MessageFlags.Ephemeral
                 });
@@ -774,7 +824,7 @@ module.exports = {
             drafts.set(interaction.user.id, draft);
 
             const cls = player.getClass(classId);
-            await interaction.update({
+            await safeUpdate(interaction, {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(cls.color)
@@ -802,7 +852,7 @@ module.exports = {
         if (id === 'j:avatar') {
             const draft = drafts.get(interaction.user.id) || photoWait.get(interaction.user.id);
             if (!draft || !draft.name || !draft.classId) {
-                return interaction.reply({
+                return safeReply(interaction, {
                     content: 'Sessão expirada. Use `O.j criar` de novo.',
                     flags: MessageFlags.Ephemeral
                 });
