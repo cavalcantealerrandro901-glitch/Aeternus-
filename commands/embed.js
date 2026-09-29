@@ -1,8 +1,8 @@
-const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 module.exports = {
     name: 'embed',
-    aliases: ['criar-embed'],
+    aliases: ['criar-embed', 'criarembed'],
     description: 'Criar embed',
     data: new SlashCommandBuilder()
         .setName('criar-embed')
@@ -32,11 +32,29 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
+            const payload = {
+                content: '❌ Sem permissão (Gerenciar Mensagens).',
+                flags: MessageFlags.Ephemeral
+            };
+            if (i.deferred || i.replied) return i.editReply(payload).catch(() => {});
+            return i.reply(payload).catch(() => {});
+        }
+
         const title = i.options.getString('titulo', true);
         const desc = i.options.getString('descricao', true);
-        await i.reply({ content: '✅', ephemeral: true });
-        await i.channel.send({
-            embeds: [new EmbedBuilder().setColor(0xa78bfa).setTitle(title).setDescription(desc)]
-        });
+
+        const embed = new EmbedBuilder()
+            .setColor(0xa78bfa)
+            .setTitle(String(title).slice(0, 256))
+            .setDescription(String(desc).slice(0, 4000));
+
+        await i.channel.send({ embeds: [embed] }).catch(() => {});
+
+        const ok = { content: '✅ Embed enviada.' };
+        if (i.deferred || i.replied) {
+            return i.editReply(ok).catch(() => {});
+        }
+        return i.reply({ ...ok, flags: MessageFlags.Ephemeral }).catch(() => {});
     }
 };
