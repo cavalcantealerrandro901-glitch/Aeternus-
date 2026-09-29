@@ -219,37 +219,50 @@ function findMyRank(list, userId) {
     };
 }
 
-async function pageEmbed(client, list, mode, page, guildName, viewerId) {
+async function pageEmbed(client, list, mode, page, guild, viewerId) {
     const meta = modeMeta(mode);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     const p = Math.min(Math.max(0, page), totalPages - 1);
     const start = p * PAGE_SIZE;
     const slice = list.slice(start, start + PAGE_SIZE);
     const mine = findMyRank(list, viewerId);
+    const guildName = guild?.name || 'Global';
 
     const blocks = [];
     for (let i = 0; i < slice.length; i++) {
         const e = slice[i];
         const pos = start + i;
         const u = await client.users.fetch(e.id).catch(() => null);
-        // Pula bots (garantia extra na página)
         if (u?.bot) continue;
 
-        // Nome real em texto (@Nome) — não notifica; <@id> às vezes só mostra o ID
-        const name = u
-            ? u.globalName || u.username || e.id
-            : e.id;
-        const tag = `@${name}`;
+        // No servidor: menção <@id> (azul, sem notificar no embed)
+        // Fora / sem resolver: nome em texto @Nome
+        let inGuild = false;
+        if (guild) {
+            inGuild = Boolean(
+                guild.members.cache.get(e.id) ||
+                    (await guild.members.fetch(e.id).catch(() => null))
+            );
+        }
+
+        let tag;
+        if (inGuild) {
+            tag = `<@${e.id}>`;
+        } else if (u) {
+            tag = `**@${u.globalName || u.username}**`;
+        } else {
+            tag = `**@usuário-${String(e.id).slice(-4)}**`;
+        }
 
         if (meta.economy) {
             blocks.push(
-                `${medal(pos)} **${tag}** = ID [\`${e.id}\`] | saldo:  ✨ **${fmt(e.value)}** éter`
+                `${medal(pos)} ${tag} = ID [\`${e.id}\`] | saldo:  ✨ **${fmt(e.value)}** éter`
             );
         } else {
             const extra =
                 e.level != null ? `\n   Nv. **${e.level}**` : '';
             blocks.push(
-                `${medal(pos)} **${tag}**\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+                `${medal(pos)} ${tag}\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
             );
         }
     }
@@ -336,7 +349,7 @@ async function sendRank(ctx, mode, page = 0) {
         list,
         mode,
         p,
-        guild?.name || 'Global',
+        guild || null,
         viewerId
     );
 
