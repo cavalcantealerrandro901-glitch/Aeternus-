@@ -30,10 +30,12 @@ function ensureAttrs(d) {
 
 function get(userId) {
     const raw = all()[userId] || { xp: 0, level: 0 };
+    const attrs = ensureAttrs({ attrs: raw.attrs });
     return {
         xp: Number(raw.xp || 0),
         level: Number(raw.level || 0),
-        attrs: ensureAttrs({ attrs: raw.attrs })
+        attrs,
+        attrPoints: Math.max(0, Math.floor(Number(raw.attrPoints || 0)))
     };
 }
 
@@ -103,8 +105,11 @@ function addXp(userId, amount) {
         } catch (_) {}
 
         const levelsGained = after - before;
+        cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
         for (let i = 0; i < levelsGained; i++) {
-            // dobro de atributos por nível (2 rolls)
+            // pontos livres para distribuir manualmente
+            cur.attrPoints += 2;
+            // bônus aleatório pequeno nos attrs
             for (let r = 0; r < 2; r++) {
                 const g = rollAttrGain(false);
                 cur.attrs[g.key] = (cur.attrs[g.key] || 0) + g.amount;
@@ -202,6 +207,82 @@ function removeXp(userId, amount) {
     return addXp(userId, -n);
 }
 
+
+function loadCur(userId) {
+    const data = all();
+    const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR }, attrPoints: 0 };
+    ensureAttrs(cur);
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
+    return { data, cur };
+}
+
+function saveCur(data, userId, cur) {
+    data[userId] = cur;
+    store.save('xp.json', data);
+}
+
+/** Gasta 1 ponto livre em um atributo */
+function spendAttrPoint(userId, key) {
+    return spendAttrPoints(userId, key, 1);
+}
+
+/** Gasta N pontos livres em um atributo */
+function spendAttrPoints(userId, key, amount) {
+    const k = String(key || '').toLowerCase();
+    if (!ATTR_KEYS.includes(k)) {
+        return { ok: false, error: 'Atributo inválido.' };
+    }
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (n <= 0) return { ok: false, error: 'Quantidade inválida.' };
+
+    const { data, cur } = loadCur(userId);
+    if (cur.attrPoints < n) {
+        return {
+            ok: false,
+            error: 'Pontos insuficientes. Você tem **' + cur.attrPoints + '**.'
+        };
+    }
+    cur.attrPoints -= n;
+    cur.attrs[k] = Math.max(0, Math.floor(Number(cur.attrs[k] || 0)) + n);
+    saveCur(data, userId, cur);
+    return { ok: true, spent: n, key: k, attrs: { ...cur.attrs }, attrPoints: cur.attrPoints };
+}
+
+/**
+ * Volta atributos à base e devolve o excedente como pontos livres.
+ */
+function redistribuirAttrs(userId) {
+    const { data, cur } = loadCur(userId);
+    let refund = 0;
+    for (const k of ATTR_KEYS) {
+        const base = BASE_ATTR[k] ?? 0;
+        const val = Math.floor(Number(cur.attrs[k] || 0));
+        if (val > base) {
+            refund += val - base;
+            cur.attrs[k] = base;
+        } else {
+            cur.attrs[k] = Math.max(base, val);
+        }
+    }
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)) + refund);
+    saveCur(data, userId, cur);
+    return {
+        ok: true,
+        refund,
+        attrPoints: cur.attrPoints,
+        attrs: { ...cur.attrs }
+    };
+}
+
+/** Adiciona pontos livres de atributo (admin / recompensas) */
+function addAttrPoints(userId, amount) {
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    const { data, cur } = loadCur(userId);
+    cur.attrPoints += n;
+    saveCur(data, userId, cur);
+    return { ok: true, attrPoints: cur.attrPoints };
+}
+
 module.exports = {
     get,
     addXp,
@@ -217,6 +298,10 @@ module.exports = {
     getAttrs,
     maxHp,
     maxMana,
+    spendAttrPoint,
+    spendAttrPoints,
+    redistribuirAttrs,
+    addAttrPoints,
     ATTR_KEYS,
     ATTR_LABEL,
     BASE_ATTR
