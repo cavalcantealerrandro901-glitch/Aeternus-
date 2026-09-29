@@ -113,7 +113,7 @@ function modeMeta(mode) {
             title: 'AETERNUS RANK · SERVIDOR',
             emoji: '✨',
             unit: 'éter',
-            color: 0x22d3ee,
+            color: 0xa78bfa,
             scope: 'local',
             economy: true
         };
@@ -122,7 +122,7 @@ function modeMeta(mode) {
         title: 'AETERNUS RANK GERAL',
         emoji: '✨',
         unit: 'éter',
-        color: 0xfbbf24,
+        color: 0xa78bfa,
         scope: 'global',
         economy: true
     };
@@ -253,7 +253,7 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
             const extra =
                 e.level != null ? `\n   Nv. **${e.level}**` : '';
             blocks.push(
-                `${medal(pos)} ${tag}\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+                `${medal(pos)} ${tag} = ID [\`${e.id}\`]\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
             );
         }
     }
@@ -280,7 +280,7 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
 
 function helpEmbed() {
     return new EmbedBuilder()
-        .setColor(0xfbbf24)
+        .setColor(0xa78bfa)
         .setTitle('🏆 Rankings · Economia Aeternus')
         .setDescription(
             [
