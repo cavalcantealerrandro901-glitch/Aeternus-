@@ -21,29 +21,25 @@ function stripAccents(s) {
         .replace(/[\u0300-\u036f]/g, '');
 }
 
-/** Detecta prefixo do servidor ou menção do bot no início da mensagem */
 function resolvePrefixMatch(message, client) {
     const content = String(message.content || '');
     if (!content) return null;
 
-    const configured = message.guild ? getPrefix(message.guild.id) : 'O.';
-    const candidates = [configured, 'O.', 'o.'].filter(Boolean);
-    const seen = new Set();
-    const list = [];
-    for (const c of candidates) {
-        const k = String(c).toLowerCase();
-        if (seen.has(k)) continue;
-        seen.add(k);
-        list.push(String(c));
-    }
+    // Só o prefixo configurado do servidor. Se mudou, O. padrão é ignorado.
+    const configured = message.guild
+        ? String(getPrefix(message.guild.id) || 'O.')
+        : 'O.';
 
     const lower = content.toLowerCase();
-    for (const p of list) {
-        if (lower.startsWith(p.toLowerCase())) {
-            return { prefix: p, rest: content.slice(p.length) };
-        }
+    const pref = configured.toLowerCase();
+    if (pref && lower.startsWith(pref)) {
+        return {
+            prefix: content.slice(0, configured.length),
+            rest: content.slice(configured.length)
+        };
     }
 
+    // Menção @bot ainda funciona
     if (client && client.user && client.user.id) {
         const re = new RegExp('^<@!?' + client.user.id + '>\\s*');
         const m = content.match(re);
