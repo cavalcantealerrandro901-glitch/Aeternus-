@@ -69,6 +69,8 @@ function isIgnorableNoise(text) {
         }
     }
     if (/connect ETIMEDOUT|getaddrinfo|EHOSTUNREACH/i.test(t)) return true;
+    // Interação já respondida — comum em race; não spam DM
+    if (/InteractionAlreadyReplied|already been sent or deferred/i.test(t)) return true;
     return false;
 }
 
@@ -117,6 +119,16 @@ function walkJsFiles(dir, acc = [], depth = 0) {
     return acc;
 }
 
+function fileMentionsCmd(raw, needle) {
+    if (!needle || !raw) return false;
+    const n = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (raw.includes("name: '" + needle + "'") || raw.includes('name: "' + needle + '"'))
+        return true;
+    if (new RegExp(`aliases:[\\s\\S]{0,400}['\"]${n}['\"]`, 'i').test(raw)) return true;
+    if (new RegExp(`setName\\(['\"]${n}['\"]\\)`, 'i').test(raw)) return true;
+    return false;
+}
+
 function searchProject(cmdName, error) {
     const needle = String(cmdName || '')
         .toLowerCase()
@@ -145,7 +157,7 @@ function searchProject(cmdName, error) {
         if (needle && base === needle) {
             score += 100;
             reasons.push('nome do arquivo = módulo');
-        } else if (needle && base.includes(needle)) {
+        } else if (needle && (base.includes(needle) || needle.includes(base))) {
             score += 40;
             reasons.push('nome parcial');
         }
@@ -163,16 +175,12 @@ function searchProject(cmdName, error) {
             reasons.push('erro menciona o arquivo');
         }
 
-        if (score < 50 && needle && file.includes(`${path.sep}commands${path.sep}`)) {
+        if (needle && file.includes(`${path.sep}commands${path.sep}`)) {
             try {
                 const raw = fs.readFileSync(file, 'utf8');
-                if (
-                    raw.includes(`name: '${needle}'`) ||
-                    raw.includes(`name: "${needle}"`) ||
-                    new RegExp(`aliases:[^\]]*['"]${needle}['"]`, 'i').test(raw)
-                ) {
+                if (fileMentionsCmd(raw, needle)) {
                     score += 90;
-                    reasons.push('name/aliases no código');
+                    reasons.push('name/aliases/setName no código');
                 }
             } catch (_) {}
         }
@@ -185,12 +193,42 @@ function searchProject(cmdName, error) {
 }
 
 function resolveCommandFile(cmdName) {
+    const needle = String(cmdName || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '');
+
+    // 1) mapa em memória do client (slash name / aliases)
+    if (clientRef?.commands) {
+        const cmd =
+            clientRef.commands.get(needle) ||
+            clientRef.slash?.get?.(needle) ||
+            [...(clientRef.commands.values() || [])].find(
+                (c) =>
+                    c?.name === needle ||
+                    c?.data?.name === needle ||
+                    (Array.isArray(c?.aliases) &&
+                        c.aliases.some((a) => String(a).toLowerCase() === needle))
+            );
+        if (cmd?.name) {
+            const byName = path.join(ROOT, 'commands', cmd.name + '.js');
+            if (fs.existsSync(byName)) return byName;
+        }
+    }
+
     const hits = searchProject(cmdName, null);
     const cmdHit = hits.find((h) => h.rel.startsWith('commands/'));
     if (cmdHit) return cmdHit.file;
 
-    const direct = path.join(ROOT, 'commands', `${cmdName}.js`);
+    const direct = path.join(ROOT, 'commands', `${needle}.js`);
     if (fs.existsSync(direct)) return direct;
+
+    // hífen: criar-embed → tentar embed.js
+    if (needle.includes('-')) {
+        const tail = needle.split('-').pop();
+        const alt = path.join(ROOT, 'commands', `${tail}.js`);
+        if (fs.existsSync(alt)) return alt;
+    }
+
     return hits[0]?.file || null;
 }
 
