@@ -89,7 +89,7 @@ const CATEGORIES = {
             { name: 'guild', desc: 'Sistema de guildas', usage: 'guild [criar|info|convidar|…]', example: 'O.guild criar', about: 'Cria guilda no PV (nome, tag, descrição, boas-vindas, imagem), banco, ranking.' },
             { name: 'arena', desc: 'PvP', usage: 'arena|pvp [diversao|aposta|equipes] @user', example: 'O.pvp aposta @user 1k', about: 'Modos: diversão, aposta 1v1, equipes e equipes+aposta.' },
             { name: 'masmorra', desc: 'Masmorra PvE', usage: 'masmorra', example: 'O.masmorra', about: 'Pisos com várias ondas de monstros e boss no final.' },
-            { name: 'xp', desc: 'Ver XP e atributos', usage: 'xp [@user]', example: 'O.xp', about: 'Nível, XP e distribuição de atributos.' },
+            { name: 'xp', desc: 'XP e nível', usage: 'xp [@user|rank|info]', example: 'O.xp', about: 'XP cumulativo: 1000 XP = 1 nível (não gasta). +5 pontos de atributo por nível.' },
             { name: 'dar', desc: 'Dar itens/XP (admin)', usage: 'dar @user <tipo> …', example: 'O.dar @user xp 500', about: 'Admin: XP, itens, livros, atributos, etc.' },
             { name: 'excluiritem', desc: 'Remover item do inventário', usage: 'excluiritem', example: 'O.excluiritem', about: 'Remove itens do inventário.' },
             { name: 'trocar', desc: 'Troca entre jogadores', usage: 'trocar @user', example: 'O.trocar @user', about: 'Sistema de troca de itens.' }

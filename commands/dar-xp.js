@@ -58,7 +58,7 @@ module.exports = {
                             `**+${fmt(amount)}** XP`,
                             '',
                             `Antes: **${fmt(before.xp)}** XP · Nv. **${before.level}**`,
-                            `Agora: **${fmt(result.xp)}** XP · Nv. **${result.level}**`,
+                            `Agora: **${fmt(result.xp)}** XP · Nv. **${result.level}**\nPróximo nível em **${fmt((result.level + 1) * 1000)}** XP total`,
                             result.leveled
                                 ? `\n🎉 Subiu de nível! (${result.oldLevel} → ${result.level})`
                                 : ''
@@ -66,6 +66,7 @@ module.exports = {
                             .filter(Boolean)
                             .join('\n')
                     )
+                    .setFooter({ text: 'XP cumulativo · 1000 XP = 1 nível' })
                     .setTimestamp()
             ]
         });

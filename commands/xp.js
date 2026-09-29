@@ -29,95 +29,120 @@ function titleForLevel(level) {
     return { emoji: '⭐', name: 'Novato' };
 }
 
+async function respond(ctx, payload) {
+    const data = typeof payload === 'string' ? { content: payload } : payload;
+    if (ctx.isChatInputCommand?.() || ctx.isButton?.()) {
+        if (ctx.deferred || ctx.replied) return ctx.editReply(data);
+        return ctx.reply(data);
+    }
+    return ctx.reply(data);
+}
+
 function profileEmbed(user, p, rankInfo) {
-    p = p || { level: 0, totalXp: 0, current: 0, need: 100, pct: 0, toNext: 100, mult: 1 };
+    p = p || {
+        level: 0,
+        totalXp: 0,
+        current: 0,
+        need: 1000,
+        pct: 0,
+        toNext: 1000,
+        mult: 1,
+        nextLevelTotal: 1000
+    };
+    const st = xp.get(user.id);
     const title = titleForLevel(p.level);
+    const nextTotal = p.nextLevelTotal != null ? p.nextLevelTotal : (p.level + 1) * 1000;
+
     const lines = [
-        title.emoji + ' **Título:** ' + title.name,
+        `${title.emoji} **Título:** ${title.name}`,
         '',
-        '🎚️ **Nível** **' + p.level + '**',
-        '✨ **XP total** · ' + fmt(p.totalXp),
+        `🎚️ **Nível** **${p.level}**`,
+        `✨ **XP total** · **${fmt(p.totalXp)}** _(não é gasto ao upar)_`,
+        `🎯 Próximo nível em **${fmt(nextTotal)}** XP total`,
         '',
-        '**Progresso no nível**',
-        '`' + bar(p.pct) + '` **' + p.pct + '%**',
-        '🔹 ' + fmt(p.current) + ' / ' + fmt(p.need) + ' XP',
-        '⏳ Faltam **' + fmt(p.toNext) + '** XP para o nível ' + (p.level + 1),
+        '**Progresso no nível atual**',
+        `\`${bar(p.pct)}\` **${p.pct}%**`,
+        `🔹 ${fmt(p.current)} / ${fmt(p.need)} XP neste nível`,
+        `⏳ Faltam **${fmt(p.toNext)}** XP para o nível **${p.level + 1}**`,
         '',
-        '🎁 **Multiplicador do Daily:** ×**' + Number(p && p.mult != null ? p.mult : 1).toFixed(2) + '**',
+        `🃏 **Pontos de atributo:** **${fmt(st.attrPoints || 0)}**`,
+        '_Distribua em `O.j atributos` · +5 por nível_',
+        '',
+        `🎁 **Multiplicador do Daily:** ×**${Number(p.mult ?? 1).toFixed(2)}**`,
         '_Cada nível aumenta o daily (máx. ×3.00)._',
         '',
         rankInfo
-            ? '🏅 **Ranking global:** #**' + rankInfo.rank + '** de ' + rankInfo.total
+            ? `🏅 **Ranking XP:** #**${rankInfo.rank}** de ${fmt(rankInfo.total)}`
             : ''
     ].filter(Boolean);
 
     return new EmbedBuilder()
         .setColor(0xa78bfa)
         .setAuthor({
-            name: user.username + ' · Experiência',
+            name: `${user.globalName || user.username} · Experiência`,
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle(title.emoji + '  Nível ' + p.level)
+        .setTitle(`${title.emoji}  Nível ${p.level}`)
         .setDescription(lines.join('\n'))
         .setThumbnail(user.displayAvatarURL({ size: 256 }))
-        .setFooter({ text: 'O.xp · O.level · O.nivel · /xp  ·  converse no chat para ganhar XP' })
+        .setFooter({
+            text: 'XP cumulativo · 1000 XP por nível · O.xp · /nivel'
+        })
         .setTimestamp();
 }
 
 function leaderboardEmbed(client, list) {
     const medals = ['🥇', '🥈', '🥉'];
-    const lines = list.length
-        ? list.map((row, i) => {
-              const medal = medals[i] || '**' + (i + 1) + '.**';
-              const title = titleForLevel(row.level);
-              return (
-                  medal +
-                  ' <@' +
-                  row.userId +
-                  '> — ' +
-                  title.emoji +
-                  ' Nv. **' +
-                  row.level +
-                  '** · ' +
-                  fmt(row.xp) +
-                  ' XP'
-              );
-          })
-        : ['_Ainda ninguém no ranking. Converse no chat!_'];
+    const lines = (list || []).map((e, i) => {
+        const medal = medals[i] || `**#${i + 1}**`;
+        const name = client.users.cache.get(e.userId)?.username || `ID ${e.userId}`;
+        return `${medal} **@${name}** = ID [\`${e.userId}\`]\n   ⭐ **${fmt(e.xp)}** XP · Nv. **${e.level}**`;
+    });
 
     return new EmbedBuilder()
-        .setColor(0xfbbf24)
-        .setTitle('🏆  Ranking de XP')
-        .setDescription(lines.join('\n'))
-        .setFooter({ text: 'Top 10 · XP global do bot' })
+        .setColor(0xa78bfa)
+        .setTitle('AETERNUS RANK XP · GLOBAL')
+        .setDescription(
+            lines.length
+                ? lines.join('\n\n')
+                : '_Ninguém no ranking ainda. Converse no chat!_'
+        )
+        .setFooter({ text: 'Aeternus rank XP • total acumulado • 1000 XP = 1 nível' })
         .setTimestamp();
 }
 
 function helpEmbed() {
     return new EmbedBuilder()
-        .setColor(0x6366f1)
-        .setTitle('⭐  Sistema de XP')
+        .setColor(0xa78bfa)
+        .setTitle('📖 Como funciona o XP')
         .setDescription(
             [
-                'Ganhe XP **conversando**, na **masmorra** e no **PvP**.',
-                'Há anti-spam no chat: mensagens seguidas dão menos XP.',
+                '**Sistema cumulativo**',
+                '• O XP **nunca some** ao subir de nível.',
+                '• Nível **1** = **1.000** XP total',
+                '• Nível **2** = **2.000** XP total',
+                '• Nível **3** = **3.000** XP total',
+                '• E assim por diante (**+1.000** por nível).',
                 '',
-                '**Chat:** ~30–77 XP por mensagem',
-                '**PvP:** XP conforme a força do adversário + **CP** + 3–5 itens',
-                '**Masmorra:** XP e CP ao limpar o piso (vários monstros + boss)',
-                '**Daily:** multiplicador sobe com o nível (até ×3)',
+                '**Como ganhar**',
+                '• Conversando no chat (com cooldown)',
+                '• Masmorra, PvP, eventos e recompensas',
+                '• Admins: `/dar-xp` · `/editar-xp`',
+                '• Entre jogadores: `/transferir-xp`',
+                '',
+                '**Ao subir de nível**',
+                '• **+5** pontos de atributo livres',
+                '• Bônus aleatório nos atributos',
+                '• Daily um pouco maior (até ×3)',
                 '',
                 '**Comandos**',
-                '`O.xp` — seu progresso',
-                '`O.xp @user` — ver outro membro',
-                '`O.xp rank` — ranking',
-                '`O.xp info` — como funciona',
-                '',
-                'Aliases: `level` · `nivel` · `lvl` · `rankxp`'
+                '`O.xp` / `/nivel` — seu progresso',
+                '`O.xp rank` / `O.rank xp global` — ranking',
+                '`O.j atributos` — gastar pontos',
+                '`O.xp info` — esta ajuda'
             ].join('\n')
         )
-        .setFooter({ text: 'Aeternus · progressão' })
-        .setTimestamp();
+        .setFooter({ text: 'Aeternus · XP' });
 }
 
 function rows() {
@@ -155,10 +180,10 @@ function parseSub(args) {
 module.exports = {
     name: 'xp',
     aliases: ['level', 'nivel', 'nível', 'lvl', 'rankxp', 'experiencia', 'experiência'],
-    description: 'Mostra XP, nível, ranking e multiplicador do daily',
+    description: 'XP cumulativo, nível, ranking e pontos de atributo',
     data: new SlashCommandBuilder()
         .setName('nivel')
-        .setDescription('Ver nivel e XP')
+        .setDescription('Ver nível e XP (sistema cumulativo)')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Ver XP de outro usuário').setRequired(false)
         )
@@ -187,7 +212,6 @@ module.exports = {
         }
 
         const user = message.mentions.users.first() || message.author;
-        // se o 1º arg for menção, parseSub já trata como me
         const p = xp.progress(user.id);
         const rankInfo = xp.rankOf(user.id);
         return message.reply({
@@ -197,21 +221,22 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const send = (payload) => respond(interaction, payload);
         const acao = interaction.options.getString('acao') || 'me';
         if (acao === 'rank') {
-            return interaction.reply({
+            return send({
                 embeds: [leaderboardEmbed(interaction.client, xp.leaderboard(10))],
                 components: rows()
             });
         }
         if (acao === 'info') {
-            return interaction.reply({ embeds: [helpEmbed()], components: rows() });
+            return send({ embeds: [helpEmbed()], components: rows() });
         }
 
         const user = interaction.options.getUser('usuario') || interaction.user;
         const p = xp.progress(user.id);
         const rankInfo = xp.rankOf(user.id);
-        return interaction.reply({
+        return send({
             embeds: [profileEmbed(user, p, rankInfo)],
             components: rows()
         });
@@ -221,14 +246,25 @@ module.exports = {
         const id = interaction.customId;
         if (!id.startsWith('xp:')) return;
 
+        const update = async (payload) => {
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    return interaction.editReply(payload);
+                }
+                return interaction.update(payload);
+            } catch (e) {
+                if (e && (e.code === 10062 || e.code === 40060)) return;
+            }
+        };
+
         if (id === 'xp:rank') {
-            return interaction.update({
+            return update({
                 embeds: [leaderboardEmbed(interaction.client, xp.leaderboard(10))],
                 components: rows()
             });
         }
         if (id === 'xp:info') {
-            return interaction.update({
+            return update({
                 embeds: [helpEmbed()],
                 components: rows()
             });
@@ -237,7 +273,7 @@ module.exports = {
             const user = interaction.user;
             const p = xp.progress(user.id);
             const rankInfo = xp.rankOf(user.id);
-            return interaction.update({
+            return update({
                 embeds: [profileEmbed(user, p, rankInfo)],
                 components: rows()
             });

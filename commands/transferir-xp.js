@@ -73,6 +73,7 @@ module.exports = {
                             `XP de <@${target.id}>: **${fmt(beforeTo.xp)}** → **${fmt(afterTo.xp)}** · Nv. **${afterTo.level}**`
                         ].join('\n')
                     )
+                    .setFooter({ text: 'XP cumulativo · 1000 XP = 1 nível' })
                     .setTimestamp()
             ]
         });
