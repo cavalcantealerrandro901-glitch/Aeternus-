@@ -256,7 +256,7 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
 
         if (meta.economy) {
             blocks.push(
-                `${medal(pos)} ${tag} = ID [\`${e.id}\`] | saldo:  ✨ **${fmt(e.value)}** éter`
+                `${medal(pos)} ${tag} = ID [\`${e.id}\`]\n   saldo:  ✨ **${fmt(e.value)}** éter`
             );
         } else {
             const extra =
