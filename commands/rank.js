@@ -129,30 +129,29 @@ function modeMeta(mode) {
 }
 
 /**
- * Lista do ranking — saldos de Éter vêm do Mongo (store → eter.json).
+ * Lista do ranking — saldos de Éter no Mongo (rápido: sem fetch em massa).
+ * Bots só são filtrados via cache; a página confirma com fetch paralelo.
  */
 async function buildList(mode, guild, client) {
     if (mode === 'xp' || mode === 'xpglobal') {
         const data = xp.all() || {};
         let entries = Object.entries(data).map(([id, v]) => ({
-            id,
+            id: String(id),
             value: Number(v?.xp || 0),
             level: Number(v?.level || 0)
         }));
 
         if (mode === 'xp' && guild) {
+            // Usa cache; evita fetch completo do servidor se já houver membros
             const memberIds = new Set();
-            try {
-                const members = await guild.members.fetch().catch(() => null);
-                if (members) members.forEach((m) => memberIds.add(m.id));
-            } catch (_) {}
-            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
-        } else if (mode === 'xpglobal' && client?.guilds?.cache?.size) {
-            const memberIds = new Set();
-            for (const g of client.guilds.cache.values()) {
+            guild.members.cache.forEach((m) => {
+                if (m.user && !m.user.bot) memberIds.add(m.id);
+            });
+            if (memberIds.size < 5) {
                 try {
-                    if (g.members.cache.size > 1) {
-                        g.members.cache.forEach((m) => {
+                    const members = await guild.members.fetch().catch(() => null);
+                    if (members) {
+                        members.forEach((m) => {
                             if (m.user && !m.user.bot) memberIds.add(m.id);
                         });
                     }
@@ -161,18 +160,12 @@ async function buildList(mode, guild, client) {
             if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
         }
 
-        const out = [];
-        for (const e of entries) {
-            if (e.value <= 0) continue;
-            let u = client?.users?.cache?.get(e.id) || null;
-            if (!u && client) u = await client.users.fetch(e.id).catch(() => null);
-            if (u?.bot) continue;
-            out.push(e);
-        }
-        return out.sort((a, b) => b.value - a.value || b.level - a.level);
+        return entries
+            .filter((e) => e.value > 0 && !isKnownBot(client, e.id))
+            .sort((a, b) => b.value - a.value || b.level - a.level);
     }
 
-    // Economia: saldos no MongoDB via utils/eter (store)
+    // Economia: só dados do Mongo + sort (sem API Discord)
     const data = eter.all() || {};
     let entries = Object.entries(data).map(([id, v]) => ({
         id: String(id),
@@ -181,32 +174,31 @@ async function buildList(mode, guild, client) {
 
     if (mode === 'local' && guild) {
         const memberIds = new Set();
-        try {
-            const members = await guild.members.fetch().catch(() => null);
-            if (members) {
-                members.forEach((m) => {
-                    if (m.user && !m.user.bot) memberIds.add(m.id);
-                });
-            }
-        } catch (_) {}
+        guild.members.cache.forEach((m) => {
+            if (m.user && !m.user.bot) memberIds.add(m.id);
+        });
+        if (memberIds.size < 5) {
+            try {
+                const members = await guild.members.fetch().catch(() => null);
+                if (members) {
+                    members.forEach((m) => {
+                        if (m.user && !m.user.bot) memberIds.add(m.id);
+                    });
+                }
+            } catch (_) {}
+        }
         if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
     }
 
-    // Remove bots: cache + fetch sob demanda
-    const humans = [];
-    for (const e of entries) {
-        if (e.value <= 0) continue;
-        let u = client?.users?.cache?.get(e.id) || null;
-        if (!u && client) {
-            u = await client.users.fetch(e.id).catch(() => null);
-        }
-        if (u?.bot) continue;
-        // IDs de bot do Discord terminam com padrões; se não achou user, ainda inclui (pode ser user offline)
-        // Se client ausente, filtra só por value
-        humans.push(e);
-    }
+    return entries
+        .filter((e) => e.value > 0 && !isKnownBot(client, e.id))
+        .sort((a, b) => b.value - a.value);
+}
 
-    return humans.sort((a, b) => b.value - a.value);
+/** Bot conhecido no cache — não faz fetch */
+function isKnownBot(client, id) {
+    const u = client?.users?.cache?.get(String(id));
+    return Boolean(u?.bot);
 }
 
 function findMyRank(list, userId) {
@@ -228,32 +220,31 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
     const mine = findMyRank(list, viewerId);
     const guildName = guild?.name || 'Global';
 
+    // Fetch só da página atual, em paralelo
+    const resolved = await Promise.all(
+        slice.map(async (e) => {
+            let u = client.users.cache.get(e.id) || null;
+            if (!u) u = await client.users.fetch(e.id).catch(() => null);
+            if (u?.bot) return null;
+            const inGuild = Boolean(guild?.members?.cache?.get(e.id));
+            let tag;
+            if (inGuild) {
+                tag = `<@${e.id}>`;
+            } else if (u) {
+                tag = `**@${u.globalName || u.username}**`;
+            } else {
+                tag = `**@usuário-${String(e.id).slice(-4)}**`;
+            }
+            return { e, tag };
+        })
+    );
+
     const blocks = [];
-    for (let i = 0; i < slice.length; i++) {
-        const e = slice[i];
+    for (let i = 0; i < resolved.length; i++) {
+        const row = resolved[i];
+        if (!row) continue;
         const pos = start + i;
-        const u = await client.users.fetch(e.id).catch(() => null);
-        if (u?.bot) continue;
-
-        // No servidor: menção <@id> (azul, sem notificar no embed)
-        // Fora / sem resolver: nome em texto @Nome
-        let inGuild = false;
-        if (guild) {
-            inGuild = Boolean(
-                guild.members.cache.get(e.id) ||
-                    (await guild.members.fetch(e.id).catch(() => null))
-            );
-        }
-
-        let tag;
-        if (inGuild) {
-            tag = `<@${e.id}>`;
-        } else if (u) {
-            tag = `**@${u.globalName || u.username}**`;
-        } else {
-            tag = `**@usuário-${String(e.id).slice(-4)}**`;
-        }
-
+        const { e, tag } = row;
         if (meta.economy) {
             blocks.push(
                 `${medal(pos)} ${tag} = ID [\`${e.id}\`]\n   saldo:  ✨ **${fmt(e.value)}** éter`
