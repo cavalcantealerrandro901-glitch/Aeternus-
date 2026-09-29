@@ -39,36 +39,42 @@ function get(userId) {
     };
 }
 
+/** XP total necessário para estar no nível L (cumulativo). Nv1=1000, Nv2=2000, … */
+const XP_PER_LEVEL = 1000;
+
 function xpForLevel(level) {
-    const lv = Math.max(0, Number(level) || 0);
-    return Math.floor(100 + lv * 85 + Math.pow(lv, 1.15) * 2);
+    // XP necessário para passar do nível `level` para level+1
+    // Sistema cumulativo: sempre 1000 por nível (total = level * 1000)
+    return XP_PER_LEVEL;
+}
+
+/** Total de XP para alcançar o nível L (L=1 → 1000, L=2 → 2000, …) */
+function totalXpForLevel(level) {
+    const lv = Math.max(0, Math.floor(Number(level) || 0));
+    return lv * XP_PER_LEVEL;
 }
 
 function levelFromXp(totalXp) {
-    let level = 0;
-    let remain = Number(totalXp || 0);
-    while (remain >= xpForLevel(level)) {
-        remain -= xpForLevel(level);
-        level++;
-        if (level > 10000) break;
-    }
-    return level;
+    const xp = Math.max(0, Math.floor(Number(totalXp) || 0));
+    // Mantém os XP; nível = quantos blocos de 1000 já juntou
+    return Math.min(10000, Math.floor(xp / XP_PER_LEVEL));
 }
 
 function progress(userId) {
     const { xp, level, attrs } = get(userId);
-    let remain = Number(xp || 0);
-    for (let lv = 0; lv < level; lv++) remain -= xpForLevel(lv);
-    if (remain < 0) remain = 0;
-    const need = xpForLevel(level);
-    const pct = Math.min(100, Math.floor((remain / Math.max(1, need)) * 100));
+    const total = Math.max(0, Math.floor(Number(xp) || 0));
+    // XP dentro do nível atual (0..999) e falta para o próximo
+    const current = total % XP_PER_LEVEL;
+    const need = XP_PER_LEVEL;
+    const pct = Math.min(100, Math.floor((current / need) * 100));
     return {
-        totalXp: xp,
+        totalXp: total,
         level,
-        current: Math.floor(remain),
+        current,
         need,
         pct,
-        toNext: Math.max(0, need - Math.floor(remain)),
+        toNext: Math.max(0, need - current),
+        nextLevelTotal: totalXpForLevel(level + 1),
         mult: dailyMultiplier(level),
         attrs
     };
@@ -107,8 +113,8 @@ function addXp(userId, amount) {
         const levelsGained = after - before;
         cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
         for (let i = 0; i < levelsGained; i++) {
-            // pontos livres para distribuir manualmente
-            cur.attrPoints += 2;
+            // pontos livres para distribuir manualmente (mais generoso)
+            cur.attrPoints += 5;
             // bônus aleatório pequeno nos attrs
             for (let r = 0; r < 2; r++) {
                 const g = rollAttrGain(false);
@@ -290,6 +296,8 @@ module.exports = {
     removeXp,
     levelFromXp,
     xpForLevel,
+    totalXpForLevel,
+    XP_PER_LEVEL,
     dailyMultiplier,
     progress,
     leaderboard,
