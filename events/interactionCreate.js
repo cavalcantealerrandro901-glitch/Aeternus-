@@ -29,13 +29,14 @@ async function bridgeSlashToPrefix(interaction, cmd, client) {
             first: () => mentionUsers.first() || null
         },
         async reply(payload) {
-            if (!replied && !interaction.replied && !interaction.deferred) {
-                replied = true;
-                return interaction.reply(payload);
-            }
+            // Preferir editReply quando já está "pensando" (deferred)
             if (interaction.deferred && !interaction.replied) {
                 replied = true;
                 return interaction.editReply(payload);
+            }
+            if (!replied && !interaction.replied && !interaction.deferred) {
+                replied = true;
+                return interaction.reply(payload);
             }
             return interaction.followUp(payload);
         }
@@ -43,8 +44,10 @@ async function bridgeSlashToPrefix(interaction, cmd, client) {
 
     await cmd.execute(fakeMessage, args, client);
 
-    if (!replied && !interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: '✅', ephemeral: true }).catch(() => {});
+    if (!replied && interaction.deferred && !interaction.replied) {
+        await interaction.editReply({ content: '✅' }).catch(() => {});
+    } else if (!replied && !interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '✅' }).catch(() => {});
     }
 }
 
@@ -73,6 +76,11 @@ module.exports = {
                             ephemeral: true
                         })
                         .catch(() => {});
+                }
+
+                // "Bot está pensando..." (como usuário digitando)
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.deferReply().catch(() => {});
                 }
 
                 if (typeof cmd.executeSlash === 'function') {
