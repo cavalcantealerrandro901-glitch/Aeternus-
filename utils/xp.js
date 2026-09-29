@@ -31,9 +31,12 @@ function ensureAttrs(d) {
 function get(userId) {
     const raw = all()[userId] || { xp: 0, level: 0 };
     const attrs = ensureAttrs({ attrs: raw.attrs });
+    const totalXp = Math.max(0, Math.floor(Number(raw.xp || 0)));
+    // Nível sempre derivado do XP total acumulado (não “gasta” o XP)
+    const level = levelFromXp(totalXp);
     return {
-        xp: Number(raw.xp || 0),
-        level: Number(raw.level || 0),
+        xp: totalXp,
+        level,
         attrs,
         attrPoints: Math.max(0, Math.floor(Number(raw.attrPoints || 0)))
     };
