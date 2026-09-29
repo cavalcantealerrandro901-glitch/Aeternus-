@@ -26,45 +26,50 @@ const BOMB_CHANCE = 0.26; // 26% de chance de bomba no botão aleatório
 
 const games = new Map();
 
-/** Com 1 bomba precisa abrir 7; cada bomba a mais reduz 1 (mín. 1). */
+/** Com 1 bomba o lucro forte começa ~7 gemas; mais bombas = sobe mais cedo. */
 function opensBeforeMult(bombs) {
     const b = Math.max(1, Math.min(Number(bombs) || 1, MAX_BOMBS));
     return Math.max(1, 8 - b); // 1→7, 2→6, …, 7→1
 }
 
 /**
- * Multiplicador atual.
- * - Antes do limiar: ×1.00 (sem lucro)
- * - No limiar e depois: sobe a cada gema; mais bombas = curva mais íngreme
+ * Multiplicador (mines clássico).
+ * Cada gema segura multiplica; house edge; mais bombas = multi maior.
+ * Antes do limiar (ex.: 7 com 1💣) o lucro é pequeno; depois acelera.
  */
 function multAt(opened, bombs) {
     const o = Math.max(0, Math.floor(Number(opened) || 0));
     if (o <= 0) return 1;
     const b = Math.max(1, Math.min(Number(bombs) || 1, TOTAL - 1));
     const threshold = opensBeforeMult(b);
-    if (o < threshold) return 1;
 
     let m = 1;
-    // Só conta os passos a partir do limiar (na 7ª gema com 1 bomba começa a multiplicar)
-    for (let i = threshold - 1; i < o; i++) {
+    for (let i = 0; i < o; i++) {
         const tilesLeft = TOTAL - i;
         const safeLeft = TOTAL - b - i;
         if (safeLeft <= 0 || tilesLeft <= 0) break;
-        // boost de risco: cada bomba extra aumenta o ganho por casa
-        const riskBoost = 1 + (b - 1) * 0.06;
+        const riskBoost = 1 + (b - 1) * 0.08;
         m *= (tilesLeft / safeLeft) * riskBoost;
     }
-    const raw = m * HOUSE;
-    // Garante que no limiar o multi já "multiplicou" (ligeiramente acima de 1)
-    if (o >= threshold && raw < 1.05) return 1.05;
-    return Number(Math.max(1, raw).toFixed(2));
+    m *= HOUSE;
+
+    // Antes do limiar: multi “visível” mas limitado (quase 1x)
+    if (o < threshold) {
+        // interpola de 1.00 até ~1.02 no limiar-1
+        const t = o / threshold;
+        m = 1 + (Math.max(m, 1) - 1) * t * 0.15;
+        return Number(Math.max(1, m).toFixed(2));
+    }
+
+    return Number(Math.max(1.05, m).toFixed(2));
 }
 
 function potentialAt(amount, opened, bombs) {
-    if (!amount || opened <= 0) return 0;
-    const m = multAt(opened, bombs);
-    if (m <= 1) return Math.floor(amount); // no limiar mínimo devolve a aposta (sem lucro)
-    return Math.floor(amount * m);
+    const amt = Math.floor(Number(amount) || 0);
+    const o = Math.floor(Number(opened) || 0);
+    if (amt <= 0 || o <= 0) return 0;
+    const m = multAt(o, bombs);
+    return Math.max(0, Math.floor(amt * m));
 }
 
 function clearTimer(game) {
@@ -163,7 +168,7 @@ function panelEmbed(game, extra) {
     const softPhrase =
         game.dead || game.cashed
             ? null
-            : '-# Toque em uma casa ou use **Aleatório**. O multi só sobe após o limiar (1💣 = 7 gemas); mais bombas = limiar menor e multi maior.';
+            : '-# Toque em uma casa ou use **Aleatório**. Multi sobe a cada gema; com 1💣 o lucro fica forte a partir de ~7 gemas. Mais bombas = multi maior.';
 
     const lines = [
         `**${status}**`,
@@ -239,8 +244,9 @@ function boardRows(game, reveal = false) {
 
 function controlsRow(game) {
     const ended = game.dead || game.cashed;
-    const pot = potentialAt(game.amount, game.opened.size, game.bombCount);
-    const canCash = game.opened.size > 0 && !ended;
+    const openedN = game.opened instanceof Set ? game.opened.size : 0;
+    const pot = potentialAt(game.amount, openedN, game.bombCount);
+    const canCash = openedN > 0 && !ended;
 
     let cashLabel = game.fun ? 'Encerrar' : 'Sacar';
     if (!game.fun && canCash) cashLabel = `Sacar ✨ ${fmt(pot)}`;
@@ -286,7 +292,7 @@ function fullComponents(game, reveal = false) {
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
-    const id = `${userId}_${Date.now()}`;
+    const id = `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
     const bombs = new Set();
     const maxBombs = Math.min(Math.max(1, bombCount), MAX_BOMBS, TOTAL - 1);
     while (bombs.size < maxBombs) bombs.add(Math.floor(Math.random() * TOTAL));
@@ -506,21 +512,46 @@ module.exports = {
         }
 
         if (action === 'cash') {
+            if (game.dead) {
+                return interaction.reply({ content: 'Jogo já acabou.', ephemeral: true }).catch(() => {});
+            }
+            if (game.cashed) {
+                return interaction.update(endPayload(game)).catch(() => {});
+            }
             if (game.fun) {
                 game.cashed = true;
-                return interaction.update(endPayload(game));
+                clearTimer(game);
+                return interaction.update(endPayload(game, '🏁 Encerrado.')).catch(() => {});
             }
-            if (!game.opened.size) {
+            const opened = game.opened instanceof Set ? game.opened.size : Number(game.opened?.size || 0);
+            if (opened <= 0) {
                 return interaction.reply({
                     content: 'Abra pelo menos uma casa antes de sacar.',
                     ephemeral: true
-                });
+                }).catch(() => {});
+            }
+            const win = potentialAt(game.amount, opened, game.bombCount);
+            if (win <= 0) {
+                return interaction.reply({
+                    content: 'Valor de saque inválido. Abra mais casas.',
+                    ephemeral: true
+                }).catch(() => {});
             }
             game.cashed = true;
-            const win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
-            eter.add(game.userId, win, { reason: 'mines cash' });
-            return interaction.update(endPayload(game));
+            clearTimer(game);
+            try {
+                eter.add(game.userId, win, { reason: 'mines cash' });
+            } catch (e) {
+                game.cashed = false;
+                return interaction.reply({
+                    content: '❌ Erro ao creditar o saque. Tente de novo.',
+                    ephemeral: true
+                }).catch(() => {});
+            }
+            return interaction
+                .update(endPayload(game, `💵 Sacou **×${multAt(opened, game.bombCount)}** → ✨ **${fmt(win)}**`))
+                .catch(() => {});
         }
 
         if (action === 'cell') {
