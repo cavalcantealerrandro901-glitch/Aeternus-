@@ -7,7 +7,7 @@ const {
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 5;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
