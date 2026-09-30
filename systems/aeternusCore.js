@@ -1,6 +1,7 @@
 /**
  * Aeternus Core — assistente de IA privado (só OWNER_ID)
  * Ativação: @aeternus | menção do bot | DM do dono
+ * IA: somente Groq
  * Multi-repo: todos os repositórios do dono (ou lista AETERNUS_REPOS)
  */
 
@@ -15,10 +16,9 @@ function isOwner(userId) {
   return oid && String(userId) === oid;
 }
 
-/** Lista de repos permitidos (opcional). Vazio = todos do GITHUB_OWNER */
 function allowedReposConfig() {
   const raw = env('AETERNUS_REPOS') || env('GITHUB_REPOS');
-  if (!raw) return null; // null = todos
+  if (!raw) return null;
   return raw
     .split(/[,;\n]+/)
     .map((s) => s.trim())
@@ -36,7 +36,6 @@ function GH_OWNER() {
   return env('GITHUB_OWNER') || 'cavalcantealerrandro901-glitch';
 }
 
-/** Resolve "repo" ou "owner/repo" → { owner, name } */
 function resolveRepoRef(repoArg) {
   const s = String(repoArg || '').trim();
   if (!s) throw new Error('Nome do repositório obrigatório');
@@ -49,9 +48,11 @@ function resolveRepoRef(repoArg) {
 
 function assertRepoAllowed(owner, name) {
   const cfg = allowedReposConfig();
-  if (!cfg) return; // todos permitidos
+  if (!cfg) return;
   const full = `${owner}/${name}`;
-  const ok = cfg.some((r) => r.full.toLowerCase() === full.toLowerCase() || r.name.toLowerCase() === name.toLowerCase());
+  const ok = cfg.some(
+    (r) => r.full.toLowerCase() === full.toLowerCase() || r.name.toLowerCase() === name.toLowerCase()
+  );
   if (!ok) {
     throw new Error(
       `Repo \`${full}\` não está na lista AETERNUS_REPOS. Permitidos: ${cfg.map((r) => r.full).join(', ')}`
@@ -99,130 +100,60 @@ function systemPrompt(extra = '') {
     'Sempre indique qual repositório está sendo usado quando falar de código/arquivos.',
     'Seja concisa em Discord (máx ~1800 caracteres por resposta quando possível).',
     extra ? '\n' + extra : ''
-  ].filter(Boolean).join('\n');
-}
-
-async function callOpenAICompatible(baseUrl, apiKey, model, messages, extraHeaders = {}) {
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      ...extraHeaders
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.55,
-      max_tokens: 1200
-    })
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`${res.status} ${t.slice(0, 140)}`);
-  }
-  const data = await res.json();
-  return String(data?.choices?.[0]?.message?.content || '').trim();
-}
-
-async function callGemini(apiKey, model, messages) {
-  const system = messages.find((m) => m.role === 'system')?.content || '';
-  const user = messages.filter((m) => m.role !== 'system').map((m) => `${m.role}: ${m.content}`).join('\n');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: `${system}\n\n${user}` }] }],
-      generationConfig: { temperature: 0.55, maxOutputTokens: 1200 }
-    })
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`gemini ${res.status} ${t.slice(0, 140)}`);
-  }
-  const data = await res.json();
-  return String(data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '').trim();
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function activeProviders() {
-  const list = [];
-  if (env('GROQ_API_KEY')) list.push('groq');
-  if (env('OPENAI_API_KEY')) list.push('openai');
-  if (env('GEMINI_API_KEY') || env('GOOGLE_API_KEY')) list.push('gemini');
-  if (env('OPENROUTER_API_KEY')) list.push('openrouter');
-  return list.length ? list : ['none'];
+  return env('GROQ_API_KEY') ? ['groq'] : ['none'];
 }
 
+/** Somente Groq */
 async function chatAI(userMessage, contextBlock = '') {
+  const key = env('GROQ_API_KEY');
+  if (!key) {
+    return {
+      text: 'Configure `GROQ_API_KEY` no Render. Chave em: https://console.groq.com/keys',
+      provider: 'none'
+    };
+  }
+
+  const model = env('GROQ_MODEL') || 'llama-3.3-70b-versatile';
   const messages = [
     { role: 'system', content: systemPrompt(contextBlock) },
     { role: 'user', content: String(userMessage || '').slice(0, 6000) }
   ];
-  const errors = [];
 
-  if (env('GROQ_API_KEY')) {
-    try {
-      const text = await callOpenAICompatible(
-        'https://api.groq.com/openai/v1',
-        env('GROQ_API_KEY'),
-        env('GROQ_MODEL') || 'llama-3.3-70b-versatile',
-        messages
-      );
-      if (text) return { text, provider: 'groq' };
-    } catch (e) {
-      errors.push(`groq: ${e.message}`);
-    }
-  }
-
-  if (env('OPENAI_API_KEY')) {
-    try {
-      const text = await callOpenAICompatible(
-        'https://api.openai.com/v1',
-        env('OPENAI_API_KEY'),
-        env('OPENAI_MODEL') || 'gpt-4o-mini',
-        messages
-      );
-      if (text) return { text, provider: 'openai' };
-    } catch (e) {
-      errors.push(`openai: ${e.message}`);
-    }
-  }
-
-  const gemKey = env('GEMINI_API_KEY') || env('GOOGLE_API_KEY');
-  if (gemKey) {
-    try {
-      const text = await callGemini(gemKey, env('GEMINI_MODEL') || 'gemini-2.0-flash', messages);
-      if (text) return { text, provider: 'gemini' };
-    } catch (e) {
-      errors.push(`gemini: ${e.message}`);
-    }
-  }
-
-  if (env('OPENROUTER_API_KEY')) {
-    try {
-      const text = await callOpenAICompatible(
-        'https://openrouter.ai/api/v1',
-        env('OPENROUTER_API_KEY'),
-        env('OPENROUTER_MODEL') || 'openai/gpt-4o-mini',
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
         messages,
-        {
-          'HTTP-Referer': env('OPENROUTER_REFERER') || 'https://aeternus.local',
-          'X-Title': 'Aeternus'
-        }
-      );
-      if (text) return { text, provider: 'openrouter' };
-    } catch (e) {
-      errors.push(`openrouter: ${e.message}`);
+        temperature: 0.55,
+        max_tokens: 1200
+      })
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`${res.status} ${t.slice(0, 160)}`);
     }
+    const data = await res.json();
+    const text = String(data?.choices?.[0]?.message?.content || '').trim();
+    if (!text) throw new Error('resposta vazia do Groq');
+    return { text, provider: 'groq', model };
+  } catch (e) {
+    return {
+      text: `Erro Groq: ${e.message}`,
+      provider: 'groq',
+      error: e.message
+    };
   }
-
-  return {
-    text:
-      'Nenhum provedor de IA disponível. Configure GROQ_API_KEY, OPENAI_API_KEY ou GEMINI_API_KEY no Render.',
-    provider: 'none',
-    error: errors.join(' | ')
-  };
 }
 
 function ghHeaders() {
@@ -257,11 +188,9 @@ async function ghFetch(path, opts = {}) {
   return data;
 }
 
-/** Lista TODOS os repos acessíveis (vários), filtrando por AETERNUS_REPOS se definido */
 async function listRepos() {
   const cfg = allowedReposConfig();
 
-  // Se lista explícita com owner/repo, busca cada um
   if (cfg && cfg.length) {
     const out = [];
     for (const r of cfg) {
@@ -282,10 +211,11 @@ async function listRepos() {
     return out;
   }
 
-  // Todos os repos do usuário autenticado (pode ser mais de 50 — pagina)
   const all = [];
   for (let page = 1; page <= 5; page++) {
-    const data = await ghFetch(`/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator`);
+    const data = await ghFetch(
+      `/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator`
+    );
     if (!Array.isArray(data) || !data.length) break;
     for (const r of data) {
       all.push({
@@ -300,7 +230,6 @@ async function listRepos() {
     if (data.length < 100) break;
   }
 
-  // Fallback: repos públicos do GITHUB_OWNER
   if (!all.length) {
     const owner = GH_OWNER();
     const data = await ghFetch(`/users/${owner}/repos?per_page=100&sort=updated`);
@@ -430,7 +359,6 @@ async function tryGithubIntent(command) {
     };
   }
 
-  // arquivos / tree — aceita owner/repo ou só repo
   const treeM = t.match(
     /(?:arquivos|lista|tree|estrutura)\s+(?:do\s+)?(?:repo\s+)?([\w.-]+(?:\/[\w.-]+)?)(?:\s+([\w./-]+))?/i
   );
@@ -521,7 +449,7 @@ async function handleOwnerMessage(message, client) {
   if (!command || !String(command).trim()) {
     await message
       .reply(
-        'Olá. Sou a **Aeternus** (modo privado, multi-repo).\n' +
+        'Olá. Sou a **Aeternus** (Groq · multi-repo).\n' +
           'Exemplos: `listar repos` · `arquivos Aeternus-` · `leia Aeternus- index.js`'
       )
       .catch(() => {});
@@ -576,7 +504,7 @@ function setup(client) {
     allowedReposConfig
   };
   console.log(
-    `[aeternusCore] multi-repo · owner=${OWNER_ID() || '?'} · providers=${activeProviders().join(',')} · repos=${cfg ? cfg.map((r) => r.full).join(',') : 'ALL'}`
+    `[aeternusCore] Groq-only · owner=${OWNER_ID() || '?'} · groq=${env('GROQ_API_KEY') ? 'ok' : 'MISSING'} · repos=${cfg ? cfg.map((r) => r.full).join(',') : 'ALL'}`
   );
 }
 
