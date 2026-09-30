@@ -1,7 +1,7 @@
 /**
  * Aeternus Core — assistente de IA privado (só OWNER_ID)
  * Ativação: @aeternus | menção do bot | DM do dono
- * IA: somente Groq
+ * IA: somente Groq (modelo padrão: openai/gpt-oss-120b)
  * Multi-repo: todos os repositórios do dono (ou lista AETERNUS_REPOS)
  */
 
@@ -109,7 +109,13 @@ function activeProviders() {
   return env('GROQ_API_KEY') ? ['groq'] : ['none'];
 }
 
-/** Somente Groq */
+/** Modelos Groq atuais (free/developer). llama-3.3-70b-versatile foi deprecado. */
+const GROQ_MODEL_FALLBACKS = [
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'qwen/qwen3.8-27b'
+];
+
 async function chatAI(userMessage, contextBlock = '') {
   const key = env('GROQ_API_KEY');
   if (!key) {
@@ -119,41 +125,51 @@ async function chatAI(userMessage, contextBlock = '') {
     };
   }
 
-  const model = env('GROQ_MODEL') || 'llama-3.3-70b-versatile';
+  const preferred = env('GROQ_MODEL');
+  const models = preferred
+    ? [preferred, ...GROQ_MODEL_FALLBACKS.filter((m) => m !== preferred)]
+    : GROQ_MODEL_FALLBACKS;
+
   const messages = [
     { role: 'system', content: systemPrompt(contextBlock) },
     { role: 'user', content: String(userMessage || '').slice(0, 6000) }
   ];
 
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.55,
-        max_tokens: 1200
-      })
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(() => '');
-      throw new Error(`${res.status} ${t.slice(0, 160)}`);
+  const errors = [];
+
+  for (const model of models) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.55,
+          max_tokens: 1200
+        })
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        throw new Error(`${res.status} ${t.slice(0, 160)}`);
+      }
+      const data = await res.json();
+      const text = String(data?.choices?.[0]?.message?.content || '').trim();
+      if (!text) throw new Error('resposta vazia');
+      return { text, provider: 'groq', model };
+    } catch (e) {
+      errors.push(`${model}: ${e.message}`);
     }
-    const data = await res.json();
-    const text = String(data?.choices?.[0]?.message?.content || '').trim();
-    if (!text) throw new Error('resposta vazia do Groq');
-    return { text, provider: 'groq', model };
-  } catch (e) {
-    return {
-      text: `Erro Groq: ${e.message}`,
-      provider: 'groq',
-      error: e.message
-    };
   }
+
+  return {
+    text: `Erro Groq (todos os modelos falharam):\n${errors.join('\n')}`,
+    provider: 'groq',
+    error: errors.join(' | ')
+  };
 }
 
 function ghHeaders() {
@@ -504,7 +520,7 @@ function setup(client) {
     allowedReposConfig
   };
   console.log(
-    `[aeternusCore] Groq-only · owner=${OWNER_ID() || '?'} · groq=${env('GROQ_API_KEY') ? 'ok' : 'MISSING'} · repos=${cfg ? cfg.map((r) => r.full).join(',') : 'ALL'}`
+    `[aeternusCore] Groq-only · owner=${OWNER_ID() || '?'} · groq=${env('GROQ_API_KEY') ? 'ok' : 'MISSING'} · model=${env('GROQ_MODEL') || 'openai/gpt-oss-120b'} · repos=${cfg ? cfg.map((r) => r.full).join(',') : 'ALL'}`
   );
 }
 
