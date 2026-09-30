@@ -122,7 +122,7 @@ function trackEmbed(track, q, title = 'Tocando agora') {
                 inline: true
             }
         )
-        .setFooter({ text: 'Busca internacional · SoundCloud prioritário' })
+        .setFooter({ text: 'Busca · SoundCloud prioritário · Serenetia' })
         .setTimestamp();
 
     const art = info.artworkUrl || info.thumbnail;
@@ -179,12 +179,17 @@ function listNodes(shoukaku) {
         for (const [, n] of shoukaku.nodes || []) {
             if (!n) continue;
             const st = n.state;
-            if (st === 2 || st === 'CONNECTED' || n.sessionId) nodes.push(n);
+            if (st === 2 || st === 'CONNECTED' || String(st).toUpperCase() === 'CONNECTED' || n.sessionId) {
+                nodes.push(n);
+            }
         }
     } catch (_) {}
     if (!nodes.length) {
         try {
-            const ideal = shoukaku.getIdealNode?.();
+            const ideal =
+                (typeof shoukaku.getIdealNode === 'function' && shoukaku.getIdealNode()) ||
+                (typeof shoukaku.getNode === 'function' && shoukaku.getNode()) ||
+                (shoukaku.options?.nodeResolver && shoukaku.options.nodeResolver(shoukaku.nodes));
             if (ideal) nodes.push(ideal);
         } catch (_) {}
     }
@@ -196,7 +201,7 @@ async function resolveOnNode(node, identifier) {
     try {
         const result = await Promise.race([
             node.rest.resolve(identifier),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12_000))
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 15_000))
         ]);
         return parseResolveResult(result);
     } catch (_) {
@@ -209,7 +214,7 @@ async function resolveTracks(shoukaku, query) {
     if (!identifiers.length) throw new Error('Query vazia.');
 
     const nodes = listNodes(shoukaku);
-    if (!nodes.length) throw new Error('Nenhum node Lavalink conectado. Aguarde alguns segundos.');
+    if (!nodes.length) throw new Error('Nenhum node Lavalink conectado. Aguarde alguns segundos e tente de novo.');
 
     for (let pass = 0; pass < MAX_RESOLVE_TRIES; pass++) {
         for (const node of nodes) {
@@ -294,7 +299,7 @@ async function ensurePlayer(shoukaku, guild, voiceChannelId) {
     if (player) return player;
 
     const shardId = guild.shardId ?? guild.shard?.id ?? 0;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
         try {
             player = await shoukaku.joinVoiceChannel({
                 guildId: guild.id,
@@ -304,8 +309,19 @@ async function ensurePlayer(shoukaku, guild, voiceChannelId) {
             });
             if (player) return player;
         } catch (e) {
-            if (i === 2) throw new Error('Não consegui entrar no canal de voz. Tente de novo.');
-            await sleep(800 * (i + 1));
+            const msg = String(e?.message || e || '');
+            if (/already have an existing connection/i.test(msg)) {
+                try {
+                    await shoukaku.leaveVoiceChannel(guild.id);
+                } catch (_) {}
+                await sleep(500);
+            }
+            if (i === 3) {
+                throw new Error(
+                    'Não consegui entrar no canal de voz. Verifique permissões (Conectar/Falar) e tente de novo.'
+                );
+            }
+            await sleep(700 * (i + 1));
         }
     }
     throw new Error('Falha ao conectar na call.');
@@ -367,14 +383,12 @@ async function attemptPlay(player, track, volume) {
     await player.playTrack({ track: { encoded: track.encoded } });
     const target = Math.max(1, Math.min(100, Number(volume) || 80));
     try {
-        await player.setGlobalVolume(Math.min(35, target));
-        await sleep(100);
-        await player.setGlobalVolume(target);
-    } catch (_) {
-        try {
+        if (typeof player.setGlobalVolume === 'function') {
             await player.setGlobalVolume(target);
-        } catch (__) {}
-    }
+        } else if (typeof player.setVolume === 'function') {
+            await player.setVolume(target);
+        }
+    } catch (_) {}
 }
 
 async function playNext(client, guildId) {
@@ -596,152 +610,105 @@ async function enqueue(client, { guild, voiceChannelId, textChannelId, query, re
     };
 }
 
-async function safeReply(interaction, payload) {
-    try {
-        if (interaction.deferred || interaction.replied) {
-            return interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
-        }
-        return interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
-    } catch (_) {}
-}
-
 async function handleMusicButton(interaction, client) {
+    const parts = String(interaction.customId || '').split(':');
+    if (parts[0] !== 'music') return false;
+    const action = parts[1];
+    const guildId = parts[2] || interaction.guildId;
+    if (!guildId) return false;
+
+    const member = interaction.member;
+    const voiceId = member?.voice?.channelId;
+    const me = interaction.guild?.members?.me;
+    if (!voiceId || (me?.voice?.channelId && me.voice.channelId !== voiceId)) {
+        await interaction
+            .reply({ content: 'Entre no mesmo canal de voz do bot.', flags: MessageFlags.Ephemeral })
+            .catch(() => {});
+        return true;
+    }
+
+    const shoukaku = client.shoukaku;
+    const player = shoukaku?.players?.get(guildId);
+    const q = getQueue(guildId);
+
     try {
-        const parts = String(interaction.customId || '').split(':');
-        const action = parts[1];
-        const guildId = parts[2] || interaction.guildId;
-        if (!guildId || guildId !== interaction.guildId) {
-            return safeReply(interaction, { content: 'Sessão inválida.' });
-        }
-
-        const member = interaction.member;
-        const voiceId = member?.voice?.channelId;
-        const q = getQueue(guildId);
-        const shoukaku = client.shoukaku;
-        const player = shoukaku?.players?.get(guildId);
-
-        if (!voiceId || (q.voiceChannelId && voiceId !== q.voiceChannelId)) {
-            return safeReply(interaction, { content: 'Entre no mesmo canal de voz do bot.' });
-        }
-
         if (action === 'pause') {
-            if (!player || !q.current) return safeReply(interaction, { content: 'Nada tocando.' });
-            try {
-                if (q.paused) {
-                    await player.setPaused(false);
-                    q.paused = false;
-                } else {
-                    await player.setPaused(true);
-                    q.paused = true;
-                }
-                await interaction
-                    .update({
-                        embeds: [trackEmbed(q.current, q, q.paused ? 'Pausado' : 'Tocando agora')],
-                        components: [controlRow(guildId, q.paused)]
-                    })
-                    .catch(() => interaction.deferUpdate().catch(() => {}));
-            } catch (_) {
-                await interaction.deferUpdate().catch(() => {});
+            if (!player) throw new Error('Nada tocando.');
+            if (q.paused) {
+                await player.setPaused(false);
+                q.paused = false;
+            } else {
+                await player.setPaused(true);
+                q.paused = true;
             }
-            return;
+            await interaction.deferUpdate().catch(() => {});
+            if (q.current) await sendOrUpdatePanel(client, guildId, q.current);
+            return true;
         }
-
         if (action === 'skip') {
-            if (!player || !q.current) return safeReply(interaction, { content: 'Nada para pular.' });
+            await interaction.deferUpdate().catch(() => {});
             q.retries = 0;
             q.current = null;
-            await safeReply(interaction, { content: '⏭️ Pulando…' });
-            try {
-                await player.stopTrack();
-            } catch (_) {
-                playNext(client, guildId).catch(() => {});
-            }
-            return;
+            await playNext(client, guildId);
+            return true;
         }
-
         if (action === 'stop') {
+            await interaction.deferUpdate().catch(() => {});
             q.tracks = [];
             q.current = null;
-            q.retries = 0;
             q.playing = false;
             try {
-                await player?.stopTrack?.();
+                if (player) await player.stopTrack();
             } catch (_) {}
-            try {
-                await interaction.update({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor(0x6b7280)
-                            .setTitle('⏹️  Parado')
-                            .setDescription('Fila limpa.')
-                    ],
-                    components: []
-                });
-            } catch (_) {
-                await interaction.deferUpdate().catch(() => {});
-            }
             await leaveIfIdle(client, guildId);
-            return;
+            await interaction.channel
+                ?.send({ embeds: [new EmbedBuilder().setColor(0xf87171).setDescription('⏹️ Parado.')] })
+                .catch(() => {});
+            return true;
         }
-
         if (action === 'queue') {
             const lines = [];
-            if (q.current) {
-                lines.push(`**▶** ${q.current.info?.title || '?'} — <@${q.current.requester}>`);
-            }
+            if (q.current) lines.push(`▶ **${q.current.info?.title || '?'}**`);
             q.tracks.slice(0, 10).forEach((t, i) => {
-                lines.push(`\`${i + 1}.\` ${t.info?.title || '?'} — <@${t.requester}>`);
+                lines.push(`\`${i + 1}.\` ${t.info?.title || '?'}`);
             });
-            if (!lines.length) lines.push('_Fila vazia._');
-            if (q.tracks.length > 10) lines.push(`_…e mais ${q.tracks.length - 10}_`);
-            return safeReply(interaction, {
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xa78bfa)
-                        .setTitle('📜 Fila')
-                        .setDescription(lines.join('\n').slice(0, 3900))
-                ]
-            });
+            await interaction
+                .reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(0x7c3aed)
+                            .setTitle('📜 Fila')
+                            .setDescription(lines.join('\n') || 'Vazia')
+                    ],
+                    flags: MessageFlags.Ephemeral
+                })
+                .catch(() => {});
+            return true;
         }
-
         if (action === 'loop') {
             q.loop = (q.loop + 1) % 3;
-            const label = q.loop === 0 ? 'Off' : q.loop === 1 ? 'Faixa' : 'Fila';
-            if (q.current) {
-                await interaction
-                    .update({
-                        embeds: [trackEmbed(q.current, q)],
-                        components: [controlRow(guildId, q.paused)]
-                    })
-                    .catch(() => {});
-            } else {
-                await interaction.deferUpdate().catch(() => {});
-            }
-            return safeReply(interaction, { content: `🔁 Loop: **${label}**` });
+            const label = q.loop === 1 ? 'Faixa' : q.loop === 2 ? 'Fila' : 'Off';
+            await interaction
+                .reply({ content: `Loop: **${label}**`, flags: MessageFlags.Ephemeral })
+                .catch(() => {});
+            if (q.current) await sendOrUpdatePanel(client, guildId, q.current);
+            return true;
         }
-
-        return safeReply(interaction, { content: 'Ação desconhecida.' });
     } catch (e) {
-        console.warn('[music] button', e?.message || e);
-        try {
-            await interaction.deferUpdate();
-        } catch (_) {}
+        await interaction
+            .reply({ content: `❌ ${e.message || e}`, flags: MessageFlags.Ephemeral })
+            .catch(() => {});
+        return true;
     }
+    return false;
 }
 
 module.exports = {
-    queues,
     getQueue,
     deleteQueue,
-    formatMs,
-    trackEmbed,
-    controlRow,
-    resolveTracks,
     enqueue,
     playNext,
-    ensurePlayer,
-    bindPlayerEvents,
     handleMusicButton,
-    leaveIfIdle,
-    MAX_PLAY_RETRIES
+    listNodes,
+    resolveTracks
 };
