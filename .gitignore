@@ -1,9 +1,33 @@
 node_modules/
 .env
+.env.*
+!.env.example
 .env.local
+*.pem
+*.key
+secrets/
+
+# dados locais e backups (nunca no Git)
 data/*.json
+data/backups/
 !data/.gitkeep
+
+# builds e caches
+dist/
+build/
+.cache/
 *.log
+npm-debug.log*
 .DS_Store
 .inv
-.env
+
+# wiki / nested builds
+aeternus-wiki/**/dist/
+aeternus-wiki/**/node_modules/
+aeternus-wiki/**/.astro/
+
+# Python (se misturar)
+.venv/
+venv/
+__pycache__/
+*.py[cod]
