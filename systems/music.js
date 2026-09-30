@@ -1,11 +1,14 @@
 /**
  * Sistema de música — Shoukaku + Lavalink v4 (Serenetia)
+ *
+ * BUG CORRIGIDO: shoukaku@4.1.1 só escutava "ready", mas discord.js v14
+ * emite "clientReady". Sem isso os nodes NUNCA conectavam e o áudio não saía.
  */
 let Shoukaku, Connectors;
 try {
     ({ Shoukaku, Connectors } = require('shoukaku'));
 } catch (e) {
-    console.warn('[music] shoukaku não instalado — música desativada. npm i shoukaku');
+    console.warn('[music] shoukaku não instalado — npm i shoukaku');
 }
 
 const { getNodes } = require('../utils/musicNodes');
@@ -13,7 +16,7 @@ const musicManager = require('../utils/musicManager');
 const youtubeOauth = require('../utils/youtubeOauth');
 
 const lastLog = new Map();
-function throttledLog(key, fn, ms = 90_000) {
+function throttledLog(key, fn, ms = 60_000) {
     const now = Date.now();
     const prev = lastLog.get(key) || 0;
     if (now - prev < ms) return;
@@ -45,12 +48,42 @@ function pickIdealNode(nodesMap) {
         }
     }
     if (best) return best;
-    // fallback: qualquer node no mapa
     try {
         return nodesMap.values().next().value || null;
     } catch {
         return null;
     }
+}
+
+/**
+ * Connector que escuta clientReady E ready (compat d.js 14 + shoukaku antigo).
+ */
+function createConnector(client) {
+    const Base = Connectors.DiscordJS;
+    class AeternusConnector extends Base {
+        listen(nodes) {
+            let started = false;
+            const start = () => {
+                if (started) return;
+                started = true;
+                console.log('[music] Discord ready → registrando nodes Lavalink…');
+                try {
+                    this.ready(nodes);
+                } catch (e) {
+                    console.error('[music] ready(nodes) falhou:', e.message);
+                }
+            };
+            this.client.once('clientReady', start);
+            this.client.once('ready', start);
+            this.client.on('raw', (packet) => this.raw(packet));
+
+            // bot já online (hot-reload)
+            if (this.client.user?.id || this.client.isReady?.()) {
+                setTimeout(start, 300);
+            }
+        }
+    }
+    return new AeternusConnector(client);
 }
 
 function setup(client) {
@@ -66,14 +99,14 @@ function setup(client) {
 
     let shoukaku;
     try {
-        shoukaku = new Shoukaku(new Connectors.DiscordJS(client), nodes, {
+        shoukaku = new Shoukaku(createConnector(client), nodes, {
             moveOnDisconnect: true,
             resume: true,
             resumeTimeout: 90,
-            reconnectTries: 15,
-            reconnectInterval: 6,
+            reconnectTries: 20,
+            reconnectInterval: 5,
             restTimeout: 45,
-            userAgent: 'Aeternus/2.1 (Shoukaku)',
+            userAgent: 'Aeternus/2.2 (Shoukaku)',
             voiceConnectionTimeout: 60,
             nodeResolver: (map) => pickIdealNode(map)
         });
@@ -84,7 +117,6 @@ function setup(client) {
 
     client.shoukaku = shoukaku;
 
-    // Polyfill Shoukaku v3 → v4 (tocar.js / musicManager)
     if (typeof shoukaku.getIdealNode !== 'function') {
         shoukaku.getIdealNode = () => pickIdealNode(shoukaku.nodes);
     }
@@ -93,31 +125,23 @@ function setup(client) {
     }
 
     shoukaku.on('ready', (name, reconnected) => {
-        throttledLog(
-            `ready:${name}`,
-            () => {
-                console.log(
-                    `🎵 [lavalink] node pronto: ${name}${reconnected ? ' (reconectado)' : ''}`
-                );
-            },
-            15_000
+        console.log(
+            `🎵 [lavalink] ONLINE: ${name}${reconnected ? ' (reconectado)' : ''}`
         );
         const node = shoukaku.nodes.get(name);
-        if (node) {
-            youtubeOauth.applyYoutubeOauthToNode(node).catch(() => {});
-        }
+        if (node) youtubeOauth.applyYoutubeOauthToNode(node).catch(() => {});
     });
 
     shoukaku.on('error', (name, error) => {
         const msg = error?.message || String(error || '');
-        throttledLog(`err:${name}:${msg.slice(0, 40)}`, () => {
-            console.warn(`🎵 [lavalink] ${name}: ${msg.slice(0, 160)}`);
+        throttledLog(`err:${name}`, () => {
+            console.warn(`🎵 [lavalink] erro ${name}: ${msg.slice(0, 180)}`);
         });
     });
 
     shoukaku.on('close', (name, code) => {
-        throttledLog(`close:${name}:${code}`, () => {
-            console.warn(`🎵 [lavalink] fechado ${name} · ${code}`);
+        throttledLog(`close:${name}`, () => {
+            console.warn(`🎵 [lavalink] close ${name} code=${code}`);
         });
     });
 
@@ -127,48 +151,31 @@ function setup(client) {
         });
     });
 
-    shoukaku.on('debug', (name, info) => {
-        if (process.env.MUSIC_DEBUG === '1') console.log(`[music:debug] ${name}`, info);
-    });
+    if (process.env.MUSIC_DEBUG === '1') {
+        shoukaku.on('debug', (name, info) => console.log(`[music:debug] ${name}`, info));
+    }
 
-    const forceConnectHint = () => {
+    const status = () => {
         try {
             const keys = [...(shoukaku.nodes?.keys?.() || [])];
-            console.log(`🎵 [music] nodes no mapa: ${keys.join(', ') || '—'}`);
+            console.log(`🎵 [music] nodes no mapa: ${keys.join(', ') || '(vazio)'}`);
             for (const [name, node] of shoukaku.nodes || []) {
-                const st = node?.state;
-                const ok = st === 2 || st === 'CONNECTED' || !!node?.sessionId;
-                console.log(`  → ${name} state=${st} session=${!!node?.sessionId} ok=${ok}`);
-                // força connect se o connector do d.js v14 não disparou "ready"
-                if (!ok && typeof node?.connect === 'function') {
-                    try {
-                        node.connect();
-                        console.log(`  ↻ connect() forçado em ${name}`);
-                    } catch (e) {
-                        console.warn(`  connect fail ${name}:`, e.message);
-                    }
-                }
+                console.log(
+                    `  → ${name} state=${node?.state} session=${node?.sessionId ? 'yes' : 'no'}`
+                );
             }
-            youtubeOauth.applyToAllNodes(shoukaku).catch(() => {});
         } catch (e) {
-            console.warn('[music] forceConnect:', e.message);
+            console.warn('[music] status:', e.message);
         }
     };
 
-    // discord.js v14: clientReady; algumas versões ainda emitem ready
-    client.once('clientReady', forceConnectHint);
-    client.once('ready', forceConnectHint);
-    // se o bot já estiver online (hot-reload)
-    if (client.isReady?.() || client.readyAt) {
-        setTimeout(forceConnectHint, 1500);
-    }
-    // retry extra (Render / cold start)
-    setTimeout(forceConnectHint, 5000);
-    setTimeout(forceConnectHint, 15000);
+    client.once('clientReady', () => setTimeout(status, 2000));
+    client.once('ready', () => setTimeout(status, 2000));
+    setTimeout(status, 8000);
 
-    console.log(`[music] Shoukaku · ${nodes.length} node(s)`);
+    console.log(`[music] Shoukaku preparado · ${nodes.length} node(s) (aguardando Discord ready)`);
     for (const n of nodes) {
-        console.log(`  → ${n.name} @ ${n.url} (secure=${!!n.secure})`);
+        console.log(`  → ${n.name} @ ${n.url} secure=${!!n.secure}`);
     }
 }
 
