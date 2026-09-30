@@ -15,8 +15,6 @@ function isOwner(userId) {
   return oid && String(userId) === oid;
 }
 
-// ─── Detecção de ativação @aeternus ───────────────────────────────────────────
-
 function detectActivation(content, client) {
   const raw = String(content || '');
   const n = raw
@@ -28,19 +26,16 @@ function detectActivation(content, client) {
 
   if (!n) return { activated: false, command: '' };
 
-  // @aeternus / arroba aeternus / at aeternus
   const strict = n.match(/(?:^|\s)(?:@\s*|arroba\s+|at\s+)aeternus\b\s*[,:]?\s*(.*)$/i);
   if (strict) {
     return { activated: true, command: (strict[1] || '').trim() || raw };
   }
 
-  // Texto original com @aeternus
   const at = raw.match(/@\s*aeternus\b\s*[,:]?\s*(.*)$/i);
   if (at) {
     return { activated: true, command: (at[1] || '').trim() || raw };
   }
 
-  // Menção do bot Discord (só conta se for o dono — checado fora)
   if (client?.user?.id) {
     const re = new RegExp('<@!?' + client.user.id + '>\\s*', 'g');
     if (re.test(raw)) {
@@ -52,14 +47,12 @@ function detectActivation(content, client) {
   return { activated: false, command: '' };
 }
 
-// ─── Multi-IA ─────────────────────────────────────────────────────────────────
-
 function systemPrompt(extra = '') {
   return [
     'Você é Aeternus, assistente pessoal privado do dono no Discord.',
     'Responda em português do Brasil, de forma direta e útil.',
     'Você pode ajudar com código, repositórios GitHub, planejamento e tarefas do sistema Aeternus.',
-    'Quando o usuário pedir para criar/editar arquivos no GitHub, use as ferramentas disponíveis.',
+    'Quando o usuário pedir para criar/editar arquivos no GitHub, oriente o formato de comando estruturado.',
     'Seja concisa em Discord (máx ~1800 caracteres por resposta quando possível).',
     extra ? '\n' + extra : ''
   ].filter(Boolean).join('\n');
@@ -188,8 +181,6 @@ async function chatAI(userMessage, contextBlock = '') {
   };
 }
 
-// ─── GitHub (repos do dono) ───────────────────────────────────────────────────
-
 const GH_OWNER = () => env('GITHUB_OWNER') || 'cavalcantealerrandro901-glitch';
 
 function ghHeaders() {
@@ -218,7 +209,7 @@ async function ghFetch(path, opts = {}) {
     data = text;
   }
   if (!res.ok) {
-    const msg = data?.message || text.slice(0, 120);
+    const msg = data?.message || String(text).slice(0, 120);
     throw new Error(`GitHub ${res.status}: ${msg}`);
   }
   return data;
@@ -291,18 +282,16 @@ async function createRepo(name, description = '', isPrivate = true) {
   return { name: data.name, url: data.html_url, private: data.private };
 }
 
-async function listTree(repo, path = '') {
+async function listTree(repo, pathFilter = '') {
   const owner = GH_OWNER();
   const data = await ghFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`);
   let tree = data?.tree || [];
-  if (path) {
-    const p = path.replace(/^\/|\/$/g, '');
+  if (pathFilter) {
+    const p = pathFilter.replace(/^\/|\/$/g, '');
     tree = tree.filter((t) => t.path === p || t.path.startsWith(p + '/'));
   }
   return tree.slice(0, 80).map((t) => `${t.type === 'tree' ? '📁' : '📄'} ${t.path}`);
 }
-
-// ─── Parser de intenções GitHub no comando ────────────────────────────────────
 
 async function tryGithubIntent(command) {
   const t = String(command || '').trim();
@@ -312,44 +301,42 @@ async function tryGithubIntent(command) {
     if (/\b(github|reposit[oó]rio|repo|arquivo|commit)\b/i.test(t)) {
       return {
         handled: true,
-        text: 'GitHub não configurado. Defina `GITHUB_TOKEN` (classic com repo scope) no Render.'
+        text: 'GitHub não configurado. Defina `GITHUB_TOKEN` (classic com scope **repo**) no Render.'
       };
     }
     return { handled: false };
   }
 
-  // listar repos
   if (/\b(lista|listar|meus)\b.*\b(repos?|reposit)/i.test(low) || /^repos?$/i.test(low)) {
     const repos = await listRepos();
-    const lines = repos.slice(0, 20).map((r) => `• **${r.name}**${r.private ? ' 🔒' : ''} — ${r.desc || r.url}`);
+    const lines = repos
+      .slice(0, 20)
+      .map((r) => `• **${r.name}**${r.private ? ' 🔒' : ''} — ${r.desc || r.url}`);
     return {
       handled: true,
       text: `Seus repositórios (${repos.length}):\n${lines.join('\n') || '(vazio)'}`
     };
   }
 
-  // árvore / arquivos
   const treeM = t.match(/(?:arquivos|lista|tree|estrutura)\s+(?:do\s+)?(?:repo\s+)?([\w.-]+)(?:\s+(.+))?/i);
   if (treeM) {
     const list = await listTree(treeM[1], treeM[2] || '');
     return {
       handled: true,
-      text: `Arquivos em \\`${treeM[1]}\\`:\n\\`\\`\\`\n${list.join('\n').slice(0, 1800)}\n\\`\\`\\``
+      text: `Arquivos em \`${treeM[1]}\`:\n\`\`\`\n${list.join('\n').slice(0, 1800)}\n\`\`\``
     };
   }
 
-  // ler arquivo: "leia repo path" ou "read repo path"
   const readM = t.match(/(?:leia|ler|read|mostra|mostrar|abre|abrir)\s+(?:o\s+)?(?:arquivo\s+)?([\w.-]+)\s+([\w./-]+)/i);
   if (readM) {
     const file = await getFile(readM[1], readM[2]);
     const body = String(file.content || '').slice(0, 1500);
     return {
       handled: true,
-      text: `📄 \\`${readM[1]}/${readM[2]}\\` (sha ${String(file.sha || '').slice(0, 7)}):\n\\`\\`\\`\n${body}\n\\`\\`\\``
+      text: `📄 \`${readM[1]}/${readM[2]}\` (sha ${String(file.sha || '').slice(0, 7)}):\n\`\`\`\n${body}\n\`\`\``
     };
   }
 
-  // criar repo: "crie repo nome" / "criar repositório nome"
   const createRepoM = t.match(/(?:crie|criar|create)\s+(?:um\s+)?(?:repo|reposit[oó]rio)\s+([\w.-]+)(?:\s+(.+))?/i);
   if (createRepoM) {
     const created = await createRepo(createRepoM[1], createRepoM[2] || 'Criado pelo Aeternus', true);
@@ -359,11 +346,6 @@ async function tryGithubIntent(command) {
     };
   }
 
-  // escrever arquivo — formato:
-  // escreva em repo path:
-  // ```
-  // conteudo
-  // ```
   const writeM = t.match(
     /(?:escreva|escrever|salve|salvar|crie arquivo|criar arquivo|update|atualize)\s+(?:em\s+)?([\w.-]+)\s+([\w./-]+)\s*[:\n]+([\s\S]+)/i
   );
@@ -374,73 +356,11 @@ async function tryGithubIntent(command) {
     const result = await putFile(writeM[1], writeM[2], content, `Aeternus: ${writeM[2]}`);
     return {
       handled: true,
-      text: `✅ Arquivo salvo: \\`${writeM[1]}/${writeM[2]}\\`\nCommit: \\`${result.commit || '?'}\\`\n${result.url || ''}`
+      text: `✅ Arquivo salvo: \`${writeM[1]}/${writeM[2]}\`\nCommit: \`${result.commit || '?'}\`\n${result.url || ''}`
     };
   }
 
   return { handled: false };
-}
-
-// ─── Handler principal ────────────────────────────────────────────────────────
-
-async function handleOwnerMessage(message, client) {
-  if (!isOwner(message.author.id)) return false;
-
-  const content = String(message.content || '');
-  const isDm = !message.guild;
-
-  // Em servidor: precisa @aeternus ou menção do bot
-  // Em DM do dono: qualquer mensagem ativa
-  let activated = false;
-  let command = content;
-
-  if (isDm) {
-    activated = true;
-    const det = detectActivation(content, client);
-    if (det.activated && det.command) command = det.command;
-  } else {
-    const det = detectActivation(content, client);
-    activated = det.activated;
-    command = det.command || content;
-  }
-
-  if (!activated) return false;
-
-  // Digitando…
-  if (message.channel?.sendTyping) {
-    await message.channel.sendTyping().catch(() => {});
-  }
-
-  try {
-    // Intenções GitHub estruturadas
-    const gh = await tryGithubIntent(command);
-    if (gh.handled) {
-      await replyChunks(message, gh.text);
-      return true;
-    }
-
-    // Contexto GitHub para a IA (se token existir)
-    let ctx = '';
-    if (ghHeaders()) {
-      try {
-        const repos = await listRepos();
-        ctx =
-          'Repos do dono (GitHub):\n' +
-          repos
-            .slice(0, 15)
-            .map((r) => `- ${r.name}${r.private ? ' (privado)' : ''}`)
-            .join('\n') +
-          '\n\nPara ações reais o dono pode pedir: listar repos, ler arquivo, escrever arquivo, criar repo.';
-      } catch (_) {}
-    }
-
-    const result = await chatAI(command, ctx);
-    await replyChunks(message, result.text || '(sem resposta)');
-    return true;
-  } catch (e) {
-    await message.reply(`❌ Erro: ${e.message}`).catch(() => {});
-    return true;
-  }
 }
 
 async function replyChunks(message, text) {
@@ -461,8 +381,66 @@ async function replyChunks(message, text) {
   }
 }
 
-function register(client) {
-  // Sistema carregado pelos loaders — só marca presença
+async function handleOwnerMessage(message, client) {
+  if (!isOwner(message.author.id)) return false;
+
+  const content = String(message.content || '');
+  const isDm = !message.guild;
+
+  let activated = false;
+  let command = content;
+
+  if (isDm) {
+    activated = true;
+    const det = detectActivation(content, client);
+    if (det.activated && det.command) command = det.command;
+  } else {
+    const det = detectActivation(content, client);
+    activated = det.activated;
+    command = det.command || content;
+  }
+
+  if (!activated) return false;
+  if (!command || !String(command).trim()) {
+    await message.reply('Olá. Sou a **Aeternus** (modo privado). Diga o que precisa — código, repos, tarefas.').catch(() => {});
+    return true;
+  }
+
+  if (message.channel?.sendTyping) {
+    await message.channel.sendTyping().catch(() => {});
+  }
+
+  try {
+    const gh = await tryGithubIntent(command);
+    if (gh.handled) {
+      await replyChunks(message, gh.text);
+      return true;
+    }
+
+    let ctx = '';
+    if (ghHeaders()) {
+      try {
+        const repos = await listRepos();
+        ctx =
+          'Repos do dono (GitHub):\n' +
+          repos
+            .slice(0, 15)
+            .map((r) => `- ${r.name}${r.private ? ' (privado)' : ''}`)
+            .join('\n') +
+          '\n\nComandos GitHub: listar repos | arquivos REPO | leia REPO path | escreva em REPO path: conteudo | criar repo NOME';
+      } catch (_) {}
+    }
+
+    const result = await chatAI(command, ctx);
+    await replyChunks(message, result.text || '(sem resposta)');
+    return true;
+  } catch (e) {
+    await message.reply(`❌ Erro: ${e.message}`).catch(() => {});
+    return true;
+  }
+}
+
+function setup(client) {
   client.aeternusCore = {
     isOwner,
     detectActivation,
@@ -479,7 +457,7 @@ function register(client) {
 }
 
 module.exports = {
-  register,
+  setup,
   isOwner,
   detectActivation,
   handleOwnerMessage,
