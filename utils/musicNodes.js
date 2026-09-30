@@ -1,67 +1,21 @@
 /**
- * Parse e defaults de nodes Lavalink para o Shoukaku.
- * Vários nodes = menos sobrecarga e failover automático.
+ * Nodes Lavalink para o Shoukaku.
+ * Padrão: Serenetia v4 (TLS 443).
  */
 
-/**
- * Node principal Aeternus (Serenetia v4, TLS 443).
- * Override com LAVALINK_NODES no Render se quiser outros.
- */
-const DEFAULT_PUBLIC_NODES = [
-    {
-        name: 'serenetia',
-        url: 'lavalinkv4.serenetia.com:443',
-        auth: 'https://seretia.link/discord',
-        secure: true
-    },
-    // fallbacks públicos (podem cair)
-    {
-        name: 'ajieblogs',
-        url: 'lava-v4.ajieblogs.eu.org:80',
-        auth: 'https://dsc.gg/ajidevserver',
-        secure: false
-    },
-    {
-        name: 'horizxon-ap',
-        url: 'lava4.horizxon.studio:80',
-        auth: 'horizxon.studio',
-        secure: false
-    },
-    {
-        name: 'horizxon-eu',
-        url: 'lava3.horizxon.studio:80',
-        auth: 'horizxon.studio',
-        secure: false
-    },
-    {
-        name: 'trinium',
-        url: 'lavalink.triniumhost.com:4333',
-        auth: 'free',
-        secure: false
-    },
-    {
-        name: 'jirayu',
-        url: 'lavalink.jirayu.net:13592',
-        auth: 'youshallnotpass',
-        secure: false
-    },
-    {
-        name: 'heavencloud',
-        url: 'free-lava.heavencloud.in:4000',
-        auth: 'heavencloud.in',
-        secure: false
-    }
-];
+/** Node oficial do bot */
+const SERENETIA = {
+    name: 'serenetia',
+    url: 'lavalinkv4.serenetia.com:443',
+    auth: 'https://seretia.link/discord',
+    secure: true
+};
+
+const DEFAULT_PUBLIC_NODES = [SERENETIA];
 
 /**
- * LAVALINK_NODES=
- *   nome|host:porta|senha|true;
- *   nome2|host2:porta2|senha2|false
- *
- * Também aceita JSON: [{"name":"a","url":"h:443","auth":"x","secure":true}]
- *
- * Exemplo Serenetia:
- *   serenetia|lavalinkv4.serenetia.com:443|https://seretia.link/discord|true
+ * LAVALINK_NODES=nome|host:porta|senha|true
+ * Ex.: serenetia|lavalinkv4.serenetia.com:443|https://seretia.link/discord|true
  */
 function parseNodesFromEnv(raw) {
     const str = String(raw || '').trim();
@@ -83,18 +37,44 @@ function parseNodesFromEnv(raw) {
         .map((line) => line.trim())
         .filter(Boolean)
         .map((line, i) => {
-            const parts = line.split('|').map((p) => p.trim());
-            if (parts.length < 3) return null;
-            const [name, url, auth, secureRaw] = parts;
-            return normalizeNode(
-                {
-                    name: name || `node-${i + 1}`,
-                    url,
-                    auth,
-                    secure: /^(1|true|yes|wss|https)$/i.test(String(secureRaw || ''))
-                },
-                i
-            );
+            // suporte formato antigo host:port:pass:secure (separado por vírgula)
+            if (line.includes('|')) {
+                const parts = line.split('|').map((p) => p.trim());
+                if (parts.length < 3) return null;
+                const [name, url, auth, secureRaw] = parts;
+                return normalizeNode(
+                    {
+                        name: name || `node-${i + 1}`,
+                        url,
+                        auth,
+                        secure: /^(1|true|yes|wss|https)$/i.test(String(secureRaw || ''))
+                    },
+                    i
+                );
+            }
+            const bits = line.split(':');
+            if (bits.length >= 3) {
+                const secureFlag = String(bits[bits.length - 1]).toLowerCase();
+                const isSecure =
+                    secureFlag === 'secure' ||
+                    secureFlag === 'true' ||
+                    secureFlag === '1';
+                const host = bits[0];
+                const port = bits[1];
+                const password = isSecure || secureFlag === 'false' || secureFlag === 'insecure'
+                    ? bits.slice(2, -1).join(':')
+                    : bits.slice(2).join(':');
+                return normalizeNode(
+                    {
+                        name: `node-${i + 1}`,
+                        url: `${host}:${port}`,
+                        auth: password,
+                        secure: isSecure || port === '443'
+                    },
+                    i
+                );
+            }
+            return null;
         })
         .filter(Boolean);
 }
@@ -116,7 +96,7 @@ function normalizeNode(n, i = 0) {
     return {
         name: String(n.name || `node-${i + 1}`).slice(0, 64),
         url,
-        auth: String(auth),
+        auth: String(auth).replace(/^["']|["']$/g, ''),
         secure
     };
 }
@@ -127,10 +107,22 @@ function getNodes() {
         console.log(`[music] ${fromEnv.length} node(s) via LAVALINK_NODES`);
         return fromEnv;
     }
-    console.log(
-        `[music] LAVALINK_NODES vazio — usando Serenetia + ${DEFAULT_PUBLIC_NODES.length - 1} fallback(s)`
-    );
+    // também aceita vars avulsas
+    if (process.env.LAVALINK_HOST) {
+        const one = normalizeNode({
+            name: 'primary',
+            host: process.env.LAVALINK_HOST,
+            port: process.env.LAVALINK_PORT || '443',
+            auth: process.env.LAVALINK_PASSWORD || SERENETIA.auth,
+            secure: String(process.env.LAVALINK_SECURE || 'true').toLowerCase() !== 'false'
+        });
+        if (one) {
+            console.log(`[music] node via LAVALINK_HOST: ${one.url}`);
+            return [one];
+        }
+    }
+    console.log(`[music] node padrão: ${SERENETIA.name} @ ${SERENETIA.url}`);
     return DEFAULT_PUBLIC_NODES.map((n, i) => normalizeNode(n, i)).filter(Boolean);
 }
 
-module.exports = { getNodes, parseNodesFromEnv, DEFAULT_PUBLIC_NODES };
+module.exports = { getNodes, parseNodesFromEnv, DEFAULT_PUBLIC_NODES, SERENETIA };
