@@ -10,6 +10,7 @@ const { rerollDrop } = require('../systems/drops');
 const autoRepair = require('../utils/autoRepair');
 const { announceLevel } = require('../systems/guildModules');
 const dmPhoto = require('../utils/dmPhoto');
+const aeternusCore = require('../systems/aeternusCore');
 
 const xpCd = new Map();
 const pendingPing = new Map();
@@ -25,7 +26,6 @@ function resolvePrefixMatch(message, client) {
     const content = String(message.content || '');
     if (!content) return null;
 
-    // Só o prefixo configurado do servidor. Se mudou, O. padrão é ignorado.
     const configured = message.guild
         ? String(getPrefix(message.guild.id) || 'O.')
         : 'O.';
@@ -39,7 +39,6 @@ function resolvePrefixMatch(message, client) {
         };
     }
 
-    // Menção @bot ainda funciona
     if (client && client.user && client.user.id) {
         const re = new RegExp('^<@!?' + client.user.id + '>\\s*');
         const m = content.match(re);
@@ -76,6 +75,14 @@ module.exports = {
     async execute(message, client) {
         if (message.author.bot) return;
 
+        // ── Aeternus Core: IA privada + GitHub (só OWNER_ID) ─────────────────
+        try {
+            const handled = await aeternusCore.handleOwnerMessage(message, client);
+            if (handled) return;
+        } catch (e) {
+            console.error('[aeternusCore]', e.message);
+        }
+
         // PV: foto do personagem, criação de guilda, e comandos no DM
         if (!message.guild) {
             try {
@@ -93,7 +100,6 @@ module.exports = {
             } catch (e) {
                 console.error('[guild dm]', e.message);
             }
-            // Continua para permitir O.guild / outros comandos no PV
             try {
                 const pre = resolvePrefixMatch(message, client);
                 if (pre) {
@@ -334,7 +340,6 @@ module.exports = {
         if (!cmd || !cmd.execute) return;
 
         try {
-            // Indicador "digitando..." como usuário pensando
             if (message.channel?.sendTyping) {
                 await message.channel.sendTyping().catch(() => {});
             }
