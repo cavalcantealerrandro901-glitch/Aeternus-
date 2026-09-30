@@ -1,6 +1,6 @@
 {
   "name": "aeternus",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Bot do Discord Aeternus",
   "main": "index.js",
   "scripts": {
@@ -20,13 +20,12 @@
     "express": "^4.18.2",
     "mongoose": "^8.1.1",
     "ws": "^8.18.0",
-    "shoukaku": "^4.1.1"
+    "shoukaku": "^4.3.0"
   },
   "engines": {
     "node": ">=18"
   },
   "optionalDependencies": {
-    "sharp": "^0.33.5",
-    "shoukaku": "^4.1.1"
+    "sharp": "^0.33.5"
   }
 }
