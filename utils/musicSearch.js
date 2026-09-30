@@ -1,6 +1,6 @@
 /**
- * Busca: SoundCloud prioritário (estável para bots Discord).
- * YouTube só se MUSIC_ALLOW_YOUTUBE=1.
+ * Busca multi-fonte para Lavalink (Serenetia).
+ * Ordem: SoundCloud → YouTube → Deezer (mais chances de stream válido).
  */
 
 function isUrl(q) {
@@ -34,88 +34,57 @@ function uniq(arr) {
 }
 
 function expandQueries(raw) {
-    const base = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+    const base = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 160);
     if (!base) return [];
 
     const noAcc = stripAccents(base);
-    const words = base.split(' ').filter(Boolean);
-    const short = words.length === 1 && base.length <= 8;
-
     const variants = [base];
     if (noAcc !== base) variants.push(noAcc);
 
-    const suffixes = [
-        'official',
-        'official audio',
-        'lyrics',
-        'song',
-        'music',
-        'audio',
-        'remix',
-        'live'
-    ];
-    for (const s of suffixes) {
-        variants.push(`${base} ${s}`);
-        if (noAcc !== base) variants.push(`${noAcc} ${s}`);
-    }
-
-    if (short) {
-        variants.push(
-            `${base} song`,
-            `${base} music`,
-            `${base} official audio`,
-            `${base} track`,
-            `${base} remix`
-        );
-    }
-
     if (base.includes(' - ')) {
         const [a, b] = base.split(' - ').map((x) => x.trim());
-        if (a && b) {
-            variants.push(`${a} ${b}`, `${b} ${a}`, `${a} ${b} official`);
-        }
+        if (a && b) variants.push(`${a} ${b}`, `${b} ${a}`);
     }
 
-    return uniq(variants).slice(0, 14);
+    return uniq(variants).slice(0, 6);
 }
 
 /**
- * Ordem:
- * 1. SoundCloud
- * 2. Deezer
- * 3. YouTube só com MUSIC_ALLOW_YOUTUBE=1
+ * Identifiers para o Lavalink resolver.
+ * Várias fontes = se uma quebra no play, o manager tenta outra.
  */
 function searchIdentifiers(raw) {
     const q = String(raw || '').trim();
     if (!q) return [];
 
-    if (isUrl(q) && isSoundcloudUrl(q)) return [q];
-
-    if (isUrl(q) && isYoutubeUrl(q)) {
-        return [q]; // musicManager pode espelhar no SC
+    if (isUrl(q)) {
+        const ids = [q];
+        if (isYoutubeUrl(q)) {
+            const idMatch = q.match(/(?:v=|youtu\.be\/|shorts\/)([a-zA-Z0-9_-]{6,})/);
+            if (idMatch) ids.push(`ytsearch:${idMatch[1]}`);
+            ids.push(`scsearch:${q.replace(/^https?:\/\//i, '').slice(0, 80)}`);
+        }
+        return uniq(ids);
     }
-
-    if (isUrl(q)) return [q];
 
     const queries = expandQueries(q);
     const ids = [];
 
-    for (const query of queries) {
+    // SoundCloud
+    for (const query of queries.slice(0, 3)) {
         ids.push(`scsearch:${query}`);
     }
-
-    for (const query of queries.slice(0, 3)) {
+    // YouTube (Serenetia tem source youtube)
+    for (const query of queries.slice(0, 2)) {
+        ids.push(`ytsearch:${query}`);
+        ids.push(`ytmsearch:${query}`);
+    }
+    // Deezer
+    for (const query of queries.slice(0, 2)) {
         ids.push(`dzsearch:${query}`);
     }
 
-    if (process.env.MUSIC_ALLOW_YOUTUBE === '1') {
-        for (const query of queries.slice(0, 2)) {
-            ids.push(`ytsearch:${query}`);
-            ids.push(`ytmsearch:${query}`);
-        }
-    }
-
-    return uniq(ids).slice(0, 32);
+    return uniq(ids).slice(0, 16);
 }
 
 module.exports = {
