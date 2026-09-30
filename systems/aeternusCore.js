@@ -1,7 +1,7 @@
 /**
  * Aeternus Core — assistente de IA privado (só OWNER_ID)
- * Ativação: @aeternus  |  menção do bot pelo dono  |  DM do dono
- * Capacidades: chat multi-IA + GitHub (listar, ler, criar/editar arquivos nos seus repos)
+ * Ativação: @aeternus | menção do bot | DM do dono
+ * Multi-repo: todos os repositórios do dono (ou lista AETERNUS_REPOS)
  */
 
 const OWNER_ID = () => String(process.env.OWNER_ID || '').trim();
@@ -13,6 +13,50 @@ function env(n) {
 function isOwner(userId) {
   const oid = OWNER_ID();
   return oid && String(userId) === oid;
+}
+
+/** Lista de repos permitidos (opcional). Vazio = todos do GITHUB_OWNER */
+function allowedReposConfig() {
+  const raw = env('AETERNUS_REPOS') || env('GITHUB_REPOS');
+  if (!raw) return null; // null = todos
+  return raw
+    .split(/[,;\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => {
+      if (s.includes('/')) {
+        const [owner, name] = s.split('/');
+        return { owner: owner.trim(), name: name.trim(), full: `${owner.trim()}/${name.trim()}` };
+      }
+      return { owner: GH_OWNER(), name: s, full: `${GH_OWNER()}/${s}` };
+    });
+}
+
+function GH_OWNER() {
+  return env('GITHUB_OWNER') || 'cavalcantealerrandro901-glitch';
+}
+
+/** Resolve "repo" ou "owner/repo" → { owner, name } */
+function resolveRepoRef(repoArg) {
+  const s = String(repoArg || '').trim();
+  if (!s) throw new Error('Nome do repositório obrigatório');
+  if (s.includes('/')) {
+    const [owner, name] = s.split('/');
+    return { owner: owner.trim(), name: name.trim() };
+  }
+  return { owner: GH_OWNER(), name: s };
+}
+
+function assertRepoAllowed(owner, name) {
+  const cfg = allowedReposConfig();
+  if (!cfg) return; // todos permitidos
+  const full = `${owner}/${name}`;
+  const ok = cfg.some((r) => r.full.toLowerCase() === full.toLowerCase() || r.name.toLowerCase() === name.toLowerCase());
+  if (!ok) {
+    throw new Error(
+      `Repo \`${full}\` não está na lista AETERNUS_REPOS. Permitidos: ${cfg.map((r) => r.full).join(', ')}`
+    );
+  }
 }
 
 function detectActivation(content, client) {
@@ -51,8 +95,8 @@ function systemPrompt(extra = '') {
   return [
     'Você é Aeternus, assistente pessoal privado do dono no Discord.',
     'Responda em português do Brasil, de forma direta e útil.',
-    'Você pode ajudar com código, repositórios GitHub, planejamento e tarefas do sistema Aeternus.',
-    'Quando o usuário pedir para criar/editar arquivos no GitHub, oriente o formato de comando estruturado.',
+    'Você tem acesso a VÁRIOS repositórios GitHub do dono — não apenas um.',
+    'Sempre indique qual repositório está sendo usado quando falar de código/arquivos.',
     'Seja concisa em Discord (máx ~1800 caracteres por resposta quando possível).',
     extra ? '\n' + extra : ''
   ].filter(Boolean).join('\n');
@@ -181,8 +225,6 @@ async function chatAI(userMessage, contextBlock = '') {
   };
 }
 
-const GH_OWNER = () => env('GITHUB_OWNER') || 'cavalcantealerrandro901-glitch';
-
 function ghHeaders() {
   const token = env('GITHUB_TOKEN') || env('GH_TOKEN');
   if (!token) return null;
@@ -215,25 +257,78 @@ async function ghFetch(path, opts = {}) {
   return data;
 }
 
+/** Lista TODOS os repos acessíveis (vários), filtrando por AETERNUS_REPOS se definido */
 async function listRepos() {
-  const owner = GH_OWNER();
-  const data = await ghFetch(`/users/${owner}/repos?per_page=50&sort=updated`);
-  return (data || []).map((r) => ({
-    name: r.name,
-    full: r.full_name,
-    private: r.private,
-    desc: r.description || '',
-    url: r.html_url
-  }));
+  const cfg = allowedReposConfig();
+
+  // Se lista explícita com owner/repo, busca cada um
+  if (cfg && cfg.length) {
+    const out = [];
+    for (const r of cfg) {
+      try {
+        const data = await ghFetch(`/repos/${r.owner}/${r.name}`);
+        out.push({
+          name: data.name,
+          full: data.full_name,
+          private: data.private,
+          desc: data.description || '',
+          url: data.html_url,
+          defaultBranch: data.default_branch || 'main'
+        });
+      } catch (e) {
+        out.push({ name: r.name, full: r.full, error: e.message });
+      }
+    }
+    return out;
+  }
+
+  // Todos os repos do usuário autenticado (pode ser mais de 50 — pagina)
+  const all = [];
+  for (let page = 1; page <= 5; page++) {
+    const data = await ghFetch(`/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator`);
+    if (!Array.isArray(data) || !data.length) break;
+    for (const r of data) {
+      all.push({
+        name: r.name,
+        full: r.full_name,
+        private: r.private,
+        desc: r.description || '',
+        url: r.html_url,
+        defaultBranch: r.default_branch || 'main'
+      });
+    }
+    if (data.length < 100) break;
+  }
+
+  // Fallback: repos públicos do GITHUB_OWNER
+  if (!all.length) {
+    const owner = GH_OWNER();
+    const data = await ghFetch(`/users/${owner}/repos?per_page=100&sort=updated`);
+    for (const r of data || []) {
+      all.push({
+        name: r.name,
+        full: r.full_name,
+        private: r.private,
+        desc: r.description || '',
+        url: r.html_url,
+        defaultBranch: r.default_branch || 'main'
+      });
+    }
+  }
+
+  return all;
 }
 
-async function getFile(repo, path, ref = 'main') {
-  const owner = GH_OWNER();
+async function getFile(repoArg, filePath, ref) {
+  const { owner, name } = resolveRepoRef(repoArg);
+  assertRepoAllowed(owner, name);
+  const branch = ref || 'main';
   const data = await ghFetch(
-    `/repos/${owner}/${repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}?ref=${ref}`
+    `/repos/${owner}/${name}/contents/${encodeURIComponent(filePath).replace(/%2F/g, '/')}?ref=${branch}`
   );
   if (data?.content && data?.encoding === 'base64') {
     return {
+      repo: `${owner}/${name}`,
       path: data.path,
       sha: data.sha,
       content: Buffer.from(data.content, 'base64').toString('utf8'),
@@ -243,27 +338,29 @@ async function getFile(repo, path, ref = 'main') {
   return data;
 }
 
-async function putFile(repo, path, content, message, branch = 'main') {
-  const owner = GH_OWNER();
+async function putFile(repoArg, filePath, content, message, branch = 'main') {
+  const { owner, name } = resolveRepoRef(repoArg);
+  assertRepoAllowed(owner, name);
   let sha;
   try {
-    const existing = await getFile(repo, path, branch);
+    const existing = await getFile(`${owner}/${name}`, filePath, branch);
     sha = existing?.sha;
   } catch (_) {}
 
   const body = {
-    message: message || `Aeternus: update ${path}`,
+    message: message || `Aeternus: update ${filePath}`,
     content: Buffer.from(String(content), 'utf8').toString('base64'),
     branch
   };
   if (sha) body.sha = sha;
 
   const data = await ghFetch(
-    `/repos/${owner}/${repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}`,
+    `/repos/${owner}/${name}/contents/${encodeURIComponent(filePath).replace(/%2F/g, '/')}`,
     { method: 'PUT', body: JSON.stringify(body) }
   );
   return {
-    path,
+    repo: `${owner}/${name}`,
+    path: filePath,
     commit: data?.commit?.sha,
     url: data?.content?.html_url || data?.commit?.html_url
   };
@@ -279,18 +376,24 @@ async function createRepo(name, description = '', isPrivate = true) {
       auto_init: true
     })
   });
-  return { name: data.name, url: data.html_url, private: data.private };
+  return { name: data.name, full: data.full_name, url: data.html_url, private: data.private };
 }
 
-async function listTree(repo, pathFilter = '') {
-  const owner = GH_OWNER();
-  const data = await ghFetch(`/repos/${owner}/${repo}/git/trees/main?recursive=1`);
+async function listTree(repoArg, pathFilter = '') {
+  const { owner, name } = resolveRepoRef(repoArg);
+  assertRepoAllowed(owner, name);
+  let data;
+  try {
+    data = await ghFetch(`/repos/${owner}/${name}/git/trees/main?recursive=1`);
+  } catch {
+    data = await ghFetch(`/repos/${owner}/${name}/git/trees/master?recursive=1`);
+  }
   let tree = data?.tree || [];
   if (pathFilter) {
     const p = pathFilter.replace(/^\/|\/$/g, '');
     tree = tree.filter((t) => t.path === p || t.path.startsWith(p + '/'));
   }
-  return tree.slice(0, 80).map((t) => `${t.type === 'tree' ? '📁' : '📄'} ${t.path}`);
+  return tree.slice(0, 100).map((t) => `${t.type === 'tree' ? '📁' : '📄'} ${t.path}`);
 }
 
 async function tryGithubIntent(command) {
@@ -307,18 +410,30 @@ async function tryGithubIntent(command) {
     return { handled: false };
   }
 
-  if (/\b(lista|listar|meus)\b.*\b(repos?|reposit)/i.test(low) || /^repos?$/i.test(low)) {
+  if (
+    /\b(lista|listar|meus)\b.*\b(repos?|reposit)/i.test(low) ||
+    /^repos?$/i.test(low) ||
+    /\breposit[oó]rios\b/i.test(low)
+  ) {
     const repos = await listRepos();
-    const lines = repos
-      .slice(0, 20)
-      .map((r) => `• **${r.name}**${r.private ? ' 🔒' : ''} — ${r.desc || r.url}`);
+    const lines = repos.map((r) => {
+      if (r.error) return `• **${r.full || r.name}** — ⚠️ ${r.error}`;
+      return `• **${r.full || r.name}**${r.private ? ' 🔒' : ''} — ${r.desc || r.url}`;
+    });
+    const cfg = allowedReposConfig();
+    const note = cfg
+      ? `\n_(lista filtrada por AETERNUS_REPOS: ${cfg.length} repos)_`
+      : `\n_(todos os repos acessíveis pelo token — ${repos.length})_`;
     return {
       handled: true,
-      text: `Seus repositórios (${repos.length}):\n${lines.join('\n') || '(vazio)'}`
+      text: `**Repositórios do sistema** (${repos.length}):\n${lines.join('\n') || '(vazio)'}${note}`
     };
   }
 
-  const treeM = t.match(/(?:arquivos|lista|tree|estrutura)\s+(?:do\s+)?(?:repo\s+)?([\w.-]+)(?:\s+(.+))?/i);
+  // arquivos / tree — aceita owner/repo ou só repo
+  const treeM = t.match(
+    /(?:arquivos|lista|tree|estrutura)\s+(?:do\s+)?(?:repo\s+)?([\w.-]+(?:\/[\w.-]+)?)(?:\s+([\w./-]+))?/i
+  );
   if (treeM) {
     const list = await listTree(treeM[1], treeM[2] || '');
     return {
@@ -327,13 +442,15 @@ async function tryGithubIntent(command) {
     };
   }
 
-  const readM = t.match(/(?:leia|ler|read|mostra|mostrar|abre|abrir)\s+(?:o\s+)?(?:arquivo\s+)?([\w.-]+)\s+([\w./-]+)/i);
+  const readM = t.match(
+    /(?:leia|ler|read|mostra|mostrar|abre|abrir)\s+(?:o\s+)?(?:arquivo\s+)?([\w.-]+(?:\/[\w.-]+)?)\s+([\w./-]+)/i
+  );
   if (readM) {
     const file = await getFile(readM[1], readM[2]);
     const body = String(file.content || '').slice(0, 1500);
     return {
       handled: true,
-      text: `📄 \`${readM[1]}/${readM[2]}\` (sha ${String(file.sha || '').slice(0, 7)}):\n\`\`\`\n${body}\n\`\`\``
+      text: `📄 \`${file.repo || readM[1]}/${readM[2]}\` (sha ${String(file.sha || '').slice(0, 7)}):\n\`\`\`\n${body}\n\`\`\``
     };
   }
 
@@ -342,12 +459,12 @@ async function tryGithubIntent(command) {
     const created = await createRepo(createRepoM[1], createRepoM[2] || 'Criado pelo Aeternus', true);
     return {
       handled: true,
-      text: `✅ Repo criado: **${created.name}**\n${created.url}`
+      text: `✅ Repo criado: **${created.full || created.name}**\n${created.url}`
     };
   }
 
   const writeM = t.match(
-    /(?:escreva|escrever|salve|salvar|crie arquivo|criar arquivo|update|atualize)\s+(?:em\s+)?([\w.-]+)\s+([\w./-]+)\s*[:\n]+([\s\S]+)/i
+    /(?:escreva|escrever|salve|salvar|crie arquivo|criar arquivo|update|atualize)\s+(?:em\s+)?([\w.-]+(?:\/[\w.-]+)?)\s+([\w./-]+)\s*[:\n]+([\s\S]+)/i
   );
   if (writeM) {
     let content = writeM[3].trim();
@@ -356,7 +473,7 @@ async function tryGithubIntent(command) {
     const result = await putFile(writeM[1], writeM[2], content, `Aeternus: ${writeM[2]}`);
     return {
       handled: true,
-      text: `✅ Arquivo salvo: \`${writeM[1]}/${writeM[2]}\`\nCommit: \`${result.commit || '?'}\`\n${result.url || ''}`
+      text: `✅ Arquivo salvo: \`${result.repo}/${writeM[2]}\`\nCommit: \`${result.commit || '?'}\`\n${result.url || ''}`
     };
   }
 
@@ -402,7 +519,12 @@ async function handleOwnerMessage(message, client) {
 
   if (!activated) return false;
   if (!command || !String(command).trim()) {
-    await message.reply('Olá. Sou a **Aeternus** (modo privado). Diga o que precisa — código, repos, tarefas.').catch(() => {});
+    await message
+      .reply(
+        'Olá. Sou a **Aeternus** (modo privado, multi-repo).\n' +
+          'Exemplos: `listar repos` · `arquivos Aeternus-` · `leia Aeternus- index.js`'
+      )
+      .catch(() => {});
     return true;
   }
 
@@ -422,12 +544,12 @@ async function handleOwnerMessage(message, client) {
       try {
         const repos = await listRepos();
         ctx =
-          'Repos do dono (GitHub):\n' +
+          `Sistema multi-repositório (${repos.length} repos):\n` +
           repos
-            .slice(0, 15)
-            .map((r) => `- ${r.name}${r.private ? ' (privado)' : ''}`)
+            .slice(0, 25)
+            .map((r) => `- ${r.full || r.name}${r.private ? ' (privado)' : ''}`)
             .join('\n') +
-          '\n\nComandos GitHub: listar repos | arquivos REPO | leia REPO path | escreva em REPO path: conteudo | criar repo NOME';
+          '\n\nComandos: listar repos | arquivos REPO | leia REPO path | escreva em REPO path: conteudo | criar repo NOME';
       } catch (_) {}
     }
 
@@ -441,6 +563,7 @@ async function handleOwnerMessage(message, client) {
 }
 
 function setup(client) {
+  const cfg = allowedReposConfig();
   client.aeternusCore = {
     isOwner,
     detectActivation,
@@ -449,10 +572,11 @@ function setup(client) {
     listRepos,
     getFile,
     putFile,
-    createRepo
+    createRepo,
+    allowedReposConfig
   };
   console.log(
-    `[aeternusCore] IA privada · owner=${OWNER_ID() || '(não definido)'} · providers=${activeProviders().join(',')}`
+    `[aeternusCore] multi-repo · owner=${OWNER_ID() || '?'} · providers=${activeProviders().join(',')} · repos=${cfg ? cfg.map((r) => r.full).join(',') : 'ALL'}`
   );
 }
 
@@ -466,5 +590,6 @@ module.exports = {
   getFile,
   putFile,
   createRepo,
-  chatAI
+  chatAI,
+  allowedReposConfig
 };
