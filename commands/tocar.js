@@ -9,14 +9,14 @@ const musicManager = require('../utils/musicManager');
 module.exports = {
     name: 'tocar',
     aliases: ['play', 'p', 'toca'],
-    description: 'Toca música via SoundCloud',
+    description: 'Toca música (SoundCloud / Lavalink)',
     data: new SlashCommandBuilder()
         .setName('tocar')
-        .setDescription('Toca música (SoundCloud)')
+        .setDescription('Toca música')
         .addStringOption((o) =>
             o
                 .setName('busca')
-                .setDescription('Nome da música ou link do SoundCloud')
+                .setDescription('Nome da música ou link (SoundCloud / YouTube)')
                 .setRequired(true)
         ),
 
@@ -25,8 +25,9 @@ module.exports = {
         if (!query) {
             return message.reply(
                 'Use: `O.tocar <nome ou link>`\n' +
-                    'Fonte: **SoundCloud**.\n' +
-                    'Dica: link do SoundCloud quase nunca falha.'
+                    'Exemplos:\n' +
+                    '• `O.tocar never gonna give you up`\n' +
+                    '• `O.tocar https://soundcloud.com/...`'
             );
         }
         return run(message, query);
@@ -34,7 +35,7 @@ module.exports = {
 
     async executeSlash(i) {
         const query = i.options.getString('busca', true);
-        await i.deferReply({ flags: MessageFlags.Ephemeral });
+        await i.deferReply();
         try {
             const result = await play(i, query);
             return i.editReply(result);
@@ -57,11 +58,11 @@ async function run(message, query) {
             ...result,
             allowedMentions: { repliedUser: false }
         });
-        setTimeout(() => sent.delete().catch(() => {}), 12_000);
+        setTimeout(() => sent.delete().catch(() => {}), 15_000);
         return sent;
     } catch (e) {
         const err = await message.reply(`❌ ${e.message || e}`);
-        setTimeout(() => err.delete().catch(() => {}), 10_000);
+        setTimeout(() => err.delete().catch(() => {}), 12_000);
         return err;
     }
 }
@@ -75,10 +76,42 @@ function sourceLabel(usedQuery, info) {
     return 'auto';
 }
 
+function getOnlineNode(shoukaku) {
+    if (!shoukaku) return null;
+    if (typeof shoukaku.getIdealNode === 'function') {
+        const n = shoukaku.getIdealNode();
+        if (n) return n;
+    }
+    if (typeof shoukaku.getNode === 'function') {
+        const n = shoukaku.getNode();
+        if (n) return n;
+    }
+    if (shoukaku.options?.nodeResolver) {
+        const n = shoukaku.options.nodeResolver(shoukaku.nodes);
+        if (n) return n;
+    }
+    try {
+        for (const node of shoukaku.nodes?.values?.() || []) {
+            const st = node?.state;
+            if (st === 2 || st === 'CONNECTED' || node?.sessionId) return node;
+        }
+    } catch (_) {}
+    return null;
+}
+
+async function waitForNode(shoukaku, tries = 8) {
+    for (let i = 0; i < tries; i++) {
+        const n = getOnlineNode(shoukaku);
+        if (n) return n;
+        await new Promise((r) => setTimeout(r, 700));
+    }
+    return null;
+}
+
 async function play(ctx, query) {
     const member = ctx.member || ctx.guild?.members?.cache?.get(ctx.user?.id);
     const voice = member?.voice?.channel;
-    if (!voice) throw new Error('Entre em um canal de voz primeiro.');
+    if (!voice) throw new Error('Entre em um **canal de voz** primeiro.');
     if (voice.type !== ChannelType.GuildVoice && voice.type !== ChannelType.GuildStageVoice) {
         throw new Error('Canal de voz inválido.');
     }
@@ -88,12 +121,21 @@ async function play(ctx, query) {
         throw new Error('Já estou em outro canal de voz neste servidor.');
     }
 
-    if (!ctx.client?.shoukaku) {
-        throw new Error('Música não inicializada. Verifique LAVALINK_NODES.');
+    const shoukaku = ctx.client?.shoukaku;
+    if (!shoukaku) {
+        throw new Error(
+            'Sistema de música não inicializou. Confira se o pacote `shoukaku` está instalado e reinicie o bot.'
+        );
     }
 
-    const node = ctx.client.shoukaku.getIdealNode();
-    if (!node) throw new Error('Nenhum node Lavalink online.');
+    const node = await waitForNode(shoukaku);
+    if (!node) {
+        throw new Error(
+            'Nenhum node **Lavalink** online ainda.\n' +
+                'Aguarde ~10s após o bot ligar e tente de novo.\n' +
+                'No Render confira `LAVALINK_NODES=serenetia|lavalinkv4.serenetia.com:443|https://seretia.link/discord|true`'
+        );
+    }
 
     const userId = ctx.author?.id || ctx.user?.id;
     const channelId = ctx.channel?.id;
@@ -110,12 +152,11 @@ async function play(ctx, query) {
         return {
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0xff5500)
+                    .setColor(0x7c3aed)
                     .setTitle('📑 Playlist na fila')
                     .setDescription(
                         `**${res.playlistName}**\n+**${res.added}** faixa(s)\nTotal: **${res.queueSize}**`
                     )
-                    .setFooter({ text: 'Só você vê esta confirmação · SoundCloud' })
             ]
         };
     }
@@ -130,18 +171,16 @@ async function play(ctx, query) {
     return {
         embeds: [
             new EmbedBuilder()
-                .setColor(0xff5500)
-                .setTitle(res.queueSize <= 1 ? '✅ Pedido recebido' : '➕ Na fila')
-                .setDescription(
-                    `**[${info.title || 'Música'}](${info.uri || '#'})**${note}`
-                )
+                .setColor(0x7c3aed)
+                .setTitle(res.queueSize <= 1 ? '✅ Tocando' : '➕ Na fila')
+                .setDescription(`**[${info.title || 'Música'}](${info.uri || '#'})**${note}`)
                 .addFields(
                     { name: 'Fonte', value: `\`${fonte}\``, inline: true },
                     { name: 'Node', value: `\`${node.name}\``, inline: true },
                     { name: 'Fila', value: `\`${res.queueSize}\``, inline: true }
                 )
                 .setThumbnail(info.artworkUrl || null)
-                .setFooter({ text: 'SoundCloud · painel público abaixo' })
+                .setFooter({ text: 'Aeternus Music · Serenetia' })
         ]
     };
 }
