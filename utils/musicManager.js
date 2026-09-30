@@ -1,7 +1,6 @@
 /**
  * Filas Shoukaku — anti-falha:
- * prioridade SoundCloud, multi-node, retries, sem sair da call,
- * lock contra race, rejoin de voz, botões seguros.
+ * multi-fonte, alternates, retries, rejoin de voz.
  */
 const {
     EmbedBuilder,
@@ -122,7 +121,7 @@ function trackEmbed(track, q, title = 'Tocando agora') {
                 inline: true
             }
         )
-        .setFooter({ text: 'Busca · SoundCloud prioritário · Serenetia' })
+        .setFooter({ text: 'Multi-fonte · Serenetia Lavalink' })
         .setTimestamp();
 
     const art = info.artworkUrl || info.thumbnail;
@@ -132,12 +131,6 @@ function trackEmbed(track, q, title = 'Tocando agora') {
 
 function isYoutubeUrl(q) {
     return /youtube\.com|youtu\.be|music\.youtube\.com/i.test(String(q || ''));
-}
-function isSpotifyUrl(q) {
-    return /open\.spotify\.com|spotify\.com/i.test(String(q || ''));
-}
-function isDeezerUrl(q) {
-    return /deezer\.com/i.test(String(q || ''));
 }
 
 function parseResolveResult(result) {
@@ -161,7 +154,7 @@ function parseResolveResult(result) {
     if (loadType === 'search') {
         const list = Array.isArray(result.data) ? result.data : [];
         if (!list.length) return null;
-        return { type: 'search', tracks: list.slice(0, 1), playlistName: null };
+        return { type: 'search', tracks: list.slice(0, 5), playlistName: null };
     }
     if (Array.isArray(result.tracks) && result.tracks.length) {
         return {
@@ -387,16 +380,7 @@ async function attemptPlay(player, track, volume) {
     if (!track?.encoded) throw new Error('track sem encoded');
     const target = Math.max(50, Math.min(100, Number(volume) || 100));
 
-    try {
-        await player.playTrack({
-            track: { encoded: track.encoded },
-            volume: target,
-            paused: false
-        });
-    } catch (e1) {
-        console.warn('[music] playTrack+vol falhou, retry mínimo:', e1?.message || e1);
-        await player.playTrack({ track: { encoded: track.encoded } });
-    }
+    await player.playTrack({ track: { encoded: track.encoded } });
 
     try {
         if (typeof player.setGlobalVolume === 'function') {
@@ -412,7 +396,14 @@ async function attemptPlay(player, track, volume) {
         if (typeof player.setPaused === 'function') await player.setPaused(false);
     } catch (_) {}
 
-    console.log('[music] play OK vol=' + target + ' title=' + String(track.info?.title || '').slice(0, 60));
+    console.log(
+        '[music] play OK vol=' +
+            target +
+            ' src=' +
+            String(track.info?.sourceName || '?') +
+            ' title=' +
+            String(track.info?.title || '').slice(0, 50)
+    );
 }
 
 async function playNext(client, guildId) {
@@ -492,14 +483,50 @@ async function handlePlayFailure(client, guildId, track, reason) {
     const q = getQueue(guildId);
     q.retries = (q.retries || 0) + 1;
 
+    // 1) alternativas da mesma busca
+    if (Array.isArray(track.__alts) && track.__alts.length) {
+        const alt = track.__alts.shift();
+        if (alt?.encoded) {
+            console.warn('[music] trocando alternate:', String(alt.info?.title || '').slice(0, 50));
+            alt.__alts = track.__alts;
+            alt.__scTried = track.__scTried;
+            q.current = alt;
+            q.retries = 0;
+            return playNext(client, guildId);
+        }
+    }
+
+    // 2) nova resolução SC / YT
     if (!track.__scTried) {
         track.__scTried = true;
         try {
             const mirror = await trySoundcloudMirror(shoukaku, track);
             if (mirror) {
+                console.warn('[music] mirror SC:', String(mirror.info?.title || '').slice(0, 50));
                 q.current = mirror;
                 q.retries = 0;
                 return playNext(client, guildId);
+            }
+        } catch (_) {}
+        try {
+            const title = track?.info?.title;
+            if (title) {
+                const nodes = listNodes(shoukaku);
+                for (const node of nodes) {
+                    for (const id of [`ytsearch:${title}`, `scsearch:${title} audio`, `dzsearch:${title}`]) {
+                        const p = await resolveOnNode(node, id);
+                        const t = p?.tracks?.[0];
+                        if (t) {
+                            const w = wrapTrack(t, track.requester);
+                            if (w) {
+                                console.warn('[music] fallback resolve:', id.slice(0, 40));
+                                q.current = w;
+                                q.retries = 0;
+                                return playNext(client, guildId);
+                            }
+                        }
+                    }
+                }
             }
         } catch (_) {}
     }
@@ -525,7 +552,7 @@ async function handlePlayFailure(client, guildId, track, reason) {
     await notifyChannel(
         client,
         guildId,
-        `Não consegui reproduzir. Fila vazia — saindo da call.`,
+        `Não consegui reproduzir esta faixa (stream do node quebrou). Tente outro nome ou link do SoundCloud.`,
         0xf87171
     );
     await leaveIfIdle(client, guildId);
@@ -575,8 +602,15 @@ function bindPlayerEvents(client, player, guildId) {
     player.on('exception', (data) => {
         try {
             const q = getQueue(guildId);
-            const msg = data?.exception?.message || data?.message || 'exception';
-            console.warn(`[music] exception ${guildId}: ${String(msg).slice(0, 100)}`);
+            const msg =
+                data?.exception?.message ||
+                data?.exception?.cause ||
+                data?.message ||
+                'exception';
+            const src = q.current?.info?.sourceName || '?';
+            console.warn(
+                `[music] exception ${guildId} src=${src}: ${String(msg).slice(0, 140)}`
+            );
             handlePlayFailure(client, guildId, q.current, msg).catch(() => {});
         } catch (_) {}
     });
@@ -606,6 +640,10 @@ async function enqueue(client, { guild, voiceChannelId, textChannelId, query, re
         .filter(Boolean);
 
     if (!wrapped.length) throw new Error('Nenhuma faixa válida.');
+
+    if (wrapped[0] && wrapped.length > 1) {
+        wrapped[0].__alts = wrapped.slice(1);
+    }
 
     const q = getQueue(guild.id);
     q.textChannelId = textChannelId;
