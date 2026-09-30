@@ -4,16 +4,17 @@
  */
 
 /**
- * Nodes públicos de fallback (instáveis — use LAVALINK_NODES com nodes seus).
- * Credenciais atualizadas conforme listas públicas conhecidas.
+ * Node principal Aeternus (Serenetia v4, TLS 443).
+ * Override com LAVALINK_NODES no Render se quiser outros.
  */
 const DEFAULT_PUBLIC_NODES = [
     {
         name: 'serenetia',
-        url: 'lavalinkv4.serenetia.com:80',
-        auth: 'https://dsc.gg/ajidevserver',
-        secure: false
+        url: 'lavalinkv4.serenetia.com:443',
+        auth: 'https://seretia.link/discord',
+        secure: true
     },
+    // fallbacks públicos (podem cair)
     {
         name: 'ajieblogs',
         url: 'lava-v4.ajieblogs.eu.org:80',
@@ -58,6 +59,9 @@ const DEFAULT_PUBLIC_NODES = [
  *   nome2|host2:porta2|senha2|false
  *
  * Também aceita JSON: [{"name":"a","url":"h:443","auth":"x","secure":true}]
+ *
+ * Exemplo Serenetia:
+ *   serenetia|lavalinkv4.serenetia.com:443|https://seretia.link/discord|true
  */
 function parseNodesFromEnv(raw) {
     const str = String(raw || '').trim();
@@ -106,7 +110,6 @@ function normalizeNode(n, i = 0) {
     if (auth == null || auth === '') return null;
 
     let secure = n.secure === true || n.secure === 'true';
-    // só força secure se a porta for 443 e o usuário não tiver definido secure=false
     if (n.secure === false || n.secure === 'false') secure = false;
     else if (!secure && /:443$/.test(url)) secure = true;
 
@@ -125,7 +128,7 @@ function getNodes() {
         return fromEnv;
     }
     console.log(
-        `[music] LAVALINK_NODES vazio — usando ${DEFAULT_PUBLIC_NODES.length} nodes públicos (podem cair). Configure nodes estáveis no Render.`
+        `[music] LAVALINK_NODES vazio — usando Serenetia + ${DEFAULT_PUBLIC_NODES.length - 1} fallback(s)`
     );
     return DEFAULT_PUBLIC_NODES.map((n, i) => normalizeNode(n, i)).filter(Boolean);
 }
