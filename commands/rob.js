@@ -51,38 +51,36 @@ function stealFromTarget(targetId, amount) {
     return { fromWallet, fromBank, total: fromWallet + fromBank };
 }
 
-function protectedEmbed(thief, target, roleId) {
-    const roleMention = roleId ? '<@&' + roleId + '>' : '**anti-roubo**';
+function protectedEmbed(thief, target, { saved }) {
     const desc = [
         '<@' + thief.id + '> tentou roubar <@' + target.id + '>.',
         '',
-        'O destino interveio. <@' + target.id + '> carrega o cargo ' + roleMention +
-            ' — protege carteira e banco: ninguém leva sequer ✨ **1** éter.',
+        saved
+            ? '<@' + target.id + '> tem **proteção anti-roubo salva no banco de dados** — vale em **todos** os servidores, mesmo sem o cargo local.'
+            : '<@' + target.id + '> possui o cargo anti-roubo. A proteção foi **gravada** e agora vale em qualquer servidor.',
         '',
-        '💎 A equipe deste servidor configura o cargo com `/config-antiroubo`.'
+        'Ninguém leva sequer ✨ **1** éter (carteira + banco).'
     ].join('\n');
     return new EmbedBuilder()
         .setColor(0x3b82f6)
         .setTitle('🔐 Escudo ativo')
         .setDescription(desc)
-        .setFooter({ text: 'Proteção anti-roubo · válida neste servidor' });
+        .setFooter({ text: 'Anti-roubo global · Aeternus' });
 }
 
-async function run(thief, target, reply, botId, guild) {
+async function run(thief, target, reply, botId, guild, client) {
     if (!target) return reply('Mencione alguém: `O.roubar @usuario`');
     if (target.bot) return reply('Não dá para roubar bots.');
     if (target.id === thief.id) return reply('Você não pode roubar a si mesmo.');
 
-    const roleId = antiRob.resolveRoleId(guild);
-    if (await antiRob.hasAntiRob(guild, target.id)) {
+    const wasSaved = antiRob.isSavedProtected(target.id);
+    const protected_ = await antiRob.hasAntiRob(guild, target.id, client || guild?.client);
+
+    if (protected_) {
         return reply({
             content: '<@' + thief.id + '>',
-            embeds: [protectedEmbed(thief, target, roleId)],
-            allowedMentions: {
-                parse: [],
-                users: [String(thief.id)],
-                roles: roleId ? [String(roleId)] : []
-            }
+            embeds: [protectedEmbed(thief, target, { saved: wasSaved })],
+            allowedMentions: { parse: [], users: [String(thief.id)] }
         });
     }
 
@@ -176,7 +174,7 @@ module.exports = {
 
     async execute(message, args) {
         const target = await resolveTarget(message, args);
-        await run(message.author, target, (p) => message.reply(p), message.client.user?.id, message.guild);
+        await run(message.author, target, (p) => message.reply(p), message.client.user?.id, message.guild, message.client);
     },
 
     async executeSlash(i) {
@@ -186,7 +184,8 @@ module.exports = {
             target,
             (p) => (typeof p === 'string' ? i.reply({ content: p, flags: MessageFlags.Ephemeral }) : i.reply(p)),
             i.client.user?.id,
-            i.guild
+            i.guild,
+            i.client
         );
     }
 };
