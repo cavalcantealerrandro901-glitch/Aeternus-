@@ -1,67 +1,27 @@
-/**
- * Ferramentas de RPG e Criação de Classes
- */
-function registerRpgTools(ai) {
-    ai.registerTool({
-        name: 'get_player_summary',
-        description: 'Resumo do perfil RPG',
-        handler: async (args, rt) => {
-            try {
-                const player = require('../utils/player');
-                const id = String(args.userId || rt.userId);
-                const p = player.get?.(id);
-                if (!p) return { ok: false, error: 'Sem ficha de personagem.' };
-                return {
-                    ok: true,
-                    userId: id,
-                    classId: p.classId || p.classe || null,
-                    level: p.level || p.nivel || null,
-                    attrs: p.attrs || p.atributos || null
-                };
-            } catch (e) {
-                return { ok: false, error: e.message || String(e) };
-            }
-        }
-    });
-
-    ai.registerTool({
-        name: 'design_rpg_class',
-        description: 'Gera um modelo de classe RPG',
-        handler: async (args) => {
-            const power = String(args.powerLevel || 'rara').toLowerCase();
-            const base = /unica|lend/.test(power) ? 220 : /epic|epica/.test(power) ? 160 : /rar/.test(power) ? 120 : 80;
-            const theme = String(args.theme || 'mistério');
-            const name = String(args.name || 'Nova Classe');
-            return {
-                ok: true,
-                classId: name
-                    .toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/[^a-z0-9]+/g, '_')
-                    .replace(/^_|_$/g, '')
-                    .slice(0, 40),
-                name,
-                theme,
-                suggestedStats: {
-                    forca: base + 10,
-                    agilidade: base,
-                    defesa: base + 5,
-                    vida: base + 15
-                },
-                suggestedActives: [
-                    { name: `${theme.split(' ')[0]} I`, power: Math.round(base * 1.2), note: 'Dano Principal' },
-                    { name: `${theme.split(' ')[0]} II`, power: Math.round(base * 0.9), note: 'Controle de Grupo' },
-                    { name: 'Evasão', power: Math.round(base * 0.7), note: 'Mobilidade' },
-                    { name: 'Despertar', power: Math.round(base * 1.8), note: 'Habilidade Suprema' }
-                ],
-                suggestedPassives: [
-                    { name: 'Essência', note: `Tema: ${theme.slice(0, 40)}` },
-                    { name: 'Resiliência', note: 'Sinergia de Combate' }
-                ]
-            };
-        }
-    });
-}
-
-module.exports = registerRpgTools;
+const fs=require('fs'); const path=require('path');
+const FILE=path.join(__dirname,'..','data','rpg_ai.json');
+const CLASSES={guerreiro:{hp:120,atk:15,def:12,emoji:'⚔️'},mago:{hp:80,atk:22,def:6,emoji:'🔮'},arqueiro:{hp:95,atk:18,def:8,emoji:'🏹'},ninja:{hp:90,atk:20,def:7,emoji:'🥷'},paladino:{hp:110,atk:14,def:14,emoji:'🛡️'},necromante:{hp:85,atk:21,def:7,emoji:'💀'}};
+function load(){try{if(fs.existsSync(FILE))return JSON.parse(fs.readFileSync(FILE,'utf8'));}catch(_){}return{};}
+function save(db){try{const d=path.dirname(FILE);if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});fs.writeFileSync(FILE,JSON.stringify(db,null,2));}catch(_){}}
+module.exports=function register({registerTool}){
+  registerTool({name:'criar_classe',description:'Classe RPG',async handler(args,runtime){
+    const name=String(args.classe||args.class||args.nome||args.query||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/criar classe\s*/,'');
+    const key=Object.keys(CLASSES).find(k=>name.includes(k));
+    const base=CLASSES[key]; if(!base) return {error:'Classes: '+Object.keys(CLASSES).join(', ')};
+    const db=load(); db[runtime.userId]={class:key,level:1,xp:0,...base,createdAt:Date.now()}; save(db);
+    return {ok:true,text:base.emoji+' Classe **'+key+'**! HP '+base.hp+' ATK '+base.atk+' DEF '+base.def};
+  }});
+  registerTool({name:'ficha_rpg',description:'Ficha',async handler(_a,runtime){
+    const p=load()[runtime.userId]; if(!p) return {ok:true,text:'Sem ficha. Use criar_classe ninja.'};
+    return {ok:true,text:'Ficha: **'+p.class+'** Nv.'+p.level+' XP '+p.xp+' HP '+p.hp+' ATK '+p.atk+' DEF '+p.def};
+  }});
+  registerTool({name:'rpg_treino',description:'Treino XP',async handler(_a,runtime){
+    const db=load(); const p=db[runtime.userId]; if(!p) return {error:'Crie uma classe primeiro.'};
+    const gain=10+Math.floor(Math.random()*25); p.xp+=gain;
+    while(p.xp>=p.level*50){p.xp-=p.level*50;p.level++;p.hp+=5;p.atk+=2;p.def+=1;}
+    save(db); return {ok:true,text:'Treino +'+gain+' XP. Nivel '+p.level};
+  }});
+  registerTool({name:'listar_classes',description:'Lista classes',async handler(){
+    return {ok:true,text:Object.entries(CLASSES).map(([k,v])=>v.emoji+' **'+k+'** HP'+v.hp).join('\n')};
+  }});
+};
