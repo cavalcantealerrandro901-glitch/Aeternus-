@@ -29,7 +29,6 @@ async function bridgeSlashToPrefix(interaction, cmd, client) {
             first: () => mentionUsers.first() || null
         },
         async reply(payload) {
-            // Preferir editReply quando já está "pensando" (deferred)
             if (interaction.deferred && !interaction.replied) {
                 replied = true;
                 return interaction.editReply(payload);
@@ -71,25 +70,44 @@ module.exports = {
                 if (!cmd) {
                     return interaction
                         .reply({
-                            content:
-                                '❌ Este slash não existe mais. Aguarde a sincronização.',
+                            content: '❌ Este slash não existe mais. Aguarde a sincronização.',
                             ephemeral: true
                         })
                         .catch(() => {});
                 }
 
-                // "Bot está pensando..." (como usuário digitando)
+                // executeSlash gerencia o próprio defer/reply (ex.: /parceria)
+                if (typeof cmd.executeSlash === 'function') {
+                    try {
+                        await cmd.executeSlash(interaction, client);
+                    } catch (err) {
+                        if (err && (err.code === 10062 || err.code === 40060)) return;
+                        await autoRepair.handleCommandError({
+                            cmdName: name,
+                            error: err,
+                            context: `slash /${name} · ${interaction.guild?.name || 'DM'} · user ${interaction.user?.id}`,
+                            interaction
+                        });
+                    }
+                    return;
+                }
+
                 if (!interaction.deferred && !interaction.replied) {
                     await interaction.deferReply().catch(() => {});
                 }
 
-                if (typeof cmd.executeSlash === 'function') {
-                    await cmd.executeSlash(interaction, client);
-                    return;
-                }
-
                 if (typeof cmd.execute === 'function') {
-                    await bridgeSlashToPrefix(interaction, cmd, client);
+                    try {
+                        await bridgeSlashToPrefix(interaction, cmd, client);
+                    } catch (err) {
+                        if (err && (err.code === 10062 || err.code === 40060)) return;
+                        await autoRepair.handleCommandError({
+                            cmdName: name,
+                            error: err,
+                            context: `slash-bridge /${name} · ${interaction.guild?.name || 'DM'}`,
+                            interaction
+                        });
+                    }
                     return;
                 }
 
@@ -122,7 +140,6 @@ module.exports = {
                     try {
                         await cmd.handleComponent(interaction, client);
                     } catch (err) {
-                        // 10062 Unknown interaction / 40060 already acknowledged
                         if (err && (err.code === 10062 || err.code === 40060)) return;
                         throw err;
                     }
