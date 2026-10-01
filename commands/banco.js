@@ -1,33 +1,20 @@
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 const bank = require('../utils/bank');
-
-/** Mesmo cargo do anti-roubo em rob.js */
-const ANTI_ROB_ROLE_ID = '1550256144138637423';
+const antiRob = require('../utils/antiRob');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-async function isProtected(guild, userId) {
-    if (!guild || !userId) return false;
-    try {
-        const member = await guild.members.fetch(userId).catch(() => null);
-        if (!member) return false;
-        return member.roles.cache.has(ANTI_ROB_ROLE_ID);
-    } catch (_) {
-        return false;
-    }
-}
-
 async function buildEmbed(user, guild) {
     const wallet = eter.get(user.id);
     const bankBal = bank.get(user.id);
-    const safe = await isProtected(guild, user.id);
+    const safe = await antiRob.hasAntiRob(guild, user.id);
+    const roleId = antiRob.resolveRoleId(guild);
+    const roleMention = roleId ? '<@&' + roleId + '>' : 'cargo anti-roubo';
 
-    // Azul (protegido) × âmbar (desprotegido) — melhor para daltonismo
     const color = safe ? 0x3b82f6 : 0xd97706;
-
     const badge = safe ? '【 PROTEGIDO 】' : '【 DESPROTEGIDO 】';
     const title = (safe ? '🔐 ' : '⚠ ') + 'Aeternus Banco · ' + badge;
 
@@ -35,19 +22,22 @@ async function buildEmbed(user, guild) {
         ? [
               '■■■ **Estado: PROTEGIDO**',
               '',
-              '🔒 Seu cofre está protegido pelo cargo <@&' + ANTI_ROB_ROLE_ID + '>.',
+              '🔒 Seu cofre está protegido pelo cargo ' + roleMention + '.',
               'Ninguém consegue roubar o éter que você guardou aqui.'
           ].join('\n')
         : [
               '▲▲▲ **Estado: DESPROTEGIDO**',
               '',
               '⚠ Sem o cargo de proteção, carteira e banco ficam expostos.',
-              'Qualquer pessoa pode tentar roubar o seu éter.'
+              'Qualquer pessoa pode tentar roubar o seu éter.',
+              roleId
+                  ? 'Peça o cargo ' + roleMention + ' à equipe deste servidor.'
+                  : 'A equipe ainda não configurou o cargo (`/config-antiroubo`).'
           ].join('\n');
 
     const tip = safe
         ? '✔ Proteção ativa — mantenha o cargo e continue em segurança.'
-        : '◆ Fale com a equipe, adquira o cargo anti-roubo e proteja de vez o seu éter.';
+        : '◆ Fale com a equipe, adquira o cargo anti-roubo e proteja o seu éter.';
 
     const vaultIcon = safe ? '🔒' : '📭';
     const handIcon = safe ? '👛' : '🪙';
@@ -73,7 +63,7 @@ async function buildEmbed(user, guild) {
         )
         .setFooter({
             text: safe
-                ? 'Estado: PROTEGIDO · cargo anti-roubo ativo'
+                ? 'Estado: PROTEGIDO · anti-roubo ativo neste servidor'
                 : 'Estado: DESPROTEGIDO · adquira o cargo anti-roubo'
         });
 }
@@ -92,12 +82,13 @@ module.exports = {
     async execute(message) {
         const user = message.mentions.users.first() || message.author;
         const emb = await buildEmbed(user, message.guild);
+        const roleId = antiRob.resolveRoleId(message.guild);
         await message.reply({
-            content: `${user}`,
+            content: '' + user,
             embeds: [emb],
             allowedMentions: {
                 users: [user.id],
-                roles: [ANTI_ROB_ROLE_ID]
+                roles: roleId ? [roleId] : []
             }
         });
     },
@@ -105,12 +96,13 @@ module.exports = {
     async executeSlash(i) {
         const user = i.options.getUser('usuario') || i.user;
         const emb = await buildEmbed(user, i.guild);
+        const roleId = antiRob.resolveRoleId(i.guild);
         await i.reply({
-            content: `${user}`,
+            content: '' + user,
             embeds: [emb],
             allowedMentions: {
                 users: [user.id],
-                roles: [ANTI_ROB_ROLE_ID]
+                roles: roleId ? [roleId] : []
             }
         });
     }
