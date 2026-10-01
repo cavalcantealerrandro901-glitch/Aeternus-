@@ -5,8 +5,7 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    ChannelType,
-    MessageFlags
+    ChannelType
 } = require('discord.js');
 const partnerships = require('../utils/partnerships');
 
@@ -30,19 +29,13 @@ function normalizeInviteUrl(code) {
 async function resolveInvite(client, textOrUrl) {
     const code = extractInviteCode(textOrUrl);
     if (!code) {
-        return {
-            ok: false,
-            error: 'Não foi encontrado um convite `discord.gg/...` válido no texto.'
-        };
+        return { ok: false, error: 'Não foi encontrado um convite `discord.gg/...` válido no texto.' };
     }
     try {
         const inv = await client.fetchInvite(code);
         const name = inv.guild?.name || inv.channel?.name || null;
         if (!name && !inv.guild) {
-            return {
-                ok: false,
-                error: 'Não foi possível validar este convite (expirado ou sem permissão).'
-            };
+            return { ok: false, error: 'Não foi possível validar este convite (expirado ou sem permissão).' };
         }
         const url = normalizeInviteUrl(inv.code || code);
         return {
@@ -53,10 +46,7 @@ async function resolveInvite(client, textOrUrl) {
             memberCount: inv.memberCount != null ? inv.memberCount : 'N/A'
         };
     } catch (_) {
-        return {
-            ok: false,
-            error: 'Convite **inválido ou expirado**. Verifique o link no texto.'
-        };
+        return { ok: false, error: 'Convite **inválido ou expirado**. Verifique o link no texto.' };
     }
 }
 
@@ -166,9 +156,7 @@ module.exports = {
 
         if (!rep || !texto) {
             return message.reply(
-                '❌ **Uso do comando:**\n' +
-                    '`O.parceria fazer @representante [#canal] [@cargo]` + texto\n' +
-                    '_Também pode responder à mensagem que contém o texto da parceria._'
+                '❌ **Uso:** `O.parceria fazer @representante [#canal] [@cargo]` + texto com convite'
             );
         }
 
@@ -184,31 +172,57 @@ module.exports = {
     },
 
     async executeSlash(i) {
-        if (!i.memberPermissions || !i.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
-            return i.reply({
-                content: '❌ Requer permissão de **Gerenciar Servidor**.',
-                flags: MessageFlags.Ephemeral
-            });
-        }
-        await i.deferReply({ flags: MessageFlags.Ephemeral });
+        const ephemeral = { ephemeral: true };
+        try {
+            if (!i.memberPermissions || !i.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
+                if (i.deferred || i.replied) {
+                    return i.editReply({ content: '❌ Requer permissão de **Gerenciar Servidor**.' });
+                }
+                return i.reply({
+                    content: '❌ Requer permissão de **Gerenciar Servidor**.',
+                    ...ephemeral
+                });
+            }
 
-        const sub = i.options.getSubcommand();
-        if (sub === 'fazer') {
-            const user = i.options.getUser('representante', true);
-            const texto = i.options.getString('texto', true).trim();
-            const targetChannel = i.options.getChannel('canal') || i.channel;
-            const notifyRole = i.options.getRole('notificar');
-            const member = await i.guild.members.fetch(user.id).catch(function () { return null; });
+            if (!i.deferred && !i.replied) {
+                await i.deferReply(ephemeral);
+            }
 
-            return run(i, {
-                repUser: user,
-                member: member,
-                texto: texto,
-                targetChannel: targetChannel,
-                client: i.client,
-                isSlash: true,
-                notifyRoleId: notifyRole ? notifyRole.id : null
-            });
+            const sub = i.options.getSubcommand();
+            if (sub === 'fazer') {
+                const user = i.options.getUser('representante', true);
+                const texto = i.options.getString('texto', true).trim();
+                const targetChannel = i.options.getChannel('canal') || i.channel;
+                const notifyRole = i.options.getRole('notificar');
+                const member = await i.guild.members.fetch(user.id).catch(function () { return null; });
+
+                return await run(i, {
+                    repUser: user,
+                    member: member,
+                    texto: texto,
+                    targetChannel: targetChannel,
+                    client: i.client,
+                    isSlash: true,
+                    notifyRoleId: notifyRole ? notifyRole.id : null
+                });
+            }
+
+            return reply(i, true, '❌ Subcomando desconhecido. Use `/parceria fazer`.');
+        } catch (err) {
+            try {
+                const autoRepair = require('../utils/autoRepair');
+                await autoRepair.handleCommandError({
+                    cmdName: 'parceria',
+                    error: err,
+                    context: 'slash /parceria · guild ' + (i.guild?.id || '?') + ' · user ' + (i.user?.id || '?'),
+                    interaction: i
+                });
+            } catch (_) {}
+            const msg = '❌ Erro ao registrar parceria: `' + String(err?.message || err).slice(0, 200) + '`';
+            try {
+                if (i.deferred || i.replied) return await i.editReply({ content: msg });
+                return await i.reply({ content: msg, ephemeral: true });
+            } catch (_) {}
         }
     }
 };
@@ -223,7 +237,7 @@ async function run(ctx, opts) {
     const notifyRoleId = opts.notifyRoleId;
 
     const guild = ctx.guild;
-    
+
     const conf = (await partnerships.getConfig(guild.id)) || {};
     if (conf.enabled === false) {
         return reply(ctx, isSlash, '❌ O sistema de parcerias está desativado nas configurações.');
@@ -243,21 +257,19 @@ async function run(ctx, opts) {
     }
 
     const name = resolved.serverName;
-    
+
     const repRoleId = conf.roleId || conf.repRoleId || null;
     const pingRoleId = notifyRoleId || conf.notifyRoleId || conf.pingRoleId || null;
 
-    // --- MONTAGEM DO CONTEÚDO EM TEXTO PURISTA ---
     const headerMentions = [];
     if (pingRoleId) headerMentions.push('<@&' + pingRoleId + '>');
-    headerMentions.push(`${repUser}`);
+    headerMentions.push('' + repUser);
 
-    const messageContent = `${headerMentions.join(' ')}\n\n${texto}`;
+    const messageContent = headerMentions.join(' ') + '\n\n' + texto;
 
-    // Botão com o link de entrada para o servidor parceiro
     const mainRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setLabel(`Entrar em ${name.slice(0, 25)}`)
+            .setLabel('Entrar em ' + name.slice(0, 25))
             .setStyle(ButtonStyle.Link)
             .setURL(resolved.url)
             .setEmoji('🌐')
@@ -302,69 +314,45 @@ async function run(ctx, opts) {
         try {
             const role = await guild.roles.fetch(repRoleId).catch(function () { return null; });
             if (role) {
-                await member.roles
-                    .add(role, 'Parceria registrada — cargo do representante')
-                    .catch(function () { return null; });
+                await member.roles.add(role, 'Parceria registrada').catch(function () { return null; });
                 roleGiven = member.roles.cache.has(role.id);
             }
         } catch (_) {}
     }
 
-    // --- DM PRIVADA PARA O REPRESENTANTE (MANTIDA COM EMBED) ---
     try {
         const dmEmbed = new EmbedBuilder()
             .setColor(0x8b5cf6)
             .setTitle('✦ PARCERIA OFICIAL')
             .setDescription(
-                `É com satisfação que anunciamos o **${name}** como novo parceiro oficial do **Aeternus**.\n\n` +
-                `Agradecemos pela confiança e esperamos construir uma parceria sólida e duradoura entre nossas comunidades. ♡\n\n` +
-                `◇ ───────────────── ◇\n\n` +
-                `**INFORMAÇÃO IMPORTANTE**\n\n` +
-                `O representante do **${name}** deverá permanecer no servidor durante toda a parceria. Caso saia, a parceria será cancelada imediatamente.`
+                'É com satisfação que anunciamos o **' + name + '** como novo parceiro oficial do **' + guild.name + '**.\n\n' +
+                'O representante deverá permanecer no servidor durante toda a parceria. Caso saia, a parceria será cancelada.'
             )
-            .setFooter({
-                text: 'Aeternus RPG • Parcerias',
-                iconURL: guild.iconURL({ dynamic: true })
-            })
+            .setFooter({ text: 'Aeternus · Parcerias', iconURL: guild.iconURL({ dynamic: true }) })
             .setTimestamp();
 
-        const dmRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel(`Entrar em ${guild.name}`)
-                .setStyle(ButtonStyle.Link)
-                .setURL(resolved.url)
-                .setEmoji('🏰')
-        );
-
-        await repUser.send({ embeds: [dmEmbed], components: [dmRow] });
+        await repUser.send({ embeds: [dmEmbed] });
     } catch (_) {}
 
-    // --- RESPOSTA DE CONFIRMAÇÃO PARA A STAFF ---
     const okEmbed = new EmbedBuilder()
         .setColor(0x10b981)
-        .setTitle('✅ Parceria Registrada com Sucesso!')
-        .setDescription(`A parceria com **${name}** está ativa e publicada em ${dest}.`)
+        .setTitle('✅ Parceria Registrada')
+        .setDescription('Parceria com **' + name + '** publicada em ' + dest + '.')
         .addFields(
-            { name: '👤 Representante', value: `${repUser} (\`${repUser.id}\`)`, inline: true },
-            { name: '🏰 Servidor', value: `**${name}**`, inline: true },
-            { name: '📍 Canal', value: `${dest}`, inline: true },
-            { name: '🆔 ID Registro', value: `\`${entry?.id || 'OK'}\``, inline: true },
-            { 
-                name: '🎭 Cargo Rep.', 
-                value: roleGiven && repRoleId 
-                    ? `<@&${repRoleId}> (Atribuído)` 
-                    : repRoleId 
-                    ? `<@&${repRoleId}> (Erro ao atribuir)` 
-                    : '_Não configurado no painel_', 
-                inline: true 
-            },
+            { name: 'Representante', value: '' + repUser + ' (`' + repUser.id + '`)', inline: true },
+            { name: 'Servidor', value: '**' + name + '**', inline: true },
+            { name: 'Canal', value: '' + dest, inline: true },
+            { name: 'ID', value: '`' + (entry?.id || 'OK') + '`', inline: true },
             {
-                name: '🔔 Cargo Notificação',
-                value: pingRoleId ? `<@&${pingRoleId}>` : '_Sem cargo de notificação_',
+                name: 'Cargo Rep.',
+                value: roleGiven && repRoleId
+                    ? '<@&' + repRoleId + '> (ok)'
+                    : repRoleId
+                    ? '<@&' + repRoleId + '> (falhou)'
+                    : '_Não configurado_',
                 inline: true
             }
         )
-        .setFooter({ text: 'Aeternus Parcerias' })
         .setTimestamp();
 
     return reply(ctx, isSlash, { embeds: [okEmbed] });
@@ -373,8 +361,17 @@ async function run(ctx, opts) {
 async function reply(ctx, isSlash, content) {
     const payload = typeof content === 'string' ? { content: content } : content;
     if (isSlash) {
-        if (ctx.deferred || ctx.replied) return ctx.editReply(payload);
-        return ctx.reply(payload);
+        try {
+            if (ctx.deferred || ctx.replied) return await ctx.editReply(payload);
+            return await ctx.reply({ ...payload, ephemeral: true });
+        } catch (e) {
+            try {
+                return await ctx.followUp({ ...payload, ephemeral: true });
+            } catch (_) {
+                console.error('[parceria] reply falhou:', e?.message || e);
+            }
+        }
+        return null;
     }
     return ctx.reply(payload);
 }
