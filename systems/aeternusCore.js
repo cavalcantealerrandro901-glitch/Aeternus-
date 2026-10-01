@@ -1,9 +1,14 @@
 /**
  * Aeternus Core — assistente de IA privado (só OWNER_ID)
  * Ativação: @aeternus | menção do bot | DM do dono
- * IA: somente Groq (modelo padrão: openai/gpt-oss-120b)
- * Multi-repo: todos os repositórios do dono (ou lista AETERNUS_REPOS)
+ * IA: Groq · GitHub multi-repo · Discord (canais, cargos, convites)
  */
+
+const {
+  ChannelType,
+  PermissionFlagsBits,
+  PermissionsBitField
+} = require('discord.js');
 
 const OWNER_ID = () => String(process.env.OWNER_ID || '').trim();
 
@@ -96,9 +101,10 @@ function systemPrompt(extra = '') {
   return [
     'Você é Aeternus, assistente pessoal privado do dono no Discord.',
     'Responda em português do Brasil, de forma direta e útil.',
-    'Você tem acesso a VÁRIOS repositórios GitHub do dono — não apenas um.',
-    'Sempre indique qual repositório está sendo usado quando falar de código/arquivos.',
-    'Seja concisa em Discord (máx ~1800 caracteres por resposta quando possível).',
+    'Você pode gerenciar o Discord do dono: criar/editar canais, cargos, categorias, convites e listar servidores.',
+    'Você tem acesso a VÁRIOS repositórios GitHub do dono.',
+    'Sempre indique qual servidor ou repositório está sendo usado.',
+    'Seja concisa (máx ~1800 caracteres por resposta quando possível).',
     extra ? '\n' + extra : ''
   ]
     .filter(Boolean)
@@ -109,7 +115,6 @@ function activeProviders() {
   return env('GROQ_API_KEY') ? ['groq'] : ['none'];
 }
 
-/** Modelos Groq atuais (free/developer). llama-3.3-70b-versatile foi deprecado. */
 const GROQ_MODEL_FALLBACKS = [
   'openai/gpt-oss-120b',
   'openai/gpt-oss-20b',
@@ -171,6 +176,8 @@ async function chatAI(userMessage, contextBlock = '') {
     error: errors.join(' | ')
   };
 }
+
+/* ───────────── GitHub ───────────── */
 
 function ghHeaders() {
   const token = env('GITHUB_TOKEN') || env('GH_TOKEN');
@@ -424,6 +431,439 @@ async function tryGithubIntent(command) {
   return { handled: false };
 }
 
+/* ───────────── Discord management ───────────── */
+
+function resolveGuild(client, message, hint) {
+  const h = String(hint || '').trim();
+
+  // menção de servidor não existe; usa id numérico ou nome parcial
+  if (h && /^\d{15,22}$/.test(h)) {
+    const g = client.guilds.cache.get(h);
+    if (g) return g;
+  }
+
+  if (h) {
+    const low = h.toLowerCase();
+    const byName = client.guilds.cache.find(
+      (g) =>
+        g.name.toLowerCase() === low ||
+        g.name.toLowerCase().includes(low) ||
+        low.includes(g.name.toLowerCase())
+    );
+    if (byName) return byName;
+  }
+
+  // servidor atual da mensagem
+  if (message?.guild) return message.guild;
+
+  // se só tiver um servidor
+  if (client.guilds.cache.size === 1) return client.guilds.cache.first();
+
+  return null;
+}
+
+function parseColor(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^#?[0-9a-fA-F]{6}$/.test(s)) return parseInt(s.replace('#', ''), 16);
+  const named = {
+    vermelho: 0xed4245,
+    verde: 0x57f287,
+    azul: 0x5865f2,
+    roxo: 0x9b59b6,
+    amarelo: 0xfee75c,
+    laranja: 0xe67e22,
+    rosa: 0xeb459e,
+    cinza: 0x95a5a6,
+    preto: 0x23272a,
+    branco: 0xffffff
+  };
+  return named[s.toLowerCase()] ?? null;
+}
+
+async function tryDiscordIntent(command, message, client) {
+  const t = String(command || '').trim();
+  const low = t.toLowerCase();
+
+  // listar servidores do bot
+  if (
+    /\b(lista|listar|meus)\b.*\b(servidores?|guilds?)\b/i.test(low) ||
+    /\bservidores?\s+do\s+bot\b/i.test(low) ||
+    /^servidores?$/i.test(low)
+  ) {
+    const lines = [...client.guilds.cache.values()]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((g) => `• **${g.name}** \`${g.id}\` · ${g.memberCount} membros`);
+    return {
+      handled: true,
+      text: `**Servidores** (${lines.length}):\n${lines.join('\n') || '(nenhum)'}`
+    };
+  }
+
+  // link / convite de um servidor
+  // exemplos: "link do servidor X" · "convite do servidor Aeternus Society" · "me dá o invite de 123"
+  const inviteM = t.match(
+    /(?:link|convite|invite)\s+(?:do\s+|da\s+|de\s+)?(?:servidor\s+)?(.+)/i
+  );
+  if (inviteM || /\b(cria|criar|gere|gerar)\s+(?:um\s+)?(?:link|convite|invite)\b/i.test(low)) {
+    const hint =
+      inviteM?.[1]?.replace(/\b(por favor|pfv|pls)\b/gi, '').trim() ||
+      message.guild?.name ||
+      '';
+    const guild = resolveGuild(client, message, hint);
+    if (!guild) {
+      const names = [...client.guilds.cache.values()].map((g) => g.name).slice(0, 15).join(', ');
+      return {
+        handled: true,
+        text:
+          'Não achei esse servidor. Diga o **nome** ou **ID**.\n' +
+          `Servidores: ${names || '(nenhum)'}`
+      };
+    }
+
+    const me = guild.members.me;
+    if (!me?.permissions?.has(PermissionFlagsBits.CreateInstantInvite)) {
+      return {
+        handled: true,
+        text: `Sem permissão **Criar Convite** em **${guild.name}**.`
+      };
+    }
+
+    // canal de texto onde o bot pode criar invite
+    let channel =
+      guild.systemChannel ||
+      guild.channels.cache.find(
+        (c) =>
+          c.isTextBased?.() &&
+          c.viewable &&
+          c.permissionsFor(me)?.has(PermissionFlagsBits.CreateInstantInvite)
+      );
+
+    if (!channel) {
+      return {
+        handled: true,
+        text: `Não achei canal de texto em **${guild.name}** onde eu possa criar convite.`
+      };
+    }
+
+    const invite = await channel.createInvite({
+      maxAge: 0,
+      maxUses: 0,
+      unique: true,
+      reason: 'Aeternus — pedido do dono'
+    });
+
+    return {
+      handled: true,
+      text:
+        `🔗 **${guild.name}**\n` +
+        `${invite.url}\n` +
+        `Canal: #${channel.name} · sem expiração · usos ilimitados`
+    };
+  }
+
+  // listar canais
+  if (/\b(lista|listar)\b.*\bcanais?\b/i.test(low) || /^canais?$/i.test(low)) {
+    const guildHint = t.match(/canais?\s+(?:do\s+|de\s+)?(.+)/i)?.[1];
+    const guild = resolveGuild(client, message, guildHint);
+    if (!guild) {
+      return { handled: true, text: 'Diga em qual servidor (nome ou ID), ou use no servidor.' };
+    }
+    const lines = guild.channels.cache
+      .filter((c) => c.type !== ChannelType.GuildCategory)
+      .sort((a, b) => a.rawPosition - b.rawPosition)
+      .map((c) => {
+        const kind =
+          c.type === ChannelType.GuildVoice
+            ? '🔊'
+            : c.type === ChannelType.GuildForum
+              ? '💬'
+              : '#️⃣';
+        return `${kind} **${c.name}** \`${c.id}\``;
+      })
+      .slice(0, 40);
+    return {
+      handled: true,
+      text: `**Canais em ${guild.name}** (${lines.length}+):\n${lines.join('\n')}`
+    };
+  }
+
+  // listar cargos
+  if (/\b(lista|listar)\b.*\bcargos?\b/i.test(low) || /^cargos?$/i.test(low)) {
+    const guildHint = t.match(/cargos?\s+(?:do\s+|de\s+)?(.+)/i)?.[1];
+    const guild = resolveGuild(client, message, guildHint);
+    if (!guild) {
+      return { handled: true, text: 'Diga em qual servidor (nome ou ID), ou use no servidor.' };
+    }
+    const lines = guild.roles.cache
+      .filter((r) => r.id !== guild.id)
+      .sort((a, b) => b.position - a.position)
+      .map((r) => `• **${r.name}** \`${r.id}\`${r.managed ? ' (gerenciado)' : ''}`)
+      .slice(0, 40);
+    return {
+      handled: true,
+      text: `**Cargos em ${guild.name}**:\n${lines.join('\n')}`
+    };
+  }
+
+  // criar categoria
+  const catM = t.match(
+    /(?:crie|criar|create)\s+(?:uma\s+)?categoria\s+["']?([^"'\n]+)["']?(?:\s+(?:no\s+|em\s+)(.+))?/i
+  );
+  if (catM) {
+    const name = catM[1].trim().slice(0, 100);
+    const guild = resolveGuild(client, message, catM[2]);
+    if (!guild) return { handled: true, text: 'Servidor não encontrado.' };
+    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) {
+      return { handled: true, text: `Sem permissão **Gerenciar Canais** em **${guild.name}**.` };
+    }
+    const ch = await guild.channels.create({
+      name,
+      type: ChannelType.GuildCategory,
+      reason: 'Aeternus — dono'
+    });
+    return {
+      handled: true,
+      text: `✅ Categoria **${ch.name}** criada em **${guild.name}**\nID: \`${ch.id}\``
+    };
+  }
+
+  // criar canal de voz
+  const voiceM = t.match(
+    /(?:crie|criar|create)\s+(?:um\s+)?canal\s+(?:de\s+)?voz\s+["']?([^"'\n]+)["']?(?:\s+(?:no\s+|em\s+)(.+))?/i
+  );
+  if (voiceM) {
+    const name = voiceM[1].trim().slice(0, 100);
+    const guild = resolveGuild(client, message, voiceM[2]);
+    if (!guild) return { handled: true, text: 'Servidor não encontrado.' };
+    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) {
+      return { handled: true, text: `Sem permissão **Gerenciar Canais** em **${guild.name}**.` };
+    }
+    const ch = await guild.channels.create({
+      name,
+      type: ChannelType.GuildVoice,
+      reason: 'Aeternus — dono'
+    });
+    return {
+      handled: true,
+      text: `✅ Canal de voz **${ch.name}** criado em **${guild.name}**\nID: \`${ch.id}\``
+    };
+  }
+
+  // criar canal de texto
+  const textChM = t.match(
+    /(?:crie|criar|create)\s+(?:um\s+)?canal(?:\s+de\s+texto)?\s+["']?([^"'\n]+)["']?(?:\s+(?:no\s+|em\s+|na\s+categoria\s+)(.+))?/i
+  );
+  if (textChM && !/canal\s+de\s+voz/i.test(t)) {
+    const name = textChM[1].trim().slice(0, 100);
+    let parentHint = textChM[2]?.trim();
+    let guild = resolveGuild(client, message, null);
+
+    // se o sufixo for nome de servidor, resolve guild; se for categoria, parent
+    if (parentHint) {
+      const maybeGuild = resolveGuild(client, message, parentHint);
+      if (maybeGuild && maybeGuild.id !== message.guild?.id) {
+        guild = maybeGuild;
+        parentHint = null;
+      }
+    }
+    if (!guild) return { handled: true, text: 'Servidor não encontrado. Use no servidor ou diga o nome.' };
+    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) {
+      return { handled: true, text: `Sem permissão **Gerenciar Canais** em **${guild.name}**.` };
+    }
+
+    let parent = null;
+    if (parentHint) {
+      parent = guild.channels.cache.find(
+        (c) =>
+          c.type === ChannelType.GuildCategory &&
+          (c.name.toLowerCase() === parentHint.toLowerCase() ||
+            c.name.toLowerCase().includes(parentHint.toLowerCase()))
+      );
+    }
+
+    const ch = await guild.channels.create({
+      name: name.replace(/\s+/g, '-').toLowerCase().slice(0, 100),
+      type: ChannelType.GuildText,
+      parent: parent?.id,
+      reason: 'Aeternus — dono'
+    });
+    return {
+      handled: true,
+      text:
+        `✅ Canal ${ch} criado em **${guild.name}**` +
+        (parent ? ` (categoria **${parent.name}**)` : '') +
+        `\nID: \`${ch.id}\``
+    };
+  }
+
+  // apagar canal
+  const delChM = t.match(
+    /(?:apague|apagar|delete|deletar|remova|remover)\s+(?:o\s+)?canal\s+["']?([^"'\n]+)["']?/i
+  );
+  if (delChM) {
+    const guild = resolveGuild(client, message, null);
+    if (!guild) return { handled: true, text: 'Use este comando dentro de um servidor.' };
+    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) {
+      return { handled: true, text: 'Sem permissão **Gerenciar Canais**.' };
+    }
+    const hint = delChM[1].trim();
+    const ch =
+      guild.channels.cache.get(hint) ||
+      guild.channels.cache.find(
+        (c) => c.name.toLowerCase() === hint.toLowerCase().replace(/^#/, '')
+      );
+    if (!ch) return { handled: true, text: `Canal \`${hint}\` não encontrado.` };
+    const n = ch.name;
+    await ch.delete('Aeternus — dono');
+    return { handled: true, text: `🗑️ Canal **${n}** apagado em **${guild.name}**.` };
+  }
+
+  // criar cargo
+  // "criar cargo Moderador" · "criar cargo VIP cor #ff00aa" · "criar cargo Staff azul"
+  const roleM = t.match(
+    /(?:crie|criar|create)\s+(?:um\s+)?cargo\s+["']?([^"'\n]+?)["']?(?:\s+cor\s+(\S+))?(?:\s+(?:no\s+|em\s+)(.+))?$/i
+  );
+  if (roleM) {
+    let namePart = roleM[1].trim();
+    let colorRaw = roleM[2];
+    // "criar cargo VIP azul" — última palavra pode ser cor
+    if (!colorRaw) {
+      const parts = namePart.split(/\s+/);
+      if (parts.length >= 2 && parseColor(parts[parts.length - 1]) != null) {
+        colorRaw = parts.pop();
+        namePart = parts.join(' ');
+      }
+    }
+    const guild = resolveGuild(client, message, roleM[3]);
+    if (!guild) return { handled: true, text: 'Servidor não encontrado.' };
+    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
+      return { handled: true, text: `Sem permissão **Gerenciar Cargos** em **${guild.name}**.` };
+    }
+    const color = parseColor(colorRaw);
+    const role = await guild.roles.create({
+      name: namePart.slice(0, 100),
+      colors: color != null ? { primaryColor: color } : undefined,
+      reason: 'Aeternus — dono'
+    });
+    return {
+      handled: true,
+      text: `✅ Cargo **${role.name}** criado em **${guild.name}**\nID: \`${role.id}\``
+    };
+  }
+
+  // apagar cargo
+  const delRoleM = t.match(
+    /(?:apague|apagar|delete|deletar|remova|remover)\s+(?:o\s+)?cargo\s+["']?([^"'\n]+)["']?/i
+  );
+  if (delRoleM) {
+    const guild = resolveGuild(client, message, null);
+    if (!guild) return { handled: true, text: 'Use este comando dentro de um servidor.' };
+    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
+      return { handled: true, text: 'Sem permissão **Gerenciar Cargos**.' };
+    }
+    const hint = delRoleM[1].trim();
+    const role =
+      guild.roles.cache.get(hint) ||
+      guild.roles.cache.find((r) => r.name.toLowerCase() === hint.toLowerCase());
+    if (!role || role.id === guild.id) {
+      return { handled: true, text: `Cargo \`${hint}\` não encontrado.` };
+    }
+    if (role.managed) {
+      return { handled: true, text: `Cargo **${role.name}** é gerenciado por integração — não posso apagar.` };
+    }
+    const n = role.name;
+    await role.delete('Aeternus — dono');
+    return { handled: true, text: `🗑️ Cargo **${n}** apagado em **${guild.name}**.` };
+  }
+
+  // dar cargo a alguém
+  const giveM = t.match(
+    /(?:d[eê]|dar|adicione|adicionar)\s+(?:o\s+)?cargo\s+["']?([^"'\n]+?)["']?\s+(?:para|ao?|pro?|a)\s+<@!?(\d+)>/i
+  ) || t.match(
+    /(?:d[eê]|dar)\s+<@!?(\d+)>\s+(?:o\s+)?cargo\s+["']?([^"'\n]+)["']?/i
+  );
+  if (giveM) {
+    const guild = resolveGuild(client, message, null);
+    if (!guild) return { handled: true, text: 'Use dentro de um servidor.' };
+    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
+      return { handled: true, text: 'Sem permissão **Gerenciar Cargos**.' };
+    }
+    let roleHint, userId;
+    if (giveM[0].match(/^d/i) && giveM[2] && giveM[1] && !giveM[0].includes('<@')) {
+      roleHint = giveM[1];
+      userId = giveM[2];
+    } else if (giveM[2] && giveM[1] && giveM[0].includes('<@')) {
+      // second pattern: dar @user cargo X — groups swapped
+      if (/^\d+$/.test(giveM[1])) {
+        userId = giveM[1];
+        roleHint = giveM[2];
+      } else {
+        roleHint = giveM[1];
+        userId = giveM[2];
+      }
+    } else {
+      roleHint = giveM[1];
+      userId = giveM[2];
+    }
+    const role =
+      guild.roles.cache.get(roleHint) ||
+      guild.roles.cache.find((r) => r.name.toLowerCase() === String(roleHint).toLowerCase());
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!role) return { handled: true, text: `Cargo \`${roleHint}\` não encontrado.` };
+    if (!member) return { handled: true, text: 'Membro não encontrado.' };
+    await member.roles.add(role, 'Aeternus — dono');
+    return {
+      handled: true,
+      text: `✅ Cargo **${role.name}** dado a **${member.user.tag}**.`
+    };
+  }
+
+  // renomear canal
+  const renameM = t.match(
+    /(?:renomeie|renomear|rename)\s+(?:o\s+)?canal\s+["']?([^"'\n]+?)["']?\s+(?:para|pra)\s+["']?([^"'\n]+)["']?/i
+  );
+  if (renameM) {
+    const guild = resolveGuild(client, message, null);
+    if (!guild) return { handled: true, text: 'Use dentro de um servidor.' };
+    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) {
+      return { handled: true, text: 'Sem permissão **Gerenciar Canais**.' };
+    }
+    const hint = renameM[1].trim();
+    const newName = renameM[2].trim().slice(0, 100);
+    const ch =
+      guild.channels.cache.get(hint) ||
+      guild.channels.cache.find(
+        (c) => c.name.toLowerCase() === hint.toLowerCase().replace(/^#/, '')
+      );
+    if (!ch) return { handled: true, text: `Canal \`${hint}\` não encontrado.` };
+    const old = ch.name;
+    await ch.setName(newName, 'Aeternus — dono');
+    return { handled: true, text: `✅ Canal **${old}** → **${ch.name}**.` };
+  }
+
+  // info do servidor
+  if (/\b(info|informa[cç][aã]o)\b.*\bservidor\b/i.test(low) || /^serverinfo$/i.test(low)) {
+    const guildHint = t.match(/servidor\s+(.+)/i)?.[1];
+    const guild = resolveGuild(client, message, guildHint);
+    if (!guild) return { handled: true, text: 'Servidor não encontrado.' };
+    return {
+      handled: true,
+      text:
+        `**${guild.name}**\n` +
+        `ID: \`${guild.id}\`\n` +
+        `Membros: ${guild.memberCount}\n` +
+        `Canais: ${guild.channels.cache.size}\n` +
+        `Cargos: ${guild.roles.cache.size}\n` +
+        `Dono: <@${guild.ownerId}>`
+    };
+  }
+
+  return { handled: false };
+}
+
+/* ───────────── reply / handler ───────────── */
+
 async function replyChunks(message, text) {
   const t = String(text || '').trim();
   if (!t) return;
@@ -465,8 +905,14 @@ async function handleOwnerMessage(message, client) {
   if (!command || !String(command).trim()) {
     await message
       .reply(
-        'Olá. Sou a **Aeternus** (Groq · multi-repo).\n' +
-          'Exemplos: `listar repos` · `arquivos Aeternus-` · `leia Aeternus- index.js`'
+        'Olá. Sou a **Aeternus** (só você).\n\n' +
+          '**Discord:** criar canal/cargo · listar servidores · link do servidor X\n' +
+          '**GitHub:** listar repos · leia REPO path · escrever arquivos\n\n' +
+          'Exemplos:\n' +
+          '`@aeternus criar canal avisos`\n' +
+          '`@aeternus criar cargo VIP cor #9b59b6`\n' +
+          '`@aeternus link do servidor Aeternus Society`\n' +
+          '`@aeternus listar servidores`'
       )
       .catch(() => {});
     return true;
@@ -477,23 +923,48 @@ async function handleOwnerMessage(message, client) {
   }
 
   try {
+    // 1) Discord (canais, cargos, convites)
+    const disc = await tryDiscordIntent(command, message, client);
+    if (disc.handled) {
+      await replyChunks(message, disc.text);
+      return true;
+    }
+
+    // 2) GitHub
     const gh = await tryGithubIntent(command);
     if (gh.handled) {
       await replyChunks(message, gh.text);
       return true;
     }
 
+    // 3) IA livre (Groq) com contexto
     let ctx = '';
+    try {
+      const guilds = [...client.guilds.cache.values()]
+        .slice(0, 12)
+        .map((g) => `- ${g.name} (${g.id})`)
+        .join('\n');
+      ctx += `Servidores do bot:\n${guilds}\n\n`;
+      ctx +=
+        'Ações Discord (já executáveis por comando natural):\n' +
+        '- criar canal NOME | criar canal de voz NOME | criar categoria NOME\n' +
+        '- criar cargo NOME [cor #hex|azul]\n' +
+        '- apagar canal/cargo NOME\n' +
+        '- link/convite do servidor NOME\n' +
+        '- listar servidores | listar canais | listar cargos\n' +
+        '- dar cargo NOME para @user\n\n';
+    } catch (_) {}
+
     if (ghHeaders()) {
       try {
         const repos = await listRepos();
-        ctx =
-          `Sistema multi-repositório (${repos.length} repos):\n` +
+        ctx +=
+          `Repos GitHub (${repos.length}):\n` +
           repos
-            .slice(0, 25)
-            .map((r) => `- ${r.full || r.name}${r.private ? ' (privado)' : ''}`)
+            .slice(0, 20)
+            .map((r) => `- ${r.full || r.name}`)
             .join('\n') +
-          '\n\nComandos: listar repos | arquivos REPO | leia REPO path | escreva em REPO path: conteudo | criar repo NOME';
+          '\n';
       } catch (_) {}
     }
 
@@ -520,7 +991,7 @@ function setup(client) {
     allowedReposConfig
   };
   console.log(
-    `[aeternusCore] Groq-only · owner=${OWNER_ID() || '?'} · groq=${env('GROQ_API_KEY') ? 'ok' : 'MISSING'} · model=${env('GROQ_MODEL') || 'openai/gpt-oss-120b'} · repos=${cfg ? cfg.map((r) => r.full).join(',') : 'ALL'}`
+    `[aeternusCore] Groq + Discord mgmt · owner=${OWNER_ID() || '?'} · groq=${env('GROQ_API_KEY') ? 'ok' : 'MISSING'} · model=${env('GROQ_MODEL') || 'openai/gpt-oss-120b'} · repos=${cfg ? cfg.map((r) => r.full).join(',') : 'ALL'}`
   );
 }
 
