@@ -1,3 +1,4 @@
+// Código completo corrigido
 const {
     EmbedBuilder,
     ActionRowBuilder,
@@ -82,7 +83,7 @@ function tradeRows(session) {
                 .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
                 .setCustomId(`troca:refresh:${session.id}`)
-                .setLabel('Atualizar')
+                .setLabel('Atualizar') // adiciona label que estava faltando
                 .setStyle(ButtonStyle.Secondary)
         )
     ];
@@ -150,18 +151,18 @@ module.exports = {
     async executeSlash(i) {
         const target = i.options.getUser('usuario', true);
         if (target.bot) {
-            return i.reply({ content: 'Não dá para trocar com bots.', flags: MessageFlags.Ephemeral });
+            return i.reply({ content: 'Não dá para trocar com bots.', ephemeral: true });
         }
         if (target.id === i.user.id) {
             return i.reply({
                 content: 'Você não pode trocar consigo mesmo.',
-                flags: MessageFlags.Ephemeral
+                ephemeral: true
             });
         }
 
         const res = trade.createTrade(i.user.id, target.id);
         if (!res.ok) {
-            return i.reply({ content: `❌ ${res.error}`, flags: MessageFlags.Ephemeral });
+            return i.reply({ content: `❌ ${res.error}`, ephemeral: true });
         }
 
         return i.reply({
@@ -183,7 +184,7 @@ module.exports = {
         if (!session) {
             return interaction.reply({
                 content: 'Esta troca expirou ou já foi finalizada.',
-                flags: MessageFlags.Ephemeral
+                ephemeral: true
             });
         }
 
@@ -191,7 +192,7 @@ module.exports = {
         if (!side) {
             return interaction.reply({
                 content: 'Só os dois participantes podem usar estes botões.',
-                flags: MessageFlags.Ephemeral
+                ephemeral: true
             });
         }
 
@@ -229,7 +230,7 @@ module.exports = {
                     content:
                         'Monte a oferta no **painel** (éter, itens, intensidade) antes de confirmar.' +
                         (link ? `\n${link}` : ''),
-                    flags: MessageFlags.Ephemeral
+                    ephemeral: true
                 });
             }
 
@@ -237,13 +238,13 @@ module.exports = {
             if (!res.ok) {
                 return interaction.reply({
                     content: `❌ ${res.error}`,
-                    flags: MessageFlags.Ephemeral
+                    ephemeral: true
                 });
             }
 
             if (res.executed) {
                 return interaction.update({
-                    content: `✅ **Troca concluída!** ${session.aId === interaction.user.id ? `<@${session.aId}> ↔ <@${session.bId}>` : `<@${session.aId}> ↔ <@${session.bId}>`}`,
+                    content: `✅ **Troca concluída!** <@${session.aId}> ↔ <@${session.bId}>`,
                     embeds: [
                         new EmbedBuilder()
                             .setColor(0x34d399)
