@@ -102,7 +102,7 @@ header a:hover{color:var(--text)}
 <body>
 <header>
   <div class="logo"><span>~</span> aeternus</div>
-  <span class="badge">termux</span>
+  <span class="badge">ai</span>
   <a href="index.html">Início</a>
   <a href="dashboard.html">Painel</a>
   <span style="flex:1"></span>
@@ -115,20 +115,20 @@ header a:hover{color:var(--text)}
     <div class="prompt-bar">
       <span class="cwd" id="cwdLabel">~</span>
       <span class="dollar">$</span>
-      <input id="termInput" placeholder="ls · ls commands · cat arquivo · help" autocomplete="off" autofocus/>
+      <input id="termInput" placeholder="ls · cat arquivo · help" autocomplete="off" autofocus/>
     </div>
   </section>
 
   <aside class="chat">
     <div class="chat-head">
-      <span>J.A.R.V.I.S.</span>
+      <span>IA</span>
       <span style="color:var(--green)">online</span>
     </div>
     <div class="chat-msgs" id="chatMsgs">
-      <div class="bubble bot">Terminal estilo Termux. Use <code>ls</code> / <code>ls pasta</code>. Peça <b>criar</b> ou <b>editar</b> um comando — o arquivo é gravado de verdade e o código aparece aqui.</div>
+      <div class="bubble bot">IA completa: cola o <b>erro do Render</b> ou pede pra criar/editar. Ela lê o arquivo, conserta, grava e valida com <code>node --check</code>.</div>
     </div>
     <div class="chat-in">
-      <input id="chatInput" placeholder="ex: cria o comando atributos"/>
+      <input id="chatInput" placeholder="cola o erro ou: cria o comando X"/>
       <button type="button" id="chatBtn" onclick="sendChat()">Enviar</button>
     </div>
   </aside>
@@ -188,9 +188,9 @@ function setCwd(p) {
 }
 
 function bootBanner() {
-  printText('Aeternus Shell · estilo Termux', 'meta');
-  printText('ls | ls <pasta> | cat <arquivo> | cd | pwd | clear | help', 'meta');
-  printText('JARVIS grava arquivo ao pedir: criar / editar / ajustar', 'meta');
+  printText('Aeternus · terminal + IA', 'meta');
+  printText('Cola o log de erro no chat → ela conserta e grava', 'meta');
+  printText('ls | cat | cd | help', 'meta');
   printText('', '');
 }
 
@@ -235,22 +235,13 @@ function joinCwd(arg) {
 async function runCmd(line) {
   const raw = String(line || '').trim();
   if (!raw) return;
-
   print('<div class="prompt-line">' + esc((cwd === '.' ? '~' : cwd) + ' $ ' + raw) + '</div>');
-
   const parts = raw.split(/\s+/);
   const cmd = parts[0].toLowerCase();
   const args = parts.slice(1);
 
-  if (cmd === 'clear' || cmd === 'cls') {
-    screen().innerHTML = '';
-    return;
-  }
-
-  if (cmd === 'pwd') {
-    printText(cwd === '.' ? '/' : '/' + cwd, 'path');
-    return;
-  }
+  if (cmd === 'clear' || cmd === 'cls') { screen().innerHTML = ''; return; }
+  if (cmd === 'pwd') { printText(cwd === '.' ? '/' : '/' + cwd, 'path'); return; }
 
   if (cmd === 'cd') {
     const target = args[0] || '.';
@@ -260,17 +251,10 @@ async function runCmd(line) {
       printText(cwd === '.' ? '~' : cwd, 'path');
       return;
     }
-    if (target === '~' || target === '/') {
-      setCwd('.');
-      printText('~', 'path');
-      return;
-    }
+    if (target === '~' || target === '/') { setCwd('.'); printText('~', 'path'); return; }
     const next = joinCwd(target);
     const check = await api('/ls?path=' + encodeURIComponent(next));
-    if (!check.ok) {
-      printText('cd: ' + (check.error || 'pasta não encontrada'), 'err');
-      return;
-    }
+    if (!check.ok) { printText('cd: ' + (check.error || 'pasta não encontrada'), 'err'); return; }
     setCwd(next);
     printText(cwd === '.' ? '~' : cwd, 'path');
     return;
@@ -279,17 +263,13 @@ async function runCmd(line) {
   if (cmd === 'ls' || cmd === 'dir') {
     const target = joinCwd(args[0] || '.');
     const data = await api('/ls?path=' + encodeURIComponent(target));
-    if (!data.ok) {
-      printText(data.error || 'erro', 'err');
-      return;
-    }
+    if (!data.ok) { printText(data.error || 'erro', 'err'); return; }
     const entries = data.entries || data.files || data.list || [];
     if (Array.isArray(entries) && entries.length) {
       const lines = entries.map((e) => {
         if (typeof e === 'string') return e;
         const name = e.name || e.path || String(e);
-        const isDir = e.type === 'dir' || e.isDirectory || e.dir;
-        return isDir ? name + '/' : name;
+        return (e.type === 'dir' || e.isDirectory || e.dir) ? name + '/' : name;
       });
       printText(lines.join('\n') || '(vazio)', 'ok');
     } else if (typeof data.text === 'string') {
@@ -302,16 +282,10 @@ async function runCmd(line) {
   }
 
   if (cmd === 'cat' || cmd === 'nano' || cmd === 'type') {
-    const file = joinCwd(args[0] || '');
-    if (!args[0]) {
-      printText('uso: cat <arquivo>', 'err');
-      return;
-    }
+    if (!args[0]) { printText('uso: cat <arquivo>', 'err'); return; }
+    const file = joinCwd(args[0]);
     const data = await api('/read?path=' + encodeURIComponent(file));
-    if (!data.ok) {
-      printText(data.error || 'erro', 'err');
-      return;
-    }
+    if (!data.ok) { printText(data.error || 'erro', 'err'); return; }
     currentPath = data.path || file;
     printText('── ' + currentPath + ' ──', 'meta');
     await typeCode(data.content || '');
@@ -319,21 +293,11 @@ async function runCmd(line) {
   }
 
   if (cmd === 'help') {
-    printText(
-      [
-        'ls              lista a raiz',
-        'ls <pasta>      lista a pasta',
-        'cd <pasta>      entra na pasta',
-        'cd ..           volta',
-        'pwd             pasta atual',
-        'cat <arquivo>   mostra arquivo',
-        'clear           limpa a tela',
-        '',
-        'No JARVIS: "cria o comando X" ou "edita commands/x.js"',
-        '→ grava o arquivo no projeto e mostra o código aqui'
-      ].join('\n'),
-      'meta'
-    );
+    printText([
+      'ls / ls pasta / cd / cat / clear',
+      'No chat: cola log de erro do Render',
+      'ou: cria o comando X / edita commands/y.js'
+    ].join('\n'), 'meta');
     return;
   }
 
@@ -342,9 +306,7 @@ async function runCmd(line) {
     currentPath = data.open;
     printText('── ' + currentPath + ' ──', 'meta');
     if (data.text) await typeCode(data.text);
-  } else if (data.text) {
-    printText(data.text, 'ok');
-  }
+  } else if (data.text) printText(data.text, 'ok');
   if (data.error) printText(data.error, 'err');
 }
 
@@ -359,19 +321,11 @@ termInput.addEventListener('keydown', (e) => {
     runCmd(v);
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
-    if (histIdx > 0) {
-      histIdx--;
-      termInput.value = history[histIdx] || '';
-    }
+    if (histIdx > 0) { histIdx--; termInput.value = history[histIdx] || ''; }
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
-    if (histIdx < history.length - 1) {
-      histIdx++;
-      termInput.value = history[histIdx] || '';
-    } else {
-      histIdx = history.length;
-      termInput.value = '';
-    }
+    if (histIdx < history.length - 1) { histIdx++; termInput.value = history[histIdx] || ''; }
+    else { histIdx = history.length; termInput.value = ''; }
   }
 });
 
@@ -383,11 +337,11 @@ async function sendChat() {
   input.value = '';
   const box = document.getElementById('chatMsgs');
   box.innerHTML += '<div class="bubble user">' + esc(msg) + '</div>';
-  box.innerHTML += '<div class="bubble bot" id="chatLoading" style="opacity:.7">gravando / pensando…</div>';
+  box.innerHTML += '<div class="bubble bot" id="chatLoading" style="opacity:.7">analisando e consertando…</div>';
   box.scrollTop = box.scrollHeight;
   btn.disabled = true;
 
-  printText('✦ jarvis: ' + msg.slice(0, 100), 'meta');
+  printText('✦ ia: ' + msg.slice(0, 120), 'meta');
 
   const data = await api('/chat', {
     method: 'POST',
@@ -400,18 +354,21 @@ async function sendChat() {
   const reply = data.reply || data.error || '…';
   let meta = '';
   if (data.readFiles && data.readFiles.length) {
-    meta =
-      '<div style="font-size:.72rem;color:#8b949e;margin-bottom:.3rem">leu: ' +
-      data.readFiles.map((f) => f.path).join(', ') +
-      '</div>';
+    meta = '<div style="font-size:.72rem;color:#8b949e;margin-bottom:.3rem">leu: ' +
+      data.readFiles.map((f) => f.path).join(', ') + '</div>';
   }
   if (data.written && data.written.length) {
-    meta +=
-      '<div style="font-size:.72rem;color:#3fb950;margin-bottom:.3rem">salvo: ' +
-      data.written
-        .map((w) => (w.ok ? w.path + ' (' + (w.bytes || 0) + ' B)' : w.path + ' ERRO'))
-        .join(', ') +
+    meta += '<div style="font-size:.72rem;color:#3fb950;margin-bottom:.3rem">salvo: ' +
+      data.written.map((w) => (w.ok ? w.path + ' (' + (w.bytes || 0) + ' B)' : w.path + ' ERRO')).join(', ') +
       '</div>';
+  }
+  if (data.syntaxChecks && data.syntaxChecks.length) {
+    meta += '<div style="font-size:.72rem;margin-bottom:.3rem">' +
+      data.syntaxChecks.map((c) =>
+        c.ok
+          ? '<span style="color:#3fb950">✓ syntax ' + esc(c.path) + '</span>'
+          : '<span style="color:#f85149">✗ syntax ' + esc(c.path) + ': ' + esc(c.error || '') + '</span>'
+      ).join('<br>') + '</div>';
   }
   box.innerHTML += '<div class="bubble bot">' + meta + esc(reply) + '</div>';
   box.scrollTop = box.scrollHeight;
@@ -424,6 +381,9 @@ async function sendChat() {
       }
       printText('── gravado: ' + w.path + ' (' + (w.bytes || 0) + ' bytes) ──', 'ok');
       currentPath = w.path;
+      const sc = (data.syntaxChecks || []).find((c) => c.path === w.path);
+      if (sc && !sc.ok) printText('syntax check falhou: ' + (sc.error || ''), 'err');
+      else if (sc && sc.ok) printText('syntax check ok', 'ok');
       try {
         const rd = await api('/read?path=' + encodeURIComponent(w.path));
         if (rd.ok && rd.content) await typeCode(rd.content);
@@ -431,11 +391,9 @@ async function sendChat() {
     }
   } else {
     const blocks = extractCodeBlocks(reply);
-    if (blocks.length) {
-      for (const b of blocks) {
-        printText('── ' + (b.lang || 'code') + ' (não gravado — diga criar/editar) ──', 'meta');
-        await typeCode(b.code);
-      }
+    for (const b of blocks) {
+      printText('── ' + (b.lang || 'code') + ' ──', 'meta');
+      await typeCode(b.code);
     }
   }
 }
