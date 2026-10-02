@@ -40,10 +40,11 @@ const JARVIS_BASE = [
     '- Direto, cortante, sem bajulação. Se o pedido for fraco, diga. Se o código estiver errado, esculache e corrija.',
     '- Sarcástico quando couber, nunca passivo. Fala como quem manda no código, não como assistente educadinho.',
     '- Português do Brasil, informal, gíria liberada — agressividade é de atitude e técnica, não xingamento vazio.',
-    '- Quando pedirem código: arquivo COMPLETO, sem enrolação, no formato:',
+    '- Quando pedirem código ou tiverem erro: arquivo COMPLETO corrigido, no formato:',
     '  ```js commands/nome.js',
     '  // código inteiro',
     '  ```',
+    '- Você CONCERTA de verdade: lê o contexto, acha o bug, reescreve. Não manda o usuário "verificar sozinho".',
     '- Não invente API. Não revele tokens. Se não souber, admita sem drama e parta pro próximo passo útil.',
     '- Zero formalidade de mordomo. Zero "senhor(a)". Você é afiado, não servo.'
 ].join('\n');
@@ -52,7 +53,10 @@ function systemPromptFor(persona) {
     if (persona === 'cyberpunk') return JARVIS_BASE + '\nModo: ainda mais seco e técnico.';
     if (persona === 'medieval') return JARVIS_BASE + '\nModo: irônico e afiado.';
     if (persona === 'editor')
-        return JARVIS_BASE + '\nModo editor: ao criar/editar, bloco com path + código completo. Sem enrolação.';
+        return (
+            JARVIS_BASE +
+            '\nModo editor/IA completa: diagnostica erro, reescreve arquivo inteiro, grava. Nunca só oriente — CONSERTE.'
+        );
     return JARVIS_BASE + '\nModo padrão: agressivo e útil.';
 }
 
@@ -61,14 +65,14 @@ async function callChatCompletions(url, apiKey, body, headersExtra = {}) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+            ...(apiKey ? { Authorization: 'Bearer ' + apiKey } : {}),
             ...headersExtra
         },
         body: JSON.stringify(body)
     });
     if (!res.ok) {
         const t = await res.text().catch(() => '');
-        throw new Error(`${res.status} ${t.slice(0, 120)}`);
+        throw new Error(res.status + ' ' + t.slice(0, 120));
     }
     const data = await res.json();
     const content =
@@ -96,7 +100,7 @@ async function providerGroq(system, userMsg) {
                     { role: 'system', content: system },
                     { role: 'user', content: userMsg }
                 ],
-                temperature: 0.65,
+                temperature: 0.55,
                 max_tokens: 4000
             });
         } catch (e) {
@@ -116,7 +120,7 @@ async function providerOpenAI(system, userMsg) {
             { role: 'system', content: system },
             { role: 'user', content: userMsg }
         ],
-        temperature: 0.65,
+        temperature: 0.55,
         max_tokens: 4000
     });
 }
@@ -125,18 +129,22 @@ async function providerGemini(system, userMsg) {
     const key = env('GEMINI_API_KEY') || env('GOOGLE_API_KEY');
     if (!key) return null;
     const model = env('GEMINI_MODEL') || 'gemini-2.0-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const url =
+        'https://generativelanguage.googleapis.com/v1beta/models/' +
+        model +
+        ':generateContent?key=' +
+        key;
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: system + '\n\n' + userMsg }] }],
-            generationConfig: { maxOutputTokens: 4000, temperature: 0.65 }
+            generationConfig: { maxOutputTokens: 4000, temperature: 0.55 }
         })
     });
     if (!res.ok) {
         const t = await res.text().catch(() => '');
-        throw new Error(`gemini ${res.status} ${t.slice(0, 120)}`);
+        throw new Error('gemini ' + res.status + ' ' + t.slice(0, 120));
     }
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
