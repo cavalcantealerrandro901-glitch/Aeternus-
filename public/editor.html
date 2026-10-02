@@ -89,7 +89,7 @@ header a{color:var(--muted);text-decoration:none;font-size:.85rem}
   <aside class="chat">
     <div class="chat-head">J.A.R.V.I.S. <span style="color:var(--green)">online</span></div>
     <div class="chat-msgs" id="chatMsgs">
-      <div class="bubble bot">E aí. Tô no editor contigo — manda código, gíria, palavrão, tanto faz. Quer ler arquivo ou comando de terminal, é só falar.</div>
+      <div class="bubble bot">E aí. Tô no editor contigo. Se pedir pra editar/ajustar um arquivo, eu leio ele primeiro (o aberto ou o caminho que você citar) e só depois respondo.</div>
     </div>
     <div class="chat-in">
       <input id="chatInput" placeholder="fala com o JARVIS…"/>
@@ -116,7 +116,31 @@ function newFile(){const p=prompt('novo arquivo');if(!p)return;currentPath=p;doc
 function termPrint(t){const o=document.getElementById('termOut');o.textContent+=(o.textContent.endsWith('\n')?'':'\n')+t+'\n';o.scrollTop=o.scrollHeight}
 async function runCmd(line){termPrint('$ '+line);const data=await api('/exec',{method:'POST',body:JSON.stringify({cmd:line})});if(data.open){currentPath=data.open;document.getElementById('editor').value=data.text||'';openTabs.set(currentPath,data.text||'');dirty=false;renderTabs();updateUI()}if(data.text)termPrint(data.text);if(data.error)termPrint('erro: '+data.error)}
 document.getElementById('termInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=e.target.value.trim();e.target.value='';if(v)runCmd(v)}});
-async function sendChat(){const input=document.getElementById('chatInput');const msg=input.value.trim();if(!msg)return;input.value='';const box=document.getElementById('chatMsgs');box.innerHTML+='<div class="bubble user">'+esc(msg)+'</div>';const data=await api('/chat',{method:'POST',body:JSON.stringify({message:msg})});box.innerHTML+='<div class="bubble bot">'+esc(data.reply||data.error||'…')+'</div>';box.scrollTop=box.scrollHeight}
+async function sendChat(){
+  const input=document.getElementById('chatInput');
+  const msg=input.value.trim();
+  if(!msg)return;
+  input.value='';
+  const box=document.getElementById('chatMsgs');
+  box.innerHTML+='<div class="bubble user">'+esc(msg)+'</div>';
+  box.innerHTML+='<div class="bubble bot" id="chatLoading" style="opacity:.7">Lendo arquivo e pensando…</div>';
+  box.scrollTop=box.scrollHeight;
+  const payload={
+    message:msg,
+    currentPath: currentPath || null,
+    editorContent: currentPath ? document.getElementById('editor').value : null
+  };
+  const data=await api('/chat',{method:'POST',body:JSON.stringify(payload)});
+  const loading=document.getElementById('chatLoading');
+  if(loading)loading.remove();
+  let meta='';
+  if(data.readFiles && data.readFiles.length){
+    meta='<div style="font-size:.72rem;color:#8b949e;margin-bottom:.35rem">📖 leu: '+
+      data.readFiles.map(f=>f.path+(f.ok?'':' (erro)')).join(', ')+'</div>';
+  }
+  box.innerHTML+='<div class="bubble bot">'+meta+esc(data.reply||data.error||'…')+'</div>';
+  box.scrollTop=box.scrollHeight;
+}
 document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat()});
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 loadTree();syncLines();
