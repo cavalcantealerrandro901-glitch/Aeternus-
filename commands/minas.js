@@ -8,41 +8,27 @@ const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const { fmt, betFooter, C } = require('../utils/gameStyle');
 
-/**
- * 4 colunas × 4 linhas = 16 casas
- * row4: Aleatório | Atualizar | Sacar
- * row5: Tentar novamente (quando termina)
- * (Discord max 5 ActionRows; texto entre botões só no embed)
- */
 const COLS = 4;
 const ROWS = 4;
 const TOTAL = COLS * ROWS;
 const MAX_BOMBS = 11;
-// Multi só começa a subir após um limiar de gemas (1 bomba → 7 casas).
-// Mais bombas = limiar menor + crescimento mais agressivo (mais risco, mais ganho).
-const HOUSE = 0.95; // na 7ª gema (1 bomba) já multiplica um pouco
+const HOUSE = 0.95;
 const IDLE_MS = 7 * 60 * 1000;
-const BOMB_CHANCE = 0.26; // 26% de chance de bomba no botão aleatório
+const BOMB_CHANCE = 0.26;
 
 const games = new Map();
+const processing = new Set();
 
-/** Com 1 bomba o lucro forte começa ~7 gemas; mais bombas = sobe mais cedo. */
 function opensBeforeMult(bombs) {
     const b = Math.max(1, Math.min(Number(bombs) || 1, MAX_BOMBS));
-    return Math.max(1, 8 - b); // 1→7, 2→6, …, 7→1
+    return Math.max(1, 8 - b);
 }
 
-/**
- * Multiplicador (mines clássico).
- * Cada gema segura multiplica; house edge; mais bombas = multi maior.
- * Antes do limiar (ex.: 7 com 1💣) o lucro é pequeno; depois acelera.
- */
 function multAt(opened, bombs) {
     const o = Math.max(0, Math.floor(Number(opened) || 0));
     if (o <= 0) return 1;
     const b = Math.max(1, Math.min(Number(bombs) || 1, TOTAL - 1));
     const threshold = opensBeforeMult(b);
-
     let m = 1;
     for (let i = 0; i < o; i++) {
         const tilesLeft = TOTAL - i;
@@ -52,15 +38,11 @@ function multAt(opened, bombs) {
         m *= (tilesLeft / safeLeft) * riskBoost;
     }
     m *= HOUSE;
-
-    // Antes do limiar: multi “visível” mas limitado (quase 1x)
     if (o < threshold) {
-        // interpola de 1.00 até ~1.02 no limiar-1
         const t = o / threshold;
         m = 1 + (Math.max(m, 1) - 1) * t * 0.15;
         return Number(Math.max(1, m).toFixed(2));
     }
-
     return Number(Math.max(1.05, m).toFixed(2));
 }
 
@@ -68,8 +50,7 @@ function potentialAt(amount, opened, bombs) {
     const amt = Math.floor(Number(amount) || 0);
     const o = Math.floor(Number(opened) || 0);
     if (amt <= 0 || o <= 0) return 0;
-    const m = multAt(o, bombs);
-    return Math.max(0, Math.floor(amt * m));
+    return Math.max(0, Math.floor(amt * multAt(o, bombs)));
 }
 
 function clearTimer(game) {
@@ -87,30 +68,28 @@ function touch(game, client) {
 
 async function autoEnd(game, client) {
     if (!games.has(game.id) || game.dead || game.cashed) return;
-
     let note = '⏱️ **7 min sem interação** — partida encerrada.';
     if (game.opened.size > 0 && !game.fun && game.amount > 0) {
         const win = potentialAt(game.amount, game.opened.size, game.bombCount);
         game.cashed = true;
         game._lastWin = win;
         eter.add(game.userId, win, { reason: 'mines auto' });
-        note += `\n💵 Saque automático: ✨ **${fmt(win)}**`;
+        note += '\n💵 Saque automático: ✨ **' + fmt(win) + '**';
     } else if (game.opened.size > 0 && game.fun) {
         game.cashed = true;
         note += '\n🏁 Diversão encerrada.';
     } else {
         game.dead = true;
-        if (!game.fun) note += `\nPrejuízo: ✨ **${fmt(game.amount)}** (nenhuma casa).`;
+        if (!game.fun) note += '\nPrejuízo: ✨ **' + fmt(game.amount) + '** (nenhuma casa).';
     }
     clearTimer(game);
-
     try {
         const ch = await client.channels.fetch(game.channelId).catch(() => null);
         const msg = ch ? await ch.messages.fetch(game.messageId).catch(() => null) : null;
         if (msg) {
             await msg
                 .edit({
-                    content: `<@${game.userId}>`,
+                    content: '<@' + game.userId + '>',
                     embeds: [panelEmbed(game, note)],
                     components: fullComponents(game, true)
                 })
@@ -130,17 +109,16 @@ function resultBanner(game) {
         const win = game._lastWin || potentialAt(game.amount, game.opened.size, game.bombCount);
         const profit = win - game.amount;
         return [
-            `🎉 **Você ganhou!**`,
-            `✨ Recebeu **${fmt(win)}** éter`,
-            `📊 Lucro **+${fmt(Math.max(0, profit))}** · Multi ×**${multAt(game.opened.size, game.bombCount)}**`,
-            `💎 Gemas **${game.opened.size}** · 💣 Minas **${game.bombCount}**`
+            '🎉 **Você ganhou!**',
+            '✨ Recebeu **' + fmt(win) + '** éter',
+            '📊 Lucro **+' + fmt(Math.max(0, profit)) + '** · Multi ×**' + multAt(game.opened.size, game.bombCount) + '**',
+            '💎 Gemas **' + game.opened.size + '** · 💣 Minas **' + game.bombCount + '**'
         ].join('\n');
     }
-    // perdeu
     return [
-        `😢 **Você perdeu.**`,
-        `💸 Prejuízo de ✨ **${fmt(game.amount)}** éter`,
-        `_Tente novamente — a próxima pode ser sua._`
+        '😢 **Você perdeu.**',
+        '💸 Prejuízo de ✨ **' + fmt(game.amount) + '** éter',
+        '_Tente novamente — a próxima pode ser sua._'
     ].join('\n');
 }
 
@@ -164,31 +142,29 @@ function panelEmbed(game, extra) {
         color = C.win;
     }
 
-    // frase "meia apagada" (depois dos botões aleatório/atualizar, no embed)
     const softPhrase =
         game.dead || game.cashed
             ? null
-            : '-# Toque em uma casa ou use **Aleatório**. Multi sobe a cada gema; com 1💣 o lucro fica forte a partir de ~7 gemas. Mais bombas = multi maior.';
+            : '-# Toque em uma casa ou use **Aleatório**. Multi sobe a cada gema; com 1💣 o lucro fica forte a partir de ~7 gemas.';
 
     const lines = [
-        `**${status}**`,
+        '**' + status + '**',
         '',
-        game.fun ? '🎮 Modo diversão · sem aposta' : `✨ Aposta **${fmt(game.amount)}** éter`,
-        `💎 Abertas **${opened}** / **${safeTotal}**  ·  💣 Minas **${bombs}**`,
-        `🟩 Livres **${freeLeft}** / **${safeTotal}**  ·  📦 Casas **${TOTAL}**`
+        game.fun ? '🎮 Modo diversão · sem aposta' : '✨ Aposta **' + fmt(game.amount) + '** éter',
+        '💎 Abertas **' + opened + '** / **' + safeTotal + '**  ·  💣 Minas **' + bombs + '**',
+        '🟩 Livres **' + freeLeft + '** / **' + safeTotal + '**  ·  📦 Casas **' + TOTAL + '**'
     ];
 
     if (!game.fun) {
         lines.push(
-            `📈 Multi atual **×${curM}**${opened > 0 ? ` → ✨ **${fmt(curPay)}**` : ''}`,
+            '📈 Multi atual **×' + curM + '**' + (opened > 0 ? ' → ✨ **' + fmt(curPay) + '**' : ''),
             opened < safeTotal && !game.dead && !game.cashed
-                ? `⏭️ Próximo multi **×${nextM}** → ✨ **${fmt(nextPay)}** _(abrir +1)_`
+                ? '⏭️ Próximo multi **×' + nextM + '** → ✨ **' + fmt(nextPay) + '** _(abrir +1)_'
                 : null
         );
     }
 
     if (softPhrase) lines.push('', softPhrase);
-
     const banner = resultBanner(game);
     if (banner) lines.push('', banner);
     if (extra) lines.push('', extra);
@@ -200,7 +176,7 @@ function panelEmbed(game, extra) {
         .setFooter({
             text: game.fun
                 ? 'O.mines <1-11> · AFK 7 min'
-                : `Éter ✨ · AFK 7 min · ${betFooter()}`
+                : 'Éter ✨ · AFK 7 min · ' + betFooter()
         })
         .setTimestamp();
 }
@@ -219,10 +195,10 @@ function boardRows(game, reveal = false) {
             let style = ButtonStyle.Secondary;
             if (ended) {
                 if (bomb) {
-                    label = `💣${num}`;
+                    label = '💣' + num;
                     style = ButtonStyle.Danger;
                 } else if (opened) {
-                    label = `💎${num}`;
+                    label = '💎' + num;
                     style = ButtonStyle.Success;
                 } else label = num;
             } else if (opened) {
@@ -231,7 +207,7 @@ function boardRows(game, reveal = false) {
             }
             row.addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`minas:cell:${game.id}:${i}`)
+                    .setCustomId('minas:cell:' + game.id + ':' + i)
                     .setLabel(label.slice(0, 80))
                     .setStyle(style)
                     .setDisabled(ended || opened)
@@ -249,23 +225,23 @@ function controlsRow(game) {
     const canCash = openedN > 0 && !ended;
 
     let cashLabel = game.fun ? 'Encerrar' : 'Sacar';
-    if (!game.fun && canCash) cashLabel = `Sacar ✨ ${fmt(pot)}`;
+    if (!game.fun && canCash) cashLabel = 'Sacar ✨ ' + fmt(pot);
 
     const buttons = [
         new ButtonBuilder()
-            .setCustomId(`minas:random:${game.id}`)
+            .setCustomId('minas:random:' + game.id)
             .setLabel('Aleatório')
             .setEmoji('🎲')
             .setStyle(ButtonStyle.Primary)
             .setDisabled(ended),
         new ButtonBuilder()
-            .setCustomId(`minas:refresh:${game.id}`)
+            .setCustomId('minas:refresh:' + game.id)
             .setLabel('Atualizar')
             .setEmoji('🔄')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(ended),
         new ButtonBuilder()
-            .setCustomId(`minas:cash:${game.id}`)
+            .setCustomId('minas:cash:' + game.id)
             .setLabel(cashLabel.slice(0, 80))
             .setEmoji(game.fun ? '🏁' : '💵')
             .setStyle(ButtonStyle.Success)
@@ -275,7 +251,7 @@ function controlsRow(game) {
     if (ended) {
         buttons.push(
             new ButtonBuilder()
-                .setCustomId(`minas:again:${game.id}`)
+                .setCustomId('minas:again:' + game.id)
                 .setLabel('Tentar novamente')
                 .setEmoji('🔁')
                 .setStyle(ButtonStyle.Primary)
@@ -287,12 +263,11 @@ function controlsRow(game) {
 
 function fullComponents(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
-    // Tabuleiro permanece visível; casas e controles desativados no fim
     return [...boardRows(game, ended), controlsRow(game)];
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
-    const id = `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const bombs = new Set();
     const maxBombs = Math.min(Math.max(1, bombCount), MAX_BOMBS, TOTAL - 1);
     while (bombs.size < maxBombs) bombs.add(Math.floor(Math.random() * TOTAL));
@@ -315,44 +290,11 @@ function makeGame(userId, amount, bombCount, fun, meta = {}) {
     return g;
 }
 
-// Função para obter vizinhos de uma célula
-function getNeighbors(idx) {
-    const neighbors = [];
-    const row = Math.floor(idx / COLS);
-    const col = idx % COLS;
-
-    for (let r = Math.max(0, row - 1); r <= Math.min(ROWS - 1, row + 1); r++) {
-        for (let c = Math.max(0, col - 1); c <= Math.min(COLS - 1, col + 1); c++) {
-            const nIdx = r * COLS + c;
-            if (nIdx !== idx) neighbors.push(nIdx);
-        }
-    }
-    return neighbors;
-}
-
-// Função para abrir casas ao redor de uma bomba
-function openAdjacentCells(game, bombIdx) {
-    const neighbors = getNeighbors(bombIdx);
-    const toOpen = [];
-    
-    for (const nIdx of neighbors) {
-        if (!game.opened.has(nIdx) && !game.bombs.has(nIdx)) {
-            toOpen.push(nIdx);
-        }
-    }
-    
-    // Abrir as casas adjacentes
-    toOpen.forEach(idx => game.opened.add(idx));
-    return toOpen;
-}
-
 function openCell(game, idx) {
     if (game.dead || game.cashed || game.opened.has(idx)) return { ok: false };
     if (game.bombs.has(idx)) {
         game.dead = true;
         clearTimer(game);
-        // Abrir casas adjacentes à bomba
-        openAdjacentCells(game, idx);
         return { ok: true, bomb: true };
     }
     game.opened.add(idx);
@@ -378,16 +320,12 @@ function pickRandom(game) {
         any.push(i);
         if (!game.bombs.has(i)) safe.push(i);
     }
-    
-    // 26% de chance de escolher uma bomba se houver disponível
     if (any.length > 0 && game.bombs.size > 0 && Math.random() < BOMB_CHANCE) {
-        const bombPool = any.filter(i => game.bombs.has(i));
+        const bombPool = any.filter((i) => game.bombs.has(i));
         if (bombPool.length > 0) {
             return bombPool[Math.floor(Math.random() * bombPool.length)];
         }
     }
-    
-    // Caso contrário, escolher uma casa segura ou qualquer uma
     const pool = safe.length ? safe : any;
     return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
 }
@@ -395,7 +333,7 @@ function pickRandom(game) {
 function endPayload(game, note) {
     clearTimer(game);
     return {
-        content: `<@${game.userId}>`,
+        content: '<@' + game.userId + '>',
         embeds: [panelEmbed(game, note || null)],
         components: fullComponents(game, true)
     };
@@ -428,7 +366,8 @@ module.exports = {
             game = makeGame(message.author.id, 0, bombsRaw, true);
         } else {
             const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
-            if (!bet.ok) return message.reply(`❌ ${bet.error}`);
+            if (!bet.ok) return message.reply('❌ ' + bet.error);
+            if (bet.amount <= 0) return message.reply('❌ Valor inválido.');
             eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
             game = makeGame(message.author.id, bet.amount, bombsRaw, false);
         }
@@ -443,129 +382,187 @@ module.exports = {
     },
 
     async handleComponent(interaction) {
-        const parts = interaction.customId.split(':');
+        const parts = String(interaction.customId || '').split(':');
         const action = parts[1];
-        const game = games.get(parts[2]);
+        const gameId = parts[2];
+        const game = games.get(gameId);
         const client = interaction.client;
 
         if (!game) {
-            return interaction.reply({
-                content: '⏱️ Jogo expirado.',
-                ephemeral: true
-            });
+            return interaction
+                .reply({ content: '⏱️ Jogo expirado. Use `O.minas` de novo.', ephemeral: true })
+                .catch(() => {});
         }
         if (interaction.user.id !== game.userId) {
-            return interaction.reply({ content: 'Não é o seu Mines.', ephemeral: true });
-        }
-
-        if (action === 'again') {
-            let ng;
-            if (game.fun) {
-                ng = makeGame(game.userId, 0, game.bombCount, true);
-            } else {
-                const bet = resolveBet(String(game.amount), eter.get(game.userId), { label: '✨' });
-                if (!bet.ok) {
-                    return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
-                }
-                eter.remove(game.userId, bet.amount, { reason: 'mines again' });
-                ng = makeGame(game.userId, bet.amount, game.bombCount, false);
-            }
-            clearTimer(game);
-            games.delete(parts[2]);
-
-            await interaction.update({
-                content: `<@${game.userId}> · nova mesa`,
-                embeds: [panelEmbed(ng)],
-                components: fullComponents(ng)
-            });
-            ng.messageId = interaction.message.id;
-            ng.channelId = interaction.channelId;
-            touch(ng, client);
-            return;
-        }
-
-        if ((game.dead || game.cashed) && action !== 'refresh') {
-            return interaction.reply({ content: 'Jogo já encerrado.', ephemeral: true });
-        }
-
-        touch(game, client);
-
-        if (action === 'refresh') {
-            const ended = game.dead || game.cashed;
-            return interaction.update({
-                embeds: [panelEmbed(game, ended ? null : '_Atualizado._')],
-                components: fullComponents(game, ended)
-            });
-        }
-
-        if (action === 'random') {
-            const idx = pickRandom(game);
-            if (idx == null) {
-                return interaction.reply({ content: 'Nenhuma casa.', ephemeral: true });
-            }
-            const res = openCell(game, idx);
-            if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
-            return interaction.update({
-                embeds: [panelEmbed(game, `🎲 Abriu **#${idx + 1}**`)],
-                components: fullComponents(game)
-            });
-        }
-
-        if (action === 'cash') {
-            if (game.dead) {
-                return interaction.reply({ content: 'Jogo já acabou.', ephemeral: true }).catch(() => {});
-            }
-            if (game.cashed) {
-                return interaction.update(endPayload(game)).catch(() => {});
-            }
-            if (game.fun) {
-                game.cashed = true;
-                clearTimer(game);
-                return interaction.update(endPayload(game, '🏁 Encerrado.')).catch(() => {});
-            }
-            const opened = game.opened instanceof Set ? game.opened.size : Number(game.opened?.size || 0);
-            if (opened <= 0) {
-                return interaction.reply({
-                    content: 'Abra pelo menos uma casa antes de sacar.',
-                    ephemeral: true
-                }).catch(() => {});
-            }
-            const win = potentialAt(game.amount, opened, game.bombCount);
-            if (win <= 0) {
-                return interaction.reply({
-                    content: 'Valor de saque inválido. Abra mais casas.',
-                    ephemeral: true
-                }).catch(() => {});
-            }
-            game.cashed = true;
-            game._lastWin = win;
-            clearTimer(game);
-            try {
-                eter.add(game.userId, win, { reason: 'mines cash' });
-            } catch (e) {
-                game.cashed = false;
-                return interaction.reply({
-                    content: '❌ Erro ao creditar o saque. Tente de novo.',
-                    ephemeral: true
-                }).catch(() => {});
-            }
             return interaction
-                .update(endPayload(game, `💵 Sacou **×${multAt(opened, game.bombCount)}** → ✨ **${fmt(win)}**`))
+                .reply({ content: 'Não é o seu Mines.', ephemeral: true })
                 .catch(() => {});
         }
 
-        if (action === 'cell') {
-            const idx = parseInt(parts[3], 10);
-            if (Number.isNaN(idx) || idx < 0 || idx >= TOTAL) {
-                return interaction.reply({ content: 'Casa inválida.', ephemeral: true });
+        if (processing.has(gameId) && action !== 'refresh') {
+            return interaction.deferUpdate().catch(() => {});
+        }
+        processing.add(gameId);
+        try {
+            if (action === 'again') {
+                let ng;
+                if (game.fun) {
+                    ng = makeGame(game.userId, 0, game.bombCount, true);
+                } else {
+                    const bet = resolveBet(String(game.amount), eter.get(game.userId), {
+                        label: '✨'
+                    });
+                    if (!bet.ok) {
+                        return interaction
+                            .reply({ content: '❌ ' + bet.error, ephemeral: true })
+                            .catch(() => {});
+                    }
+                    eter.remove(game.userId, bet.amount, { reason: 'mines again' });
+                    ng = makeGame(game.userId, bet.amount, game.bombCount, false);
+                }
+                clearTimer(game);
+                games.delete(gameId);
+
+                await interaction
+                    .update({
+                        content: '<@' + game.userId + '> · nova mesa',
+                        embeds: [panelEmbed(ng)],
+                        components: fullComponents(ng)
+                    })
+                    .catch(() => {});
+                ng.messageId = interaction.message?.id;
+                ng.channelId = interaction.channelId;
+                touch(ng, client);
+                return;
             }
-            if (game.opened.has(idx)) return interaction.deferUpdate().catch(() => {});
-            const res = openCell(game, idx);
-            if (res.bomb || res.autoWin) return interaction.update(endPayload(game));
-            return interaction.update({
-                embeds: [panelEmbed(game)],
-                components: fullComponents(game)
-            });
+
+            if ((game.dead || game.cashed) && action !== 'refresh' && action !== 'again') {
+                return interaction
+                    .reply({
+                        content: 'Jogo já encerrado. Use **Tentar novamente**.',
+                        ephemeral: true
+                    })
+                    .catch(() => {});
+            }
+
+            touch(game, client);
+
+            if (action === 'refresh') {
+                const ended = game.dead || game.cashed;
+                return interaction
+                    .update({
+                        embeds: [panelEmbed(game, ended ? null : '_Atualizado._')],
+                        components: fullComponents(game, ended)
+                    })
+                    .catch(() => {});
+            }
+
+            if (action === 'random') {
+                const idx = pickRandom(game);
+                if (idx == null) {
+                    return interaction
+                        .reply({ content: 'Nenhuma casa livre.', ephemeral: true })
+                        .catch(() => {});
+                }
+                const res = openCell(game, idx);
+                if (res.bomb || res.autoWin) {
+                    return interaction.update(endPayload(game)).catch(() => {});
+                }
+                return interaction
+                    .update({
+                        embeds: [panelEmbed(game, '🎲 Abriu **#' + (idx + 1) + '**')],
+                        components: fullComponents(game)
+                    })
+                    .catch(() => {});
+            }
+
+            if (action === 'cash') {
+                if (game.dead) {
+                    return interaction
+                        .reply({ content: 'Jogo já acabou.', ephemeral: true })
+                        .catch(() => {});
+                }
+                if (game.cashed) {
+                    return interaction.update(endPayload(game)).catch(() => {});
+                }
+                if (game.fun) {
+                    game.cashed = true;
+                    clearTimer(game);
+                    return interaction
+                        .update(endPayload(game, '🏁 Encerrado.'))
+                        .catch(() => {});
+                }
+                const opened =
+                    game.opened instanceof Set
+                        ? game.opened.size
+                        : Number(game.opened?.size || 0);
+                if (opened <= 0) {
+                    return interaction
+                        .reply({
+                            content: 'Abra pelo menos uma casa antes de sacar.',
+                            ephemeral: true
+                        })
+                        .catch(() => {});
+                }
+                game.cashed = true;
+                const win = potentialAt(game.amount, opened, game.bombCount);
+                if (win <= 0) {
+                    game.cashed = false;
+                    return interaction
+                        .reply({ content: 'Valor de saque inválido.', ephemeral: true })
+                        .catch(() => {});
+                }
+                game._lastWin = win;
+                clearTimer(game);
+                try {
+                    eter.add(game.userId, win, { reason: 'mines cash' });
+                } catch (e) {
+                    game.cashed = false;
+                    game._lastWin = 0;
+                    return interaction
+                        .reply({
+                            content: '❌ Erro ao creditar o saque. Tente de novo.',
+                            ephemeral: true
+                        })
+                        .catch(() => {});
+                }
+                return interaction
+                    .update(
+                        endPayload(
+                            game,
+                            '💵 Sacou **×' +
+                                multAt(opened, game.bombCount) +
+                                '** → ✨ **' +
+                                fmt(win) +
+                                '**'
+                        )
+                    )
+                    .catch(() => {});
+            }
+
+            if (action === 'cell') {
+                const idx = parseInt(parts[3], 10);
+                if (Number.isNaN(idx) || idx < 0 || idx >= TOTAL) {
+                    return interaction
+                        .reply({ content: 'Casa inválida.', ephemeral: true })
+                        .catch(() => {});
+                }
+                if (game.opened.has(idx)) {
+                    return interaction.deferUpdate().catch(() => {});
+                }
+                const res = openCell(game, idx);
+                if (res.bomb || res.autoWin) {
+                    return interaction.update(endPayload(game)).catch(() => {});
+                }
+                return interaction
+                    .update({
+                        embeds: [panelEmbed(game)],
+                        components: fullComponents(game)
+                    })
+                    .catch(() => {});
+            }
+        } finally {
+            processing.delete(gameId);
         }
     }
 };
