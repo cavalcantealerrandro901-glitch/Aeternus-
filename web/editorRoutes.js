@@ -13,7 +13,10 @@ function panelAuth(req, res, next) {
     next();
 }
 
-/** Qualquer pedido de criar, editar ou consertar */
+function env(n) {
+    return String(process.env[n] || '').trim();
+}
+
 function isCodeWriteRequest(msg) {
     return /\b(edit|editar|ajusta|ajustar|corrija|corrigir|modifica|modificar|muda|mudar|altera|alterar|refatora|refatorar|reescrev|implementa|adiciona|remove|conserta|conserte|consertar|fix|patch|atualiza|cria|criar|create|gere|gerar|escreva|escrever|salva|salvar|novo\s+comando|novo\s+arquivo|faz\s+o\s+comando|fa[cç]a|resolve|resolver|quebra|quebrado|bug|erro|error|syntaxerror|typeerror|cannot find|module_not_found|n[aã]o\s+funciona|nao\s+sobe|deploy)\b/i.test(
         msg
@@ -21,12 +24,15 @@ function isCodeWriteRequest(msg) {
 }
 
 function isErrorFixRequest(msg) {
-    return /\b(erro|error|syntaxerror|typeerror|referenceerror|bug|quebra|quebrado|falha|failed|exception|stack|cannot find|module_not_found|n[aã]o\s+(funciona|sobe|inicia)|conserta|conserte|consertar|corrija|corrigir|fix)\b/i.test(
-        msg
-    ) || /at\s+[\w./]+:\d+/i.test(msg) || /\/app\/[\w./-]+\.js:\d+/i.test(msg);
+    return (
+        /\b(erro|error|syntaxerror|typeerror|referenceerror|bug|quebra|quebrado|falha|failed|exception|stack|cannot find|module_not_found|n[aã]o\s+(funciona|sobe|inicia)|conserta|conserte|consertar|corrija|corrigir|fix)\b/i.test(
+            msg
+        ) ||
+        /at\s+[\w./]+:\d+/i.test(msg) ||
+        /\/app\/[\w./-]+\.js:\d+/i.test(msg)
+    );
 }
 
-/** Paths em mensagem + stacks de erro (/app/utils/x.js:44) */
 function extractPaths(msg) {
     const found = new Set();
     const re =
@@ -34,8 +40,8 @@ function extractPaths(msg) {
     let m;
     while ((m = re.exec(msg))) found.add(m[1].replace(/^["'`(]+|["'`)]+$/g, ''));
 
-    // stack: /app/utils/aeternusAI.js:44  ou  utils/aeternusAI.js:44
-    const stackRe = /(?:\/app\/|\(\s*|\s)((?:commands|utils|web|tools|systems|events|bot|public|data)[\/][\w./-]+\.[a-z]+):\d+/gi;
+    const stackRe =
+        /(?:\/app\/|\(\s*|\s)((?:commands|utils|web|tools|systems|events|bot|public|data)[\/][\w./-]+\.[a-z]+):\d+/gi;
     while ((m = stackRe.exec(msg))) found.add(m[1].replace(/^\/+/, ''));
 
     const simple = msg.match(/(?:arquivo|file|comando)\s+["'`]?([\w./-]+\.[a-z0-9]+)/i);
@@ -92,7 +98,7 @@ function buildFileContext({ message, currentPath, editorContent }) {
 
 function formatFilesForPrompt(files) {
     if (!files.length) return '';
-    const parts = ['\n\n=== CÓDIGO DO PROJETO (use isto, não invente) ==='];
+    const parts = ['\n\n=== CÓDIGO DO PROJETO (use isto) ==='];
     for (const f of files) {
         if (f.error) {
             parts.push(`\n--- ${f.path} ---\n[ERRO AO LER: ${f.error}]`);
@@ -100,7 +106,7 @@ function formatFilesForPrompt(files) {
         }
         parts.push(`\n--- ${f.path} (${f.source || 'disco'}) ---\n${f.content}`);
     }
-    parts.push('\n=== FIM DO CÓDIGO ===\n');
+    parts.push('\n=== FIM ===\n');
     return parts.join('');
 }
 
@@ -135,32 +141,107 @@ function extractWritableBlocks(reply, fallbackPath) {
     return out;
 }
 
-function writeBlocksToDisk(blocks) {
+/* ── GitHub: commit pra o Render puxar deploy ── */
+
+function ghConfig() {
+    const token = env('GITHUB_TOKEN') || env('GH_TOKEN');
+    const owner = env('GITHUB_OWNER') || 'cavalcantealerrandro901-glitch';
+    const repo = env('GITHUB_REPO') || 'Aeternus-';
+    const branch = env('GITHUB_BRANCH') || 'main';
+    if (!token) return null;
+    return { token, owner, repo, branch };
+}
+
+async function githubPutFile(relPath, content, message) {
+    const cfg = ghConfig();
+    if (!cfg) {
+        return {
+            ok: false,
+            error: 'GITHUB_TOKEN não configurado no Render — arquivo só no disco local (some no redeploy)'
+        };
+    }
+
+    const apiBase = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${relPath}`;
+    const headers = {
+        Authorization: `Bearer ${cfg.token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'Aeternus-Editor',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+    };
+
+    let sha;
+    try {
+        const getRes = await fetch(`${apiBase}?ref=${cfg.branch}`, { headers });
+        if (getRes.ok) {
+            const data = await getRes.json();
+            sha = data.sha;
+        }
+    } catch (_) {}
+
+    const body = {
+        message: message || `Aeternus editor: ${relPath}`,
+        content: Buffer.from(String(content), 'utf8').toString('base64'),
+        branch: cfg.branch
+    };
+    if (sha) body.sha = sha;
+
+    const putRes = await fetch(apiBase, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body)
+    });
+    const putData = await putRes.json().catch(() => ({}));
+    if (!putRes.ok) {
+        return {
+            ok: false,
+            error: putData.message || `GitHub ${putRes.status}`
+        };
+    }
+    return {
+        ok: true,
+        commit: putData.commit?.sha,
+        url: putData.content?.html_url || putData.commit?.html_url
+    };
+}
+
+async function writeBlocksToDiskAndGitHub(blocks) {
     const written = [];
     for (const b of blocks) {
+        const item = { path: b.path, ok: false };
         try {
             const result = shell.writeFile(b.path, b.code);
-            if (result.ok) written.push({ path: result.path || b.path, bytes: result.bytes, ok: true });
-            else written.push({ path: b.path, ok: false, error: result.error || 'falha' });
+            if (!result.ok) {
+                item.error = result.error || 'falha local';
+                written.push(item);
+                continue;
+            }
+            item.ok = true;
+            item.bytes = result.bytes;
+            item.path = result.path || b.path;
+
+            const gh = await githubPutFile(
+                item.path,
+                b.code,
+                `Aeternus IA: atualiza ${item.path}`
+            );
+            item.github = gh;
         } catch (e) {
-            written.push({ path: b.path, ok: false, error: e.message });
+            item.error = e.message;
         }
+        written.push(item);
     }
     return written;
 }
 
-/** node --check no arquivo gravado */
 function syntaxCheck(relPath) {
     return new Promise((resolve) => {
         try {
             const abs = path.join(shell.ROOT || process.cwd(), relPath);
             if (!fs.existsSync(abs)) return resolve({ ok: false, error: 'arquivo não existe' });
             execFile('node', ['--check', abs], { timeout: 8000 }, (err, stdout, stderr) => {
-                if (err) {
-                    resolve({ ok: false, error: String(stderr || err.message).slice(0, 500) });
-                } else {
-                    resolve({ ok: true });
-                }
+                if (err) resolve({ ok: false, error: String(stderr || err.message).slice(0, 500) });
+                else resolve({ ok: true });
             });
         } catch (e) {
             resolve({ ok: false, error: e.message });
@@ -168,30 +249,29 @@ function syntaxCheck(relPath) {
     });
 }
 
-async function askAI(message, persona, fileContext, { wantWrite, fallbackPath, isFix }) {
+async function askAI(message, fileContext, { wantWrite, fallbackPath, isFix }) {
     const rules = [
-        'Você é uma IA de código COMPLETA (nível Grok): analisa, explica e CONCERTA.',
-        'Português do Brasil, direto, agressivo quando o código estiver zoado.',
-        'Nunca diga só "verifique o arquivo" — leia o contexto, aplique o fix, entregue o arquivo inteiro.',
+        'Você é uma IA de código completa (nível Grok): analisa e CONCERTA.',
+        'Português do Brasil, direto e agressivo quando o código estiver zoado.',
+        'Nunca diga só "verifique" — aplique o fix e entregue o arquivo inteiro.',
         isFix
-            ? 'MODO CONSERTO: o usuário mandou erro/log/stack. Ache a causa, reescreva o arquivo CORRETO por completo.'
+            ? 'MODO CONSERTO: o usuário mandou erro/log. Reescreva o arquivo CORRETO por completo.'
             : '',
         wantWrite
             ? [
-                  'MODO GRAVAÇÃO OBRIGATÓRIO — responda com o arquivo completo:',
+                  'MODO GRAVAÇÃO — arquivo completo:',
                   '```js caminho/arquivo.js',
-                  '// código inteiro corrigido',
+                  '// código inteiro',
                   '```',
                   fallbackPath ? 'Arquivo principal: ' + fallbackPath : '',
-                  'Se vários arquivos quebraram, um bloco por arquivo.',
-                  'Depois: 2–4 linhas do que era o bug e o que você mudou.'
+                  'Depois: 2–4 linhas do bug e do que mudou.'
               ].join('\n')
-            : 'Se for só dúvida, responda claro. Se envolver código quebrado, proponha o fix completo no formato de bloco com path.'
+            : 'Se envolver código quebrado, proponha o fix completo com path no bloco.'
     ]
         .filter(Boolean)
         .join('\n');
 
-    const extra = ['[Aeternus Editor AI]', rules, fileContext, '\nPedido do usuário:\n'].join('\n');
+    const extra = ['[Aeternus Editor AI]', rules, fileContext, '\nPedido:\n'].join('\n');
 
     if (typeof ai.fetchPublicAIResponse === 'function') {
         return await ai.fetchPublicAIResponse(extra + message, 'editor');
@@ -223,11 +303,14 @@ function registerEditorRoutes(app) {
         res.status(result.ok ? 200 : 400).json(result);
     });
 
-    r.post('/write', (req, res) => {
+    r.post('/write', async (req, res) => {
         try {
             const p = req.body?.path;
             if (!p) return res.status(400).json({ ok: false, error: 'path obrigatório' });
-            res.json(shell.writeFile(p, req.body?.content ?? ''));
+            const content = req.body?.content ?? '';
+            const local = shell.writeFile(p, content);
+            const github = await githubPutFile(p, content, `Aeternus editor: ${p}`);
+            res.json({ ...local, github });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }
@@ -236,12 +319,6 @@ function registerEditorRoutes(app) {
     r.post('/exec', async (req, res) => {
         try {
             const line = req.body?.cmd || req.body?.line || '';
-            if (/^cat\s+>\s*\S+\s*<<\s*\w+/i.test(String(line).trim()) && req.body?.content != null) {
-                const m = String(line).match(/^cat\s+>\s*(\S+)/i);
-                if (!m?.[1]) return res.status(400).json({ ok: false, error: 'path inválido' });
-                const result = shell.writeFile(m[1], req.body.content);
-                return res.json({ ok: true, text: 'escrito ' + result.path + ' (' + result.bytes + ' bytes)' });
-            }
             res.json(await shell.execLine(line));
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
@@ -272,15 +349,8 @@ function registerEditorRoutes(app) {
                 if (paths.length) fallbackPath = paths[0].replace(/^app\//, '');
             }
 
-            const reply = await askAI(msg, req.body?.persona || 'editor', fileContext, {
-                wantWrite,
-                fallbackPath,
-                isFix
-            });
-
-            const text =
-                reply ||
-                'IA não respondeu. Confere GROQ_API_KEY no Render.';
+            const reply = await askAI(msg, fileContext, { wantWrite, fallbackPath, isFix });
+            const text = reply || 'IA não respondeu. Confere GROQ_API_KEY no Render.';
 
             let written = [];
             if (wantWrite) {
@@ -291,10 +361,9 @@ function registerEditorRoutes(app) {
                         blocks = [{ path: fallbackPath, code: loose[1].replace(/\n+$/, ''), lang: 'js' }];
                     }
                 }
-                if (blocks.length) written = writeBlocksToDisk(blocks);
+                if (blocks.length) written = await writeBlocksToDiskAndGitHub(blocks);
             }
 
-            // syntax check nos arquivos gravados
             const checks = [];
             for (const w of written) {
                 if (!w.ok || !/\.js$/i.test(w.path || '')) continue;
@@ -302,11 +371,16 @@ function registerEditorRoutes(app) {
                 checks.push({ path: w.path, ...c });
             }
 
+            const ghOk = written.filter((w) => w.github && w.github.ok).length;
+            const ghMissing = !ghConfig();
+
             res.json({
                 ok: true,
                 reply: text,
                 written,
                 syntaxChecks: checks,
+                githubConfigured: !ghMissing,
+                githubCommits: ghOk,
                 readFiles: files.map((f) => ({
                     path: f.path,
                     ok: !f.error,
@@ -321,7 +395,11 @@ function registerEditorRoutes(app) {
     });
 
     app.use('/api/editor', r);
-    console.log('🛠️  [web] Editor AI · conserta erros + grava + node --check');
+    const gh = ghConfig();
+    console.log(
+        '🛠️  [web] Editor chat · GitHub ' +
+            (gh ? `ok (${gh.owner}/${gh.repo}@${gh.branch})` : 'MISSING GITHUB_TOKEN')
+    );
 }
 
 module.exports = { registerEditorRoutes };

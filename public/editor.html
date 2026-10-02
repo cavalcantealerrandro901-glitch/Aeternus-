@@ -3,144 +3,111 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Aeternus — Termux</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@500;700&display=swap" rel="stylesheet"/>
+<title>Aeternus — IA</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;700&display=swap" rel="stylesheet"/>
 <style>
 :root{
-  --bg:#0a0c10;--panel:#0d1117;--border:#1e2633;--text:#e6edf3;--muted:#8b949e;
-  --accent:#58a6ff;--green:#3fb950;--cyan:#39d353;--purple:#a371f7;
+  --bg:#0a0c10;--panel:#0d1117;--border:#21262d;--text:#e6edf3;--muted:#8b949e;
+  --accent:#58a6ff;--green:#3fb950;--red:#f85149;--user:#1f6feb33;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 body{
-  font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-family:'Plus Jakarta Sans',system-ui,sans-serif;
   background:var(--bg);color:var(--text);
   display:flex;flex-direction:column;
 }
 header{
   display:flex;align-items:center;gap:.75rem;
-  padding:.4rem .75rem;background:#010409;
+  padding:.55rem 1rem;background:#010409;
   border-bottom:1px solid var(--border);flex-shrink:0;
-  font-size:.78rem;
 }
-header .logo{font-family:'Plus Jakarta Sans',sans-serif;font-weight:700}
-header .logo span{color:var(--green)}
-header a{color:var(--muted);text-decoration:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:.8rem}
+header .logo{font-weight:700;letter-spacing:.02em}
+header .logo span{color:var(--accent)}
+header a{color:var(--muted);text-decoration:none;font-size:.85rem}
 header a:hover{color:var(--text)}
 .badge{
-  font-size:.65rem;padding:.15rem .45rem;border-radius:4px;
+  font-size:.68rem;padding:.15rem .5rem;border-radius:999px;
   background:#12261a;color:var(--green);border:1px solid #1a3d28;
 }
-.layout{
-  flex:1;display:grid;
-  grid-template-columns:minmax(0,1fr) 300px;
-  min-height:0;
+main{
+  flex:1;display:flex;flex-direction:column;min-height:0;
+  max-width:820px;width:100%;margin:0 auto;
 }
-@media(max-width:800px){
-  .layout{grid-template-columns:1fr}
-  .chat{display:none}
+#msgs{
+  flex:1;overflow:auto;padding:1.25rem 1rem;
+  display:flex;flex-direction:column;gap:.85rem;
 }
-.main{
-  display:flex;flex-direction:column;min-height:0;min-width:0;
-  background:#0d1117;
+.bubble{
+  max-width:92%;padding:.75rem .9rem;border-radius:14px;
+  font-size:.92rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;
 }
-#termScreen{
-  flex:1;overflow:auto;padding:.65rem .8rem 1rem;
-  font-size:.8rem;line-height:1.45;
-  white-space:pre-wrap;word-break:break-word;
-  color:#c9d1d9;
+.bubble.user{
+  align-self:flex-end;background:var(--user);
+  border:1px solid #388bfd55;
 }
-#termScreen .meta{color:var(--muted)}
-#termScreen .ok{color:var(--green)}
-#termScreen .err{color:#f85149}
-#termScreen .path{color:var(--accent)}
-#termScreen .cmd{color:#e6edf3}
-#termScreen .code{color:#d2a8ff}
-#termScreen .prompt-line{color:var(--green)}
-#termScreen .cursor{
-  display:inline-block;width:.55ch;height:1em;background:var(--green);
-  vertical-align:text-bottom;animation:blink .9s step-end infinite;
+.bubble.bot{
+  align-self:flex-start;background:var(--panel);
+  border:1px solid var(--border);
 }
-@keyframes blink{50%{opacity:0}}
-.prompt-bar{
-  display:flex;align-items:center;gap:.4rem;
-  padding:.45rem .75rem;border-top:1px solid var(--border);
-  background:#010409;font-size:.8rem;
+.bubble .meta{
+  font-size:.72rem;color:var(--muted);margin-bottom:.4rem;
+  font-family:'JetBrains Mono',monospace;
 }
-.prompt-bar .cwd{color:var(--accent);max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prompt-bar .dollar{color:var(--green)}
-.prompt-bar input{
-  flex:1;background:transparent;border:none;outline:none;
-  color:var(--text);font-family:inherit;font-size:inherit;
+.bubble .meta .ok{color:var(--green)}
+.bubble .meta .err{color:var(--red)}
+.bubble pre{
+  margin-top:.5rem;padding:.65rem;border-radius:8px;
+  background:#010409;overflow:auto;max-height:320px;
+  font-family:'JetBrains Mono',monospace;font-size:.78rem;
+  border:1px solid var(--border);
 }
-.chat{
-  background:#010409;border-left:1px solid var(--border);
-  display:flex;flex-direction:column;min-height:0;
-  font-family:'Plus Jakarta Sans',system-ui,sans-serif;
+.composer{
+  padding:.75rem 1rem 1rem;border-top:1px solid var(--border);
+  background:#010409;
 }
-.chat-head{
-  padding:.5rem .7rem;font-size:.7rem;text-transform:uppercase;
-  letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border);
-  display:flex;justify-content:space-between;
+.composer-row{
+  display:flex;gap:.5rem;align-items:flex-end;
 }
-.chat-msgs{flex:1;overflow:auto;padding:.65rem;display:flex;flex-direction:column;gap:.5rem}
-.bubble{padding:.5rem .65rem;border-radius:10px;font-size:.82rem;line-height:1.4}
-.bubble.user{background:#1f6feb33;align-self:flex-end;border:1px solid #388bfd55}
-.bubble.bot{background:#161b22;align-self:flex-start;border:1px solid var(--border)}
-.chat-in{display:flex;gap:.35rem;padding:.5rem;border-top:1px solid var(--border)}
-.chat-in input{
-  flex:1;background:#0d1117;border:1px solid var(--border);border-radius:8px;
-  color:var(--text);padding:.45rem .6rem;outline:none;font-size:.85rem;
+.composer textarea{
+  flex:1;min-height:48px;max-height:160px;resize:vertical;
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  color:var(--text);padding:.7rem .85rem;font:inherit;outline:none;
 }
-.chat-in button{
-  background:#238636;color:#fff;border:none;border-radius:8px;
-  padding:.45rem .75rem;font-weight:600;cursor:pointer;font-size:.8rem;
+.composer textarea:focus{border-color:var(--accent)}
+.composer button{
+  background:#238636;color:#fff;border:none;border-radius:12px;
+  padding:.7rem 1.1rem;font-weight:700;cursor:pointer;font-size:.9rem;
 }
-.chat-in button:disabled{opacity:.5}
+.composer button:disabled{opacity:.5;cursor:wait}
+.hint{font-size:.75rem;color:var(--muted);margin-top:.45rem}
 </style>
 </head>
 <body>
 <header>
-  <div class="logo"><span>~</span> aeternus</div>
-  <span class="badge">ai</span>
+  <div class="logo"><span>AET</span>ERNUS</div>
+  <span class="badge">IA</span>
   <a href="index.html">Início</a>
   <a href="dashboard.html">Painel</a>
   <span style="flex:1"></span>
-  <span id="hdrCwd" style="color:var(--muted)">~</span>
+  <span style="font-size:.75rem;color:var(--muted)">grava no GitHub → Render deploy</span>
 </header>
 
-<div class="layout">
-  <section class="main">
-    <div id="termScreen"></div>
-    <div class="prompt-bar">
-      <span class="cwd" id="cwdLabel">~</span>
-      <span class="dollar">$</span>
-      <input id="termInput" placeholder="ls · cat arquivo · help" autocomplete="off" autofocus/>
+<main>
+  <div id="msgs">
+    <div class="bubble bot">Manda o que precisa: criar comando, editar arquivo ou colar o erro do Render.\nEu leio o código, conserto, <b>commit no GitHub</b> e o Render faz deploy sozinho.</div>
+  </div>
+  <div class="composer">
+    <div class="composer-row">
+      <textarea id="input" placeholder="ex: cria o comando daily · conserta este erro: …" rows="2"></textarea>
+      <button type="button" id="btn" onclick="send()">Enviar</button>
     </div>
-  </section>
-
-  <aside class="chat">
-    <div class="chat-head">
-      <span>IA</span>
-      <span style="color:var(--green)">online</span>
-    </div>
-    <div class="chat-msgs" id="chatMsgs">
-      <div class="bubble bot">IA completa: cola o <b>erro do Render</b> ou pede pra criar/editar. Ela lê o arquivo, conserta, grava e valida com <code>node --check</code>.</div>
-    </div>
-    <div class="chat-in">
-      <input id="chatInput" placeholder="cola o erro ou: cria o comando X"/>
-      <button type="button" id="chatBtn" onclick="sendChat()">Enviar</button>
-    </div>
-  </aside>
-</div>
+    <div class="hint">Alterações vão para o repositório (GITHUB_TOKEN). Sem terminal.</div>
+  </div>
+</main>
 
 <script>
 const API = '/api/editor';
-let currentPath = null;
-let cwd = '.';
-let typing = false;
-let history = [];
-let histIdx = -1;
 
 function headers() {
   const h = { 'Content-Type': 'application/json' };
@@ -166,245 +133,101 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function screen() {
-  return document.getElementById('termScreen');
-}
-
-function print(html) {
-  const el = screen();
-  el.insertAdjacentHTML('beforeend', html);
-  el.scrollTop = el.scrollHeight;
-}
-
-function printText(text, cls = '') {
-  print('<div class="' + cls + '">' + esc(text) + '</div>');
-}
-
-function setCwd(p) {
-  cwd = p || '.';
-  const label = cwd === '.' ? '~' : cwd;
-  document.getElementById('cwdLabel').textContent = label;
-  document.getElementById('hdrCwd').textContent = label;
-}
-
-function bootBanner() {
-  printText('Aeternus · terminal + IA', 'meta');
-  printText('Cola o log de erro no chat → ela conserta e grava', 'meta');
-  printText('ls | cat | cd | help', 'meta');
-  printText('', '');
-}
-
-async function typeCode(text) {
-  typing = true;
-  const el = screen();
-  const wrap = document.createElement('div');
-  wrap.className = 'code';
-  el.appendChild(wrap);
-  const cursor = document.createElement('span');
-  cursor.className = 'cursor';
-  wrap.appendChild(cursor);
-  const str = String(text || '');
-  const step = Math.max(1, Math.floor(str.length / 100));
-  for (let i = 0; i < str.length; i += step) {
-    wrap.insertBefore(document.createTextNode(str.slice(i, i + step)), cursor);
-    el.scrollTop = el.scrollHeight;
-    await new Promise((r) => setTimeout(r, str.length > 3000 ? 3 : 8));
-  }
-  cursor.remove();
-  wrap.appendChild(document.createTextNode('\n'));
-  typing = false;
-}
-
 function extractCodeBlocks(reply) {
   const blocks = [];
-  const re = /```([\w.+-]*)?\n?([\s\S]*?)```/g;
+  const re = /```([\w.+-]*)?(?:\s+[\w./-]*)?\n?([\s\S]*?)```/g;
   let m;
   while ((m = re.exec(reply))) {
-    blocks.push({ lang: (m[1] || '').trim(), code: m[2].replace(/\n$/, '') });
+    blocks.push({ lang: (m[1] || '').trim(), code: (m[2] || '').replace(/\n$/, '') });
   }
   return blocks;
 }
 
-function joinCwd(arg) {
-  if (!arg || arg === '.') return cwd === '.' ? '.' : cwd;
-  if (arg.startsWith('/')) return arg.replace(/^\/+/, '');
-  if (cwd === '.' || cwd === '') return arg.replace(/^\.\//, '');
-  return (cwd.replace(/\/+$/, '') + '/' + arg.replace(/^\.\//, '')).replace(/\/+/g, '/');
-}
-
-async function runCmd(line) {
-  const raw = String(line || '').trim();
-  if (!raw) return;
-  print('<div class="prompt-line">' + esc((cwd === '.' ? '~' : cwd) + ' $ ' + raw) + '</div>');
-  const parts = raw.split(/\s+/);
-  const cmd = parts[0].toLowerCase();
-  const args = parts.slice(1);
-
-  if (cmd === 'clear' || cmd === 'cls') { screen().innerHTML = ''; return; }
-  if (cmd === 'pwd') { printText(cwd === '.' ? '/' : '/' + cwd, 'path'); return; }
-
-  if (cmd === 'cd') {
-    const target = args[0] || '.';
-    if (target === '..') {
-      if (cwd === '.' || !cwd.includes('/')) setCwd('.');
-      else setCwd(cwd.split('/').slice(0, -1).join('/') || '.');
-      printText(cwd === '.' ? '~' : cwd, 'path');
-      return;
-    }
-    if (target === '~' || target === '/') { setCwd('.'); printText('~', 'path'); return; }
-    const next = joinCwd(target);
-    const check = await api('/ls?path=' + encodeURIComponent(next));
-    if (!check.ok) { printText('cd: ' + (check.error || 'pasta não encontrada'), 'err'); return; }
-    setCwd(next);
-    printText(cwd === '.' ? '~' : cwd, 'path');
-    return;
-  }
-
-  if (cmd === 'ls' || cmd === 'dir') {
-    const target = joinCwd(args[0] || '.');
-    const data = await api('/ls?path=' + encodeURIComponent(target));
-    if (!data.ok) { printText(data.error || 'erro', 'err'); return; }
-    const entries = data.entries || data.files || data.list || [];
-    if (Array.isArray(entries) && entries.length) {
-      const lines = entries.map((e) => {
-        if (typeof e === 'string') return e;
-        const name = e.name || e.path || String(e);
-        return (e.type === 'dir' || e.isDirectory || e.dir) ? name + '/' : name;
-      });
-      printText(lines.join('\n') || '(vazio)', 'ok');
-    } else if (typeof data.text === 'string') {
-      printText(data.text || '(vazio)', 'ok');
-    } else {
-      const exec = await api('/exec', { method: 'POST', body: JSON.stringify({ cmd: 'ls ' + (args[0] || '') }) });
-      printText(exec.text || exec.error || '(vazio)', exec.ok === false ? 'err' : 'ok');
-    }
-    return;
-  }
-
-  if (cmd === 'cat' || cmd === 'nano' || cmd === 'type') {
-    if (!args[0]) { printText('uso: cat <arquivo>', 'err'); return; }
-    const file = joinCwd(args[0]);
-    const data = await api('/read?path=' + encodeURIComponent(file));
-    if (!data.ok) { printText(data.error || 'erro', 'err'); return; }
-    currentPath = data.path || file;
-    printText('── ' + currentPath + ' ──', 'meta');
-    await typeCode(data.content || '');
-    return;
-  }
-
-  if (cmd === 'help') {
-    printText([
-      'ls / ls pasta / cd / cat / clear',
-      'No chat: cola log de erro do Render',
-      'ou: cria o comando X / edita commands/y.js'
-    ].join('\n'), 'meta');
-    return;
-  }
-
-  const data = await api('/exec', { method: 'POST', body: JSON.stringify({ cmd: raw }) });
-  if (data.open) {
-    currentPath = data.open;
-    printText('── ' + currentPath + ' ──', 'meta');
-    if (data.text) await typeCode(data.text);
-  } else if (data.text) printText(data.text, 'ok');
-  if (data.error) printText(data.error, 'err');
-}
-
-const termInput = document.getElementById('termInput');
-termInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    const v = termInput.value.trim();
-    termInput.value = '';
-    if (!v) return;
-    history.push(v);
-    histIdx = history.length;
-    runCmd(v);
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    if (histIdx > 0) { histIdx--; termInput.value = history[histIdx] || ''; }
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    if (histIdx < history.length - 1) { histIdx++; termInput.value = history[histIdx] || ''; }
-    else { histIdx = history.length; termInput.value = ''; }
-  }
-});
-
-async function sendChat() {
-  const input = document.getElementById('chatInput');
-  const btn = document.getElementById('chatBtn');
-  const msg = input.value.trim();
-  if (!msg || typing) return;
-  input.value = '';
-  const box = document.getElementById('chatMsgs');
-  box.innerHTML += '<div class="bubble user">' + esc(msg) + '</div>';
-  box.innerHTML += '<div class="bubble bot" id="chatLoading" style="opacity:.7">analisando e consertando…</div>';
+function addBubble(role, html) {
+  const box = document.getElementById('msgs');
+  const div = document.createElement('div');
+  div.className = 'bubble ' + role;
+  div.innerHTML = html;
+  box.appendChild(div);
   box.scrollTop = box.scrollHeight;
-  btn.disabled = true;
+  return div;
+}
 
-  printText('✦ ia: ' + msg.slice(0, 120), 'meta');
+async function send() {
+  const input = document.getElementById('input');
+  const btn = document.getElementById('btn');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  addBubble('user', esc(msg));
+  const loading = addBubble('bot', '<span style="opacity:.7">analisando…</span>');
+  btn.disabled = true;
 
   const data = await api('/chat', {
     method: 'POST',
-    body: JSON.stringify({ message: msg, currentPath: currentPath || null, editorContent: null })
+    body: JSON.stringify({ message: msg, currentPath: null, editorContent: null })
   });
-  const loading = document.getElementById('chatLoading');
-  if (loading) loading.remove();
+
+  loading.remove();
   btn.disabled = false;
 
-  const reply = data.reply || data.error || '…';
+  const reply = data.reply || data.error || 'sem resposta';
   let meta = '';
+
   if (data.readFiles && data.readFiles.length) {
-    meta = '<div style="font-size:.72rem;color:#8b949e;margin-bottom:.3rem">leu: ' +
-      data.readFiles.map((f) => f.path).join(', ') + '</div>';
+    meta += '<div class="meta">leu: ' + esc(data.readFiles.map((f) => f.path).join(', ')) + '</div>';
   }
   if (data.written && data.written.length) {
-    meta += '<div style="font-size:.72rem;color:#3fb950;margin-bottom:.3rem">salvo: ' +
-      data.written.map((w) => (w.ok ? w.path + ' (' + (w.bytes || 0) + ' B)' : w.path + ' ERRO')).join(', ') +
+    meta +=
+      '<div class="meta">' +
+      data.written
+        .map((w) => {
+          if (!w.ok) return '<span class="err">✗ ' + esc(w.path) + ' ' + esc(w.error || '') + '</span>';
+          let s = '<span class="ok">✓ ' + esc(w.path) + ' (' + (w.bytes || 0) + ' B)</span>';
+          if (w.github) {
+            s += w.github.ok
+              ? ' <span class="ok">· GitHub commit</span>'
+              : ' <span class="err">· GitHub: ' + esc(w.github.error || 'falhou') + '</span>';
+          }
+          return s;
+        })
+        .join('<br>') +
       '</div>';
   }
   if (data.syntaxChecks && data.syntaxChecks.length) {
-    meta += '<div style="font-size:.72rem;margin-bottom:.3rem">' +
-      data.syntaxChecks.map((c) =>
-        c.ok
-          ? '<span style="color:#3fb950">✓ syntax ' + esc(c.path) + '</span>'
-          : '<span style="color:#f85149">✗ syntax ' + esc(c.path) + ': ' + esc(c.error || '') + '</span>'
-      ).join('<br>') + '</div>';
+    meta +=
+      '<div class="meta">' +
+      data.syntaxChecks
+        .map((c) =>
+          c.ok
+            ? '<span class="ok">✓ syntax ' + esc(c.path) + '</span>'
+            : '<span class="err">✗ syntax ' + esc(c.path) + ': ' + esc(c.error || '') + '</span>'
+        )
+        .join('<br>') +
+      '</div>';
   }
-  box.innerHTML += '<div class="bubble bot">' + meta + esc(reply) + '</div>';
-  box.scrollTop = box.scrollHeight;
 
-  if (data.written && data.written.length) {
-    for (const w of data.written) {
-      if (!w.ok) {
-        printText('✗ falha ao gravar ' + (w.path || '?') + ': ' + (w.error || ''), 'err');
-        continue;
-      }
-      printText('── gravado: ' + w.path + ' (' + (w.bytes || 0) + ' bytes) ──', 'ok');
-      currentPath = w.path;
-      const sc = (data.syntaxChecks || []).find((c) => c.path === w.path);
-      if (sc && !sc.ok) printText('syntax check falhou: ' + (sc.error || ''), 'err');
-      else if (sc && sc.ok) printText('syntax check ok', 'ok');
-      try {
-        const rd = await api('/read?path=' + encodeURIComponent(w.path));
-        if (rd.ok && rd.content) await typeCode(rd.content);
-      } catch (_) {}
-    }
-  } else {
-    const blocks = extractCodeBlocks(reply);
-    for (const b of blocks) {
-      printText('── ' + (b.lang || 'code') + ' ──', 'meta');
-      await typeCode(b.code);
-    }
+  // texto sem blocos de código gigantes no bubble (mostra preview)
+  let text = reply;
+  const blocks = extractCodeBlocks(reply);
+  if (blocks.length) {
+    text = reply.replace(/```[\s\S]*?```/g, '').trim() || 'Arquivo atualizado.';
   }
+
+  let codeHtml = '';
+  for (const b of blocks.slice(0, 3)) {
+    codeHtml += '<pre>' + esc(b.code.slice(0, 4000)) + (b.code.length > 4000 ? '\n…' : '') + '</pre>';
+  }
+
+  addBubble('bot', meta + esc(text) + codeHtml);
 }
 
-document.getElementById('chatInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendChat();
+document.getElementById('input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
 });
-
-bootBanner();
-setCwd('.');
-termInput.focus();
 </script>
 </body>
 </html>
