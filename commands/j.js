@@ -122,7 +122,7 @@ function profileEmbed(user, profile, opts = {}) {
     const classLine = cls
         ? `**Classe:** ${cls.emoji || '⚔️'} ${cls.name}`
         : '**Classe:** _Sem classe_';
-    const emb = new EmbedBuilder()
+    return new EmbedBuilder()
         .setColor((cls && cls.color) || 0xa78bfa)
         .setTitle(displayName || 'Sem nome')
         .setThumbnail(photo)
@@ -142,7 +142,6 @@ function profileEmbed(user, profile, opts = {}) {
         )
         .setFooter({ text: 'O.j atributos · O.j criar' })
         .setTimestamp();
-    return emb;
 }
 
 function atributosPayload(user) {
@@ -159,7 +158,7 @@ function atributosPayload(user) {
 
     const attrLines = ATTR_META.map((a) => {
         const v = Number(attrs[a.key] || 0);
-        return `${a.emoji} **${a.label}** \\\`${String(v).padStart(3, ' ')}\\\`  [+]`;
+        return a.emoji + ' **' + a.label + '** `' + String(v).padStart(3, ' ') + '`  [+]';
     });
 
     const emb = new EmbedBuilder()
@@ -168,14 +167,18 @@ function atributosPayload(user) {
         .setThumbnail(photo)
         .setDescription(
             [
-                `👤 **${nome}**`,
-                `${cls?.emoji || '⚔️'} **${cls?.name || 'Sem classe'}** · Nv **${level}**`,
-                `❤️ HP \\\`${hpMax.toLocaleString('pt-BR')}\\\` · 🔷 Mana \\\`${manaMax.toLocaleString('pt-BR')}\\\``,
+                '👤 **' + nome + '**',
+                (cls?.emoji || '⚔️') + ' **' + (cls?.name || 'Sem classe') + '** · Nv **' + level + '**',
+                '❤️ HP `' +
+                    hpMax.toLocaleString('pt-BR') +
+                    '` · 🔷 Mana `' +
+                    manaMax.toLocaleString('pt-BR') +
+                    '`',
                 '',
                 '⚔️ **ATRIBUTOS**',
                 ...attrLines,
                 '',
-                `✦ Pontos disponíveis: **${points}**`
+                '✦ Pontos disponíveis: **' + points + '**'
             ].join('\n')
         )
         .setFooter({ text: '+1 · Depositar · Redistribuir' });
@@ -480,8 +483,7 @@ module.exports = {
                 });
             }
             const payload = atributosPayload(interaction.user);
-            payload.content =
-                '✅ +' + spent.spent + ' em ' + meta.emoji + ' ' + meta.label;
+            payload.content = '✅ +' + spent.spent + ' em ' + meta.emoji + ' ' + meta.label;
             return safeUpdate(interaction, payload);
         }
 
