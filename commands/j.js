@@ -101,43 +101,120 @@ function classSelect(customId = 'j:class') {
     );
 }
 
-function profileEmbed(user, profile) {
+function profileEmbed(user, profile, opts = {}) {
     if (!profile) {
         return new EmbedBuilder()
             .setColor(0xef4444)
             .setTitle('Sem perfil')
             .setDescription('Crie com `O.j criar`.');
     }
+
     const cls = profile.classId ? player.getClass(profile.classId) : null;
     const st = xp.get(user.id) || { level: 0, xp: 0, attrs: {} };
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
-    const displayName = (profile.name && String(profile.name).trim()) || user.username;
-    const attrs = st.attrs || {};
-    const attrLines = ATTR_META.map((a) => {
-        const v = Number(attrs[a.key] || 0);
-        return a.emoji + ' **' + a.label + ':** ' + v;
-    }).join('\n');
+    const hasName = !!(profile.name && String(profile.name).trim());
+    const displayName = hasName ? String(profile.name).trim() : null;
 
-    return new EmbedBuilder()
-        .setColor(cls?.color || 0x5865f2)
-        .setTitle('✦ ' + displayName)
+    let eterBal = 0;
+    let cristaisBal = 0;
+    try {
+        eterBal = require('../utils/eter').get(user.id) || 0;
+    } catch (_) {}
+    try {
+        cristaisBal = require('../utils/cp').get(user.id) || 0;
+    } catch (_) {
+        try {
+            const cristais = require('../utils/cristais');
+            if (cristais && typeof cristais.get === 'function') cristaisBal = cristais.get(user.id) || 0;
+        } catch (_) {}
+    }
+
+    let guildLine = '_Sem guilda_';
+    try {
+        const g = require('../utils/guilds').findByMember(user.id);
+        if (g) {
+            const tag = g.tag ? '[' + g.tag + ']' : '';
+            guildLine =
+                '**' + (tag ? tag + ' ' : '') + (g.name || 'Guilda') + '** · Nv.' + (g.level || 1);
+        }
+    } catch (_) {}
+
+    const a = st.attrs || {};
+    const forca = Number(a.forca ?? 0);
+    const agilidade = Number(a.agilidade ?? 0);
+    const defesa = Number(a.defesa ?? a.constituicao ?? 0);
+    const inteligencia = Number(a.inteligencia ?? a.espirito ?? 0);
+    const vitalidade = Number(a.vitalidade ?? a.vida ?? 0);
+    const sorte = Number(a.sorte ?? 0);
+
+    let manaMax = 20 + Number(st.level || 0) * 4;
+    try {
+        if (typeof player.maxManaFromLevel === 'function') {
+            manaMax = player.maxManaFromLevel(st.level, profile.classId);
+        } else if (typeof xp.maxMana === 'function') {
+            manaMax = xp.maxMana(user.id);
+        }
+    } catch (_) {}
+
+    const classLine = cls
+        ? '**Classe:** ' + (cls.emoji || '⚔️') + ' ' + cls.name
+        : '**Classe:** _Sem classe — use `O.classe`_';
+    const classDesc = cls?.desc
+        ? '_' +
+          String(cls.desc).slice(0, 220) +
+          (String(cls.desc).length > 220 ? '…' : '') +
+          '_'
+        : null;
+
+    const titleName = displayName || 'Sem nome';
+    const emb = new EmbedBuilder()
+        .setColor((cls && cls.color) || 0xa78bfa)
+        .setTitle(titleName)
         .setThumbnail(photo)
         .setDescription(
             [
-                (cls?.emoji || '⚔️') +
-                    ' **' +
-                    (cls?.name || 'Sem classe') +
-                    '** · Nv **' +
-                    (st.level || 0) +
-                    '**',
-                'XP: **' + (st.xp || 0) + '** · Pontos: **' + (st.attrPoints || 0) + '**',
+                !hasName
+                    ? '_Use `O.j editar nome <nome>` para definir seu nome._'
+                    : null,
+                classLine,
+                classDesc,
                 '',
-                attrLines,
+                '🎚️ **Nível** ' +
+                    Number(st.level || 0) +
+                    ' · **XP** ' +
+                    Number(st.xp || 0).toLocaleString('pt-BR'),
                 '',
-                'Use `O.j atributos` para gastar pontos.'
-            ].join('\n')
-        )
-        .setFooter({ text: 'O.j atributos · O.j criar' });
+                '💙 **Mana máx:** ' + Number(manaMax).toLocaleString('pt-BR'),
+                '',
+                '✨ **Éter** ' +
+                    Number(eterBal).toLocaleString('pt-BR') +
+                    ' · 💠 **cristais** ' +
+                    Number(cristaisBal).toLocaleString('pt-BR'),
+                '',
+                '🏰 **Guilda:** ' + guildLine,
+                '',
+                '─────────────────────────────',
+                '**Atributos**',
+                '',
+                '💪 **força:** ' + forca,
+                '⚡ **agilidade:** ' + agilidade,
+                '🛡️ **defesa:** ' + defesa,
+                '🧠 **inteligência:** ' + inteligencia,
+                '✨ **vitalidade:** ' + vitalidade,
+                '🍀 **sorte:** ' + sorte,
+                '─────────────────────────────'
+            ]
+                .filter((x) => x != null)
+                .join('\n')
+        );
+
+    const serverName = opts.guildName || opts.serverName || null;
+    const dateStr = new Date().toLocaleDateString('pt-BR');
+    emb.setFooter({
+        text: ['Aeternus • jogador • perfil', dateStr, serverName].filter(Boolean).join(' • ')
+    });
+    emb.setTimestamp();
+    return emb;
 }
 
 function atributosPayload(user) {
@@ -226,8 +303,8 @@ function atributosPayload(user) {
     return { embeds: [emb], components };
 }
 
-function profilePayload(user, profile) {
-    return { embeds: [profileEmbed(user, profile)], components: [] };
+function profilePayload(user, profile, opts = {}) {
+    return { embeds: [profileEmbed(user, profile, opts)], components: [] };
 }
 
 async function beginCreate(interaction) {
@@ -264,6 +341,7 @@ module.exports = {
     aliases: ['jogador', 'personagem', 'perfiljogador'],
     description: 'Perfil de jogador / atributos',
     category: 'rpg',
+    profileEmbed,
     data: new SlashCommandBuilder()
         .setName('j')
         .setDescription('Personagem e atributos')
@@ -295,9 +373,15 @@ module.exports = {
             return message.reply('Manda a imagem no meu PV em até 2 min, ou anexa aqui.');
         }
 
-        const profile = player.get(message.author.id);
-        if (!profile) return message.reply('Sem personagem. Use `O.j criar`.');
-        return message.reply(profilePayload(message.author, profile));
+        const target = message.mentions.users.first() || message.author;
+        const profile = player.get(target.id);
+        if (!profile) {
+            if (target.id === message.author.id) return message.reply('Sem personagem. Use `O.j criar`.');
+            return message.reply(String(target) + ' ainda não tem personagem.');
+        }
+        return message.reply(
+            profilePayload(target, profile, { guildName: message.guild?.name })
+        );
     },
 
     async executeSlash(interaction) {
@@ -316,7 +400,9 @@ module.exports = {
 
         const profile = player.get(interaction.user.id);
         if (!profile) return reply({ content: 'Sem personagem. Use `/j criar`.', ephemeral: true });
-        return reply(profilePayload(interaction.user, profile));
+        return reply(
+            profilePayload(interaction.user, profile, { guildName: interaction.guild?.name })
+        );
     },
 
     async handleComponent(interaction) {
@@ -449,21 +535,10 @@ module.exports = {
             return safeUpdate(interaction, payload);
         }
 
-        if (id.startsWith('j:attrcancel:')) {
+        if (id.startsWith('j:attrcancel:') || id.startsWith('j:attrrefresh:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) {
                 return safeReply(interaction, { content: 'Só o dono.', flags: MessageFlags.Ephemeral });
-            }
-            return safeUpdate(interaction, atributosPayload(interaction.user));
-        }
-
-        if (id.startsWith('j:attrrefresh:')) {
-            const ownerId = id.split(':')[2];
-            if (String(interaction.user.id) !== String(ownerId)) {
-                return safeReply(interaction, {
-                    content: 'Só o dono do perfil.',
-                    flags: MessageFlags.Ephemeral
-                });
             }
             return safeUpdate(interaction, atributosPayload(interaction.user));
         }
@@ -495,40 +570,64 @@ module.exports = {
                 .catch(() => {});
         }
 
+        if (id === 'j:start') return beginCreate(interaction);
+
         if (id === 'j:class' && interaction.isStringSelectMenu()) {
-            const classId = interaction.values?.[0];
-            if (!classId || classId === 'none') {
-                return safeReply(interaction, { content: 'Classe inválida.', flags: MessageFlags.Ephemeral });
-            }
-            try {
-                if (typeof player.setClass === 'function') player.setClass(interaction.user.id, classId);
-                else if (typeof player.update === 'function') player.update(interaction.user.id, { classId });
-            } catch (e) {
+            const draft = drafts.get(interaction.user.id);
+            if (!draft?.name) {
                 return safeReply(interaction, {
-                    content: 'Falha ao definir classe: ' + (e.message || e),
+                    content: 'Sessão expirada.',
                     flags: MessageFlags.Ephemeral
                 });
             }
-            const profile = player.get(interaction.user.id);
-            return safeUpdate(interaction, profilePayload(interaction.user, profile));
+            const classId = interaction.values[0];
+            if (classId === 'none' || (!player.getClass(classId) && !player.CLASSES?.[classId])) {
+                return safeReply(interaction, {
+                    content: 'Classe inválida.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+            try {
+                player.create(interaction.user.id, {
+                    name: draft.name,
+                    classId,
+                    photoUrl: interaction.user.displayAvatarURL({ size: 256 })
+                });
+                drafts.delete(interaction.user.id);
+                const profile = player.get(interaction.user.id);
+                return safeUpdate(interaction, {
+                    content: '✅ Personagem criado!',
+                    embeds: [
+                        profileEmbed(interaction.user, profile, {
+                            guildName: interaction.guild?.name
+                        })
+                    ],
+                    components: []
+                });
+            } catch (e) {
+                return safeReply(interaction, {
+                    content: 'Erro: ' + (e.message || e),
+                    flags: MessageFlags.Ephemeral
+                });
+            }
         }
+    },
 
-        if (id === 'j:name' && interaction.isModalSubmit()) {
-            const nome = String(interaction.fields.getTextInputValue('nome') || '').trim();
-            if (nome.length < 2) {
-                return safeReply(interaction, { content: 'Nome inválido.', flags: MessageFlags.Ephemeral });
-            }
-            if (typeof player.create === 'function') {
-                player.create(interaction.user.id, { name: nome });
-            }
-            drafts.delete(interaction.user.id);
-            const profile = player.get(interaction.user.id);
+    async handleModal(interaction) {
+        if (interaction.customId !== 'j:name') return;
+        const nome = interaction.fields.getTextInputValue('nome').trim();
+        if (nome.length < 2) {
             return interaction.reply({
-                content: 'Personagem **' + nome + '** criado. Escolha a classe se quiser.',
-                embeds: profile ? [profileEmbed(interaction.user, profile)] : [],
-                components: [classSelect('j:class')]
+                content: 'Nome muito curto.',
+                flags: MessageFlags.Ephemeral
             });
         }
+        drafts.set(interaction.user.id, { step: 'class', name: nome });
+        return interaction.reply({
+            content: 'Nome **' + nome + '**. Escolha a classe:',
+            components: [classSelect('j:class')],
+            flags: MessageFlags.Ephemeral
+        });
     },
 
     tryConsumePhotoMessage
