@@ -49,21 +49,27 @@ const xp = require('../utils/xp');
 const drafts = new Map();
 const photoWait = new Map();
 
-/** Alinhado a utils/xp.js ATTR_KEYS */
 const ATTR_META = [
     { key: 'forca', label: 'Força', emoji: '💪' },
     { key: 'defesa', label: 'Defesa', emoji: '🛡️' },
     { key: 'agilidade', label: 'Agilidade', emoji: '⚡' },
-    { key: 'vida', label: 'Vida', emoji: '❤️' }
+    { key: 'vida', label: 'Vida', emoji: '❤️' },
+    { key: 'inteligencia', label: 'Intel.', emoji: '🧠' },
+    { key: 'sorte', label: 'Sorte', emoji: '🍀' },
+    { key: 'precisao', label: 'Precisão', emoji: '🎯' },
+    { key: 'resistencia', label: 'Resist.', emoji: '🪨' }
 ];
 
 function normalizeAttrKey(key) {
     const k = String(key || '').toLowerCase().trim();
     if (k === 'constituicao' || k === 'defense') return 'defesa';
-    if (k === 'strength' || k === 'force' || k === 'inteligencia') return 'forca';
-    if (k === 'agility' || k === 'espirito') return 'agilidade';
+    if (k === 'strength' || k === 'force') return 'forca';
+    if (k === 'agility') return 'agilidade';
     if (k === 'life' || k === 'hp' || k === 'vitalidade') return 'vida';
-    if (k === 'sorte') return 'defesa';
+    if (k === 'intel' || k === 'intelligence' || k === 'espirito') return 'inteligencia';
+    if (k === 'luck') return 'sorte';
+    if (k === 'accuracy' || k === 'crit') return 'precisao';
+    if (k === 'res' || k === 'resistance') return 'resistencia';
     return k;
 }
 
@@ -78,7 +84,8 @@ function classSelect(customId = 'j:class') {
             ? list.map((c) => {
                   const label = String(c.name || c.id).slice(0, 100) || c.id;
                   const value = String(c.id).slice(0, 100);
-                  let description = `${c.rarityName || c.rarity || 'Comum'} · ${String(c.desc || '').slice(0, 40)}`;
+                  let description =
+                      (c.rarityName || c.rarity || 'Comum') + ' · ' + String(c.desc || '').slice(0, 40);
                   description = description.slice(0, 100) || 'Classe';
                   const opt = { label, value, description };
                   const em = c.emoji && String(c.emoji);
@@ -94,7 +101,7 @@ function classSelect(customId = 'j:class') {
     );
 }
 
-function profileEmbed(user, profile, opts = {}) {
+function profileEmbed(user, profile) {
     if (!profile) {
         return new EmbedBuilder()
             .setColor(0xef4444)
@@ -108,7 +115,7 @@ function profileEmbed(user, profile, opts = {}) {
     const attrs = st.attrs || {};
     const attrLines = ATTR_META.map((a) => {
         const v = Number(attrs[a.key] || 0);
-        return `${a.emoji} **${a.label}:** ${v}`;
+        return a.emoji + ' **' + a.label + ':** ' + v;
     }).join('\n');
 
     return new EmbedBuilder()
@@ -117,7 +124,12 @@ function profileEmbed(user, profile, opts = {}) {
         .setThumbnail(photo)
         .setDescription(
             [
-                (cls?.emoji || '⚔️') + ' **' + (cls?.name || 'Sem classe') + '** · Nv **' + (st.level || 0) + '**',
+                (cls?.emoji || '⚔️') +
+                    ' **' +
+                    (cls?.name || 'Sem classe') +
+                    '** · Nv **' +
+                    (st.level || 0) +
+                    '**',
                 'XP: **' + (st.xp || 0) + '** · Pontos: **' + (st.attrPoints || 0) + '**',
                 '',
                 attrLines,
@@ -152,7 +164,12 @@ function atributosPayload(user) {
         .setDescription(
             [
                 '👤 **' + nome + '**',
-                (cls?.emoji || '⚔️') + ' **' + (cls?.name || 'Sem classe') + '** · Nv **' + level + '**',
+                (cls?.emoji || '⚔️') +
+                    ' **' +
+                    (cls?.name || 'Sem classe') +
+                    '** · Nv **' +
+                    level +
+                    '**',
                 '❤️ HP `' +
                     Number(hpMax).toLocaleString('pt-BR') +
                     '` · 🔷 Mana `' +
@@ -167,44 +184,50 @@ function atributosPayload(user) {
                     : '✦ Pontos disponíveis: **0** — suba de nível para ganhar mais'
             ].join('\n')
         )
-        .setFooter({ text: 'Cada +1 gasta 1 ponto · Gastar vários · Redistribuir devolve pontos' });
+        .setFooter({ text: 'Cada +1 gasta 1 ponto · Gastar vários · Redistribuir' });
 
-    const plusRow = new ActionRowBuilder();
-    for (const a of ATTR_META) {
-        const v = Number(attrs[a.key] || 0);
-        plusRow.addComponents(
-            new ButtonBuilder()
-                .setCustomId('j:attrplus:' + a.key + ':' + user.id)
-                .setLabel(('+1 ' + a.label + ' (' + v + ')').slice(0, 80))
-                .setEmoji(a.emoji)
-                .setStyle(points > 0 ? ButtonStyle.Success : ButtonStyle.Secondary)
-                .setDisabled(points <= 0)
-        );
+    const components = [];
+    for (let i = 0; i < ATTR_META.length; i += 4) {
+        const row = new ActionRowBuilder();
+        for (const a of ATTR_META.slice(i, i + 4)) {
+            const v = Number(attrs[a.key] || 0);
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId('j:attrplus:' + a.key + ':' + user.id)
+                    .setLabel(('+1 ' + a.label + ' (' + v + ')').slice(0, 80))
+                    .setEmoji(a.emoji)
+                    .setStyle(points > 0 ? ButtonStyle.Success : ButtonStyle.Secondary)
+                    .setDisabled(points <= 0)
+            );
+        }
+        components.push(row);
     }
 
-    const utilRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('j:attrdist:' + user.id)
-            .setLabel('Gastar vários')
-            .setEmoji('⚖️')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(points <= 0),
-        new ButtonBuilder()
-            .setCustomId('j:attrredis:' + user.id)
-            .setLabel('Redistribuir')
-            .setEmoji('🔄')
-            .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-            .setCustomId('j:attrrefresh:' + user.id)
-            .setLabel('Atualizar')
-            .setStyle(ButtonStyle.Secondary)
+    components.push(
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('j:attrdist:' + user.id)
+                .setLabel('Gastar vários')
+                .setEmoji('⚖️')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(points <= 0),
+            new ButtonBuilder()
+                .setCustomId('j:attrredis:' + user.id)
+                .setLabel('Redistribuir')
+                .setEmoji('🔄')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId('j:attrrefresh:' + user.id)
+                .setLabel('Atualizar')
+                .setStyle(ButtonStyle.Secondary)
+        )
     );
 
-    return { embeds: [emb], components: [plusRow, utilRow] };
+    return { embeds: [emb], components };
 }
 
-function profilePayload(user, profile, opts = {}) {
-    return { embeds: [profileEmbed(user, profile, opts)], components: [] };
+function profilePayload(user, profile) {
+    return { embeds: [profileEmbed(user, profile)], components: [] };
 }
 
 async function beginCreate(interaction) {
@@ -231,7 +254,6 @@ async function beginCreate(interaction) {
 }
 
 const dmPhoto = require('../utils/dmPhoto');
-const pickImageUrl = dmPhoto.pickImageUrl;
 async function tryConsumePhotoMessage(message, client) {
     if (client) return dmPhoto.tryConsumePhotoMessage(message, client);
     return false;
