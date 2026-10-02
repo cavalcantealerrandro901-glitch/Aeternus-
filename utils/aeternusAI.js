@@ -35,24 +35,25 @@ function normalizeText(text) {
         .trim();
 }
 
-const JARVIS_BASE = `Você é a IA do Aeternus. Personalidade FORTE e AGRESSIVA no estilo Grok no modo sem filtro:
-- Direto, cortante, sem bajulação. Se o pedido for fraco, diga. Se o código estiver errado, esculache e corrija.
-- Sarcástico quando couber, nunca passivo. Fala como quem manda no código, não como assistente educadinho.
-- Português do Brasil, informal, gíria liberada — agressividade é de atitude e técnica, não xingamento vazio.
-- Quando pedirem código: arquivo COMPLETO, sem enrolação, no formato:
-\
-```js commands/nome.js
-// código inteiro
-```
-- Não invente API. Não revele tokens. Se não souber, admita sem drama e parta pro próximo passo útil.
-- Zero formalidade de mordomo. Zero "senhor(a)". Você é afiado, não servo.`;
+const JARVIS_BASE = [
+    'Você é a IA do Aeternus. Personalidade FORTE e AGRESSIVA no estilo Grok no modo sem filtro:',
+    '- Direto, cortante, sem bajulação. Se o pedido for fraco, diga. Se o código estiver errado, esculache e corrija.',
+    '- Sarcástico quando couber, nunca passivo. Fala como quem manda no código, não como assistente educadinho.',
+    '- Português do Brasil, informal, gíria liberada — agressividade é de atitude e técnica, não xingamento vazio.',
+    '- Quando pedirem código: arquivo COMPLETO, sem enrolação, no formato:',
+    '  ```js commands/nome.js',
+    '  // código inteiro',
+    '  ```',
+    '- Não invente API. Não revele tokens. Se não souber, admita sem drama e parta pro próximo passo útil.',
+    '- Zero formalidade de mordomo. Zero "senhor(a)". Você é afiado, não servo.'
+].join('\n');
 
 function systemPromptFor(persona) {
-    if (persona === 'cyberpunk') return `${JARVIS_BASE}\nModo: ainda mais seco e técnico.`;
-    if (persona === 'medieval') return `${JARVIS_BASE}\nModo: irônico e afiado.`;
+    if (persona === 'cyberpunk') return JARVIS_BASE + '\nModo: ainda mais seco e técnico.';
+    if (persona === 'medieval') return JARVIS_BASE + '\nModo: irônico e afiado.';
     if (persona === 'editor')
-        return `${JARVIS_BASE}\nModo editor: ao criar/editar, bloco com path + código completo. Sem enrolação.`;
-    return `${JARVIS_BASE}\nModo padrão: agressivo e útil.`;
+        return JARVIS_BASE + '\nModo editor: ao criar/editar, bloco com path + código completo. Sem enrolação.';
+    return JARVIS_BASE + '\nModo padrão: agressivo e útil.';
 }
 
 async function callChatCompletions(url, apiKey, body, headersExtra = {}) {
@@ -162,11 +163,11 @@ async function providerOpenRouter(system, userMsg) {
 }
 
 async function providerPollinations(system, userMsg) {
-    const full = `${system}\n\nUsuário: ${userMsg}\nAssistente:`;
-    const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(full)}`);
-    if (!res.ok) throw new Error(`pollinations ${res.status}`);
+    const full = system + '\n\nUsuário: ' + userMsg + '\nAssistente:';
+    const res = await fetch('https://text.pollinations.ai/' + encodeURIComponent(full));
+    if (!res.ok) throw new Error('pollinations ' + res.status);
     const text = await res.text();
-    if (!text?.trim()) throw new Error('pollinations empty');
+    if (!text || !text.trim()) throw new Error('pollinations empty');
     return text.trim();
 }
 
@@ -182,17 +183,17 @@ async function fetchJarvisReply(userText, persona = 'default', history = []) {
     const system = systemPromptFor(persona);
     let contextBlock = '';
     if (Array.isArray(history) && history.length) {
-        const last = history.slice(-6).map((h) => `- ${h.text || h}`).join('\n');
-        contextBlock = `\nContexto recente:\n${last}\n`;
+        const last = history.slice(-6).map((h) => '- ' + (h.text || h)).join('\n');
+        contextBlock = '\nContexto recente:\n' + last + '\n';
     }
-    const userMsg = `${contextBlock}Mensagem: ${userText}`.trim();
+    const userMsg = (contextBlock + 'Mensagem: ' + userText).trim();
     const errors = [];
     for (const p of PROVIDERS) {
         try {
             const text = await p.fn(system, userMsg);
             if (text) return { text: text.slice(0, 12000), provider: p.name };
         } catch (e) {
-            errors.push(`${p.name}: ${e.message}`);
+            errors.push(p.name + ': ' + e.message);
         }
     }
     if (errors.length) console.warn('[AI]', errors.join(' | '));
@@ -209,7 +210,7 @@ async function fetchWordDefinition(word) {
     if (dictCache[cleanWord]) return dictCache[cleanWord];
     try {
         const res = await fetch(
-            `https://api.dicionario-aberto.net/word/${encodeURIComponent(cleanWord)}`
+            'https://api.dicionario-aberto.net/word/' + encodeURIComponent(cleanWord)
         );
         if (!res.ok) return null;
         const data = await res.json();
@@ -265,7 +266,7 @@ function listContexts() {
     return [...contexts.keys()];
 }
 function registerTool(def) {
-    if (def?.name) tools.set(def.name, def);
+    if (def && def.name) tools.set(def.name, def);
 }
 function listTools() {
     return [...tools.keys()];
@@ -280,10 +281,10 @@ function clearHistory(userId) {
 async function chat({ userId, message, client, guild, channel, author }) {
     const text = String(message || '').trim();
     if (!text) return { text: 'Manda algo com conteúdo. Mensagem vazia não é prompt.', provider: 'none' };
-    const profile = getUserProfile(userId, author?.username);
+    const profile = getUserProfile(userId, author && author.username);
     const history = profile.history || [];
     const result = await fetchJarvisReply(text, 'default', history);
-    profile.history = [...history, { text }].slice(-20);
+    profile.history = history.concat([{ text }]).slice(-20);
     saveData();
     if (!result) {
         return {
