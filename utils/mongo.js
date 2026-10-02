@@ -31,7 +31,6 @@ async function connect() {
         try {
             mongoose.set('strictQuery', true);
             await mongoose.connect(uri, {
-                // timeouts mais tolerantes em hosts compartilhados
                 serverSelectionTimeoutMS: 15_000,
                 connectTimeoutMS: 15_000,
                 maxPoolSize: 10
@@ -94,8 +93,44 @@ const BackupSchema = new mongoose.Schema(
     { collection: 'aeternus_backups' }
 );
 
+const UserXpSchema = new mongoose.Schema(
+    {
+        _id: { type: String },
+        xp: { type: Number, default: 0, index: true },
+        level: { type: Number, default: 0, index: true },
+        attrs: {
+            forca: { type: Number, default: 5 },
+            defesa: { type: Number, default: 5 },
+            agilidade: { type: Number, default: 5 },
+            vida: { type: Number, default: 10 }
+        },
+        attrPoints: { type: Number, default: 0 },
+        totalXpGained: { type: Number, default: 0 },
+        lastGainAt: { type: Date, default: null },
+        lastGainAmount: { type: Number, default: 0 },
+        updatedAt: { type: Date, default: Date.now }
+    },
+    { collection: 'aeternus_user_xp', timestamps: false }
+);
+
+const XpGainSchema = new mongoose.Schema(
+    {
+        userId: { type: String, index: true, required: true },
+        amount: { type: Number, required: true },
+        reason: { type: String, default: 'xp' },
+        levelBefore: { type: Number, default: 0 },
+        levelAfter: { type: Number, default: 0 },
+        attrs: { type: mongoose.Schema.Types.Mixed, default: null },
+        attrGains: { type: mongoose.Schema.Types.Mixed, default: null },
+        createdAt: { type: Date, default: Date.now, index: true }
+    },
+    { collection: 'aeternus_xp_gains' }
+);
+
+const UserXp = mongoose.models.AeternusUserXp || mongoose.model('AeternusUserXp', UserXpSchema);
+const XpGain = mongoose.models.AeternusXpGain || mongoose.model('AeternusXpGain', XpGainSchema);
 const Kv = mongoose.models.AeternusStore || mongoose.model('AeternusStore', KvSchema);
 const Backup =
     mongoose.models.AeternusBackup || mongoose.model('AeternusBackup', BackupSchema);
 
-module.exports = { connect, isConnected, Kv, Backup, mongoose };
+module.exports = { connect, isConnected, Kv, Backup, UserXp, XpGain, mongoose };
