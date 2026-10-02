@@ -5,7 +5,6 @@ function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
 
-/** Rank global de éter (carteira) */
 function globalRank(userId) {
     const data = eter.all() || {};
     const list = Object.entries(data)
@@ -24,45 +23,41 @@ function buildText(viewer, target) {
 
     if (String(viewer.id) === String(target.id)) {
         return [
-            `${target} Você possui ✨ **${fmt(bal)}** éter`,
-            `e está em **#${rankStr}** global.`,
+            target + ' Você possui ✨ **' + fmt(bal) + '** éter',
+            'e está em **#' + rankStr + '** global.',
             '',
-            'Comandos disponíveis: `/minas` e `/ver_saldo`.'
+            'Comandos disponíveis: `/minas` e `/ver-saldo`.'
         ].join('\n');
     }
 
     return [
-        `${viewer} O ${target} possui ✨ **${fmt(bal)}** éter`,
-        `e você sabia que ${target} está em **#${rankStr}** lugar do rank global?`
+        viewer + ' O ' + target + ' possui ✨ **' + fmt(bal) + '** éter',
+        'e você sabia que ' + target + ' está em **#' + rankStr + '** lugar do rank global?'
     ].join('\n');
 }
 
 async function run(viewer, target, reply) {
-    const mentionIds = [...new Set([viewer.id, target.id])];
-    return reply({
-        content: buildText(viewer, target),
-        allowedMentions: { users: mentionIds }
-    });
+    return reply(buildText(viewer, target));
 }
 
 module.exports = {
     name: 'saldo',
-    aliases: ['bal', 'atm', 'balance', 'carteira', 'eter'],
+    aliases: ['balance', 'money', 'éter', 'eter'],
     description: 'Ver saldo',
     data: new SlashCommandBuilder()
-        .setName('ver_saldo')
+        .setName('ver-saldo')
         .setDescription('Ver saldo de éter')
         .addUserOption((o) =>
             o.setName('usuario').setDescription('Usuário').setRequired(false)
         ),
 
     async execute(message) {
-        const user = message.mentions.users.first() || message.author;
-        await run(message.author, user, (p) => message.reply(p));
+        const target = message.mentions.users.first() || message.author;
+        await run(message.author, target, (t) => message.reply({ content: t, allowedMentions: { users: [target.id] } }));
     },
 
-    async executeSlash(interaction) {
-        const user = interaction.options.getUser('usuario') || interaction.user;
-        await run(interaction.user, user, (p) => interaction.reply(p));
+    async executeSlash(i) {
+        const target = i.options.getUser('usuario') || i.user;
+        await run(i.user, target, (t) => i.reply({ content: t, allowedMentions: { users: [target.id] } }));
     }
 };
