@@ -229,7 +229,12 @@ function startWeb(client) {
     const port = process.env.PORT || 10000;
     const host = process.env.HOST || '0.0.0.0';
     const server = app.listen(port, host, () => {
-        console.log('Painel em http://' + host + ':' + port);
+        const publicBase =
+            (process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '').replace(/\/$/, '') ||
+            ('http://' + host + ':' + port);
+        console.log('🌐 Painel:  ' + publicBase + '/dashboard');
+        console.log('🛠️  Editor:  ' + publicBase + '/editor.html');
+        console.log('   (também /editor)');
         if (REDIRECT) console.log('[web] OAuth redirect:', REDIRECT);
     });
     return server;
