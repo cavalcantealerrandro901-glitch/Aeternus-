@@ -10,9 +10,119 @@ function panelAuth(req, res, next) {
     next();
 }
 
-async function askJarvis(message, persona) {
-    const extra =
-        '[Editor Aeternus] Pode sugerir ls/cat/nano/npm. Fale de boa, gíria e palavrão liberados.\n\n';
+/** Detecta se o pedido é para editar/ajustar código */
+function isEditRequest(msg) {
+    return /\b(edit|editar|ajusta|ajustar|corrija|corrigir|modifica|modificar|muda|mudar|altera|alterar|refatora|refatorar|reescrev|implementa|adiciona|remove|conserta|fix|patch|atualiza)\b/i.test(
+        msg
+    );
+}
+
+/** Extrai caminhos de arquivo da mensagem */
+function extractPaths(msg) {
+    const found = new Set();
+    const re =
+        /(?:^|[\s"'`(])((?:commands|utils|web|tools|systems|events|bot|public|data|js)\/[\w./-]+\.[a-z0-9]+|[\w.-]+\/(?:[\w./-]+\.)+[a-z0-9]+)/gi;
+    let m;
+    while ((m = re.exec(msg))) found.add(m[1].replace(/^["'`(]+|["'`)]+$/g, ''));
+    // caminhos simples tipo rob.js, banco.js se citados com editar
+    const simple = msg.match(/(?:arquivo|file)\s+["'`]?([\w./-]+\.[a-z0-9]+)/i);
+    if (simple) found.add(simple[1]);
+    return [...found];
+}
+
+function readFileSafe(rel) {
+    try {
+        const r = shell.cat(rel, { max: 24_000 });
+        if (!r.ok) return { path: rel, error: r.error };
+        return { path: r.path || rel, content: r.content, truncated: r.truncated };
+    } catch (e) {
+        return { path: rel, error: e.message };
+    }
+}
+
+/**
+ * Monta contexto: sempre lê o arquivo aberto e/ou os citados
+ * antes de pedir resposta ao JARVIS.
+ */
+function buildFileContext({ message, currentPath, editorContent }) {
+    const files = [];
+    const paths = extractPaths(message);
+
+    if (currentPath) paths.unshift(String(currentPath));
+
+    // únicos
+    const seen = new Set();
+    for (const p of paths) {
+        const key = String(p).replace(/^\.\//, '');
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+
+        // se é o arquivo aberto e o client mandou o buffer, usa o buffer (pode ter edits não salvos)
+        if (
+            currentPath &&
+            key === String(currentPath).replace(/^\.\//, '') &&
+            typeof editorContent === 'string' &&
+            editorContent.length
+        ) {
+            files.push({
+                path: key,
+                content: editorContent.slice(0, 24_000),
+                source: 'editor-buffer'
+            });
+            continue;
+        }
+
+        const r = readFileSafe(key);
+        files.push(r);
+    }
+
+    // pedido de edição sem path → ainda assim lê o arquivo aberto se houver
+    if (!files.length && currentPath) {
+        if (typeof editorContent === 'string' && editorContent.length) {
+            files.push({
+                path: currentPath,
+                content: editorContent.slice(0, 24_000),
+                source: 'editor-buffer'
+            });
+        } else {
+            files.push(readFileSafe(currentPath));
+        }
+    }
+
+    return files;
+}
+
+function formatFilesForPrompt(files) {
+    if (!files.length) return '';
+    const parts = ['\n\n=== ARQUIVOS LIDOS (leia isto ANTES de responder) ==='];
+    for (const f of files) {
+        if (f.error) {
+            parts.push(`\n--- ${f.path} ---\n[ERRO ao ler: ${f.error}]`);
+            continue;
+        }
+        parts.push(
+            `\n--- ${f.path} (${f.source || 'disco'}${f.truncated ? ', truncado' : ''}) ---\n${f.content}`
+        );
+    }
+    parts.push('\n=== FIM DOS ARQUIVOS ===\n');
+    return parts.join('');
+}
+
+async function askJarvis(message, persona, fileContext) {
+    const editHint = isEditRequest(message)
+        ? '\nO usuário pediu EDITAR/AJUSTAR. Você JÁ TEM o conteúdo do arquivo acima. Baseie a resposta no código lido. Se propor mudança, mostre o trecho completo em bloco ```...``` com o path no início se possível.'
+        : '';
+
+    const extra = [
+        '[Editor Aeternus]',
+        'Fale de boa, gíria e palavrão liberados.',
+        'REGRA: se o usuário pedir editar/ajustar/corrigir um arquivo, o conteúdo JÁ FOI LIDO e está no contexto — use esse conteúdo, não invente o arquivo.',
+        'Pode sugerir ls/cat/nano/npm quando fizer sentido.',
+        editHint,
+        fileContext,
+        '\nPedido do usuário:\n'
+    ].join('\n');
+
     if (typeof ai.fetchPublicAIResponse === 'function') {
         return await ai.fetchPublicAIResponse(extra + message, persona);
     }
@@ -72,8 +182,29 @@ function registerEditorRoutes(app) {
         try {
             const msg = String(req.body?.message || '').trim();
             if (!msg) return res.status(400).json({ ok: false, error: 'message vazio' });
-            const reply = await askJarvis(msg, req.body?.persona || 'default');
-            res.json({ ok: true, reply: reply || '… deu ruim, tenta de novo.' });
+
+            const currentPath = req.body?.currentPath ? String(req.body.currentPath) : null;
+            const editorContent =
+                req.body?.editorContent != null ? String(req.body.editorContent) : null;
+
+            // 1) Lê arquivo(s) PRIMEIRO
+            const files = buildFileContext({ message: msg, currentPath, editorContent });
+            const fileContext = formatFilesForPrompt(files);
+
+            // 2) Só então chama a IA com o conteúdo
+            const reply = await askJarvis(msg, req.body?.persona || 'default', fileContext);
+
+            res.json({
+                ok: true,
+                reply: reply || '… deu ruim, tenta de novo.',
+                readFiles: files.map((f) => ({
+                    path: f.path,
+                    ok: !f.error,
+                    error: f.error || null,
+                    source: f.source || (f.error ? null : 'disk'),
+                    chars: f.content ? f.content.length : 0
+                }))
+            });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }
