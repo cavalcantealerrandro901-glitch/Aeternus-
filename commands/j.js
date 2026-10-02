@@ -261,7 +261,7 @@ async function tryConsumePhotoMessage(message, client) {
 
 module.exports = {
     name: 'j',
-    aliases: ['jogador', 'personagem', 'perfiljogador', 'atributos'],
+    aliases: ['jogador', 'personagem', 'perfiljogador'],
     description: 'Perfil de jogador / atributos',
     category: 'rpg',
     data: new SlashCommandBuilder()
