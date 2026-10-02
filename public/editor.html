@@ -3,147 +3,387 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Editor — Aeternus</title>
+<title>Aeternus — Live Code</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@500;700&display=swap" rel="stylesheet"/>
 <style>
-:root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--tab:#21262d}
+:root{
+  --bg:#07090f;--panel:#0e131c;--border:#1c2433;--text:#e8eef7;--muted:#7a8799;
+  --accent:#7c5cff;--green:#3dd68c;--cyan:#5eead4;--orange:#f59e0b;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
-header{display:flex;align-items:center;gap:1rem;padding:.55rem 1rem;background:var(--panel);border-bottom:1px solid var(--border)}
-header .logo{font-weight:700}header .logo span{color:var(--accent)}
-header a{color:var(--muted);text-decoration:none;font-size:.85rem}
-.layout{flex:1;display:grid;grid-template-columns:240px 1fr 300px;min-height:0}
-@media(max-width:900px){.layout{grid-template-columns:1fr}.sidebar,.chat{display:none}}
-.sidebar,.chat{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
-.chat{border-right:none;border-left:1px solid var(--border)}
-.side-head,.chat-head{padding:.6rem .8rem;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
-.file-list{overflow:auto;flex:1;padding:.4rem;font-family:JetBrains Mono,monospace;font-size:.78rem}
-.file-list button{display:block;width:100%;text-align:left;background:transparent;border:none;color:var(--text);padding:.28rem .4rem;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.file-list button:hover{background:#1f6feb33;color:var(--accent)}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Plus Jakarta Sans',system-ui,sans-serif;
+  background:radial-gradient(1200px 600px at 20% -10%,#1a1040 0%,transparent 55%),
+             radial-gradient(900px 500px at 90% 10%,#0a2a2a 0%,transparent 50%),
+             var(--bg);
+  color:var(--text);
+  display:flex;flex-direction:column;
+}
+header{
+  display:flex;align-items:center;gap:.85rem;
+  padding:.5rem 1rem;background:rgba(14,19,28,.85);
+  border-bottom:1px solid var(--border);backdrop-filter:blur(8px);
+  flex-shrink:0;
+}
+header .logo{font-weight:700;letter-spacing:.04em}
+header .logo span{color:var(--accent)}
+header a{color:var(--muted);text-decoration:none;font-size:.82rem}
+header a:hover{color:var(--text)}
+.badge{
+  font-size:.7rem;padding:.2rem .5rem;border-radius:999px;
+  background:#1a1233;color:var(--accent);border:1px solid #3b2a7a;
+}
+.layout{
+  flex:1;display:grid;
+  grid-template-columns:220px minmax(0,1fr) 320px;
+  min-height:0;
+}
+@media(max-width:960px){
+  .layout{grid-template-columns:1fr}
+  .sidebar,.chat{display:none}
+}
+.sidebar,.chat{
+  background:rgba(14,19,28,.92);
+  display:flex;flex-direction:column;min-height:0;
+}
+.sidebar{border-right:1px solid var(--border)}
+.chat{border-left:1px solid var(--border)}
+.side-head,.chat-head{
+  padding:.55rem .75rem;font-size:.7rem;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--muted);border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.file-list{overflow:auto;flex:1;padding:.35rem;font-family:'JetBrains Mono',monospace;font-size:.74rem}
+.file-list button{
+  display:block;width:100%;text-align:left;background:transparent;border:none;
+  color:var(--text);padding:.28rem .4rem;border-radius:6px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.file-list button:hover{background:#7c5cff22;color:#c4b5fd}
+.file-list button.active{background:#7c5cff33;color:#e9e0ff}
+
+/* ── LIVE CODE LOG (tela principal) ── */
 .main{display:flex;flex-direction:column;min-height:0;min-width:0}
-.toolbar{display:flex;gap:.4rem;padding:.4rem .6rem;border-bottom:1px solid var(--border);background:var(--panel);flex-wrap:wrap}
-.toolbar button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:.45rem .8rem;font-weight:600;cursor:pointer;font-size:.8rem}
-.toolbar button.secondary{background:var(--tab);color:var(--text);border:1px solid var(--border)}
-.tabs{display:flex;background:var(--tab);border-bottom:1px solid var(--border);overflow-x:auto}
-.tab{padding:.45rem .9rem;font-size:.8rem;color:var(--muted);border-right:1px solid var(--border);cursor:pointer}
-.tab.active{background:var(--bg);color:var(--text)}
-.editor-wrap{flex:1;display:flex;min-height:0}
-#lineNums{width:48px;background:var(--bg);color:var(--muted);font-family:JetBrains Mono,monospace;font-size:13px;line-height:1.55;padding:12px 6px;text-align:right;overflow:hidden;border-right:1px solid var(--border);user-select:none}
-#editor{flex:1;background:var(--bg);color:#c9d1d9;border:none;outline:none;resize:none;font-family:JetBrains Mono,monospace;font-size:13px;line-height:1.55;padding:12px;white-space:pre;overflow:auto;tab-size:2}
-.statusbar{display:flex;gap:1rem;padding:.25rem .75rem;background:#0d419d;font-size:.72rem;color:#fff}
-.term{height:190px;border-top:1px solid var(--border);display:flex;flex-direction:column;background:#010409}
-.term-head{padding:.35rem .75rem;font-size:.72rem;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
-#termOut{flex:1;overflow:auto;font-family:JetBrains Mono,monospace;font-size:12px;padding:.5rem .75rem;color:#3fb950;white-space:pre-wrap}
-.term-in{display:flex;border-top:1px solid var(--border)}
-.term-in span{padding:.4rem .6rem;color:var(--accent);font-family:JetBrains Mono,monospace;font-size:12px}
-.term-in input{flex:1;background:transparent;border:none;color:var(--text);font-family:JetBrains Mono,monospace;font-size:12px;padding:.4rem;outline:none}
-.chat-msgs{flex:1;overflow:auto;padding:.75rem;display:flex;flex-direction:column;gap:.6rem}
-.bubble{padding:.55rem .7rem;border-radius:10px;font-size:.85rem;line-height:1.45}
-.bubble.user{background:#1f6feb33;align-self:flex-end}
-.bubble.bot{background:#21262d;align-self:flex-start;border:1px solid var(--border)}
+.log-head{
+  display:flex;align-items:center;gap:.6rem;
+  padding:.45rem .75rem;border-bottom:1px solid var(--border);
+  background:rgba(14,19,28,.7);font-size:.78rem;color:var(--muted);
+}
+.log-head .dot{
+  width:8px;height:8px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px var(--green);animation:pulse 1.6s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+#codeLog{
+  flex:1;overflow:auto;padding:1rem 1.1rem 1.5rem;
+  font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.55;
+  white-space:pre-wrap;word-break:break-word;
+  color:#c8d1dc;
+}
+#codeLog .line-meta{color:var(--muted);font-size:.72rem;margin:1rem 0 .35rem}
+#codeLog .line-path{color:var(--cyan);font-weight:600}
+#codeLog .line-code{color:#dce6f5}
+#codeLog .line-ok{color:var(--green)}
+#codeLog .line-err{color:#f87171}
+#codeLog .line-ai{color:#c4b5fd}
+#codeLog .cursor{
+  display:inline-block;width:.55ch;height:1em;background:var(--accent);
+  vertical-align:text-bottom;margin-left:1px;animation:blink .8s step-end infinite;
+}
+@keyframes blink{50%{opacity:0}}
+
+.term{
+  border-top:1px solid var(--border);background:rgba(8,10,16,.95);
+  display:flex;flex-direction:column;max-height:28vh;min-height:120px;
+}
+.term-head{
+  padding:.35rem .75rem;font-size:.68rem;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--muted);display:flex;justify-content:space-between;
+}
+#termOut{
+  flex:1;overflow:auto;padding:.4rem .75rem;font-family:'JetBrains Mono',monospace;
+  font-size:.75rem;color:#9fb0c5;white-space:pre-wrap;
+}
+.term-in{
+  display:flex;align-items:center;gap:.4rem;padding:.4rem .75rem;
+  border-top:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.8rem;
+}
+.term-in span{color:var(--green)}
+.term-in input{
+  flex:1;background:transparent;border:none;outline:none;color:var(--text);
+  font-family:inherit;font-size:inherit;
+}
+
+.chat-msgs{flex:1;overflow:auto;padding:.75rem;display:flex;flex-direction:column;gap:.55rem}
+.bubble{padding:.55rem .7rem;border-radius:12px;font-size:.84rem;line-height:1.45;max-width:100%}
+.bubble.user{background:#7c5cff33;align-self:flex-end;border:1px solid #5b45b5}
+.bubble.bot{background:#151b26;align-self:flex-start;border:1px solid var(--border)}
 .chat-in{display:flex;gap:.4rem;padding:.6rem;border-top:1px solid var(--border)}
-.chat-in input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:.5rem .7rem;outline:none}
-.chat-in button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:.5rem .85rem;font-weight:600;cursor:pointer}
-.secret-bar{padding:.4rem .75rem;background:#21262d;font-size:.75rem;display:flex;gap:.5rem;align-items:center;border-bottom:1px solid var(--border)}
-.secret-bar input{flex:1;max-width:220px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:.3rem .5rem;border-radius:4px}
+.chat-in input{
+  flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;
+  color:var(--text);padding:.55rem .75rem;outline:none;
+}
+.chat-in input:focus{border-color:var(--accent)}
+.chat-in button{
+  background:linear-gradient(135deg,#7c5cff,#5b8def);color:#fff;border:none;
+  border-radius:10px;padding:.55rem .9rem;font-weight:600;cursor:pointer;
+}
+.chat-in button:disabled{opacity:.5;cursor:wait}
+.status-online{color:var(--green);font-size:.7rem}
 </style>
 </head>
 <body>
 <header>
-  <div class="logo"><span>AET</span>ERNUS · Editor</div>
+  <div class="logo"><span>AET</span>ERNUS</div>
+  <span class="badge">LIVE CODE</span>
   <a href="index.html">Início</a>
   <a href="dashboard.html">Painel</a>
   <span style="flex:1"></span>
-  <span id="pathLabel" style="font-size:.8rem;color:var(--muted);font-family:JetBrains Mono,monospace">nenhum arquivo</span>
+  <span id="statusPath" style="font-size:.75rem;color:var(--muted);font-family:JetBrains Mono,monospace">pronto</span>
 </header>
-<div class="secret-bar">
-  <label>PANEL_SECRET</label>
-  <input id="secret" type="password" placeholder="se configurado no Render"/>
-  <button onclick="localStorage.setItem('panel_secret',document.getElementById('secret').value);alert('salvo')" style="background:#30363d;color:#fff;border:none;padding:.3rem .6rem;border-radius:4px;cursor:pointer">Salvar</button>
-</div>
+
 <div class="layout">
   <aside class="sidebar">
-    <div class="side-head">Arquivos <button onclick="loadTree()" style="background:none;border:none;color:var(--accent);cursor:pointer">↻</button></div>
+    <div class="side-head">Arquivos <button type="button" onclick="loadTree()" style="background:none;border:none;color:var(--accent);cursor:pointer">↻</button></div>
     <div class="file-list" id="files"></div>
   </aside>
+
   <section class="main">
-    <div class="toolbar">
-      <button onclick="saveFile()">Salvar</button>
-      <button class="secondary" onclick="newFile()">Novo</button>
-      <button class="secondary" onclick="runCmd('ls')">ls</button>
-      <button class="secondary" onclick="runCmd('tree')">tree</button>
-      <button class="secondary" onclick="runCmd('help')">help</button>
+    <div class="log-head">
+      <span class="dot"></span>
+      <span>Log de criação · tempo real</span>
+      <span style="flex:1"></span>
+      <button type="button" onclick="clearLog()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:.2rem .5rem;cursor:pointer;font-size:.7rem">limpar</button>
     </div>
-    <div class="tabs" id="tabs"></div>
-    <div class="editor-wrap">
-      <div id="lineNums">1</div>
-      <textarea id="editor" spellcheck="false" placeholder="// nano caminho/arquivo.js no terminal"></textarea>
-    </div>
-    <div class="statusbar"><span id="pos">Ln 1, Col 1</span><span id="dirty"></span><span>UTF-8</span></div>
+    <div id="codeLog"></div>
     <div class="term">
-      <div class="term-head"><span>TERMINAL</span><span>ls · cat · nano · npm · node · help</span></div>
+      <div class="term-head"><span>Terminal</span><span>ls · cat · npm · help</span></div>
       <div id="termOut">Aeternus Shell — digite help\n</div>
-      <div class="term-in"><span>$</span><input id="termInput" placeholder="ls | cat utils/x.js | nano commands/rob.js | npm install" autocomplete="off"/></div>
+      <div class="term-in"><span>$</span><input id="termInput" placeholder="ls | cat path | help" autocomplete="off"/></div>
     </div>
   </section>
+
   <aside class="chat">
-    <div class="chat-head">J.A.R.V.I.S. <span style="color:var(--green)">online</span></div>
+    <div class="chat-head">
+      <span>J.A.R.V.I.S.</span>
+      <span class="status-online">ONLINE</span>
+    </div>
     <div class="chat-msgs" id="chatMsgs">
-      <div class="bubble bot">E aí. Tô no editor contigo. Se pedir pra editar/ajustar um arquivo, eu leio ele primeiro (o aberto ou o caminho que você citar) e só depois respondo.</div>
+      <div class="bubble bot">E aí. Tô no log contigo — manda o que quer criar ou ajustar. Eu mostro o código aqui no meio, linha a linha.</div>
     </div>
     <div class="chat-in">
       <input id="chatInput" placeholder="fala com o JARVIS…"/>
-      <button onclick="sendChat()">Enviar</button>
+      <button type="button" id="chatBtn" onclick="sendChat()">Enviar</button>
     </div>
   </aside>
 </div>
+
 <script>
-const API='/api/editor';
-let currentPath=null,dirty=false;
-const openTabs=new Map();
-function headers(){const h={'Content-Type':'application/json'};const s=localStorage.getItem('panel_secret')||document.getElementById('secret').value;if(s)h['x-panel-secret']=s;return h}
-document.getElementById('secret').value=localStorage.getItem('panel_secret')||'';
-async function api(path,opts={}){const res=await fetch(API+path,{...opts,headers:{...headers(),...(opts.headers||{})}});return res.json()}
-async function loadTree(){const data=await api('/tree');const el=document.getElementById('files');if(!data.ok){el.textContent=data.error||'erro';return}el.innerHTML=data.files.map(f=>'<button onclick="openFile(\''+f.replace(/'/g,"\\'")+'\')">'+f+'</button>').join('')}
-async function openFile(p){const data=await api('/read?path='+encodeURIComponent(p));if(!data.ok){termPrint('erro: '+data.error);return}currentPath=data.path||p;document.getElementById('editor').value=data.content||'';dirty=false;updateUI();openTabs.set(currentPath,document.getElementById('editor').value);renderTabs();termPrint('aberto: '+currentPath)}
-function renderTabs(){const tabs=document.getElementById('tabs');tabs.innerHTML='';for(const[p] of openTabs){const t=document.createElement('div');t.className='tab'+(p===currentPath?' active':'');t.textContent=p.split('/').pop();t.onclick=()=>openFile(p);tabs.appendChild(t)}}
-function updateUI(){document.getElementById('pathLabel').textContent=currentPath||'nenhum arquivo';document.getElementById('dirty').textContent=dirty?'modificado':'';syncLines()}
-function syncLines(){const ed=document.getElementById('editor');const n=ed.value.split('\n').length;document.getElementById('lineNums').textContent=Array.from({length:n},(_,i)=>i+1).join('\n')}
-document.getElementById('editor').addEventListener('input',()=>{dirty=true;updateUI();if(currentPath)openTabs.set(currentPath,document.getElementById('editor').value)});
-document.getElementById('editor').addEventListener('scroll',()=>{document.getElementById('lineNums').scrollTop=document.getElementById('editor').scrollTop});
-async function saveFile(){if(!currentPath){const p=prompt('caminho');if(!p)return;currentPath=p}const data=await api('/write',{method:'POST',body:JSON.stringify({path:currentPath,content:document.getElementById('editor').value})});if(data.ok){dirty=false;updateUI();termPrint('salvo: '+data.path)}else termPrint('erro: '+data.error)}
-function newFile(){const p=prompt('novo arquivo');if(!p)return;currentPath=p;document.getElementById('editor').value='';dirty=true;openTabs.set(p,'');renderTabs();updateUI()}
-function termPrint(t){const o=document.getElementById('termOut');o.textContent+=(o.textContent.endsWith('\n')?'':'\n')+t+'\n';o.scrollTop=o.scrollHeight}
-async function runCmd(line){termPrint('$ '+line);const data=await api('/exec',{method:'POST',body:JSON.stringify({cmd:line})});if(data.open){currentPath=data.open;document.getElementById('editor').value=data.text||'';openTabs.set(currentPath,data.text||'');dirty=false;renderTabs();updateUI()}if(data.text)termPrint(data.text);if(data.error)termPrint('erro: '+data.error)}
-document.getElementById('termInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=e.target.value.trim();e.target.value='';if(v)runCmd(v)}});
-async function sendChat(){
-  const input=document.getElementById('chatInput');
-  const msg=input.value.trim();
-  if(!msg)return;
-  input.value='';
-  const box=document.getElementById('chatMsgs');
-  box.innerHTML+='<div class="bubble user">'+esc(msg)+'</div>';
-  box.innerHTML+='<div class="bubble bot" id="chatLoading" style="opacity:.7">Lendo arquivo e pensando…</div>';
-  box.scrollTop=box.scrollHeight;
-  const payload={
-    message:msg,
-    currentPath: currentPath || null,
-    editorContent: currentPath ? document.getElementById('editor').value : null
-  };
-  const data=await api('/chat',{method:'POST',body:JSON.stringify(payload)});
-  const loading=document.getElementById('chatLoading');
-  if(loading)loading.remove();
-  let meta='';
-  if(data.readFiles && data.readFiles.length){
-    meta='<div style="font-size:.72rem;color:#8b949e;margin-bottom:.35rem">📖 leu: '+
-      data.readFiles.map(f=>f.path+(f.ok?'':' (erro)')).join(', ')+'</div>';
-  }
-  box.innerHTML+='<div class="bubble bot">'+meta+esc(data.reply||data.error||'…')+'</div>';
-  box.scrollTop=box.scrollHeight;
+const API = '/api/editor';
+let currentPath = null;
+let typing = false;
+
+function headers() {
+  const h = { 'Content-Type': 'application/json' };
+  const s = localStorage.getItem('panel_secret') || '';
+  if (s) h['x-panel-secret'] = s;
+  return h;
 }
-document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat()});
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-loadTree();syncLines();
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } });
+  const data = await res.json().catch(() => ({ ok: false, error: 'resposta inválida' }));
+  if (res.status === 401) {
+    const secret = prompt('PANEL_SECRET (Render):');
+    if (secret != null) {
+      localStorage.setItem('panel_secret', secret);
+      return api(path, opts);
+    }
+  }
+  return data;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' }[c]));
+}
+
+const logEl = () => document.getElementById('codeLog');
+
+function appendLogHtml(html) {
+  const el = logEl();
+  el.insertAdjacentHTML('beforeend', html);
+  el.scrollTop = el.scrollHeight;
+}
+
+function logMeta(text) {
+  appendLogHtml('<div class="line-meta">' + esc(text) + '</div>');
+}
+
+function clearLog() {
+  logEl().innerHTML = '';
+  logMeta('log limpo · ' + new Date().toLocaleTimeString());
+}
+
+/** Escreve texto no log com efeito de digitação */
+async function typeIntoLog(text, className = 'line-code') {
+  typing = true;
+  const el = logEl();
+  const wrap = document.createElement('div');
+  wrap.className = className;
+  el.appendChild(wrap);
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  wrap.appendChild(cursor);
+
+  const str = String(text || '');
+  const chunk = Math.max(1, Math.floor(str.length / 120));
+  for (let i = 0; i < str.length; i += chunk) {
+    const piece = str.slice(i, i + chunk);
+    wrap.insertBefore(document.createTextNode(piece), cursor);
+    el.scrollTop = el.scrollHeight;
+    await new Promise((r) => setTimeout(r, str.length > 2000 ? 4 : 10));
+  }
+  cursor.remove();
+  wrap.appendChild(document.createTextNode('\n'));
+  typing = false;
+}
+
+/** Extrai blocos ``` de uma resposta */
+function extractCodeBlocks(reply) {
+  const blocks = [];
+  const re = /```([\w.+-]*)?\n?([\s\S]*?)```/g;
+  let m;
+  while ((m = re.exec(reply))) {
+    blocks.push({ lang: (m[1] || '').trim(), code: m[2].replace(/\n$/, '') });
+  }
+  return blocks;
+}
+
+async function streamCodeBlocks(reply) {
+  const blocks = extractCodeBlocks(reply);
+  if (!blocks.length) return false;
+  for (const b of blocks) {
+    logMeta('── ' + (b.lang || 'código') + ' · gerando…');
+    await typeIntoLog(b.code, 'line-code');
+    appendLogHtml('<div class="line-ok">✓ bloco concluído</div>');
+  }
+  return true;
+}
+
+async function loadTree() {
+  const data = await api('/tree');
+  const box = document.getElementById('files');
+  if (!data.ok) {
+    box.innerHTML = '<div style="color:#f87171;padding:.5rem;font-size:.75rem">' + esc(data.error || 'erro') + '</div>';
+    return;
+  }
+  const files = data.files || [];
+  box.innerHTML = files
+    .map(
+      (f) =>
+        '<button type="button" data-path="' +
+        esc(f) +
+        '" onclick="openFile(this.dataset.path)">' +
+        esc(f) +
+        '</button>'
+    )
+    .join('');
+}
+
+async function openFile(p) {
+  const data = await api('/read?path=' + encodeURIComponent(p));
+  if (!data.ok) {
+    termPrint('erro: ' + data.error);
+    appendLogHtml('<div class="line-err">✗ ' + esc(data.error) + '</div>');
+    return;
+  }
+  currentPath = data.path || p;
+  document.getElementById('statusPath').textContent = currentPath;
+  document.querySelectorAll('.file-list button').forEach((b) => {
+    b.classList.toggle('active', b.dataset.path === currentPath);
+  });
+  logMeta('📂 abriu ' + currentPath);
+  await typeIntoLog(data.content || '', 'line-code');
+  termPrint('aberto: ' + currentPath);
+}
+
+function termPrint(t) {
+  const o = document.getElementById('termOut');
+  o.textContent += (o.textContent.endsWith('\n') ? '' : '\n') + t + '\n';
+  o.scrollTop = o.scrollHeight;
+}
+
+async function runCmd(line) {
+  termPrint('$ ' + line);
+  const data = await api('/exec', { method: 'POST', body: JSON.stringify({ cmd: line }) });
+  if (data.open) {
+    currentPath = data.open;
+    document.getElementById('statusPath').textContent = currentPath;
+    logMeta('📂 ' + currentPath);
+    if (data.text) await typeIntoLog(data.text, 'line-code');
+  }
+  if (data.text && !data.open) termPrint(data.text);
+  if (data.error) termPrint('erro: ' + data.error);
+}
+
+document.getElementById('termInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const v = e.target.value.trim();
+    e.target.value = '';
+    if (v) runCmd(v);
+  }
+});
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const btn = document.getElementById('chatBtn');
+  const msg = input.value.trim();
+  if (!msg || typing) return;
+  input.value = '';
+  const box = document.getElementById('chatMsgs');
+  box.innerHTML += '<div class="bubble user">' + esc(msg) + '</div>';
+  box.innerHTML += '<div class="bubble bot" id="chatLoading" style="opacity:.7">Pensando…</div>';
+  box.scrollTop = box.scrollHeight;
+  btn.disabled = true;
+
+  logMeta('✦ JARVIS · ' + msg.slice(0, 80) + (msg.length > 80 ? '…' : ''));
+
+  const payload = {
+    message: msg,
+    currentPath: currentPath || null,
+    editorContent: null
+  };
+  const data = await api('/chat', { method: 'POST', body: JSON.stringify(payload) });
+  const loading = document.getElementById('chatLoading');
+  if (loading) loading.remove();
+  btn.disabled = false;
+
+  let meta = '';
+  if (data.readFiles && data.readFiles.length) {
+    meta =
+      '<div style="font-size:.72rem;color:#8b949e;margin-bottom:.35rem">📖 leu: ' +
+      data.readFiles.map((f) => f.path + (f.ok ? '' : ' (erro)')).join(', ') +
+      '</div>';
+  }
+  const reply = data.reply || data.error || '…';
+  box.innerHTML += '<div class="bubble bot">' + meta + esc(reply) + '</div>';
+  box.scrollTop = box.scrollHeight;
+
+  // Código no log central (tempo real)
+  const hadCode = await streamCodeBlocks(reply);
+  if (!hadCode && reply) {
+    appendLogHtml('<div class="line-ai">' + esc(reply.slice(0, 500)) + (reply.length > 500 ? '…' : '') + '</div>');
+  }
+}
+
+document.getElementById('chatInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendChat();
+});
+
+logMeta('Aeternus Live Code · ' + new Date().toLocaleString());
+appendLogHtml('<div class="line-ai">Aguardando pedido… o código aparece aqui linha a linha.</div>');
+loadTree();
 </script>
 </body>
 </html>
