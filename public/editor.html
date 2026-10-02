@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Editor — Aeternus</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@500;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--tab:#21262d}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:1rem;padding:.55rem 1rem;background:var(--panel);border-bottom:1px solid var(--border)}
+header .logo{font-weight:700}header .logo span{color:var(--accent)}
+header a{color:var(--muted);text-decoration:none;font-size:.85rem}
+.layout{flex:1;display:grid;grid-template-columns:240px 1fr 300px;min-height:0}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.sidebar,.chat{display:none}}
+.sidebar,.chat{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.chat{border-right:none;border-left:1px solid var(--border)}
+.side-head,.chat-head{padding:.6rem .8rem;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+.file-list{overflow:auto;flex:1;padding:.4rem;font-family:JetBrains Mono,monospace;font-size:.78rem}
+.file-list button{display:block;width:100%;text-align:left;background:transparent;border:none;color:var(--text);padding:.28rem .4rem;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-list button:hover{background:#1f6feb33;color:var(--accent)}
+.main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.toolbar{display:flex;gap:.4rem;padding:.4rem .6rem;border-bottom:1px solid var(--border);background:var(--panel);flex-wrap:wrap}
+.toolbar button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:.45rem .8rem;font-weight:600;cursor:pointer;font-size:.8rem}
+.toolbar button.secondary{background:var(--tab);color:var(--text);border:1px solid var(--border)}
+.tabs{display:flex;background:var(--tab);border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:.45rem .9rem;font-size:.8rem;color:var(--muted);border-right:1px solid var(--border);cursor:pointer}
+.tab.active{background:var(--bg);color:var(--text)}
+.editor-wrap{flex:1;display:flex;min-height:0}
+#lineNums{width:48px;background:var(--bg);color:var(--muted);font-family:JetBrains Mono,monospace;font-size:13px;line-height:1.55;padding:12px 6px;text-align:right;overflow:hidden;border-right:1px solid var(--border);user-select:none}
+#editor{flex:1;background:var(--bg);color:#c9d1d9;border:none;outline:none;resize:none;font-family:JetBrains Mono,monospace;font-size:13px;line-height:1.55;padding:12px;white-space:pre;overflow:auto;tab-size:2}
+.statusbar{display:flex;gap:1rem;padding:.25rem .75rem;background:#0d419d;font-size:.72rem;color:#fff}
+.term{height:190px;border-top:1px solid var(--border);display:flex;flex-direction:column;background:#010409}
+.term-head{padding:.35rem .75rem;font-size:.72rem;color:var(--muted);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+#termOut{flex:1;overflow:auto;font-family:JetBrains Mono,monospace;font-size:12px;padding:.5rem .75rem;color:#3fb950;white-space:pre-wrap}
+.term-in{display:flex;border-top:1px solid var(--border)}
+.term-in span{padding:.4rem .6rem;color:var(--accent);font-family:JetBrains Mono,monospace;font-size:12px}
+.term-in input{flex:1;background:transparent;border:none;color:var(--text);font-family:JetBrains Mono,monospace;font-size:12px;padding:.4rem;outline:none}
+.chat-msgs{flex:1;overflow:auto;padding:.75rem;display:flex;flex-direction:column;gap:.6rem}
+.bubble{padding:.55rem .7rem;border-radius:10px;font-size:.85rem;line-height:1.45}
+.bubble.user{background:#1f6feb33;align-self:flex-end}
+.bubble.bot{background:#21262d;align-self:flex-start;border:1px solid var(--border)}
+.chat-in{display:flex;gap:.4rem;padding:.6rem;border-top:1px solid var(--border)}
+.chat-in input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:.5rem .7rem;outline:none}
+.chat-in button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:.5rem .85rem;font-weight:600;cursor:pointer}
+.secret-bar{padding:.4rem .75rem;background:#21262d;font-size:.75rem;display:flex;gap:.5rem;align-items:center;border-bottom:1px solid var(--border)}
+.secret-bar input{flex:1;max-width:220px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:.3rem .5rem;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span>AET</span>ERNUS · Editor</div>
+  <a href="index.html">Início</a>
+  <a href="dashboard.html">Painel</a>
+  <span style="flex:1"></span>
+  <span id="pathLabel" style="font-size:.8rem;color:var(--muted);font-family:JetBrains Mono,monospace">nenhum arquivo</span>
+</header>
+<div class="secret-bar">
+  <label>PANEL_SECRET</label>
+  <input id="secret" type="password" placeholder="se configurado no Render"/>
+  <button onclick="localStorage.setItem('panel_secret',document.getElementById('secret').value);alert('salvo')" style="background:#30363d;color:#fff;border:none;padding:.3rem .6rem;border-radius:4px;cursor:pointer">Salvar</button>
+</div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="side-head">Arquivos <button onclick="loadTree()" style="background:none;border:none;color:var(--accent);cursor:pointer">↻</button></div>
+    <div class="file-list" id="files"></div>
+  </aside>
+  <section class="main">
+    <div class="toolbar">
+      <button onclick="saveFile()">Salvar</button>
+      <button class="secondary" onclick="newFile()">Novo</button>
+      <button class="secondary" onclick="runCmd('ls')">ls</button>
+      <button class="secondary" onclick="runCmd('tree')">tree</button>
+      <button class="secondary" onclick="runCmd('help')">help</button>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="editor-wrap">
+      <div id="lineNums">1</div>
+      <textarea id="editor" spellcheck="false" placeholder="// nano caminho/arquivo.js no terminal"></textarea>
+    </div>
+    <div class="statusbar"><span id="pos">Ln 1, Col 1</span><span id="dirty"></span><span>UTF-8</span></div>
+    <div class="term">
+      <div class="term-head"><span>TERMINAL</span><span>ls · cat · nano · npm · node · help</span></div>
+      <div id="termOut">Aeternus Shell — digite help\n</div>
+      <div class="term-in"><span>$</span><input id="termInput" placeholder="ls | cat utils/x.js | nano commands/rob.js | npm install" autocomplete="off"/></div>
+    </div>
+  </section>
+  <aside class="chat">
+    <div class="chat-head">J.A.R.V.I.S. <span style="color:var(--green)">online</span></div>
+    <div class="chat-msgs" id="chatMsgs">
+      <div class="bubble bot">E aí. Tô no editor contigo — manda código, gíria, palavrão, tanto faz. Quer ler arquivo ou comando de terminal, é só falar.</div>
+    </div>
+    <div class="chat-in">
+      <input id="chatInput" placeholder="fala com o JARVIS…"/>
+      <button onclick="sendChat()">Enviar</button>
+    </div>
+  </aside>
+</div>
+<script>
+const API='/api/editor';
+let currentPath=null,dirty=false;
+const openTabs=new Map();
+function headers(){const h={'Content-Type':'application/json'};const s=localStorage.getItem('panel_secret')||document.getElementById('secret').value;if(s)h['x-panel-secret']=s;return h}
+document.getElementById('secret').value=localStorage.getItem('panel_secret')||'';
+async function api(path,opts={}){const res=await fetch(API+path,{...opts,headers:{...headers(),...(opts.headers||{})}});return res.json()}
+async function loadTree(){const data=await api('/tree');const el=document.getElementById('files');if(!data.ok){el.textContent=data.error||'erro';return}el.innerHTML=data.files.map(f=>'<button onclick="openFile(\''+f.replace(/'/g,"\\'")+'\')">'+f+'</button>').join('')}
+async function openFile(p){const data=await api('/read?path='+encodeURIComponent(p));if(!data.ok){termPrint('erro: '+data.error);return}currentPath=data.path||p;document.getElementById('editor').value=data.content||'';dirty=false;updateUI();openTabs.set(currentPath,document.getElementById('editor').value);renderTabs();termPrint('aberto: '+currentPath)}
+function renderTabs(){const tabs=document.getElementById('tabs');tabs.innerHTML='';for(const[p] of openTabs){const t=document.createElement('div');t.className='tab'+(p===currentPath?' active':'');t.textContent=p.split('/').pop();t.onclick=()=>openFile(p);tabs.appendChild(t)}}
+function updateUI(){document.getElementById('pathLabel').textContent=currentPath||'nenhum arquivo';document.getElementById('dirty').textContent=dirty?'modificado':'';syncLines()}
+function syncLines(){const ed=document.getElementById('editor');const n=ed.value.split('\n').length;document.getElementById('lineNums').textContent=Array.from({length:n},(_,i)=>i+1).join('\n')}
+document.getElementById('editor').addEventListener('input',()=>{dirty=true;updateUI();if(currentPath)openTabs.set(currentPath,document.getElementById('editor').value)});
+document.getElementById('editor').addEventListener('scroll',()=>{document.getElementById('lineNums').scrollTop=document.getElementById('editor').scrollTop});
+async function saveFile(){if(!currentPath){const p=prompt('caminho');if(!p)return;currentPath=p}const data=await api('/write',{method:'POST',body:JSON.stringify({path:currentPath,content:document.getElementById('editor').value})});if(data.ok){dirty=false;updateUI();termPrint('salvo: '+data.path)}else termPrint('erro: '+data.error)}
+function newFile(){const p=prompt('novo arquivo');if(!p)return;currentPath=p;document.getElementById('editor').value='';dirty=true;openTabs.set(p,'');renderTabs();updateUI()}
+function termPrint(t){const o=document.getElementById('termOut');o.textContent+=(o.textContent.endsWith('\n')?'':'\n')+t+'\n';o.scrollTop=o.scrollHeight}
+async function runCmd(line){termPrint('$ '+line);const data=await api('/exec',{method:'POST',body:JSON.stringify({cmd:line})});if(data.open){currentPath=data.open;document.getElementById('editor').value=data.text||'';openTabs.set(currentPath,data.text||'');dirty=false;renderTabs();updateUI()}if(data.text)termPrint(data.text);if(data.error)termPrint('erro: '+data.error)}
+document.getElementById('termInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=e.target.value.trim();e.target.value='';if(v)runCmd(v)}});
+async function sendChat(){const input=document.getElementById('chatInput');const msg=input.value.trim();if(!msg)return;input.value='';const box=document.getElementById('chatMsgs');box.innerHTML+='<div class="bubble user">'+esc(msg)+'</div>';const data=await api('/chat',{method:'POST',body:JSON.stringify({message:msg})});box.innerHTML+='<div class="bubble bot">'+esc(data.reply||data.error||'…')+'</div>';box.scrollTop=box.scrollHeight}
+document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat()});
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+loadTree();syncLines();
+</script>
+</body>
+</html>
