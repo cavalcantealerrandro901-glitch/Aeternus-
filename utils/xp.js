@@ -1,18 +1,35 @@
 const store = require('./store');
 
-const ATTR_KEYS = ['forca', 'defesa', 'agilidade', 'vida'];
+const ATTR_KEYS = [
+    'forca',
+    'defesa',
+    'agilidade',
+    'vida',
+    'inteligencia',
+    'sorte',
+    'precisao',
+    'resistencia'
+];
 const ATTR_LABEL = {
     forca: 'Força',
     defesa: 'Defesa',
     agilidade: 'Agilidade',
-    vida: 'Vida'
+    vida: 'Vida',
+    inteligencia: 'Inteligência',
+    sorte: 'Sorte',
+    precisao: 'Precisão',
+    resistencia: 'Resistência'
 };
 
 const BASE_ATTR = {
     forca: 5,
     defesa: 5,
     agilidade: 5,
-    vida: 10
+    vida: 10,
+    inteligencia: 5,
+    sorte: 5,
+    precisao: 5,
+    resistencia: 5
 };
 
 function all() {
@@ -32,7 +49,6 @@ function get(userId) {
     const raw = all()[userId] || { xp: 0, level: 0 };
     const attrs = ensureAttrs({ attrs: raw.attrs });
     const totalXp = Math.max(0, Math.floor(Number(raw.xp || 0)));
-    // Nível sempre derivado do XP total acumulado (não “gasta” o XP)
     const level = levelFromXp(totalXp);
     return {
         xp: totalXp,
@@ -42,16 +58,12 @@ function get(userId) {
     };
 }
 
-/** XP total necessário para estar no nível L (cumulativo). Nv1=1000, Nv2=2000, … */
 const XP_PER_LEVEL = 1000;
 
 function xpForLevel(level) {
-    // XP necessário para passar do nível `level` para level+1
-    // Sistema cumulativo: sempre 1000 por nível (total = level * 1000)
     return XP_PER_LEVEL;
 }
 
-/** Total de XP para alcançar o nível L (L=1 → 1000, L=2 → 2000, …) */
 function totalXpForLevel(level) {
     const lv = Math.max(0, Math.floor(Number(level) || 0));
     return lv * XP_PER_LEVEL;
@@ -59,14 +71,12 @@ function totalXpForLevel(level) {
 
 function levelFromXp(totalXp) {
     const xp = Math.max(0, Math.floor(Number(totalXp) || 0));
-    // Mantém os XP; nível = quantos blocos de 1000 já juntou
     return Math.min(10000, Math.floor(xp / XP_PER_LEVEL));
 }
 
 function progress(userId) {
     const { xp, level, attrs } = get(userId);
     const total = Math.max(0, Math.floor(Number(xp) || 0));
-    // XP dentro do nível atual (0..999) e falta para o próximo
     const current = total % XP_PER_LEVEL;
     const need = XP_PER_LEVEL;
     const pct = Math.min(100, Math.floor((current / need) * 100));
@@ -98,55 +108,31 @@ function addXp(userId, amount) {
     const data = all();
     const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR } };
     ensureAttrs(cur);
-
-    const before = levelFromXp(cur.xp);
-    cur.xp = Math.max(0, Number(cur.xp || 0) + Number(amount || 0));
+    const before = levelFromXp(cur.xp || 0);
+    const n = Math.floor(Number(amount) || 0);
+    cur.xp = Math.max(0, Math.floor(Number(cur.xp || 0)) + n);
     const after = levelFromXp(cur.xp);
     cur.level = after;
-
+    const levelsGained = Math.max(0, after - before);
     const gains = [];
-    const items = [];
-
-    if (after > before) {
-        let playerUtil = null;
-        try {
-            playerUtil = require('./player');
-        } catch (_) {}
-
-        const levelsGained = after - before;
+    if (levelsGained > 0) {
         cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
+        cur.attrPoints += levelsGained * 5;
         for (let i = 0; i < levelsGained; i++) {
-            // pontos livres para distribuir manualmente (mais generoso)
-            cur.attrPoints += 5;
-            // bônus aleatório pequeno nos attrs
-            for (let r = 0; r < 2; r++) {
-                const g = rollAttrGain(false);
-                cur.attrs[g.key] = (cur.attrs[g.key] || 0) + g.amount;
-                gains.push(g);
-            }
-
-            // 5% item de classe
-            if (playerUtil && Math.random() < 0.05) {
-                const profile = playerUtil.get(userId);
-                const classId = profile?.classId || 'guerreiro';
-                const item = playerUtil.rollClassItem(classId);
-                playerUtil.addItem(userId, item);
-                items.push(item);
-            }
+            const g = rollAttrGain(false);
+            cur.attrs[g.key] = (cur.attrs[g.key] || 0) + g.amount;
+            gains.push(g);
         }
     }
-
     data[userId] = cur;
     store.save('xp.json', data);
-
     return {
         xp: cur.xp,
         level: cur.level,
         attrs: { ...cur.attrs },
-        leveled: after > before,
-        reward: 0,
+        attrPoints: cur.attrPoints || 0,
+        levelsGained,
         attrGains: gains,
-        items,
         oldLevel: before,
         progress: progress(userId)
     };
@@ -158,19 +144,25 @@ function getAttrs(userId) {
 
 function maxHp(userId) {
     const a = getAttrs(userId);
-    return 50 + a.vida * 8;
+    return 50 + Number(a.vida || 0) * 8 + Number(a.resistencia || 0) * 2;
 }
 
 function maxMana(userId) {
+    const a = getAttrs(userId);
+    const level = get(userId).level;
+    let base = 20 + level * 4 + Number(a.inteligencia || 0) * 3;
     try {
         const player = require('./player');
         const profile = player.get(userId);
-        const level = get(userId).level;
-        return player.maxManaFromLevel(level, profile?.classId || 'guerreiro');
-    } catch {
-        const level = get(userId).level;
-        return 20 + level * 4;
-    }
+        if (typeof player.maxManaFromLevel === 'function') {
+            base = Math.max(
+                base,
+                player.maxManaFromLevel(level, profile?.classId || 'guerreiro') +
+                    Number(a.inteligencia || 0) * 2
+            );
+        }
+    } catch (_) {}
+    return Math.floor(base);
 }
 
 function leaderboard(limit = 10) {
@@ -216,7 +208,6 @@ function removeXp(userId, amount) {
     return addXp(userId, -n);
 }
 
-
 function loadCur(userId) {
     const data = all();
     const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR }, attrPoints: 0 };
@@ -230,12 +221,10 @@ function saveCur(data, userId, cur) {
     store.save('xp.json', data);
 }
 
-/** Gasta 1 ponto livre em um atributo */
 function spendAttrPoint(userId, key) {
     return spendAttrPoints(userId, key, 1);
 }
 
-/** Gasta N pontos livres em um atributo */
 function spendAttrPoints(userId, key, amount) {
     const k = String(key || '').toLowerCase();
     if (!ATTR_KEYS.includes(k)) {
@@ -257,9 +246,6 @@ function spendAttrPoints(userId, key, amount) {
     return { ok: true, spent: n, key: k, attrs: { ...cur.attrs }, attrPoints: cur.attrPoints };
 }
 
-/**
- * Volta atributos à base e devolve o excedente como pontos livres.
- */
 function redistribuirAttrs(userId) {
     const { data, cur } = loadCur(userId);
     let refund = 0;
@@ -278,41 +264,31 @@ function redistribuirAttrs(userId) {
     return {
         ok: true,
         refund,
-        attrPoints: cur.attrPoints,
-        attrs: { ...cur.attrs }
+        attrs: { ...cur.attrs },
+        attrPoints: cur.attrPoints
     };
 }
 
-/** Adiciona pontos livres de atributo (admin / recompensas) */
-function addAttrPoints(userId, amount) {
-    const n = Math.max(0, Math.floor(Number(amount) || 0));
-    const { data, cur } = loadCur(userId);
-    cur.attrPoints += n;
-    saveCur(data, userId, cur);
-    return { ok: true, attrPoints: cur.attrPoints };
-}
-
 module.exports = {
+    all,
     get,
+    progress,
     addXp,
     setXp,
     removeXp,
-    levelFromXp,
-    xpForLevel,
-    totalXpForLevel,
-    XP_PER_LEVEL,
-    dailyMultiplier,
-    progress,
-    leaderboard,
-    rankOf,
-    all,
     getAttrs,
     maxHp,
     maxMana,
+    leaderboard,
+    rankOf,
+    levelFromXp,
+    totalXpForLevel,
+    xpForLevel,
+    dailyMultiplier,
+    rollAttrGain,
     spendAttrPoint,
     spendAttrPoints,
     redistribuirAttrs,
-    addAttrPoints,
     ATTR_KEYS,
     ATTR_LABEL,
     BASE_ATTR
