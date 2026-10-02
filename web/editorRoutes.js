@@ -10,6 +10,17 @@ function panelAuth(req, res, next) {
     next();
 }
 
+async function askJarvis(message, persona) {
+    const extra =
+        '[Editor Aeternus] Pode sugerir ls/cat/nano/npm. Fale de boa, gíria e palavrão liberados.\n\n';
+    if (typeof ai.fetchPublicAIResponse === 'function') {
+        return await ai.fetchPublicAIResponse(extra + message, persona);
+    }
+    const r = await ai.fetchJarvisReply(extra + message, persona, []);
+    if (!r) return null;
+    return typeof r === 'string' ? r : r.text || null;
+}
+
 function registerEditorRoutes(app) {
     const r = express.Router();
     r.use(panelAuth);
@@ -61,10 +72,7 @@ function registerEditorRoutes(app) {
         try {
             const msg = String(req.body?.message || '').trim();
             if (!msg) return res.status(400).json({ ok: false, error: 'message vazio' });
-            const persona = req.body?.persona || 'default';
-            const extra = '[Editor Aeternus] Pode sugerir ls/cat/nano/npm. Fale de boa, gíria e palavrão liberados.\n\n';
-            const fn = ai.fetchPublicAIResponse || ai.fetchJarvisReply;
-            const reply = await fn(extra + msg, persona);
+            const reply = await askJarvis(msg, req.body?.persona || 'default');
             res.json({ ok: true, reply: reply || '… deu ruim, tenta de novo.' });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
