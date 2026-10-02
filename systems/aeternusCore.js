@@ -1,6 +1,6 @@
 /**
- * Aeternus Core — assistente de IA privado (só OWNER_ID)
- * Ativação: marcar o bot | @aeternus | @aeternos | reply | DM do dono
+ * Aeternus Core — IA pública no Discord; moderação/GitHub só admin
+ * Ativação: marcar o bot | @aeternus | @aeternos | reply | DM
  */
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 
@@ -8,27 +8,55 @@ const OWNER_ID = () => String(process.env.OWNER_ID || '').trim();
 function env(n) { return String(process.env[n] || '').trim(); }
 function isOwner(userId) { const oid = OWNER_ID(); return oid && String(userId) === oid; }
 
+/** Dono ou admin do servidor (Administrator / ManageGuild) */
+function isAdmin(member, userId) {
+  if (isOwner(userId)) return true;
+  if (!member) return false;
+  try {
+    const perms = member.permissions;
+    if (!perms) return false;
+    return (
+      perms.has(PermissionFlagsBits.Administrator) ||
+      perms.has(PermissionFlagsBits.ManageGuild)
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
 function allowedReposConfig() {
   const raw = env('AETERNUS_REPOS') || env('GITHUB_REPOS');
   if (!raw) return null;
   return raw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean).map((s) => {
-    if (s.includes('/')) { const [owner, name] = s.split('/'); return { owner: owner.trim(), name: name.trim(), full: `${owner.trim()}/${name.trim()}` }; }
+    if (s.includes('/')) {
+      const [owner, name] = s.split('/');
+      return { owner, name, full: `${owner}/${name}` };
+    }
     return { owner: GH_OWNER(), name: s, full: `${GH_OWNER()}/${s}` };
   });
 }
+
 function GH_OWNER() { return env('GITHUB_OWNER') || 'cavalcantealerrandro901-glitch'; }
-function resolveRepoRef(repoArg) {
-  const s = String(repoArg || '').trim();
-  if (!s) throw new Error('Nome do repositório obrigatório');
-  if (s.includes('/')) { const [owner, name] = s.split('/'); return { owner: owner.trim(), name: name.trim() }; }
+
+function parseRepo(input) {
+  const s = String(input || '').trim();
+  if (!s) return null;
+  if (s.includes('/')) {
+    const [owner, name] = s.split('/');
+    return { owner, name };
+  }
   return { owner: GH_OWNER(), name: s };
 }
-function assertRepoAllowed(owner, name) {
-  const cfg = allowedReposConfig();
-  if (!cfg) return;
-  const full = `${owner}/${name}`;
-  const ok = cfg.some((r) => r.full.toLowerCase() === full.toLowerCase() || r.name.toLowerCase() === name.toLowerCase());
-  if (!ok) throw new Error(`Repo \`${full}\` não está em AETERNUS_REPOS`);
+
+function ghHeaders() {
+  const token = env('GITHUB_TOKEN') || env('GH_TOKEN');
+  if (!token) return null;
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'Aeternus-Bot',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
 }
 
 function detectActivation(content, client, message = null) {
@@ -52,19 +80,30 @@ function detectActivation(content, client, message = null) {
   return { activated: false, command: '' };
 }
 
-function systemPrompt(extra = '') {
-  return ['Você é Aeternus, assistente pessoal privado do dono no Discord.', 'Responda em português do Brasil, de forma direta e útil.', 'Você pode gerenciar Discord (canais, cargos, convites) e repositórios GitHub.', extra ? '\n' + extra : ''].filter(Boolean).join('\n');
+function systemPrompt(extra = '', { admin = false } = {}) {
+  const base = [
+    'Você é Aeternus, a IA do servidor no Discord.',
+    'Responda em português do Brasil, de forma direta e útil.',
+    'Personalidade: afiada, sem enrolação (estilo Grok).'
+  ];
+  if (admin) {
+    base.push('O usuário é ADMIN: pode pedir gestão de canais, cargos, convites e (se configurado) GitHub.');
+  } else {
+    base.push('O usuário é MEMBRO comum: só conversa e tirar dúvidas. NÃO ofereça nem invente ações de moderação, ban, kick, criar canal/cargo ou GitHub.');
+  }
+  if (extra) base.push(extra);
+  return base.join('\n');
 }
 
 function activeProviders() { return env('GROQ_API_KEY') ? ['groq'] : ['none']; }
 const GROQ_MODEL_FALLBACKS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'];
 
-async function chatAI(userMessage, contextBlock = '') {
+async function chatAI(userMessage, contextBlock = '', { admin = false } = {}) {
   const key = env('GROQ_API_KEY');
   if (!key) return { text: 'Configure `GROQ_API_KEY` no Render.', provider: 'none' };
   const preferred = env('GROQ_MODEL');
   const models = preferred ? [preferred, ...GROQ_MODEL_FALLBACKS.filter((m) => m !== preferred)] : GROQ_MODEL_FALLBACKS;
-  const messages = [{ role: 'system', content: systemPrompt(contextBlock) }, { role: 'user', content: String(userMessage || '').slice(0, 6000) }];
+  const messages = [{ role: 'system', content: systemPrompt(contextBlock, { admin }) }, { role: 'user', content: String(userMessage || '').slice(0, 6000) }];
   const errors = [];
   for (const model of models) {
     try {
@@ -75,27 +114,22 @@ async function chatAI(userMessage, contextBlock = '') {
       });
       if (!res.ok) { const t = await res.text().catch(() => ''); throw new Error(`${res.status} ${t.slice(0, 160)}`); }
       const data = await res.json();
-      const text = String(data?.choices?.[0]?.message?.content || '').trim();
-      if (!text) throw new Error('resposta vazia');
-      return { text, provider: 'groq', model };
-    } catch (e) { errors.push(`${model}: ${e.message}`); }
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text || !String(text).trim()) throw new Error('empty');
+      return { text: String(text).trim(), provider: 'groq', model };
+    } catch (e) {
+      errors.push(`${model}: ${e.message}`);
+    }
   }
-  return { text: `Erro Groq:\n${errors.join('\n')}`, provider: 'groq', error: errors.join(' | ') };
-}
-
-function ghHeaders() {
-  const token = env('GITHUB_TOKEN') || env('GH_TOKEN');
-  if (!token) return null;
-  return { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'Aeternus-Bot', 'X-GitHub-Api-Version': '2022-11-28' };
+  return { text: 'IA indisponível: ' + errors.join(' | '), provider: 'none' };
 }
 
 async function ghFetch(path, opts = {}) {
-  const headers = ghHeaders();
-  if (!headers) throw new Error('GITHUB_TOKEN não configurado');
-  const res = await fetch(`https://api.github.com${path}`, { ...opts, headers: { ...headers, ...(opts.headers || {}), 'Content-Type': 'application/json' } });
-  const text = await res.text();
-  let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (!res.ok) throw new Error(`GitHub ${res.status}: ${data?.message || String(text).slice(0, 120)}`);
+  const h = ghHeaders();
+  if (!h) throw new Error('GITHUB_TOKEN ausente');
+  const res = await fetch(`https://api.github.com${path}`, { ...opts, headers: { ...h, ...(opts.headers || {}) } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `GitHub ${res.status}`);
   return data;
 }
 
@@ -106,55 +140,65 @@ async function listRepos() {
     for (const r of cfg) {
       try {
         const data = await ghFetch(`/repos/${r.owner}/${r.name}`);
-        out.push({ name: data.name, full: data.full_name, private: data.private, desc: data.description || '', url: data.html_url, defaultBranch: data.default_branch || 'main' });
-      } catch (e) { out.push({ name: r.name, full: r.full, error: e.message }); }
+        out.push({ full: data.full_name, name: data.name, private: data.private, url: data.html_url, desc: data.description });
+      } catch (e) {
+        out.push({ full: r.full, name: r.name, error: e.message });
+      }
     }
     return out;
   }
-  const all = [];
-  for (let page = 1; page <= 5; page++) {
-    const data = await ghFetch(`/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator`);
-    if (!Array.isArray(data) || !data.length) break;
-    for (const r of data) all.push({ name: r.name, full: r.full_name, private: r.private, desc: r.description || '', url: r.html_url, defaultBranch: r.default_branch || 'main' });
-    if (data.length < 100) break;
-  }
-  return all;
+  const data = await ghFetch('/user/repos?per_page=50&sort=updated');
+  return (Array.isArray(data) ? data : []).map((r) => ({
+    full: r.full_name, name: r.name, private: r.private, url: r.html_url, desc: r.description
+  }));
 }
 
-async function getFile(repoArg, filePath, ref) {
-  const { owner, name } = resolveRepoRef(repoArg);
-  assertRepoAllowed(owner, name);
-  const branch = ref || 'main';
-  const data = await ghFetch(`/repos/${owner}/${name}/contents/${encodeURIComponent(filePath).replace(/%2F/g, '/')}?ref=${branch}`);
-  if (data?.content && data?.encoding === 'base64') {
-    return { repo: `${owner}/${name}`, path: data.path, sha: data.sha, content: Buffer.from(data.content, 'base64').toString('utf8'), size: data.size };
-  }
-  return data;
+async function getFile(repoInput, path) {
+  const repo = parseRepo(repoInput);
+  if (!repo) throw new Error('Repo inválido');
+  const data = await ghFetch(`/repos/${repo.owner}/${repo.name}/contents/${path}`);
+  const content = Buffer.from(data.content || '', 'base64').toString('utf8');
+  return { content, sha: data.sha, path: data.path, repo: `${repo.owner}/${repo.name}` };
 }
 
-async function putFile(repoArg, filePath, content, message, branch = 'main') {
-  const { owner, name } = resolveRepoRef(repoArg);
-  assertRepoAllowed(owner, name);
+async function putFile(repoInput, path, content, message) {
+  const repo = parseRepo(repoInput);
+  if (!repo) throw new Error('Repo inválido');
   let sha;
-  try { const existing = await getFile(`${owner}/${name}`, filePath, branch); sha = existing?.sha; } catch (_) {}
-  const body = { message: message || `Aeternus: update ${filePath}`, content: Buffer.from(String(content), 'utf8').toString('base64'), branch };
+  try {
+    const existing = await ghFetch(`/repos/${repo.owner}/${repo.name}/contents/${path}`);
+    sha = existing.sha;
+  } catch (_) {}
+  const body = {
+    message: message || `Aeternus: ${path}`,
+    content: Buffer.from(String(content), 'utf8').toString('base64'),
+    branch: env('GITHUB_BRANCH') || 'main'
+  };
   if (sha) body.sha = sha;
-  const data = await ghFetch(`/repos/${owner}/${name}/contents/${encodeURIComponent(filePath).replace(/%2F/g, '/')}`, { method: 'PUT', body: JSON.stringify(body) });
-  return { repo: `${owner}/${name}`, path: filePath, commit: data?.commit?.sha, url: data?.content?.html_url || data?.commit?.html_url };
+  const data = await ghFetch(`/repos/${repo.owner}/${repo.name}/contents/${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return { ok: true, url: data.content?.html_url || data.commit?.html_url, repo: `${repo.owner}/${repo.name}` };
 }
 
-async function createRepo(name, description = '', isPrivate = true) {
-  const data = await ghFetch('/user/repos', { method: 'POST', body: JSON.stringify({ name, description, private: isPrivate, auto_init: true }) });
-  return { name: data.name, full: data.full_name, url: data.html_url, private: data.private };
+async function createRepo(name, description, isPrivate = true) {
+  const data = await ghFetch('/user/repos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description: description || '', private: !!isPrivate, auto_init: true })
+  });
+  return { full: data.full_name, name: data.name, url: data.html_url };
 }
 
-async function listTree(repoArg, pathFilter = '') {
-  const { owner, name } = resolveRepoRef(repoArg);
-  assertRepoAllowed(owner, name);
-  let data;
-  try { data = await ghFetch(`/repos/${owner}/${name}/git/trees/main?recursive=1`); } catch { data = await ghFetch(`/repos/${owner}/${name}/git/trees/master?recursive=1`); }
-  let tree = data?.tree || [];
-  if (pathFilter) { const p = pathFilter.replace(/^\/|\/$/g, ''); tree = tree.filter((t) => t.path === p || t.path.startsWith(p + '/')); }
+async function listTree(repoInput, path = '') {
+  const repo = parseRepo(repoInput);
+  if (!repo) throw new Error('Repo inválido');
+  const ref = env('GITHUB_BRANCH') || 'main';
+  const data = await ghFetch(`/repos/${repo.owner}/${repo.name}/git/trees/${ref}?recursive=1`);
+  let tree = Array.isArray(data.tree) ? data.tree : [];
+  if (path) tree = tree.filter((t) => t.path.startsWith(path.replace(/^\/+/, '')));
   return tree.slice(0, 100).map((t) => `${t.type === 'tree' ? '📁' : '📄'} ${t.path}`);
 }
 
@@ -198,133 +242,68 @@ async function tryGithubIntent(command) {
 
 function resolveGuild(client, message, hint) {
   const h = String(hint || '').trim();
-  if (h && /^\d{15,22}$/.test(h)) { const g = client.guilds.cache.get(h); if (g) return g; }
   if (h) {
-    const low = h.toLowerCase();
-    const byName = client.guilds.cache.find((g) => g.name.toLowerCase() === low || g.name.toLowerCase().includes(low));
+    const byId = client.guilds.cache.get(h);
+    if (byId) return byId;
+    const byName = client.guilds.cache.find((g) => g.name.toLowerCase() === h.toLowerCase() || g.name.toLowerCase().includes(h.toLowerCase()));
     if (byName) return byName;
   }
-  if (message?.guild) return message.guild;
-  if (client.guilds.cache.size === 1) return client.guilds.cache.first();
-  return null;
-}
-
-function parseColor(raw) {
-  if (!raw) return null;
-  const s = String(raw).trim();
-  if (/^#?[0-9a-fA-F]{6}$/.test(s)) return parseInt(s.replace('#', ''), 16);
-  const named = { vermelho: 0xed4245, verde: 0x57f287, azul: 0x5865f2, roxo: 0x9b59b6, amarelo: 0xfee75c, laranja: 0xe67e22, rosa: 0xeb459e, cinza: 0x95a5a6, preto: 0x23272a, branco: 0xffffff };
-  return named[s.toLowerCase()] ?? null;
+  return message.guild || null;
 }
 
 async function tryDiscordIntent(command, message, client) {
   const t = String(command || '').trim();
   const low = t.toLowerCase();
 
-  if (/\b(lista|listar|meus)\b.*\b(servidores?|guilds?)\b/i.test(low) || /^servidores?$/i.test(low)) {
-    const lines = [...client.guilds.cache.values()].sort((a, b) => a.name.localeCompare(b.name)).map((g) => `• **${g.name}** \`${g.id}\` · ${g.memberCount} membros`);
+  if (/\b(lista|listar)\b.*\bservidores?\b/i.test(low) || /^servidores?$/i.test(low)) {
+    const lines = [...client.guilds.cache.values()].map((g) => `• **${g.name}** (\`${g.id}\`) — ${g.memberCount} membros`);
     return { handled: true, text: `**Servidores** (${lines.length}):\n${lines.join('\n') || '(nenhum)'}` };
   }
 
-  const inviteM = t.match(/(?:link|convite|invite)\s+(?:do\s+|da\s+|de\s+)?(?:servidor\s+)?(.+)/i);
-  if (inviteM || /\b(cria|criar|gere|gerar)\s+(?:um\s+)?(?:link|convite|invite)\b/i.test(low)) {
-    const hint = inviteM?.[1]?.replace(/\b(por favor|pfv|pls)\b/gi, '').trim() || message.guild?.name || '';
-    const guild = resolveGuild(client, message, hint);
-    if (!guild) {
-      const names = [...client.guilds.cache.values()].map((g) => g.name).slice(0, 15).join(', ');
-      return { handled: true, text: `Não achei esse servidor. Servidores: ${names || '(nenhum)'}` };
-    }
+  const inviteM = t.match(/(?:link|convite|invite)\s+(?:do\s+)?(?:servidor\s+)?(.+)/i) || ( /\b(convite|invite)\b/i.test(low) ? [null, ''] : null);
+  if (inviteM) {
+    const guild = resolveGuild(client, message, inviteM[1]);
+    if (!guild) return { handled: true, text: 'Servidor não encontrado. Use o nome ou ID.' };
     const me = guild.members.me;
     if (!me?.permissions?.has(PermissionFlagsBits.CreateInstantInvite)) return { handled: true, text: `Sem permissão **Criar Convite** em **${guild.name}**.` };
     let channel = guild.systemChannel || guild.channels.cache.find((c) => c.isTextBased?.() && c.viewable && c.permissionsFor(me)?.has(PermissionFlagsBits.CreateInstantInvite));
-    if (!channel) return { handled: true, text: `Sem canal para criar convite em **${guild.name}**.` };
-    const invite = await channel.createInvite({ maxAge: 0, maxUses: 0, unique: true, reason: 'Aeternus — dono' });
-    return { handled: true, text: `🔗 **${guild.name}**\n${invite.url}\nCanal: #${channel.name}` };
+    if (!channel) return { handled: true, text: 'Nenhum canal adequado para convite.' };
+    const inv = await channel.createInvite({ maxAge: 0, maxUses: 0, reason: 'Aeternus admin' });
+    return { handled: true, text: `🔗 Convite de **${guild.name}**: ${inv.url}` };
   }
 
-  if (/\b(lista|listar)\b.*\bcanais?\b/i.test(low) || /^canais?$/i.test(low)) {
-    const guild = resolveGuild(client, message, t.match(/canais?\s+(?:do\s+|de\s+)?(.+)/i)?.[1]);
-    if (!guild) return { handled: true, text: 'Diga o servidor ou use no servidor.' };
-    const lines = guild.channels.cache.filter((c) => c.type !== ChannelType.GuildCategory).sort((a, b) => a.rawPosition - b.rawPosition).map((c) => `${c.type === ChannelType.GuildVoice ? '🔊' : '#️⃣'} **${c.name}** \`${c.id}\``).slice(0, 40);
-    return { handled: true, text: `**Canais em ${guild.name}**:\n${lines.join('\n')}` };
+  if (/\b(lista|listar)\b.*\bcanais?\b/i.test(low)) {
+    const guild = resolveGuild(client, message, t.match(/servidor\s+(.+)/i)?.[1]);
+    if (!guild) return { handled: true, text: 'Use dentro de um servidor ou diga o nome.' };
+    const lines = guild.channels.cache.filter((c) => c.isTextBased?.()).map((c) => `• #${c.name} (\`${c.id}\`)`).first(30);
+    return { handled: true, text: `**Canais de texto** em **${guild.name}**:\n${[...guild.channels.cache.filter((c) => c.isTextBased?.()).values()].slice(0, 30).map((c) => `• #${c.name} (\`${c.id}\`)`).join('\n')}` };
   }
 
-  if (/\b(lista|listar)\b.*\bcargos?\b/i.test(low) || /^cargos?$/i.test(low)) {
-    const guild = resolveGuild(client, message, t.match(/cargos?\s+(?:do\s+|de\s+)?(.+)/i)?.[1]);
-    if (!guild) return { handled: true, text: 'Diga o servidor ou use no servidor.' };
-    const lines = guild.roles.cache.filter((r) => r.id !== guild.id).sort((a, b) => b.position - a.position).map((r) => `• **${r.name}** \`${r.id}\``).slice(0, 40);
-    return { handled: true, text: `**Cargos em ${guild.name}**:\n${lines.join('\n')}` };
+  if (/\b(lista|listar)\b.*\bcargos?\b/i.test(low)) {
+    const guild = resolveGuild(client, message, null);
+    if (!guild) return { handled: true, text: 'Use dentro de um servidor.' };
+    const lines = [...guild.roles.cache.values()].filter((r) => r.id !== guild.id).sort((a, b) => b.position - a.position).slice(0, 40).map((r) => `• **${r.name}** (\`${r.id}\`)`);
+    return { handled: true, text: `**Cargos** em **${guild.name}**:\n${lines.join('\n')}` };
   }
 
-  const catM = t.match(/(?:crie|criar|create)\s+(?:uma\s+)?categoria\s+["']?([^"'\n]+)["']?(?:\s+(?:no\s+|em\s+)(.+))?/i);
-  if (catM) {
-    const guild = resolveGuild(client, message, catM[2]);
-    if (!guild) return { handled: true, text: 'Servidor não encontrado.' };
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) return { handled: true, text: 'Sem permissão **Gerenciar Canais**.' };
-    const ch = await guild.channels.create({ name: catM[1].trim().slice(0, 100), type: ChannelType.GuildCategory, reason: 'Aeternus — dono' });
-    return { handled: true, text: `✅ Categoria **${ch.name}** criada em **${guild.name}**` };
-  }
-
-  const voiceM = t.match(/(?:crie|criar|create)\s+(?:um\s+)?canal\s+(?:de\s+)?voz\s+["']?([^"'\n]+)["']?(?:\s+(?:no\s+|em\s+)(.+))?/i);
-  if (voiceM) {
-    const guild = resolveGuild(client, message, voiceM[2]);
-    if (!guild) return { handled: true, text: 'Servidor não encontrado.' };
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) return { handled: true, text: 'Sem permissão **Gerenciar Canais**.' };
-    const ch = await guild.channels.create({ name: voiceM[1].trim().slice(0, 100), type: ChannelType.GuildVoice, reason: 'Aeternus — dono' });
-    return { handled: true, text: `✅ Canal de voz **${ch.name}** criado em **${guild.name}**` };
-  }
-
-  const textChM = t.match(/(?:crie|criar|create)\s+(?:um\s+)?canal(?:\s+de\s+texto)?\s+["']?([^"'\n]+)["']?(?:\s+(?:no\s+|em\s+|na\s+categoria\s+)(.+))?/i);
-  if (textChM && !/canal\s+de\s+voz/i.test(t)) {
-    let parentHint = textChM[2]?.trim();
-    let guild = resolveGuild(client, message, null);
-    if (parentHint) {
-      const maybeGuild = resolveGuild(client, message, parentHint);
-      if (maybeGuild && maybeGuild.id !== message.guild?.id) { guild = maybeGuild; parentHint = null; }
-    }
-    if (!guild) return { handled: true, text: 'Servidor não encontrado.' };
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) return { handled: true, text: 'Sem permissão **Gerenciar Canais**.' };
-    let parent = null;
-    if (parentHint) parent = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && (c.name.toLowerCase() === parentHint.toLowerCase() || c.name.toLowerCase().includes(parentHint.toLowerCase())));
-    const ch = await guild.channels.create({ name: textChM[1].trim().replace(/\s+/g, '-').toLowerCase().slice(0, 100), type: ChannelType.GuildText, parent: parent?.id, reason: 'Aeternus — dono' });
-    return { handled: true, text: `✅ Canal ${ch} criado em **${guild.name}**` + (parent ? ` (categoria **${parent.name}**)` : '') };
-  }
-
-  const delChM = t.match(/(?:apague|apagar|delete|deletar|remova|remover)\s+(?:o\s+)?canal\s+["']?([^"'\n]+)["']?/i);
-  if (delChM) {
+  const createCh = t.match(/(?:crie|criar|create)\s+(?:um\s+)?(?:canal\s+)?(?:de\s+texto\s+)?(?:chamado\s+|nome\s+)?["']?([\w\-\sáàãâéêíóôõúç]+)["']?/i);
+  if (createCh && /\b(canal|channel)\b/i.test(low)) {
     const guild = resolveGuild(client, message, null);
     if (!guild) return { handled: true, text: 'Use dentro de um servidor.' };
     if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) return { handled: true, text: 'Sem permissão **Gerenciar Canais**.' };
-    const hint = delChM[1].trim();
-    const ch = guild.channels.cache.get(hint) || guild.channels.cache.find((c) => c.name.toLowerCase() === hint.toLowerCase().replace(/^#/, ''));
-    if (!ch) return { handled: true, text: `Canal \`${hint}\` não encontrado.` };
-    const n = ch.name; await ch.delete('Aeternus — dono');
-    return { handled: true, text: `🗑️ Canal **${n}** apagado.` };
+    const name = createCh[1].trim().toLowerCase().replace(/\s+/g, '-').slice(0, 90);
+    const ch = await guild.channels.create({ name, type: ChannelType.GuildText, reason: 'Aeternus admin' });
+    return { handled: true, text: `✅ Canal criado: ${ch}` };
   }
 
-  const roleM = t.match(/(?:crie|criar|create)\s+(?:um\s+)?cargo\s+["']?([^"'\n]+?)["']?(?:\s+cor\s+(\S+))?(?:\s+(?:no\s+|em\s+)(.+))?$/i);
-  if (roleM) {
-    let namePart = roleM[1].trim(); let colorRaw = roleM[2];
-    if (!colorRaw) { const parts = namePart.split(/\s+/); if (parts.length >= 2 && parseColor(parts[parts.length - 1]) != null) { colorRaw = parts.pop(); namePart = parts.join(' '); } }
-    const guild = resolveGuild(client, message, roleM[3]);
-    if (!guild) return { handled: true, text: 'Servidor não encontrado.' };
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageRoles)) return { handled: true, text: 'Sem permissão **Gerenciar Cargos**.' };
-    const color = parseColor(colorRaw);
-    const role = await guild.roles.create({ name: namePart.slice(0, 100), colors: color != null ? { primaryColor: color } : undefined, reason: 'Aeternus — dono' });
-    return { handled: true, text: `✅ Cargo **${role.name}** criado em **${guild.name}**` };
-  }
-
-  const delRoleM = t.match(/(?:apague|apagar|delete|deletar|remova|remover)\s+(?:o\s+)?cargo\s+["']?([^"'\n]+)["']?/i);
-  if (delRoleM) {
+  const createRole = t.match(/(?:crie|criar|create)\s+(?:um\s+)?cargo\s+["']?([^"'\n]+)["']?/i);
+  if (createRole) {
     const guild = resolveGuild(client, message, null);
     if (!guild) return { handled: true, text: 'Use dentro de um servidor.' };
     if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageRoles)) return { handled: true, text: 'Sem permissão **Gerenciar Cargos**.' };
-    const hint = delRoleM[1].trim();
-    const role = guild.roles.cache.get(hint) || guild.roles.cache.find((r) => r.name.toLowerCase() === hint.toLowerCase());
-    if (!role || role.id === guild.id) return { handled: true, text: `Cargo \`${hint}\` não encontrado.` };
-    if (role.managed) return { handled: true, text: `Cargo **${role.name}** é gerenciado — não posso apagar.` };
-    const n = role.name; await role.delete('Aeternus — dono');
-    return { handled: true, text: `🗑️ Cargo **${n}** apagado.` };
+    const name = createRole[1].trim().slice(0, 100);
+    const role = await guild.roles.create({ name, reason: 'Aeternus admin' });
+    return { handled: true, text: `✅ Cargo criado: **${role.name}** (\`${role.id}\`)` };
   }
 
   const giveM = t.match(/(?:d[eê]|dar|adicione|adicionar)\s+(?:o\s+)?cargo\s+["']?([^"'\n]+?)["']?\s+(?:para|ao?|pro?|a)\s+<@!?(\d+)>/i) || t.match(/(?:d[eê]|dar)\s+<@!?(\d+)>\s+(?:o\s+)?cargo\s+["']?([^"'\n]+)["']?/i);
@@ -338,7 +317,7 @@ async function tryDiscordIntent(command, message, client) {
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!role) return { handled: true, text: `Cargo \`${roleHint}\` não encontrado.` };
     if (!member) return { handled: true, text: 'Membro não encontrado.' };
-    await member.roles.add(role, 'Aeternus — dono');
+    await member.roles.add(role, 'Aeternus admin');
     return { handled: true, text: `✅ Cargo **${role.name}** dado a **${member.user.tag}**.` };
   }
 
@@ -364,11 +343,11 @@ async function replyChunks(message, text) {
 }
 
 async function handleOwnerMessage(message, client) {
-  if (!isOwner(message.author.id)) return false;
   const content = String(message.content || '');
   const isDm = !message.guild;
   let activated = false;
   let command = content;
+  const admin = isAdmin(message.member, message.author.id);
 
   if (isDm) {
     activated = true;
@@ -381,50 +360,86 @@ async function handleOwnerMessage(message, client) {
     if (!activated && message.reference?.messageId) {
       try {
         const ref = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
-        if (ref?.author?.id === client.user?.id) { activated = true; command = content.trim(); }
+        if (ref?.author?.id === client.user?.id) {
+          activated = true;
+          command = content.trim();
+        }
       } catch (_) {}
     }
   }
 
   if (!activated) return false;
+
   if (!command || !String(command).trim()) {
-    await message.reply(
-      'Olá. Sou a **Aeternus** (só você).\n\n' +
-        '**Como me chamar:**\n' +
-        '• Me **marque**: `@' + (client.user?.username || 'Aeternos') + ' sua pergunta`\n' +
-        '• Ou escreva `@aeternus` / `@aeternos`\n' +
-        '• Ou **responda** uma mensagem minha\n' +
-        '• No PV, qualquer mensagem\n\n' +
-        '**Exemplos:**\n' +
-        '`@' + (client.user?.username || 'Aeternos') + ' criar canal avisos`\n' +
-        '`@aeternus criar cargo VIP`\n' +
-        '`@aeternus link do servidor Aeternus Society`\n' +
-        '`@aeternus listar servidores`'
-    ).catch(() => {});
+    const botName = client.user?.username || 'Aeternos';
+    const lines = [
+      'Olá! Sou a **Aeternus**.',
+      '',
+      '**Como me chamar:**',
+      '• Me marque: `@' + botName + ' sua pergunta`',
+      '• Ou escreva `@aeternus` / `@aeternos`',
+      '• Ou responda uma mensagem minha',
+      '• No PV, qualquer mensagem'
+    ];
+    if (admin) {
+      lines.push('', '**Admin:** criar canal/cargo, convites, listar servidores, GitHub (se configurado).');
+    } else {
+      lines.push('', 'Pode conversar livremente. Moderação e gestão de servidor são só para admins.');
+    }
+    await message.reply(lines.join('\n')).catch(() => {});
     return true;
   }
 
   if (message.channel?.sendTyping) await message.channel.sendTyping().catch(() => {});
 
   try {
-    const disc = await tryDiscordIntent(command, message, client);
-    if (disc.handled) { await replyChunks(message, disc.text); return true; }
-    const gh = await tryGithubIntent(command);
-    if (gh.handled) { await replyChunks(message, gh.text); return true; }
+    if (admin) {
+      const disc = await tryDiscordIntent(command, message, client);
+      if (disc.handled) {
+        await replyChunks(message, disc.text);
+        return true;
+      }
+      const gh = await tryGithubIntent(command);
+      if (gh.handled) {
+        await replyChunks(message, gh.text);
+        return true;
+      }
+    } else if (
+      /\b(ban|kick|mute|expuls|criar\s+canal|criar\s+cargo|apagar\s+canal|deletar\s+canal|gerenciar|convite|github|reposit[oó]rio|commit)\b/i.test(
+        command
+      )
+    ) {
+      await message
+        .reply('Isso é só para **admins** do servidor. Posso ajudar com outras dúvidas.')
+        .catch(() => {});
+      return true;
+    }
 
     let ctx = '';
-    try {
-      const guilds = [...client.guilds.cache.values()].slice(0, 12).map((g) => `- ${g.name} (${g.id})`).join('\n');
-      ctx += `Servidores:\n${guilds}\n\n`;
-      ctx += 'Ações: criar canal/cargo · link do servidor · listar servidores/canais/cargos\n';
-    } catch (_) {}
-    if (ghHeaders()) {
+    if (admin) {
       try {
-        const repos = await listRepos();
-        ctx += `Repos (${repos.length}):\n` + repos.slice(0, 15).map((r) => `- ${r.full || r.name}`).join('\n') + '\n';
+        const guilds = [...client.guilds.cache.values()]
+          .slice(0, 12)
+          .map((g) => `- ${g.name} (${g.id})`)
+          .join('\n');
+        ctx += `Servidores:\n${guilds}\n\n`;
+        ctx += 'Ações admin: criar canal/cargo · link do servidor · listar servidores/canais/cargos\n';
       } catch (_) {}
+      if (ghHeaders()) {
+        try {
+          const repos = await listRepos();
+          ctx +=
+            `Repos (${repos.length}):\n` +
+            repos.slice(0, 15).map((r) => `- ${r.full || r.name}`).join('\n') +
+            '\n';
+        } catch (_) {}
+      }
+    } else {
+      ctx += 'Usuário comum: só conversa. Não invente ações de moderação.\n';
+      if (message.guild) ctx += `Servidor atual: ${message.guild.name}\n`;
     }
-    const result = await chatAI(command, ctx);
+
+    const result = await chatAI(command, ctx, { admin });
     await replyChunks(message, result.text || '(sem resposta)');
     return true;
   } catch (e) {
@@ -434,9 +449,34 @@ async function handleOwnerMessage(message, client) {
 }
 
 function setup(client) {
-  const cfg = allowedReposConfig();
-  client.aeternusCore = { isOwner, detectActivation, handleOwnerMessage, activeProviders, listRepos, getFile, putFile, createRepo, allowedReposConfig };
-  console.log(`[aeternusCore] menção+IA · owner=${OWNER_ID() || '?'} · groq=${env('GROQ_API_KEY') ? 'ok' : 'MISSING'}`);
+  client.aeternusCore = {
+    isOwner,
+    isAdmin,
+    detectActivation,
+    handleOwnerMessage,
+    activeProviders,
+    listRepos,
+    getFile,
+    putFile,
+    createRepo,
+    allowedReposConfig
+  };
+  console.log(
+    `[aeternusCore] IA pública · admin=OWNER/ManageGuild · owner=${OWNER_ID() || '?'} · groq=${env('GROQ_API_KEY') ? 'ok' : 'MISSING'}`
+  );
 }
 
-module.exports = { setup, isOwner, detectActivation, handleOwnerMessage, activeProviders, listRepos, getFile, putFile, createRepo, chatAI, allowedReposConfig };
+module.exports = {
+  setup,
+  isOwner,
+  isAdmin,
+  detectActivation,
+  handleOwnerMessage,
+  activeProviders,
+  listRepos,
+  getFile,
+  putFile,
+  createRepo,
+  chatAI,
+  allowedReposConfig
+};
