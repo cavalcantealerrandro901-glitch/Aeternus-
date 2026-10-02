@@ -104,44 +104,28 @@ function profileEmbed(user, profile, opts = {}) {
     const cls = profile.classId ? player.getClass(profile.classId) : null;
     const st = xp.get(user.id) || { level: 0, xp: 0, attrs: {} };
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
-    const displayName = (profile.name && String(profile.name).trim()) || null;
-    let eterBal = 0;
-    let cristaisBal = 0;
-    try { eterBal = require('../utils/eter').get(user.id) || 0; } catch (_) {}
-    try { cristaisBal = require('../utils/cp').get(user.id) || 0; } catch (_) {}
-    let guildLine = '_Sem guilda_';
-    try {
-        const g = require('../utils/guilds').findByMember(user.id);
-        if (g) guildLine = `**[${g.tag || '???'}] ${g.name || 'Guilda'}** · Nv.${g.level || 1}`;
-    } catch (_) {}
-    const a = st.attrs || {};
-    const manaMax =
-        typeof player.maxManaFromLevel === 'function'
-            ? player.maxManaFromLevel(st.level, profile.classId)
-            : 20 + Number(st.level || 0) * 4;
-    const classLine = cls
-        ? `**Classe:** ${cls.emoji || '⚔️'} ${cls.name}`
-        : '**Classe:** _Sem classe_';
+    const displayName = (profile.name && String(profile.name).trim()) || user.username;
+    const attrs = st.attrs || {};
+    const attrLines = ATTR_META.map((a) => {
+        const v = Number(attrs[a.key] || 0);
+        return `${a.emoji} **${a.label}:** ${v}`;
+    }).join('\n');
+
     return new EmbedBuilder()
-        .setColor((cls && cls.color) || 0xa78bfa)
-        .setTitle(displayName || 'Sem nome')
+        .setColor(cls?.color || 0x5865f2)
+        .setTitle('✦ ' + displayName)
         .setThumbnail(photo)
         .setDescription(
             [
-                classLine,
-                `🎚️ **Nível** ${Number(st.level || 0)} · **XP** ${Number(st.xp || 0).toLocaleString('pt-BR')}`,
-                `💙 **Mana máx:** ${manaMax}`,
-                `✨ **Éter** ${Number(eterBal).toLocaleString('pt-BR')} · 💠 **cristais** ${Number(cristaisBal).toLocaleString('pt-BR')}`,
-                `🏰 **Guilda:** ${guildLine}`,
+                (cls?.emoji || '⚔️') + ' **' + (cls?.name || 'Sem classe') + '** · Nv **' + (st.level || 0) + '**',
+                'XP: **' + (st.xp || 0) + '** · Pontos: **' + (st.attrPoints || 0) + '**',
                 '',
-                '**Atributos**',
-                `💪 força: **${Number(a.forca || 0)}** · 🛡️ defesa: **${Number(a.defesa || 0)}**`,
-                `⚡ agilidade: **${Number(a.agilidade || 0)}** · ❤️ vida: **${Number(a.vida || 0)}**`,
-                `🃏 Pontos livres: **${Number(st.attrPoints || 0)}**`
+                attrLines,
+                '',
+                'Use `O.j atributos` para gastar pontos.'
             ].join('\n')
         )
-        .setFooter({ text: 'O.j atributos · O.j criar' })
-        .setTimestamp();
+        .setFooter({ text: 'O.j atributos · O.j criar' });
 }
 
 function atributosPayload(user) {
@@ -152,67 +136,71 @@ function atributosPayload(user) {
     const cls = profile ? player.getClass(profile.classId) : null;
     const nome = (profile?.name || user.username || 'Aventureiro').toUpperCase();
     const level = Number(st.level || 0);
-    const hpMax = xp.maxHp(user.id);
-    const manaMax = xp.maxMana(user.id);
+    const hpMax = typeof xp.maxHp === 'function' ? xp.maxHp(user.id) : 0;
+    const manaMax = typeof xp.maxMana === 'function' ? xp.maxMana(user.id) : 0;
     const photo = profile?.photoUrl || user.displayAvatarURL({ size: 256, extension: 'png' });
 
     const attrLines = ATTR_META.map((a) => {
         const v = Number(attrs[a.key] || 0);
-        return a.emoji + ' **' + a.label + '** `' + String(v).padStart(3, ' ') + '`  [+]';
+        return a.emoji + ' **' + a.label + '** · `' + v + '`';
     });
 
     const emb = new EmbedBuilder()
         .setColor(cls?.color || 0xc4b5fd)
-        .setTitle('✦ AETERNUS • FICHA')
+        .setTitle('✦ AETERNUS • ATRIBUTOS')
         .setThumbnail(photo)
         .setDescription(
             [
                 '👤 **' + nome + '**',
                 (cls?.emoji || '⚔️') + ' **' + (cls?.name || 'Sem classe') + '** · Nv **' + level + '**',
                 '❤️ HP `' +
-                    hpMax.toLocaleString('pt-BR') +
+                    Number(hpMax).toLocaleString('pt-BR') +
                     '` · 🔷 Mana `' +
-                    manaMax.toLocaleString('pt-BR') +
+                    Number(manaMax).toLocaleString('pt-BR') +
                     '`',
                 '',
                 '⚔️ **ATRIBUTOS**',
                 ...attrLines,
                 '',
-                '✦ Pontos disponíveis: **' + points + '**'
+                points > 0
+                    ? '✦ Pontos disponíveis: **' + points + '** — clique em **+1** para gastar'
+                    : '✦ Pontos disponíveis: **0** — suba de nível para ganhar mais'
             ].join('\n')
         )
-        .setFooter({ text: '+1 · Depositar · Redistribuir' });
+        .setFooter({ text: 'Cada +1 gasta 1 ponto · Gastar vários · Redistribuir devolve pontos' });
 
-    const components = [];
-    for (let i = 0; i < ATTR_META.length; i += 2) {
-        const row = new ActionRowBuilder();
-        for (const a of ATTR_META.slice(i, i + 2)) {
-            row.addComponents(
-                new ButtonBuilder()
-                    .setCustomId('j:attrplus:' + a.key + ':' + user.id)
-                    .setLabel((a.emoji + ' ' + a.label + ' +').slice(0, 80))
-                    .setStyle(ButtonStyle.Secondary)
-                    .setDisabled(points <= 0)
-            );
-        }
-        components.push(row);
+    const plusRow = new ActionRowBuilder();
+    for (const a of ATTR_META) {
+        const v = Number(attrs[a.key] || 0);
+        plusRow.addComponents(
+            new ButtonBuilder()
+                .setCustomId('j:attrplus:' + a.key + ':' + user.id)
+                .setLabel(('+1 ' + a.label + ' (' + v + ')').slice(0, 80))
+                .setEmoji(a.emoji)
+                .setStyle(points > 0 ? ButtonStyle.Success : ButtonStyle.Secondary)
+                .setDisabled(points <= 0)
+        );
     }
-    components.push(
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('j:attrdist:' + user.id)
-                .setLabel('Depositar')
-                .setEmoji('⚖️')
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(points <= 0),
-            new ButtonBuilder()
-                .setCustomId('j:attrredis:' + user.id)
-                .setLabel('Redistribuir')
-                .setEmoji('🔄')
-                .setStyle(ButtonStyle.Danger)
-        )
+
+    const utilRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('j:attrdist:' + user.id)
+            .setLabel('Gastar vários')
+            .setEmoji('⚖️')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(points <= 0),
+        new ButtonBuilder()
+            .setCustomId('j:attrredis:' + user.id)
+            .setLabel('Redistribuir')
+            .setEmoji('🔄')
+            .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+            .setCustomId('j:attrrefresh:' + user.id)
+            .setLabel('Atualizar')
+            .setStyle(ButtonStyle.Secondary)
     );
-    return { embeds: [emb], components };
+
+    return { embeds: [emb], components: [plusRow, utilRow] };
 }
 
 function profilePayload(user, profile, opts = {}) {
@@ -251,104 +239,66 @@ async function tryConsumePhotoMessage(message, client) {
 
 module.exports = {
     name: 'j',
-    tryConsumePhotoMessage,
-    pickImageUrl,
-    profileEmbed,
-    drafts,
-    photoWait,
     aliases: ['jogador', 'personagem', 'perfiljogador', 'atributos'],
     description: 'Perfil de jogador / atributos',
+    category: 'rpg',
     data: new SlashCommandBuilder()
-        .setName('jogador')
-        .setDescription('Perfil de jogador')
+        .setName('j')
+        .setDescription('Personagem e atributos')
         .addSubcommand((s) => s.setName('perfil').setDescription('Ver perfil'))
         .addSubcommand((s) => s.setName('criar').setDescription('Criar personagem'))
-        .addSubcommand((s) =>
-            s.setName('atributos').setDescription('Ver e gastar pontos de atributo')
-        ),
+        .addSubcommand((s) => s.setName('atributos').setDescription('Ver e gastar pontos de atributo'))
+        .addSubcommand((s) => s.setName('foto').setDescription('Definir foto do personagem')),
 
     async execute(message, args) {
-        const sub = String(args[0] || 'perfil').toLowerCase();
-        if (sub === 'criar' || sub === 'create') {
-            if (player.has(message.author.id)) return message.reply('Você já tem perfil. Use `O.j perfil`.');
-            return message.reply({
-                content: 'Clique para criar o personagem.',
-                components: [
-                    new ActionRowBuilder().addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('j:start')
-                            .setLabel('Criar meu perfil')
-                            .setStyle(ButtonStyle.Primary)
-                            .setEmoji('✨')
-                    )
-                ]
-            });
+        const sub = (args[0] || 'perfil').toLowerCase();
+
+        if (sub === 'criar') {
+            if (player.has(message.author.id)) {
+                return message.reply('Você já tem perfil. Use `O.j perfil`.');
+            }
+            if (typeof player.create === 'function') {
+                player.create(message.author.id, { name: message.author.username });
+                return message.reply('Personagem criado. Use `O.j perfil` e `O.classe`.');
+            }
+            return message.reply('Sistema de personagem indisponível.');
         }
+
         if (sub === 'atributos' || sub === 'attrs' || sub === 'stats') {
             return message.reply(atributosPayload(message.author));
         }
-        const target = message.mentions.users.first() || message.author;
-        if (!player.has(target.id)) {
-            if (target.id === message.author.id) {
-                return message.reply({
-                    content: 'Você ainda não tem personagem.',
-                    components: [
-                        new ActionRowBuilder().addComponents(
-                            new ButtonBuilder()
-                                .setCustomId('j:start')
-                                .setLabel('Criar meu perfil')
-                                .setStyle(ButtonStyle.Primary)
-                        )
-                    ]
-                });
-            }
-            return message.reply(String(target) + ' ainda não tem personagem.');
+
+        if (sub === 'foto') {
+            photoWait.set(message.author.id, Date.now() + 120000);
+            return message.reply('Manda a imagem no meu PV em até 2 min, ou anexa aqui.');
         }
-        return message.reply(
-            profilePayload(target, player.get(target.id), { guildName: message.guild?.name })
-        );
+
+        const profile = player.get(message.author.id);
+        if (!profile) return message.reply('Sem personagem. Use `O.j criar`.');
+        return message.reply(profilePayload(message.author, profile));
     },
 
-    async executeSlash(i) {
-        const reply = async (payload) => {
-            if (i.deferred || i.replied) {
-                return i.editReply(typeof payload === 'string' ? { content: payload } : payload);
-            }
-            return i.reply(payload);
-        };
-        const sub = i.options.getSubcommand();
-        if (sub === 'criar') {
-            if (player.has(i.user.id)) {
-                return reply({ content: 'Você já tem perfil.', flags: MessageFlags.Ephemeral });
-            }
-            if (i.deferred || i.replied) {
-                return reply({ content: 'Use `O.j criar` ou o botão Criar (modal).' });
-            }
-            return beginCreate(i);
+    async executeSlash(interaction) {
+        const sub = interaction.options.getSubcommand(false) || 'perfil';
+        const reply = (p) =>
+            interaction.replied || interaction.deferred
+                ? interaction.editReply(p)
+                : interaction.reply(p);
+
+        if (sub === 'criar') return beginCreate(interaction);
+        if (sub === 'atributos') return reply(atributosPayload(interaction.user));
+        if (sub === 'foto') {
+            photoWait.set(interaction.user.id, Date.now() + 120000);
+            return reply({ content: 'Manda a imagem no meu PV em até 2 minutos.', ephemeral: true });
         }
-        if (sub === 'atributos') return reply(atributosPayload(i.user));
-        if (!player.has(i.user.id)) {
-            return reply({
-                content: 'Sem personagem. Use `/jogador criar` ou `O.j criar`.',
-                flags: MessageFlags.Ephemeral
-            });
-        }
-        return reply(profilePayload(i.user, player.get(i.user.id), { guildName: i.guild?.name }));
+
+        const profile = player.get(interaction.user.id);
+        if (!profile) return reply({ content: 'Sem personagem. Use `/j criar`.', ephemeral: true });
+        return reply(profilePayload(interaction.user, profile));
     },
 
     async handleComponent(interaction) {
-        const id0 = String(interaction.customId || '');
-        if (
-            (id0.startsWith('j:attr') || id0.startsWith('j:class')) &&
-            !interaction.deferred &&
-            !interaction.replied
-        ) {
-            await interaction.deferUpdate().catch(() => {});
-        }
-        const id = interaction.customId || '';
-        if (!id.startsWith('j:')) return;
-
-        if (id === 'j:start') return beginCreate(interaction);
+        const id = String(interaction.customId || '');
 
         if (id.startsWith('j:attrplus:')) {
             const parts = id.split(':');
@@ -428,29 +378,22 @@ module.exports = {
             const ownerId = parts[3];
             const meta = ATTR_META.find((a) => a.key === attrKey);
             if (!meta || String(interaction.user.id) !== String(ownerId)) {
-                return safeReply(interaction, {
-                    content: 'Inválido.',
-                    flags: MessageFlags.Ephemeral
-                });
+                return safeReply(interaction, { content: 'Inválido.', flags: MessageFlags.Ephemeral });
             }
             const pts = Number(xp.get(ownerId).attrPoints || 0);
             if (pts <= 0) return safeUpdate(interaction, atributosPayload(interaction.user));
-            const amounts = [1, 5, 10, 25, 50].filter((n) => n <= pts);
-            if (!amounts.includes(pts)) amounts.push(pts);
-            const row = new ActionRowBuilder();
-            for (const n of amounts.slice(0, 5)) {
-                row.addComponents(
+
+            const qtyRow = new ActionRowBuilder();
+            const options = [1, 2, 3, 5, 10].filter((n) => n <= pts);
+            for (const n of options) {
+                qtyRow.addComponents(
                     new ButtonBuilder()
                         .setCustomId('j:attrqty:' + attrKey + ':' + ownerId + ':' + n)
-                        .setLabel(String(n))
-                        .setStyle(ButtonStyle.Primary)
+                        .setLabel('+' + n)
+                        .setStyle(ButtonStyle.Success)
                 );
             }
-            const row2 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('j:attrdist:' + ownerId)
-                    .setLabel('Trocar')
-                    .setStyle(ButtonStyle.Secondary),
+            qtyRow.addComponents(
                 new ButtonBuilder()
                     .setCustomId('j:attrcancel:' + ownerId)
                     .setLabel('Cancelar')
@@ -459,7 +402,7 @@ module.exports = {
             return safeUpdate(interaction, {
                 content: meta.emoji + ' **' + meta.label + '** — quantos pontos?',
                 embeds: [],
-                components: [row, row2]
+                components: [qtyRow]
             });
         }
 
@@ -470,10 +413,7 @@ module.exports = {
             const amount = Math.floor(Number(parts[4]) || 0);
             const meta = ATTR_META.find((a) => a.key === attrKey);
             if (!meta || String(interaction.user.id) !== String(ownerId) || amount <= 0) {
-                return safeReply(interaction, {
-                    content: 'Inválido.',
-                    flags: MessageFlags.Ephemeral
-                });
+                return safeReply(interaction, { content: 'Inválido.', flags: MessageFlags.Ephemeral });
             }
             const spent = xp.spendAttrPoints(ownerId, attrKey, amount);
             if (!spent?.ok) {
@@ -490,8 +430,16 @@ module.exports = {
         if (id.startsWith('j:attrcancel:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) {
+                return safeReply(interaction, { content: 'Só o dono.', flags: MessageFlags.Ephemeral });
+            }
+            return safeUpdate(interaction, atributosPayload(interaction.user));
+        }
+
+        if (id.startsWith('j:attrrefresh:')) {
+            const ownerId = id.split(':')[2];
+            if (String(interaction.user.id) !== String(ownerId)) {
                 return safeReply(interaction, {
-                    content: 'Só o dono.',
+                    content: 'Só o dono do perfil.',
                     flags: MessageFlags.Ephemeral
                 });
             }
@@ -502,7 +450,7 @@ module.exports = {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) {
                 return safeReply(interaction, {
-                    content: 'Só o dono.',
+                    content: 'Só o dono do perfil.',
                     flags: MessageFlags.Ephemeral
                 });
             }
@@ -526,56 +474,40 @@ module.exports = {
         }
 
         if (id === 'j:class' && interaction.isStringSelectMenu()) {
-            const draft = drafts.get(interaction.user.id);
-            if (!draft?.name) {
-                return safeReply(interaction, {
-                    content: 'Sessão expirada.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-            const classId = interaction.values[0];
-            if (classId === 'none' || (!player.getClass(classId) && !player.CLASSES?.[classId])) {
-                return safeReply(interaction, {
-                    content: 'Classe inválida.',
-                    flags: MessageFlags.Ephemeral
-                });
+            const classId = interaction.values?.[0];
+            if (!classId || classId === 'none') {
+                return safeReply(interaction, { content: 'Classe inválida.', flags: MessageFlags.Ephemeral });
             }
             try {
-                player.create(interaction.user.id, {
-                    name: draft.name,
-                    classId,
-                    photoUrl: interaction.user.displayAvatarURL({ size: 256 })
-                });
-                drafts.delete(interaction.user.id);
-                const profile = player.get(interaction.user.id);
-                return safeUpdate(interaction, {
-                    content: '✅ Personagem criado!',
-                    embeds: [profileEmbed(interaction.user, profile)],
-                    components: []
-                });
+                if (typeof player.setClass === 'function') player.setClass(interaction.user.id, classId);
+                else if (typeof player.update === 'function') player.update(interaction.user.id, { classId });
             } catch (e) {
                 return safeReply(interaction, {
-                    content: 'Erro: ' + (e.message || e),
+                    content: 'Falha ao definir classe: ' + (e.message || e),
                     flags: MessageFlags.Ephemeral
                 });
             }
+            const profile = player.get(interaction.user.id);
+            return safeUpdate(interaction, profilePayload(interaction.user, profile));
+        }
+
+        if (id === 'j:name' && interaction.isModalSubmit()) {
+            const nome = String(interaction.fields.getTextInputValue('nome') || '').trim();
+            if (nome.length < 2) {
+                return safeReply(interaction, { content: 'Nome inválido.', flags: MessageFlags.Ephemeral });
+            }
+            if (typeof player.create === 'function') {
+                player.create(interaction.user.id, { name: nome });
+            }
+            drafts.delete(interaction.user.id);
+            const profile = player.get(interaction.user.id);
+            return interaction.reply({
+                content: 'Personagem **' + nome + '** criado. Escolha a classe se quiser.',
+                embeds: profile ? [profileEmbed(interaction.user, profile)] : [],
+                components: [classSelect('j:class')]
+            });
         }
     },
 
-    async handleModal(interaction) {
-        if (interaction.customId !== 'j:name') return;
-        const nome = interaction.fields.getTextInputValue('nome').trim();
-        if (nome.length < 2) {
-            return interaction.reply({
-                content: 'Nome muito curto.',
-                flags: MessageFlags.Ephemeral
-            });
-        }
-        drafts.set(interaction.user.id, { step: 'class', name: nome });
-        return interaction.reply({
-            content: 'Nome **' + nome + '**. Escolha a classe:',
-            components: [classSelect('j:class')],
-            flags: MessageFlags.Ephemeral
-        });
-    }
+    tryConsumePhotoMessage
 };
