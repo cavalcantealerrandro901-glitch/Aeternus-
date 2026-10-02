@@ -130,20 +130,19 @@ async function askAI(message, persona, fileContext, { wantWrite, fallbackPath })
     const writeRules = wantWrite
         ? [
               '',
-              'MODO GRAVAÇÃO: entregue o arquivo COMPLETO para salvar.',
-              'Formato obrigatório:',
+              'MODO GRAVAÇÃO: arquivo COMPLETO. Sem enrolação.',
+              'Formato:',
               '```js commands/nome.js',
-              '// código inteiro do arquivo',
+              '// código inteiro',
               '```',
-              'Ou // FILE: commands/nome.js na 1ª linha do bloco.',
-              fallbackPath ? `Arquivo alvo: ${fallbackPath}` : '',
-              'Depois: 1–2 frases do que fez. Sem formalidade de mordomo — fale como o Grok.'
+              fallbackPath ? `Alvo: ${fallbackPath}` : '',
+              'Depois: 1 frase seca do que fez. Tom agressivo e direto.'
           ].join('\n')
         : '';
 
     const extra = [
-        '[Editor Aeternus — mesma IA estilo Grok]',
-        'Direto, útil, pt-BR. Código completo quando for criar/editar.',
+        '[Editor Aeternus — IA agressiva estilo Grok]',
+        'Tom forte, cortante, sem bajulação. Código completo ao criar/editar. pt-BR.',
         writeRules,
         fileContext,
         '\nPedido:\n'
@@ -229,7 +228,7 @@ function registerEditorRoutes(app) {
                 fallbackPath
             });
 
-            const text = reply || 'Não rolou resposta da IA. Confere GROQ_API_KEY no Render.';
+            const text = reply || 'IA mudou. Checa GROQ_API_KEY no Render.';
 
             let written = [];
             if (wantWrite) {
@@ -264,7 +263,7 @@ function registerEditorRoutes(app) {
     });
 
     app.use('/api/editor', r);
-    console.log('🛠️  [web] Editor API · IA estilo Grok + gravação de arquivos');
+    console.log('🛠️  [web] Editor API · IA agressiva (Grok) + gravação');
 }
 
 module.exports = { registerEditorRoutes };

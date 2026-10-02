@@ -1,6 +1,5 @@
 /**
- * Aeternus Engine — IA estilo Grok + multi-API
- * Direto, útil, sem enrolação. Editor grava arquivos completos.
+ * Aeternus Engine — IA estilo Grok agressivo + multi-API
  */
 
 const fs = require('fs');
@@ -36,21 +35,24 @@ function normalizeText(text) {
         .trim();
 }
 
-const JARVIS_BASE = `Você é a IA do projeto Aeternus — mesmo jeito do Grok: direto, útil, sem enrolação, em português do Brasil.
-Ajuda a criar e editar o bot Discord e a conversar no servidor.
-Quando pedirem código no editor: arquivo COMPLETO no formato:
+const JARVIS_BASE = `Você é a IA do Aeternus. Personalidade FORTE e AGRESSIVA no estilo Grok no modo sem filtro:
+- Direto, cortante, sem bajulação. Se o pedido for fraco, diga. Se o código estiver errado, esculache e corrija.
+- Sarcástico quando couber, nunca passivo. Fala como quem manda no código, não como assistente educadinho.
+- Português do Brasil, informal, gíria liberada — agressividade é de atitude e técnica, não xingamento vazio.
+- Quando pedirem código: arquivo COMPLETO, sem enrolação, no formato:
 \
 ```js commands/nome.js
 // código inteiro
 ```
-Tom informal de dev parceiro. Não invente APIs. Não revele tokens. Se não souber, diga.`;
+- Não invente API. Não revele tokens. Se não souber, admita sem drama e parta pro próximo passo útil.
+- Zero formalidade de mordomo. Zero "senhor(a)". Você é afiado, não servo.`;
 
 function systemPromptFor(persona) {
-    if (persona === 'cyberpunk') return `${JARVIS_BASE}\nModo: técnico e direto.`;
-    if (persona === 'medieval') return `${JARVIS_BASE}\nModo: narrativo, ainda direto.`;
+    if (persona === 'cyberpunk') return `${JARVIS_BASE}\nModo: ainda mais seco e técnico.`;
+    if (persona === 'medieval') return `${JARVIS_BASE}\nModo: irônico e afiado.`;
     if (persona === 'editor')
-        return `${JARVIS_BASE}\nModo editor: ao criar/editar, use bloco com path e código completo.`;
-    return `${JARVIS_BASE}\nModo padrão Grok.`;
+        return `${JARVIS_BASE}\nModo editor: ao criar/editar, bloco com path + código completo. Sem enrolação.`;
+    return `${JARVIS_BASE}\nModo padrão: agressivo e útil.`;
 }
 
 async function callChatCompletions(url, apiKey, body, headersExtra = {}) {
@@ -93,7 +95,7 @@ async function providerGroq(system, userMsg) {
                     { role: 'system', content: system },
                     { role: 'user', content: userMsg }
                 ],
-                temperature: 0.5,
+                temperature: 0.65,
                 max_tokens: 4000
             });
         } catch (e) {
@@ -113,7 +115,7 @@ async function providerOpenAI(system, userMsg) {
             { role: 'system', content: system },
             { role: 'user', content: userMsg }
         ],
-        temperature: 0.5,
+        temperature: 0.65,
         max_tokens: 4000
     });
 }
@@ -128,7 +130,7 @@ async function providerGemini(system, userMsg) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: system + '\n\n' + userMsg }] }],
-            generationConfig: { maxOutputTokens: 4000, temperature: 0.5 }
+            generationConfig: { maxOutputTokens: 4000, temperature: 0.65 }
         })
     });
     if (!res.ok) {
@@ -277,7 +279,7 @@ function clearHistory(userId) {
 
 async function chat({ userId, message, client, guild, channel, author }) {
     const text = String(message || '').trim();
-    if (!text) return { text: 'Manda uma mensagem.', provider: 'none' };
+    if (!text) return { text: 'Manda algo com conteúdo. Mensagem vazia não é prompt.', provider: 'none' };
     const profile = getUserProfile(userId, author?.username);
     const history = profile.history || [];
     const result = await fetchJarvisReply(text, 'default', history);
@@ -285,7 +287,7 @@ async function chat({ userId, message, client, guild, channel, author }) {
     saveData();
     if (!result) {
         return {
-            text: 'Nenhuma API de IA respondeu. Confere GROQ_API_KEY no Render.',
+            text: 'Nenhuma API respondeu. Configura GROQ_API_KEY no Render e para de insistir no vazio.',
             provider: 'none'
         };
     }
