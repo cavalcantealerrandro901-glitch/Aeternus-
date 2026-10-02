@@ -6,6 +6,7 @@ const { getSettings, setSettings, getPrefix } = require('../utils/settings');
 const player = require('../utils/player');
 const xp = require('../utils/xp');
 const { registerAvatarRoutes } = require('../utils/avatarApi');
+const { registerEditorRoutes } = require('./editorRoutes');
 
 function startWeb(client) {
     const app = express();
@@ -15,7 +16,6 @@ function startWeb(client) {
 
     const publicDir = path.join(__dirname, '..', 'public');
 
-    // Middleware: Injeta automaticamente o CSS e o JS das brasas em qualquer HTML acessado
     app.use((req, res, next) => {
         if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || !path.extname(req.path))) {
             let fileName = req.path === '/' ? 'index.html' : req.path;
@@ -24,17 +24,12 @@ function startWeb(client) {
 
             if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
                 let content = fs.readFileSync(filePath, 'utf8');
-
-                // Injeta CSS se não houver
                 if (!content.includes('dashboard.css')) {
                     content = content.replace('</head>', '    <link rel="stylesheet" href="dashboard.css">\n</head>');
                 }
-
-                // Injeta JS de Brasas/Animação se não houver
                 if (!content.includes('dashboard-app.js')) {
                     content = content.replace('</body>', '    <script src="dashboard-app.js"></script>\n</body>');
                 }
-
                 res.setHeader('Content-Type', 'text/html');
                 return res.send(content);
             }
@@ -53,9 +48,7 @@ function startWeb(client) {
             : null);
 
     app.get('/login', (req, res) => {
-        if (!CLIENT_ID || !REDIRECT) {
-            return res.status(500).send('OAuth não configurado');
-        }
+        if (!CLIENT_ID || !REDIRECT) return res.status(500).send('OAuth não configurado');
         const url =
             'https://discord.com/api/oauth2/authorize?client_id=' +
             CLIENT_ID +
@@ -83,10 +76,7 @@ function startWeb(client) {
             });
             const token = await tokenRes.json();
             if (!token.access_token) return res.redirect('/dashboard');
-            res.cookie('discord_token', token.access_token, {
-                httpOnly: true,
-                maxAge: 7 * 24 * 3600 * 1000
-            });
+            res.cookie('discord_token', token.access_token, { httpOnly: true, maxAge: 7 * 24 * 3600 * 1000 });
             res.redirect('/dashboard');
         } catch (e) {
             res.redirect('/dashboard');
@@ -105,13 +95,7 @@ function startWeb(client) {
     app.get('/api/guild/:id', (req, res) => {
         const g = client.guilds.cache.get(req.params.id);
         if (!g) return res.status(404).json({ error: 'guild' });
-        const settings = getSettings(req.params.id);
-        res.json({
-            id: g.id,
-            name: g.name,
-            prefix: getPrefix(req.params.id),
-            settings
-        });
+        res.json({ id: g.id, name: g.name, prefix: getPrefix(req.params.id), settings: getSettings(req.params.id) });
     });
 
     app.post('/api/guild/:id/prefix', (req, res) => {
@@ -125,25 +109,12 @@ function startWeb(client) {
         res.json({ ok: true });
     });
 
-    app.post('/api/guild/:id/drops', (req, res) => {
-        res.json({ ok: true });
-    });
-
-    app.post('/api/guild/:id/partnership', (req, res) => {
-        res.json({ ok: true });
-    });
-
-    // —— Arena & Masmorra ——
     const arenaEngine = require('../utils/arenaEngine');
     const dungeon = require('../utils/dungeon');
 
-    app.get('/wiki', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'wiki.html'));
-    });
-
-    app.get('/arena', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'arena.html'));
-    });
+    app.get('/wiki', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'wiki.html')));
+    app.get('/arena', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'arena.html')));
+    app.get('/editor', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'editor.html')));
 
     app.get('/api/arena/:id', (req, res) => {
         const match = arenaEngine.getMatch(req.params.id);
@@ -153,10 +124,7 @@ function startWeb(client) {
 
     app.post('/api/arena/:id/move', (req, res) => {
         const body = req.body || {};
-        const result = arenaEngine.applyMove(req.params.id, body.playerId, {
-            moveId: body.moveId,
-            targetId: body.targetId
-        });
+        const result = arenaEngine.applyMove(req.params.id, body.playerId, { moveId: body.moveId, targetId: body.targetId });
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
@@ -167,11 +135,7 @@ function startWeb(client) {
         const teamB = Array.isArray(body.teamB) ? body.teamB : [body.bId].filter(Boolean);
         const result = arenaEngine.createMatch({ mode: body.mode, teamA, teamB, bet: body.bet });
         if (!result.ok) return res.status(400).json(result);
-        return res.json({
-            ok: true,
-            id: result.match.id,
-            state: arenaEngine.publicState(result.match, body.as || teamA[0])
-        });
+        return res.json({ ok: true, id: result.match.id, state: arenaEngine.publicState(result.match, body.as || teamA[0]) });
     });
 
     app.get('/api/dungeon/:id', (req, res) => {
@@ -182,10 +146,7 @@ function startWeb(client) {
 
     app.post('/api/dungeon/:id/move', (req, res) => {
         const body = req.body || {};
-        const result = dungeon.applyDungeonMove(req.params.id, body.playerId, {
-            moveId: body.moveId,
-            targetId: body.targetId
-        });
+        const result = dungeon.applyDungeonMove(req.params.id, body.playerId, { moveId: body.moveId, targetId: body.targetId });
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
@@ -194,11 +155,7 @@ function startWeb(client) {
         const body = req.body || {};
         const result = dungeon.startFloor(body.userId, body.floor);
         if (!result.ok) return res.status(400).json(result);
-        return res.json({
-            ok: true,
-            id: result.match.id,
-            state: dungeon.publicDungeon(result.match, body.userId)
-        });
+        return res.json({ ok: true, id: result.match.id, state: dungeon.publicDungeon(result.match, body.userId) });
     });
 
     app.post('/api/arena/:id/chat', (req, res) => {
@@ -219,17 +176,10 @@ function startWeb(client) {
         const body = req.body || {};
         const result = dungeon.advanceFloor(req.params.id, body.playerId || body.userId);
         if (!result.ok) return res.status(400).json(result);
-        return res.json({
-            ok: true,
-            id: result.match.id,
-            match: dungeon.publicDungeon(result.match, body.playerId || body.userId)
-        });
+        return res.json({ ok: true, id: result.match.id, match: dungeon.publicDungeon(result.match, body.playerId || body.userId) });
     });
 
-    // Avatar
-    app.get('/avatar', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'avatar.html'));
-    });
+    app.get('/avatar', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'avatar.html')));
 
     app.get('/api/avatar/:userId', (req, res) => {
         try {
@@ -243,6 +193,7 @@ function startWeb(client) {
     });
 
     registerAvatarRoutes(app);
+    try { registerEditorRoutes(app); } catch (e) { console.warn('[web] editor routes:', e.message); }
 
     app.post('/api/avatar/save', (req, res) => {
         try {
@@ -250,9 +201,7 @@ function startWeb(client) {
             const userId = String(body.userId || '').trim();
             if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
             if (!player.has(userId)) {
-                return res
-                    .status(400)
-                    .json({ error: 'Crie o personagem no bot primeiro (O.j criar).' });
+                return res.status(400).json({ error: 'Crie o personagem no bot primeiro (O.j criar).' });
             }
             const saved = player.setBattleAvatar(userId, body.avatar || {});
             if (!saved) return res.status(400).json({ error: 'Falha ao salvar' });
@@ -262,10 +211,7 @@ function startWeb(client) {
         }
     });
 
-    app.get('/dashboard', (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
-    });
-
+    app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html')));
     app.get('/', (req, res) => res.redirect('/dashboard'));
 
     app.get('/health', (req, res) => {
@@ -277,12 +223,7 @@ function startWeb(client) {
                 return false;
             }
         })();
-        res.status(200).json({
-            ok: true,
-            service: 'aeternus',
-            mongo,
-            uptime: process.uptime()
-        });
+        res.status(200).json({ ok: true, service: 'aeternus', mongo, uptime: process.uptime() });
     });
 
     const port = process.env.PORT || 10000;
