@@ -1,9 +1,9 @@
 /**
- * Carregado pelo loaders — reforça moderação, memória e bloqueia write no GitHub via Discord.
- * Não remove o aeternusCore original; envelopa handleOwnerMessage.
+ * aeternusCoreBoost — moderação + gerenciar servidor + memória
+ * Edição de repo pelo Discord continua bloqueada (só Editor web).
  */
 const core = require('./aeternusCore');
-const { PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits, ChannelType } = require('discord.js');
 
 const memoryByUser = new Map();
 const MEMORY_LIMIT = 24;
@@ -47,14 +47,57 @@ async function resolveMember(guild, message, hint) {
   else if (/^\d{15,22}$/.test(h)) id = h;
   else if (message?.mentions?.users?.size) id = [...message.mentions.users.keys()][0];
   if (id) return guild.members.fetch(id).catch(() => null);
+  if (!h) return null;
+  const low = h.toLowerCase().replace(/^@/, '');
+  return (
+    guild.members.cache.find(
+      (m) =>
+        m.user.username.toLowerCase() === low ||
+        m.displayName.toLowerCase() === low ||
+        m.user.tag.toLowerCase() === low
+    ) || null
+  );
+}
+
+function resolveChannel(guild, message, hint) {
+  if (!guild) return null;
+  const h = String(hint || '').trim().replace(/^#/, '');
+  if (!h) return message?.channel || null;
+  if (message?.mentions?.channels?.size) {
+    const c = message.mentions.channels.first();
+    if (c) return c;
+  }
+  if (/^\d{15,22}$/.test(h)) return guild.channels.cache.get(h) || null;
+  const low = h.toLowerCase();
+  return (
+    guild.channels.cache.find(
+      (c) => c.name.toLowerCase() === low || c.name.toLowerCase().includes(low)
+    ) || null
+  );
+}
+
+function resolveRole(guild, hint) {
+  if (!guild || !hint) return null;
+  const h = String(hint).trim().replace(/^@/, '');
+  if (/^\d{15,22}$/.test(h)) return guild.roles.cache.get(h) || null;
+  const low = h.toLowerCase();
+  return (
+    guild.roles.cache.find((r) => r.name.toLowerCase() === low || r.name.toLowerCase().includes(low)) ||
+    null
+  );
+}
+
+function needPerm(guild, bit, label) {
+  if (!guild?.members?.me?.permissions?.has(bit)) {
+    return `Sem permissão **${label}**.`;
+  }
   return null;
 }
 
-async function tryModeration(command, message, client) {
+async function tryServerManage(command, message, client) {
   const t = String(command || '').trim();
   const low = t.toLowerCase();
   const guild = message.guild;
-  if (!guild) return { handled: false };
 
   if (
     /\b(escreva|escrever|salve|salvar|crie arquivo|criar arquivo|update arquivo|atualize arquivo|commit|push|edite o (?:repo|arquivo)|modifique o arquivo)\b/i.test(
@@ -66,7 +109,7 @@ async function tryModeration(command, message, client) {
       handled: true,
       text:
         '🛑 **Edição de código/repo pelo Discord está desligada.**\n' +
-        'Use o **Editor** do site (`/editor.html`). Aqui só moderação, servidor e conversa.'
+        'Use o **Editor** do site (`/editor.html`). Aqui: moderação + gerenciar servidor.'
     };
   }
 
@@ -75,14 +118,195 @@ async function tryModeration(command, message, client) {
     return { handled: true, text: '🧠 Memória desta conversa limpa.' };
   }
 
-  if (/\b(bane|banir|ban)\b/i.test(low)) {
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.BanMembers)) {
-      return { handled: true, text: 'Sem permissão **Banir Membros**.' };
+  if (
+    /^(ajuda|help)\s*(servidor|gerenciar|mod)?$/i.test(low) ||
+    /\bo que (voc[eê]|tu) (pode|consegue) (fazer|gerenciar)\b/i.test(low)
+  ) {
+    return {
+      handled: true,
+      text:
+        '**Gerenciar servidor / moderação** (me marque e peça):\n\n' +
+        '**Canais:** criar/apagar texto·voz·categoria · renomear · tópico · trancar/destrancar · slowmode · mover pra categoria\n' +
+        '**Cargos:** criar/apagar · dar/tirar · renomear\n' +
+        '**Mods:** ban · kick · mute/timeout · unmute · limpar N msgs · nick\n' +
+        '**Outros:** convite · listar canais/cargos/servidores · info servidor · renomear servidor\n' +
+        '**Voz:** desconectar membro · mover pra canal de voz\n\n' +
+        'Ex.: `criar canal avisos` · `trancar canal` · `dar cargo VIP @user` · `mute @user por 30m`'
+    };
+  }
+
+  if (!guild) return { handled: false };
+
+  if (/\b(tranca|trancar|lock)\b/i.test(low) && !/\bdestranc/i.test(low)) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageChannels, 'Gerenciar Canais');
+    if (err) return { handled: true, text: err };
+    const chHint = t.match(/(?:tranca|trancar|lock)\s+(?:o\s+)?(?:canal\s+)?(#?[\w-]+|\d{15,22})/i)?.[1];
+    const ch = resolveChannel(guild, message, chHint) || message.channel;
+    if (!ch?.permissionOverwrites) return { handled: true, text: 'Canal inválido.' };
+    await ch.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: false }, { reason: 'Aeternus lock' });
+    return { handled: true, text: `🔒 Canal **#${ch.name}** trancado (everyone sem enviar).` };
+  }
+
+  if (/\b(destranca|destrancar|unlock)\b/i.test(low)) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageChannels, 'Gerenciar Canais');
+    if (err) return { handled: true, text: err };
+    const chHint = t.match(/(?:destranca|destrancar|unlock)\s+(?:o\s+)?(?:canal\s+)?(#?[\w-]+|\d{15,22})/i)?.[1];
+    const ch = resolveChannel(guild, message, chHint) || message.channel;
+    if (!ch?.permissionOverwrites) return { handled: true, text: 'Canal inválido.' };
+    await ch.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: null }, { reason: 'Aeternus unlock' });
+    return { handled: true, text: `🔓 Canal **#${ch.name}** destrancado.` };
+  }
+
+  const renameCh =
+    t.match(
+      /(?:renomeia|renomear|renomeie)\s+(?:o\s+)?canal\s+(?:#)?([\w-]+|\d{15,22})\s+(?:para|pra)\s+["']?([^"'\n]+)["']?/i
+    ) ||
+    t.match(
+      /(?:renomeia|renomear|renomeie)\s+(?:este|esse)\s+canal\s+(?:para|pra)\s+["']?([^"'\n]+)["']?/i
+    );
+  if (renameCh) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageChannels, 'Gerenciar Canais');
+    if (err) return { handled: true, text: err };
+    let ch, newName;
+    if (renameCh.length >= 3 && renameCh[2]) {
+      ch = resolveChannel(guild, message, renameCh[1]);
+      newName = renameCh[2];
+    } else {
+      ch = message.channel;
+      newName = renameCh[1];
     }
+    if (!ch?.setName) return { handled: true, text: 'Canal não encontrado.' };
+    const old = ch.name;
+    await ch.setName(String(newName).replace(/\s+/g, '-').slice(0, 100), 'Aeternus');
+    return { handled: true, text: `✅ Canal **#${old}** → **#${ch.name}**` };
+  }
+
+  const topicM = t.match(
+    /(?:define|definir|seta|setar|muda|mudar)\s+(?:o\s+)?t[oó]pico\s+(?:para|pra|:)?\s*["']?([^"'\n]+)["']?/i
+  );
+  if (topicM) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageChannels, 'Gerenciar Canais');
+    if (err) return { handled: true, text: err };
+    const ch = message.channel;
+    if (!ch?.setTopic) return { handled: true, text: 'Este canal não tem tópico.' };
+    await ch.setTopic(topicM[1].slice(0, 1024), 'Aeternus');
+    return { handled: true, text: `📌 Tópico de **#${ch.name}** atualizado.` };
+  }
+
+  const moveCh = t.match(
+    /(?:move|mover)\s+(?:o\s+)?canal\s+(?:#)?([\w-]+|\d{15,22})\s+(?:para|pra)\s+(?:a\s+)?(?:categoria\s+)?["']?([^"'\n]+)["']?/i
+  );
+  if (moveCh) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageChannels, 'Gerenciar Canais');
+    if (err) return { handled: true, text: err };
+    const ch = resolveChannel(guild, message, moveCh[1]);
+    const cat = guild.channels.cache.find(
+      (c) =>
+        c.type === ChannelType.GuildCategory &&
+        (c.name.toLowerCase() === moveCh[2].toLowerCase() ||
+          c.name.toLowerCase().includes(moveCh[2].toLowerCase()))
+    );
+    if (!ch) return { handled: true, text: 'Canal não encontrado.' };
+    if (!cat) return { handled: true, text: `Categoria \`${moveCh[2]}\` não encontrada.` };
+    await ch.setParent(cat.id, { reason: 'Aeternus' });
+    return { handled: true, text: `📁 **#${ch.name}** movido para **${cat.name}**.` };
+  }
+
+  const takeRole =
+    t.match(
+      /(?:tira|tirar|remova|remover|remove)\s+(?:o\s+)?cargo\s+["']?([^"'\n]+?)["']?\s+(?:de|do|da)\s+<@!?(\d+)>/i
+    ) ||
+    t.match(
+      /(?:tira|tirar|remova|remover)\s+(?:o\s+)?cargo\s+["']?([^"'\n]+?)["']?\s+(?:de|do)\s+(\d{15,22})/i
+    );
+  if (takeRole) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageRoles, 'Gerenciar Cargos');
+    if (err) return { handled: true, text: err };
+    const role = resolveRole(guild, takeRole[1]);
+    const member = await resolveMember(guild, message, takeRole[2]);
+    if (!role) return { handled: true, text: `Cargo \`${takeRole[1]}\` não encontrado.` };
+    if (!member) return { handled: true, text: 'Membro não encontrado.' };
+    await member.roles.remove(role, 'Aeternus');
+    return { handled: true, text: `✅ Cargo **${role.name}** removido de **${member.user.tag}**.` };
+  }
+
+  const renameRole = t.match(
+    /(?:renomeia|renomear|renomeie)\s+(?:o\s+)?cargo\s+["']?([^"'\n]+?)["']?\s+(?:para|pra)\s+["']?([^"'\n]+)["']?/i
+  );
+  if (renameRole) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageRoles, 'Gerenciar Cargos');
+    if (err) return { handled: true, text: err };
+    const role = resolveRole(guild, renameRole[1]);
+    if (!role || role.id === guild.id) return { handled: true, text: 'Cargo não encontrado.' };
+    const old = role.name;
+    await role.setName(renameRole[2].trim().slice(0, 100), 'Aeternus');
+    return { handled: true, text: `✅ Cargo **${old}** → **${role.name}**` };
+  }
+
+  const renameGuild = t.match(
+    /(?:renomeia|renomear|renomeie)\s+(?:o\s+)?servidor\s+(?:para|pra)\s+["']?([^"'\n]+)["']?/i
+  );
+  if (renameGuild) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageGuild, 'Gerenciar Servidor');
+    if (err) return { handled: true, text: err };
+    const old = guild.name;
+    await guild.setName(renameGuild[1].trim().slice(0, 100), 'Aeternus');
+    return { handled: true, text: `✅ Servidor **${old}** → **${guild.name}**` };
+  }
+
+  const dcVoice = t.match(
+    /(?:desconecta|desconectar|disconnect)\s+(?:o\s+)?(?:@)?(<@!?\d+>|\d{15,22})/i
+  );
+  if (dcVoice || (/\b(desconecta|disconnect)\b/i.test(low) && message.mentions?.users?.size)) {
+    const err = needPerm(guild, PermissionFlagsBits.MoveMembers, 'Mover Membros');
+    if (err) return { handled: true, text: err };
+    const target = await resolveMember(guild, message, dcVoice?.[1]);
+    if (!target) return { handled: true, text: 'Marca quem desconectar.' };
+    if (!target.voice?.channel) return { handled: true, text: `**${target.user.tag}** não está em voz.` };
+    await target.voice.disconnect('Aeternus');
+    return { handled: true, text: `🔌 **${target.user.tag}** desconectado da call.` };
+  }
+
+  const moveVoice = t.match(
+    /(?:move|mover)\s+(?:o\s+)?(?:@)?(<@!?\d+>|\d{15,22})\s+(?:para|pra)\s+(?:o\s+)?(?:canal\s+)?(?:de\s+)?voz\s+["']?([^"'\n]+)["']?/i
+  );
+  if (moveVoice) {
+    const err = needPerm(guild, PermissionFlagsBits.MoveMembers, 'Mover Membros');
+    if (err) return { handled: true, text: err };
+    const target = await resolveMember(guild, message, moveVoice[1]);
+    const voiceCh = guild.channels.cache.find(
+      (c) =>
+        (c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildStageVoice) &&
+        (c.name.toLowerCase() === moveVoice[2].toLowerCase() ||
+          c.name.toLowerCase().includes(moveVoice[2].toLowerCase()))
+    );
+    if (!target) return { handled: true, text: 'Membro não encontrado.' };
+    if (!voiceCh) return { handled: true, text: `Canal de voz \`${moveVoice[2]}\` não encontrado.` };
+    await target.voice.setChannel(voiceCh, 'Aeternus');
+    return { handled: true, text: `🔊 **${target.user.tag}** movido para **${voiceCh.name}**.` };
+  }
+
+  if (/\b(ativa|ativar|liga|ligar)\s+nsfw\b/i.test(low)) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageChannels, 'Gerenciar Canais');
+    if (err) return { handled: true, text: err };
+    if (!message.channel?.setNSFW) return { handled: true, text: 'Este canal não suporta NSFW.' };
+    await message.channel.setNSFW(true, 'Aeternus');
+    return { handled: true, text: `🔞 NSFW ativado em **#${message.channel.name}**.` };
+  }
+  if (/\b(desativa|desativar|desliga|desligar)\s+nsfw\b/i.test(low)) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageChannels, 'Gerenciar Canais');
+    if (err) return { handled: true, text: err };
+    if (!message.channel?.setNSFW) return { handled: true, text: 'Este canal não suporta NSFW.' };
+    await message.channel.setNSFW(false, 'Aeternus');
+    return { handled: true, text: `✅ NSFW desativado em **#${message.channel.name}**.` };
+  }
+
+  if (/\b(bane|banir|ban)\b/i.test(low)) {
+    const err = needPerm(guild, PermissionFlagsBits.BanMembers, 'Banir Membros');
+    if (err) return { handled: true, text: err };
     const m = t.match(/(?:bane|banir|ban)\s+(?:o\s+)?(?:@)?(<@!?\d+>|\d{15,22})/i);
     const target = await resolveMember(guild, message, m?.[1]);
-    const reasonMatch = t.match(/(?:por|motivo)\s+(.+)$/i);
-    const reason = (reasonMatch?.[1] || 'Banido via Aeternus').slice(0, 200);
+    const reason = (t.match(/(?:por|motivo)\s+(.+)$/i)?.[1] || 'Banido via Aeternus').slice(0, 200);
     if (!target && m?.[1]) {
       const id = String(m[1]).replace(/\D/g, '');
       if (/^\d{15,22}$/.test(id)) {
@@ -97,9 +321,8 @@ async function tryModeration(command, message, client) {
   }
 
   if (/\b(desbane|desbanir|unban)\b/i.test(low)) {
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.BanMembers)) {
-      return { handled: true, text: 'Sem permissão **Banir Membros**.' };
-    }
+    const err = needPerm(guild, PermissionFlagsBits.BanMembers, 'Banir Membros');
+    if (err) return { handled: true, text: err };
     const m = t.match(/(\d{15,22})/);
     if (!m) return { handled: true, text: 'Passe o ID pra desbanir.' };
     await guild.members.unban(m[1], 'Aeternus');
@@ -107,9 +330,8 @@ async function tryModeration(command, message, client) {
   }
 
   if (/\b(expulsa|expulsar|kick)\b/i.test(low)) {
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.KickMembers)) {
-      return { handled: true, text: 'Sem permissão **Expulsar Membros**.' };
-    }
+    const err = needPerm(guild, PermissionFlagsBits.KickMembers, 'Expulsar Membros');
+    if (err) return { handled: true, text: err };
     const m = t.match(/(?:expulsa|expulsar|kick)\s+(?:o\s+)?(?:@)?(<@!?\d+>|\d{15,22})/i);
     const target = await resolveMember(guild, message, m?.[1]);
     const reason = (t.match(/(?:por|motivo)\s+(.+)$/i)?.[1] || 'Expulso via Aeternus').slice(0, 200);
@@ -120,9 +342,8 @@ async function tryModeration(command, message, client) {
   }
 
   if (/\b(unmute|desmutar|desilencia|remover timeout)\b/i.test(low)) {
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ModerateMembers)) {
-      return { handled: true, text: 'Sem permissão **Moderar Membros**.' };
-    }
+    const err = needPerm(guild, PermissionFlagsBits.ModerateMembers, 'Moderar Membros');
+    if (err) return { handled: true, text: err };
     const m = t.match(
       /(?:unmute|desmutar|desilencia|remover timeout)\s+(?:o\s+)?(?:@)?(<@!?\d+>|\d{15,22})/i
     );
@@ -133,9 +354,8 @@ async function tryModeration(command, message, client) {
   }
 
   if (/\b(mute|mutar|silencia|silenciar|timeout|castigo)\b/i.test(low)) {
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ModerateMembers)) {
-      return { handled: true, text: 'Sem permissão **Moderar Membros** (timeout).' };
-    }
+    const err = needPerm(guild, PermissionFlagsBits.ModerateMembers, 'Moderar Membros');
+    if (err) return { handled: true, text: err };
     const m = t.match(
       /(?:mute|mutar|silencia|silenciar|timeout|castigo)\s+(?:o\s+)?(?:@)?(<@!?\d+>|\d{15,22})(?:\s+por\s+(\d+\s*\w+))?/i
     );
@@ -156,9 +376,8 @@ async function tryModeration(command, message, client) {
     /(?:limpa|limpar|clear|purge)\s+(?:as\s+)?(?:últimas\s+)?(\d{1,3})\s*(?:mensagens?)?/i
   );
   if (clearM) {
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageMessages)) {
-      return { handled: true, text: 'Sem permissão **Gerenciar Mensagens**.' };
-    }
+    const err = needPerm(guild, PermissionFlagsBits.ManageMessages, 'Gerenciar Mensagens');
+    if (err) return { handled: true, text: err };
     if (!message.channel?.bulkDelete) return { handled: true, text: 'Só em canal de texto.' };
     const n = Math.min(100, Math.max(1, Number(clearM[1]) || 10));
     const deleted = await message.channel.bulkDelete(n, true);
@@ -167,9 +386,8 @@ async function tryModeration(command, message, client) {
 
   const slowM = t.match(/(?:slowmode|modo lento)\s+(\d+)\s*(s|sec|m|min)?/i);
   if (slowM) {
-    if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)) {
-      return { handled: true, text: 'Sem permissão **Gerenciar Canais**.' };
-    }
+    const err = needPerm(guild, PermissionFlagsBits.ManageChannels, 'Gerenciar Canais');
+    if (err) return { handled: true, text: err };
     let sec = Number(slowM[1]) || 0;
     if (/^m/.test(slowM[2] || '')) sec *= 60;
     sec = Math.min(21600, Math.max(0, sec));
@@ -178,6 +396,18 @@ async function tryModeration(command, message, client) {
       handled: true,
       text: sec ? `🐢 Slowmode **${sec}s**` : '🐢 Slowmode desligado'
     };
+  }
+
+  const nickM = t.match(
+    /(?:nick|apelido|renomear membro)\s+(?:de\s+)?(?:@)?(<@!?\d+>|\d{15,22})\s+(?:para\s+)?["']?([^"'\n]+)["']?/i
+  );
+  if (nickM) {
+    const err = needPerm(guild, PermissionFlagsBits.ManageNicknames, 'Gerenciar Apelidos');
+    if (err) return { handled: true, text: err };
+    const target = await resolveMember(guild, message, nickM[1]);
+    if (!target) return { handled: true, text: 'Membro não encontrado.' };
+    await target.setNickname(nickM[2].trim().slice(0, 32), 'Aeternus');
+    return { handled: true, text: `✅ Apelido de **${target.user.tag}** → **${nickM[2].trim().slice(0, 32)}**` };
   }
 
   return { handled: false };
@@ -218,17 +448,17 @@ async function handleOwnerMessage(message, client) {
   }
 
   try {
-    const mod = await tryModeration(command, message, client);
-    if (mod.handled) {
+    const mgr = await tryServerManage(command, message, client);
+    if (mgr.handled) {
       pushMem(message.author.id, 'user', command);
-      pushMem(message.author.id, 'assistant', mod.text);
+      pushMem(message.author.id, 'assistant', mgr.text);
       await message
-        .reply({ content: mod.text.slice(0, 1900) })
-        .catch(() => message.channel.send(mod.text.slice(0, 1900)).catch(() => {}));
+        .reply({ content: mgr.text.slice(0, 1900) })
+        .catch(() => message.channel.send(mgr.text.slice(0, 1900)).catch(() => {}));
       return true;
     }
   } catch (e) {
-    await message.reply(`❌ Moderação: ${e.message}`).catch(() => {});
+    await message.reply(`❌ Servidor/mod: ${e.message}`).catch(() => {});
     return true;
   }
 
@@ -236,7 +466,11 @@ async function handleOwnerMessage(message, client) {
   const origChat = core.chatAI;
   if (typeof origChat === 'function') {
     core.chatAI = async (userMessage, contextBlock = '') => {
-      const r = await origChat(userMessage, mem + (contextBlock || ''));
+      const extra =
+        mem +
+        (contextBlock || '') +
+        '\nVocê gerencia o servidor Discord do dono (canais, cargos, mods). NÃO edita GitHub daqui.\n';
+      const r = await origChat(userMessage, extra);
       if (r?.text) pushMem(message.author.id, 'assistant', r.text);
       return r;
     };
@@ -265,7 +499,7 @@ module.exports = {
       client.aeternusCore.putFile = core.putFile;
       client.aeternusCore.createRepo = core.createRepo;
     }
-    console.log('[aeternusCoreBoost] mod+memória+sem-write-github no Discord');
+    console.log('[aeternusCoreBoost] gerenciar servidor + mod + memória (sem write github)');
   },
   handleOwnerMessage
 };
