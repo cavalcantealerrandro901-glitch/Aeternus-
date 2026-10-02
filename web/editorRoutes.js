@@ -10,18 +10,12 @@ function panelAuth(req, res, next) {
     next();
 }
 
-/** Pedido de criar / editar / gravar código */
 function isCodeWriteRequest(msg) {
     return /\b(edit|editar|ajusta|ajustar|corrija|corrigir|modifica|modificar|muda|mudar|altera|alterar|refatora|refatorar|reescrev|implementa|adiciona|remove|conserta|fix|patch|atualiza|cria|criar|create|gere|gerar|escreva|escrever|salva|salvar|novo\s+comando|novo\s+arquivo|faz\s+o\s+comando|fa[cç]a)\b/i.test(
         msg
     );
 }
 
-function isEditRequest(msg) {
-    return isCodeWriteRequest(msg);
-}
-
-/** Extrai caminhos de arquivo da mensagem */
 function extractPaths(msg) {
     const found = new Set();
     const re =
@@ -30,7 +24,6 @@ function extractPaths(msg) {
     while ((m = re.exec(msg))) found.add(m[1].replace(/^["'`(]+|["'`)]+$/g, ''));
     const simple = msg.match(/(?:arquivo|file|comando)\s+["'`]?([\w./-]+\.[a-z0-9]+)/i);
     if (simple) found.add(simple[1]);
-    // "comando atributos" → commands/atributos.js se existir depois
     const cmdName = msg.match(/(?:comando|command)\s+["'`]?([a-z0-9_-]+)/i);
     if (cmdName) found.add('commands/' + cmdName[1].toLowerCase() + '.js');
     return [...found];
@@ -49,72 +42,47 @@ function readFileSafe(rel) {
 function buildFileContext({ message, currentPath, editorContent }) {
     const files = [];
     const paths = extractPaths(message);
-
     if (currentPath) paths.unshift(String(currentPath));
-
     const seen = new Set();
     for (const p of paths) {
         const key = String(p).replace(/^\.\//, '');
         if (!key || seen.has(key)) continue;
         seen.add(key);
-
         if (
             currentPath &&
             key === String(currentPath).replace(/^\.\//, '') &&
             typeof editorContent === 'string' &&
             editorContent.length
         ) {
-            files.push({
-                path: key,
-                content: editorContent.slice(0, 24_000),
-                source: 'editor-buffer'
-            });
+            files.push({ path: key, content: editorContent.slice(0, 24_000), source: 'editor-buffer' });
             continue;
         }
-
-        const r = readFileSafe(key);
-        files.push(r);
+        files.push(readFileSafe(key));
     }
-
     if (!files.length && currentPath) {
         if (typeof editorContent === 'string' && editorContent.length) {
-            files.push({
-                path: currentPath,
-                content: editorContent.slice(0, 24_000),
-                source: 'editor-buffer'
-            });
+            files.push({ path: currentPath, content: editorContent.slice(0, 24_000), source: 'editor-buffer' });
         } else {
             files.push(readFileSafe(currentPath));
         }
     }
-
     return files;
 }
 
 function formatFilesForPrompt(files) {
     if (!files.length) return '';
-    const parts = ['\n\n=== ARQUIVOS LIDOS (leia isto ANTES de responder) ==='];
+    const parts = ['\n\n=== ARQUIVOS LIDOS ==='];
     for (const f of files) {
         if (f.error) {
-            parts.push(`\n--- ${f.path} ---\n[ERRO ao ler: ${f.error}]`);
+            parts.push(`\n--- ${f.path} ---\n[ERRO: ${f.error}]`);
             continue;
         }
-        parts.push(
-            `\n--- ${f.path} (${f.source || 'disco'}${f.truncated ? ', truncado' : ''}) ---\n${f.content}`
-        );
+        parts.push(`\n--- ${f.path} (${f.source || 'disco'}) ---\n${f.content}`);
     }
-    parts.push('\n=== FIM DOS ARQUIVOS ===\n');
+    parts.push('\n=== FIM ===\n');
     return parts.join('');
 }
 
-/**
- * Extrai blocos de código com path e grava no disco.
- * Formatos aceitos:
- *   ```js commands/foo.js
- *   ```javascript:commands/foo.js
- *   ```js\n// FILE: commands/foo.js
- *   ```js\n// path: commands/foo.js
- */
 function extractWritableBlocks(reply, fallbackPath) {
     const out = [];
     const re = /```([\w.+-]*)?(?:\s*:?\s*([\w./\\-]+\.[a-z0-9]+))?\s*\n([\s\S]*?)```/gi;
@@ -123,8 +91,6 @@ function extractWritableBlocks(reply, fallbackPath) {
         const lang = (m[1] || '').trim();
         let pathHint = (m[2] || '').trim().replace(/^[:\s]+/, '');
         let code = m[3] || '';
-
-        // path na 1ª linha do bloco
         const firstLine = code.split('\n')[0] || '';
         const fileLine = firstLine.match(
             /^\s*(?:\/\/|#)\s*(?:FILE|PATH|ARQUIVO)\s*:?\s*([\w./\\-]+\.[a-z0-9]+)/i
@@ -133,25 +99,14 @@ function extractWritableBlocks(reply, fallbackPath) {
             pathHint = fileLine[1];
             code = code.split('\n').slice(1).join('\n');
         }
-
         code = code.replace(/^\n+/, '').replace(/\n+$/, '');
         if (!code.trim()) continue;
-
-        // ignora blocos minúsculos que não são código de arquivo
         if (code.trim().split('\n').length < 2 && code.length < 40 && !pathHint) continue;
-
         let target = pathHint || fallbackPath || '';
-        // se lang parece path (ex: commands/x.js)
-        if (!target && lang && /[\/]/.test(lang) && /\.[a-z0-9]+$/i.test(lang)) {
-            target = lang;
-        }
-
+        if (!target && lang && /[\/]/.test(lang) && /\.[a-z0-9]+$/i.test(lang)) target = lang;
         if (!target) continue;
-
-        // normaliza
         target = String(target).replace(/^\.\//, '').replace(/\\/g, '/');
         if (target.startsWith('/')) target = target.slice(1);
-
         out.push({ path: target, code, lang });
     }
     return out;
@@ -162,15 +117,8 @@ function writeBlocksToDisk(blocks) {
     for (const b of blocks) {
         try {
             const result = shell.writeFile(b.path, b.code);
-            if (result.ok) {
-                written.push({
-                    path: result.path || b.path,
-                    bytes: result.bytes,
-                    ok: true
-                });
-            } else {
-                written.push({ path: b.path, ok: false, error: result.error || 'falha ao gravar' });
-            }
+            if (result.ok) written.push({ path: result.path || b.path, bytes: result.bytes, ok: true });
+            else written.push({ path: b.path, ok: false, error: result.error || 'falha' });
         } catch (e) {
             written.push({ path: b.path, ok: false, error: e.message });
         }
@@ -178,30 +126,27 @@ function writeBlocksToDisk(blocks) {
     return written;
 }
 
-async function askJarvis(message, persona, fileContext, { wantWrite, fallbackPath }) {
+async function askAI(message, persona, fileContext, { wantWrite, fallbackPath }) {
     const writeRules = wantWrite
         ? [
               '',
-              'MODO GRAVAÇÃO ATIVO — você DEVE entregar o arquivo completo para ser salvo.',
-              'Formato OBRIGATÓRIO (um bloco por arquivo):',
+              'MODO GRAVAÇÃO: entregue o arquivo COMPLETO para salvar.',
+              'Formato obrigatório:',
               '```js commands/nome.js',
-              '// código completo do arquivo',
+              '// código inteiro do arquivo',
               '```',
-              'Ou na primeira linha do bloco: // FILE: commands/nome.js',
-              'Sempre o arquivo INTEIRO (module.exports etc), nunca só um trecho solto.',
-              fallbackPath ? `Arquivo alvo preferencial: ${fallbackPath}` : '',
-              'Depois do bloco, uma frase curta dizendo o que mudou.'
+              'Ou // FILE: commands/nome.js na 1ª linha do bloco.',
+              fallbackPath ? `Arquivo alvo: ${fallbackPath}` : '',
+              'Depois: 1–2 frases do que fez. Sem formalidade de mordomo — fale como o Grok.'
           ].join('\n')
         : '';
 
     const extra = [
-        '[Editor Aeternus · Terminal Termux]',
-        'Fale de boa, direto. Português BR.',
-        'REGRA: se o usuário pedir criar/editar/ajustar comando ou arquivo, o conteúdo lido (se houver) está abaixo — use-o.',
-        'Quando for código para salvar, use o formato de bloco com path (commands/x.js).',
+        '[Editor Aeternus — mesma IA estilo Grok]',
+        'Direto, útil, pt-BR. Código completo quando for criar/editar.',
         writeRules,
         fileContext,
-        '\nPedido do usuário:\n'
+        '\nPedido:\n'
     ].join('\n');
 
     if (typeof ai.fetchPublicAIResponse === 'function') {
@@ -272,7 +217,6 @@ function registerEditorRoutes(app) {
             const fileContext = formatFilesForPrompt(files);
             const wantWrite = isCodeWriteRequest(msg);
 
-            // path de fallback: arquivo lido / citado / comando inferido
             let fallbackPath = currentPath || null;
             if (!fallbackPath && files.length && files[0].path) fallbackPath = files[0].path;
             if (!fallbackPath) {
@@ -280,21 +224,19 @@ function registerEditorRoutes(app) {
                 if (paths.length) fallbackPath = paths[0];
             }
 
-            const reply = await askJarvis(msg, req.body?.persona || 'default', fileContext, {
+            const reply = await askAI(msg, req.body?.persona || 'default', fileContext, {
                 wantWrite,
                 fallbackPath
             });
 
-            const text = reply || '… deu ruim, tenta de novo.';
+            const text = reply || 'Não rolou resposta da IA. Confere GROQ_API_KEY no Render.';
 
-            // Grava blocos de código no disco
             let written = [];
             if (wantWrite) {
                 const blocks = extractWritableBlocks(text, fallbackPath);
                 if (blocks.length) {
                     written = writeBlocksToDisk(blocks);
                 } else if (fallbackPath) {
-                    // tenta bloco único sem path
                     const loose = /```[\w.+-]*\n([\s\S]*?)```/.exec(text);
                     if (loose && loose[1] && loose[1].trim().length > 40) {
                         written = writeBlocksToDisk([
@@ -322,7 +264,7 @@ function registerEditorRoutes(app) {
     });
 
     app.use('/api/editor', r);
-    console.log('🛠️  [web] Editor API em /api/editor/*');
+    console.log('🛠️  [web] Editor API · IA estilo Grok + gravação de arquivos');
 }
 
 module.exports = { registerEditorRoutes };
