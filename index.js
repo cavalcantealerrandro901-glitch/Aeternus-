@@ -9,8 +9,21 @@ const { getToken } = require('./utils/env');
 async function main() {
     console.log('🚀 Aeternus iniciando…');
     const mongoOk = await connect();
-    const n = await store.hydrate();
-    console.log(mongoOk ? '📦 Dados carregados do MongoDB (' + n + ' docs)' : '⚠️ Sem Mongo — dados efêmeros');
+    const hydrated = await store.hydrate();
+    const docs = hydrated && typeof hydrated === 'object' ? hydrated.docs : hydrated;
+    console.log(
+        mongoOk
+            ? '📦 Dados carregados do MongoDB (' + (docs ?? '?') + ' docs)'
+            : '⚠️ Sem Mongo — dados efêmeros'
+    );
+    if (mongoOk && typeof store.migrateLocalToMongo === 'function') {
+        try {
+            const mig = await store.migrateLocalToMongo();
+            if (mig?.uploaded) console.log('📤 Migração local→Mongo: ' + mig.uploaded + ' arquivo(s)');
+        } catch (e) {
+            console.warn('migração:', e.message);
+        }
+    }
 
     const token = getToken();
     if (!token) {
@@ -22,9 +35,7 @@ async function main() {
         process.exit(1);
     }
 
-    const { Client } = require('discord.js');
-// placeholder
-const client = new Client({
+    const client = new Client({
         intents: [
             GatewayIntentBits.Guilds,
             GatewayIntentBits.GuildMembers,
@@ -43,8 +54,7 @@ const client = new Client({
             Partials.Reaction
         ]
     });
-try { client.setMaxListeners(25); } catch (_) {}
-
+    try { client.setMaxListeners(25); } catch (_) {}
 
     client.commands = new Collection();
     client.slash = new Collection();
@@ -54,6 +64,14 @@ try { client.setMaxListeners(25); } catch (_) {}
     loadEvents(client);
     loadSystems(client);
     startWeb(client);
+
+    const site =
+        (process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '').replace(/\/$/, '') ||
+        ('http://0.0.0.0:' + (process.env.PORT || 10000));
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🛠️  Editor do site: ' + site + '/editor.html');
+    console.log('🌐 Painel:          ' + site + '/dashboard');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     const backup = require('./utils/backup');
     const shutdown = async (sig) => {
@@ -75,8 +93,6 @@ main().catch((e) => {
     process.exit(1);
 });
 
-// unhandledRejection / uncaughtException são capturados pelo systems/autoRepair
-// (reportError → DM do OWNER_ID). Mantém log de fallback se o sistema ainda não carregou.
 process.on('unhandledRejection', (err) => {
     try {
         const ar = require('./utils/autoRepair');
