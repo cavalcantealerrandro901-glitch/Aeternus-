@@ -40,8 +40,6 @@ header a:hover{color:var(--text)}
   .layout{grid-template-columns:1fr}
   .chat{display:none}
 }
-
-/* ── área principal = Termux ── */
 .main{
   display:flex;flex-direction:column;min-height:0;min-width:0;
   background:#0d1117;
@@ -64,7 +62,6 @@ header a:hover{color:var(--text)}
   vertical-align:text-bottom;animation:blink .9s step-end infinite;
 }
 @keyframes blink{50%{opacity:0}}
-
 .prompt-bar{
   display:flex;align-items:center;gap:.4rem;
   padding:.45rem .75rem;border-top:1px solid var(--border);
@@ -76,8 +73,6 @@ header a:hover{color:var(--text)}
   flex:1;background:transparent;border:none;outline:none;
   color:var(--text);font-family:inherit;font-size:inherit;
 }
-
-/* chat */
 .chat{
   background:#010409;border-left:1px solid var(--border);
   display:flex;flex-direction:column;min-height:0;
@@ -130,10 +125,10 @@ header a:hover{color:var(--text)}
       <span style="color:var(--green)">online</span>
     </div>
     <div class="chat-msgs" id="chatMsgs">
-      <div class="bubble bot">Terminal estilo Termux. Use <code>ls</code> na raiz e <code>ls pasta</code> pra entrar. Código que eu gerar aparece no terminal.</div>
+      <div class="bubble bot">Terminal estilo Termux. Use <code>ls</code> / <code>ls pasta</code>. Peça <b>criar</b> ou <b>editar</b> um comando — o arquivo é gravado de verdade e o código aparece aqui.</div>
     </div>
     <div class="chat-in">
-      <input id="chatInput" placeholder="fala com o JARVIS…"/>
+      <input id="chatInput" placeholder="ex: cria o comando atributos"/>
       <button type="button" id="chatBtn" onclick="sendChat()">Enviar</button>
     </div>
   </aside>
@@ -168,7 +163,7 @@ async function api(path, opts = {}) {
 }
 
 function esc(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' }[c]));
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 function screen() {
@@ -194,7 +189,8 @@ function setCwd(p) {
 
 function bootBanner() {
   printText('Aeternus Shell · estilo Termux', 'meta');
-  printText('Comandos: ls | ls <pasta> | cat <arquivo> | pwd | clear | help', 'meta');
+  printText('ls | ls <pasta> | cat <arquivo> | cd | pwd | clear | help', 'meta');
+  printText('JARVIS grava arquivo ao pedir: criar / editar / ajustar', 'meta');
   printText('', '');
 }
 
@@ -229,7 +225,6 @@ function extractCodeBlocks(reply) {
   return blocks;
 }
 
-/** Normaliza path relativo ao projeto */
 function joinCwd(arg) {
   if (!arg || arg === '.') return cwd === '.' ? '.' : cwd;
   if (arg.startsWith('/')) return arg.replace(/^\/+/, '');
@@ -247,19 +242,16 @@ async function runCmd(line) {
   const cmd = parts[0].toLowerCase();
   const args = parts.slice(1);
 
-  // clear
   if (cmd === 'clear' || cmd === 'cls') {
     screen().innerHTML = '';
     return;
   }
 
-  // pwd
   if (cmd === 'pwd') {
     printText(cwd === '.' ? '/' : '/' + cwd, 'path');
     return;
   }
 
-  // cd (só atualiza cwd local se a pasta existir via ls)
   if (cmd === 'cd') {
     const target = args[0] || '.';
     if (target === '..') {
@@ -284,7 +276,6 @@ async function runCmd(line) {
     return;
   }
 
-  // ls / ls pasta
   if (cmd === 'ls' || cmd === 'dir') {
     const target = joinCwd(args[0] || '.');
     const data = await api('/ls?path=' + encodeURIComponent(target));
@@ -292,7 +283,6 @@ async function runCmd(line) {
       printText(data.error || 'erro', 'err');
       return;
     }
-    // formato Termux: pastas e arquivos
     const entries = data.entries || data.files || data.list || [];
     if (Array.isArray(entries) && entries.length) {
       const lines = entries.map((e) => {
@@ -304,19 +294,13 @@ async function runCmd(line) {
       printText(lines.join('\n') || '(vazio)', 'ok');
     } else if (typeof data.text === 'string') {
       printText(data.text || '(vazio)', 'ok');
-    } else if (Array.isArray(data.dirs) || Array.isArray(data.files)) {
-      const dirs = (data.dirs || []).map((d) => d + '/');
-      const files = data.files || [];
-      printText([...dirs, ...files].join('\n') || '(vazio)', 'ok');
     } else {
-      // fallback: manda pro shell exec
       const exec = await api('/exec', { method: 'POST', body: JSON.stringify({ cmd: 'ls ' + (args[0] || '') }) });
       printText(exec.text || exec.error || '(vazio)', exec.ok === false ? 'err' : 'ok');
     }
     return;
   }
 
-  // cat arquivo → mostra no terminal com digitação
   if (cmd === 'cat' || cmd === 'nano' || cmd === 'type') {
     const file = joinCwd(args[0] || '');
     if (!args[0]) {
@@ -334,25 +318,25 @@ async function runCmd(line) {
     return;
   }
 
-  // help
   if (cmd === 'help') {
     printText(
       [
-        'ls              lista a raiz do projeto',
-        'ls <pasta>      lista o conteúdo da pasta',
+        'ls              lista a raiz',
+        'ls <pasta>      lista a pasta',
         'cd <pasta>      entra na pasta',
         'cd ..           volta',
         'pwd             pasta atual',
-        'cat <arquivo>   mostra o arquivo',
+        'cat <arquivo>   mostra arquivo',
         'clear           limpa a tela',
-        'npm / node ...  via shell do servidor'
+        '',
+        'No JARVIS: "cria o comando X" ou "edita commands/x.js"',
+        '→ grava o arquivo no projeto e mostra o código aqui'
       ].join('\n'),
       'meta'
     );
     return;
   }
 
-  // resto: shell do servidor
   const data = await api('/exec', { method: 'POST', body: JSON.stringify({ cmd: raw }) });
   if (data.open) {
     currentPath = data.open;
@@ -399,7 +383,7 @@ async function sendChat() {
   input.value = '';
   const box = document.getElementById('chatMsgs');
   box.innerHTML += '<div class="bubble user">' + esc(msg) + '</div>';
-  box.innerHTML += '<div class="bubble bot" id="chatLoading" style="opacity:.7">…</div>';
+  box.innerHTML += '<div class="bubble bot" id="chatLoading" style="opacity:.7">gravando / pensando…</div>';
   box.scrollTop = box.scrollHeight;
   btn.disabled = true;
 
@@ -421,15 +405,37 @@ async function sendChat() {
       data.readFiles.map((f) => f.path).join(', ') +
       '</div>';
   }
+  if (data.written && data.written.length) {
+    meta +=
+      '<div style="font-size:.72rem;color:#3fb950;margin-bottom:.3rem">salvo: ' +
+      data.written
+        .map((w) => (w.ok ? w.path + ' (' + (w.bytes || 0) + ' B)' : w.path + ' ERRO'))
+        .join(', ') +
+      '</div>';
+  }
   box.innerHTML += '<div class="bubble bot">' + meta + esc(reply) + '</div>';
   box.scrollTop = box.scrollHeight;
 
-  const blocks = extractCodeBlocks(reply);
-  if (blocks.length) {
-    for (const b of blocks) {
-      printText('── ' + (b.lang || 'code') + ' ──', 'meta');
-      await typeCode(b.code);
-      printText('✓', 'ok');
+  if (data.written && data.written.length) {
+    for (const w of data.written) {
+      if (!w.ok) {
+        printText('✗ falha ao gravar ' + (w.path || '?') + ': ' + (w.error || ''), 'err');
+        continue;
+      }
+      printText('── gravado: ' + w.path + ' (' + (w.bytes || 0) + ' bytes) ──', 'ok');
+      currentPath = w.path;
+      try {
+        const rd = await api('/read?path=' + encodeURIComponent(w.path));
+        if (rd.ok && rd.content) await typeCode(rd.content);
+      } catch (_) {}
+    }
+  } else {
+    const blocks = extractCodeBlocks(reply);
+    if (blocks.length) {
+      for (const b of blocks) {
+        printText('── ' + (b.lang || 'code') + ' (não gravado — diga criar/editar) ──', 'meta');
+        await typeCode(b.code);
+      }
     }
   }
 }
