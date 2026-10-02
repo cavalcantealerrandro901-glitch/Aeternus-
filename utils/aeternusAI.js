@@ -1,6 +1,6 @@
 /**
- * Aeternus Engine — IA do bot / editor
- * Personalidade estilo Grok: direta, útil, sem enrolação.
+ * Aeternus Engine — IA estilo Grok + multi-API
+ * Direto, útil, sem enrolação. Editor grava arquivos completos.
  */
 
 const fs = require('fs');
@@ -8,52 +8,48 @@ const path = require('path');
 
 const DATA_PATH = path.join(__dirname, '..', 'data', 'ai-cache.json');
 let dictCache = {};
+let profiles = {};
 try {
     if (fs.existsSync(DATA_PATH)) {
         const raw = JSON.parse(fs.readFileSync(DATA_PATH, 'utf8'));
         dictCache = raw.dictCache || {};
+        profiles = raw.profiles || {};
     }
 } catch (_) {}
 
 function saveData() {
     try {
         fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
-        fs.writeFileSync(DATA_PATH, JSON.stringify({ dictCache }, null, 0));
+        fs.writeFileSync(DATA_PATH, JSON.stringify({ dictCache, profiles }, null, 0));
     } catch (_) {}
-}
-
-function normalizeText(s) {
-    return String(s || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim();
 }
 
 function env(name) {
     return String(process.env[name] || '').trim();
 }
 
+function normalizeText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+}
+
 const JARVIS_BASE = `Você é a IA do projeto Aeternus — mesmo jeito do Grok: direto, útil, sem enrolação, em português do Brasil.
-Você ajuda a criar e editar o bot Discord (comandos, sistemas, utilitários, editor).
-Quando pedirem código: entregue o arquivo COMPLETO e funcional, pronto pra salvar.
-Formato ao gravar arquivo:
-\`\`\`js commands/nome.js
+Ajuda a criar e editar o bot Discord e a conversar no servidor.
+Quando pedirem código no editor: arquivo COMPLETO no formato:
+\
+```js commands/nome.js
 // código inteiro
-\`\`\`
-Seja honesto se não souber. Não invente API que não existe. Não revele tokens/segredos.
-Tom: informal e claro, como um dev parceiro — não formal tipo mordomo.`;
+```
+Tom informal de dev parceiro. Não invente APIs. Não revele tokens. Se não souber, diga.`;
 
 function systemPromptFor(persona) {
-    if (persona === 'cyberpunk') {
-        return `${JARVIS_BASE}\nModo: técnico e direto.`;
-    }
-    if (persona === 'medieval') {
-        return `${JARVIS_BASE}\nModo: narrativo, ainda direto.`;
-    }
-    if (persona === 'editor') {
-        return `${JARVIS_BASE}\nModo editor: sempre que for criar/editar arquivo, use bloco com path (commands/x.js) e código completo.`;
-    }
+    if (persona === 'cyberpunk') return `${JARVIS_BASE}\nModo: técnico e direto.`;
+    if (persona === 'medieval') return `${JARVIS_BASE}\nModo: narrativo, ainda direto.`;
+    if (persona === 'editor')
+        return `${JARVIS_BASE}\nModo editor: ao criar/editar, use bloco com path e código completo.`;
     return `${JARVIS_BASE}\nModo padrão Grok.`;
 }
 
@@ -84,15 +80,15 @@ async function callChatCompletions(url, apiKey, body, headersExtra = {}) {
 async function providerGroq(system, userMsg) {
     const key = env('GROQ_API_KEY');
     if (!key) return null;
-    const model = env('GROQ_MODEL') || 'openai/gpt-oss-120b';
-    const models = [model, 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'].filter(
+    const preferred = env('GROQ_MODEL') || 'openai/gpt-oss-120b';
+    const models = [preferred, 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b'].filter(
         (v, i, a) => a.indexOf(v) === i
     );
     let lastErr;
-    for (const m of models) {
+    for (const model of models) {
         try {
             return await callChatCompletions('https://api.groq.com/openai/v1/chat/completions', key, {
-                model: m,
+                model,
                 messages: [
                     { role: 'system', content: system },
                     { role: 'user', content: userMsg }
@@ -111,9 +107,8 @@ async function providerGroq(system, userMsg) {
 async function providerOpenAI(system, userMsg) {
     const key = env('OPENAI_API_KEY');
     if (!key) return null;
-    const model = env('OPENAI_MODEL') || 'gpt-4o-mini';
     return callChatCompletions('https://api.openai.com/v1/chat/completions', key, {
-        model,
+        model: env('OPENAI_MODEL') || 'gpt-4o-mini',
         messages: [
             { role: 'system', content: system },
             { role: 'user', content: userMsg }
@@ -149,12 +144,11 @@ async function providerGemini(system, userMsg) {
 async function providerOpenRouter(system, userMsg) {
     const key = env('OPENROUTER_API_KEY');
     if (!key) return null;
-    const model = env('OPENROUTER_MODEL') || 'meta-llama/llama-3.1-8b-instruct:free';
     return callChatCompletions(
         'https://openrouter.ai/api/v1/chat/completions',
         key,
         {
-            model,
+            model: env('OPENROUTER_MODEL') || 'meta-llama/llama-3.1-8b-instruct:free',
             messages: [
                 { role: 'system', content: system },
                 { role: 'user', content: userMsg }
@@ -170,7 +164,7 @@ async function providerPollinations(system, userMsg) {
     const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(full)}`);
     if (!res.ok) throw new Error(`pollinations ${res.status}`);
     const text = await res.text();
-    if (!text || !text.trim()) throw new Error('pollinations empty');
+    if (!text?.trim()) throw new Error('pollinations empty');
     return text.trim();
 }
 
@@ -186,11 +180,10 @@ async function fetchJarvisReply(userText, persona = 'default', history = []) {
     const system = systemPromptFor(persona);
     let contextBlock = '';
     if (Array.isArray(history) && history.length) {
-        const last = history.slice(-6).map((h) => `- ${h.text}`).join('\n');
+        const last = history.slice(-6).map((h) => `- ${h.text || h}`).join('\n');
         contextBlock = `\nContexto recente:\n${last}\n`;
     }
     const userMsg = `${contextBlock}Mensagem: ${userText}`.trim();
-
     const errors = [];
     for (const p of PROVIDERS) {
         try {
@@ -200,7 +193,7 @@ async function fetchJarvisReply(userText, persona = 'default', history = []) {
             errors.push(`${p.name}: ${e.message}`);
         }
     }
-    if (errors.length) console.warn('[AI] falhou:', errors.join(' | '));
+    if (errors.length) console.warn('[AI]', errors.join(' | '));
     return null;
 }
 
@@ -218,7 +211,7 @@ async function fetchWordDefinition(word) {
         );
         if (!res.ok) return null;
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0 && data[0].xml) {
+        if (Array.isArray(data) && data.length && data[0].xml) {
             const definition = data[0].xml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
             dictCache[cleanWord] = definition;
             saveData();
@@ -228,10 +221,92 @@ async function fetchWordDefinition(word) {
     return null;
 }
 
+function getUserProfile(userId, displayName) {
+    const id = String(userId);
+    if (!profiles[id]) {
+        profiles[id] = { id, name: displayName || id, xp: 0, level: 1, history: [], badges: [] };
+    }
+    if (displayName) profiles[id].name = displayName;
+    return profiles[id];
+}
+
+function ownerId() {
+    return env('OWNER_ID');
+}
+
+function isOwner(userId) {
+    const o = ownerId();
+    return o && String(userId) === o;
+}
+
+function configured() {
+    return !!(env('GROQ_API_KEY') || env('OPENAI_API_KEY') || env('GEMINI_API_KEY') || env('OPENROUTER_API_KEY'));
+}
+
+function activeProviders() {
+    const out = [];
+    if (env('GROQ_API_KEY')) out.push('groq');
+    if (env('OPENAI_API_KEY')) out.push('openai');
+    if (env('GEMINI_API_KEY') || env('GOOGLE_API_KEY')) out.push('gemini');
+    if (env('OPENROUTER_API_KEY')) out.push('openrouter');
+    out.push('pollinations');
+    return out;
+}
+
+const contexts = new Map();
+const tools = new Map();
+
+function registerContext(id, def) {
+    contexts.set(id, def);
+}
+function listContexts() {
+    return [...contexts.keys()];
+}
+function registerTool(def) {
+    if (def?.name) tools.set(def.name, def);
+}
+function listTools() {
+    return [...tools.keys()];
+}
+
+function clearHistory(userId) {
+    const p = profiles[String(userId)];
+    if (p) p.history = [];
+    saveData();
+}
+
+async function chat({ userId, message, client, guild, channel, author }) {
+    const text = String(message || '').trim();
+    if (!text) return { text: 'Manda uma mensagem.', provider: 'none' };
+    const profile = getUserProfile(userId, author?.username);
+    const history = profile.history || [];
+    const result = await fetchJarvisReply(text, 'default', history);
+    profile.history = [...history, { text }].slice(-20);
+    saveData();
+    if (!result) {
+        return {
+            text: 'Nenhuma API de IA respondeu. Confere GROQ_API_KEY no Render.',
+            provider: 'none'
+        };
+    }
+    return { text: result.text, provider: result.provider };
+}
+
 module.exports = {
+    configured,
+    registerContext,
+    listContexts,
+    registerTool,
+    listTools,
+    chat,
+    clearHistory,
+    isOwner,
+    activeProviders,
     fetchJarvisReply,
     fetchPublicAIResponse,
     fetchWordDefinition,
+    normalizeText,
     systemPromptFor,
-    normalizeText
+    model: () => 'aeternus-grok-multi-api',
+    baseUrl: () => 'multi-provider'
 };
