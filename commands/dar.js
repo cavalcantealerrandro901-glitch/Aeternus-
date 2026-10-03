@@ -6,9 +6,16 @@ const cp = require('../utils/cp');
 const items = require('../utils/items');
 const store = require('../utils/store');
 
+function makeItem(id) {
+    if (typeof items.instantiateItem === 'function') return items.instantiateItem(id);
+    const def = items.getItemDef?.(id) || items.ITEMS?.[id];
+    if (!def) return null;
+    return { ...def, effects: { ...(def.effects || {}) } };
+}
+
 /**
  * O.dar @user <tipo> <valor>
- * tipos: xp | eter | cp | item:<id> | livro:<attr> | attr:<chave> | pontos <n>
+ * tipos: xp | eter | cp | item <id> | livro <attr> | attr <chave> <n> | pontos <n>
  */
 module.exports = {
     name: 'dar',
@@ -49,17 +56,23 @@ module.exports = {
             lines.push(`✨ +**${n}** XP`);
         } else if (tipo === 'cp') {
             const n = Math.max(0, parseInt(valor, 10) || 0);
-            cp.add(user.id, n, { reason: 'admin_dar' });
-            lines.push(`💠 +**${n}** CP`);
-        } else if (tipo === 'eter' || tipo === 'money' || tipo === 'flocos') {
+            if (typeof cp.add === 'function') cp.add(user.id, n);
+            else if (typeof cp.addCp === 'function') cp.addCp(user.id, n);
+            lines.push(`💎 +**${n}** CP`);
+        } else if (tipo === 'eter' || tipo === 'ether') {
             const n = Math.max(0, parseInt(valor, 10) || 0);
-            eter.add(user.id, n, { reason: 'admin_dar' });
-            lines.push(`✨ +**${n}** éter`);
+            if (typeof eter.add === 'function') eter.add(user.id, n);
+            else if (typeof eter.addEter === 'function') eter.addEter(user.id, n);
+            lines.push(`🌌 +**${n}** éter`);
         } else if (tipo === 'item' || tipo.startsWith('item:')) {
             const id = tipo.startsWith('item:') ? tipo.slice(5) : valor.split(/\s+/)[0];
-            const inst = items.instantiateItem(id);
-            if (!inst) return message.reply('Item inválido. Use um id do catálogo (`cajado_arcano`, `foice_grande`…).');
-            if (!player.has(user.id)) return message.reply('Usuário sem perfil.');
+            const inst = makeItem(id);
+            if (!inst) {
+                return message.reply(
+                    'Item inválido. Exemplos: `lamina_arcana`, `armadura_de_corceus`, `colar_da_ressurreicao`, `espada_aco`.'
+                );
+            }
+            if (!player.has(user.id)) return message.reply('Usuário sem perfil. Peça para usar `O.j criar`.');
             player.addItem(user.id, inst);
             lines.push(`${inst.emoji || '📦'} **${inst.name}**`);
         } else if (tipo === 'livro' || tipo === 'book') {
@@ -72,16 +85,27 @@ module.exports = {
             };
             const id = map[key];
             if (!id) return message.reply('Livro: forca | defesa | agilidade | vida');
-            const inst = items.instantiateItem(id);
-            if (!player.has(user.id)) return message.reply('Usuário sem perfil.');
+            const inst = makeItem(id);
+            if (!inst) return message.reply('Livro não encontrado no catálogo.');
+            if (!player.has(user.id)) return message.reply('Usuário sem perfil. Peça para usar `O.j criar`.');
             player.addItem(user.id, inst);
             lines.push(`${inst.emoji || '📕'} **${inst.name}**`);
         } else if (tipo === 'attr' || tipo === 'atributo') {
             const parts = valor.split(/\s+/);
             const key = parts[0];
             const n = Math.max(0, parseInt(parts[1], 10) || 1);
-            if (!['forca', 'defesa', 'agilidade', 'vida'].includes(key)) {
-                return message.reply('Atributo: forca | defesa | agilidade | vida');
+            const ok = [
+                'forca',
+                'defesa',
+                'agilidade',
+                'vida',
+                'inteligencia',
+                'sorte',
+                'precisao',
+                'resistencia'
+            ];
+            if (!ok.includes(key)) {
+                return message.reply('Atributo: ' + ok.join(' | '));
             }
             const data = store.load('xp.json', {});
             const cur = data[user.id] || { xp: 0, level: 0, attrs: {} };

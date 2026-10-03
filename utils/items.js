@@ -30,7 +30,6 @@ const ITEMS = {
     orbe_eclipse: { id: 'orbe_eclipse', name: 'Orbe do Eclipse', emoji: '🌑', category: 'acessorio', rarity: 'epico', classId: 'mago', effects: { mana: 8, forca: 2 } },
     arco_tempestade: { id: 'arco_tempestade', name: 'Arco da Tempestade', emoji: '⛈️', category: 'arma', rarity: 'epico', classId: 'arqueiro', effects: { agilidade: 4, forca: 2 } },
 
-    // Arcanjo do Véu
     lamina_arcana: {
         id: 'lamina_arcana',
         name: 'Lâmina Arcana',
@@ -63,14 +62,39 @@ const ITEMS = {
         exclusive: true,
         effects: { vidaPerKillPct: 0.01, reviveOnce: true, reviveHpPct: 0.1 },
         desc: '+1% vida máx. por oponente derrotado. Ressuscita 1× com 10% do HP máximo.'
-    }
+    },
+
+    livro_forca: { id: 'livro_forca', name: 'Livro de Força', emoji: '📕', category: 'consumivel', rarity: 'raro', effects: {}, bookAttr: 'forca', consumable: true },
+    livro_defesa: { id: 'livro_defesa', name: 'Livro de Defesa', emoji: '📘', category: 'consumivel', rarity: 'raro', effects: {}, bookAttr: 'defesa', consumable: true },
+    livro_agilidade: { id: 'livro_agilidade', name: 'Livro de Agilidade', emoji: '📗', category: 'consumivel', rarity: 'raro', effects: {}, bookAttr: 'agilidade', consumable: true },
+    livro_vida: { id: 'livro_vida', name: 'Livro de Vida', emoji: '📙', category: 'consumivel', rarity: 'raro', effects: {}, bookAttr: 'vida', consumable: true }
 };
 
 const RECIPES = {};
 const TRADE_SHOP = [];
 
 function getItemDef(id) {
-    return ITEMS[id] || null;
+    return ITEMS[id] || ITEMS[String(id || '').toLowerCase()] || null;
+}
+
+function instantiateItem(id, overrides = {}) {
+    const key = String(id || '').trim();
+    const def = getItemDef(key);
+    if (!def) return null;
+    return {
+        id: def.id,
+        name: def.name,
+        emoji: def.emoji || '📦',
+        category: def.category || 'misc',
+        rarity: def.rarity || 'comum',
+        classId: def.classId || null,
+        effects: { ...(def.effects || {}) },
+        desc: def.desc || '',
+        exclusive: !!def.exclusive,
+        bookAttr: def.bookAttr || undefined,
+        consumable: !!def.consumable,
+        ...overrides
+    };
 }
 
 function listItems(filter) {
@@ -88,5 +112,6 @@ module.exports = {
     RECIPES,
     TRADE_SHOP,
     getItemDef,
-    listItems
+    listItems,
+    instantiateItem
 };
