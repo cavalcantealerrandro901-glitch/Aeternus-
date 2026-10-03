@@ -34,7 +34,6 @@ function loadFighter(userId) {
         basicAttack: { id: 'basico', name: 'Ataque', emoji: '⚔️', type: 'physical', power: 1, mana: 0 }
     };
     for (const [k, v] of Object.entries(cls.bonus || {})) attrs[k] = (attrs[k] || 0) + Number(v || 0);
-    // defaults se attrs vazios
     for (const k of ['forca', 'defesa', 'agilidade', 'vida']) {
         if (attrs[k] == null) attrs[k] = k === 'vida' ? 10 : 5;
     }
@@ -78,11 +77,37 @@ function loadFighter(userId) {
 function publicFighter(f) {
     if (!f) return null;
     return {
-        id: f.id, name: f.name, classId: f.classId, className: f.className, emoji: f.emoji, type: f.type,
-        photo: f.photo, battleAvatar: f.battleAvatar, level: f.level, attrs: f.attrs,
-        hp: f.hp, maxHp: f.maxHp, mana: f.mana, maxMana: f.maxMana, effects: f.effects, team: f.team,
-        actives: (f.actives || []).map(a => ({ id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd, currentCd: f.cds?.[a.id] || 0, desc: a.desc })),
-        passives: (f.passives || []).map(a => ({ id: a.id, name: a.name, emoji: a.emoji, desc: a.desc })),
+        id: f.id,
+        name: f.name,
+        classId: f.classId,
+        className: f.className,
+        emoji: f.emoji,
+        type: f.type,
+        photo: f.photo,
+        battleAvatar: f.battleAvatar,
+        level: f.level,
+        attrs: f.attrs,
+        hp: f.hp,
+        maxHp: f.maxHp,
+        mana: f.mana,
+        maxMana: f.maxMana,
+        effects: f.effects,
+        team: f.team,
+        actives: (f.actives || []).map((a) => ({
+            id: a.id,
+            name: a.name,
+            emoji: a.emoji,
+            mana: a.mana,
+            cd: a.cd,
+            currentCd: f.cds?.[a.id] || 0,
+            desc: a.desc
+        })),
+        passives: (f.passives || []).map((a) => ({
+            id: a.id,
+            name: a.name,
+            emoji: a.emoji,
+            desc: a.desc
+        })),
         basicAttack: f.basicAttack
     };
 }
@@ -160,9 +185,11 @@ function createMatch({ mode = '1v1', teamA = [], teamB = [], bet = 0, fun = fals
     return { ok: true, match };
 }
 
-function getMatch(id) { return arenas.get(id) || null; }
+function getMatch(id) {
+    return arenas.get(id) || null;
+}
 function aliveOnTeam(match, team) {
-    return (team === 'A' ? match.teamA : match.teamB).filter(id => match.fighters[id]?.hp > 0);
+    return (team === 'A' ? match.teamA : match.teamB).filter((id) => match.fighters[id]?.hp > 0);
 }
 
 function applyDotAndRegen(fighter) {
@@ -188,29 +215,36 @@ function applyDotAndRegen(fighter) {
         fighter.hp = Math.min(fighter.maxHp, fighter.hp + h);
         if (h > 0) logs.push(`${fighter.name} regenera ${h} de vida.`);
     }
-    if (fighter.passMods?.manaRegen) fighter.mana = Math.min(fighter.maxMana, fighter.mana + fighter.passMods.manaRegen);
+    if (fighter.passMods?.manaRegen) {
+        fighter.mana = Math.min(fighter.maxMana, fighter.mana + fighter.passMods.manaRegen);
+    }
     for (const k of Object.keys(fighter.cds || {})) if (fighter.cds[k] > 0) fighter.cds[k] -= 1;
     return logs;
 }
 
 function calcDamage(attacker, defender, skill) {
-    const atkAttr = skill.type === 'magic' || skill.type === 'heal'
-        ? (attacker.attrs.forca || 5) * 0.4 + (attacker.level || 0) * 1.2
-        : (attacker.attrs.forca || 5) * 1.1 + (attacker.attrs.agilidade || 5) * 0.3;
+    const atkAttr =
+        skill.type === 'magic' || skill.type === 'heal'
+            ? (attacker.attrs.forca || 5) * 0.4 + (attacker.level || 0) * 1.2
+            : (attacker.attrs.forca || 5) * 1.1 + (attacker.attrs.agilidade || 5) * 0.3;
     const defAttr = (defender.attrs.defesa || 5) + (defender.attrs.vida || 5) * 0.15;
     let power = skill.power || 1;
-    if (attacker.effects?.some(e => e.type === 'rage')) power *= 1.25;
+    if (attacker.effects?.some((e) => e.type === 'rage')) power *= 1.25;
     let raw = Math.max(4, (12 + atkAttr * 3.2) * power - defAttr * 1.4);
     if (skill.type === 'physical') raw *= 1 + (attacker.passMods?.physPower || 0);
     if (skill.type === 'magic') raw *= 1 + (attacker.passMods?.magicPower || 0);
     let reduce = 0;
     if (skill.type === 'physical') reduce += defender.passMods?.dmgReducePhys || 0;
     if (skill.type === 'magic') reduce += defender.passMods?.dmgReduceMag || 0;
-    if (defender.effects?.some(e => e.type === 'barrier')) reduce += 0.35;
-    if (defender.effects?.some(e => e.type === 'shield')) reduce += 0.25;
-    if (defender.effects?.some(e => e.type === 'rage')) reduce -= 0.15;
+    if (defender.effects?.some((e) => e.type === 'barrier')) reduce += 0.35;
+    if (defender.effects?.some((e) => e.type === 'shield')) reduce += 0.25;
+    if (defender.effects?.some((e) => e.type === 'rage')) reduce -= 0.15;
     raw *= Math.max(0.2, 1 - reduce);
-    const critChance = 0.08 + (attacker.passMods?.crit || 0) + (skill.critBonus || 0) + (attacker.attrs.agilidade || 0) * 0.002;
+    const critChance =
+        0.08 +
+        (attacker.passMods?.crit || 0) +
+        (skill.critBonus || 0) +
+        (attacker.attrs.agilidade || 0) * 0.002;
     const crit = Math.random() < critChance;
     if (crit) raw *= 1.75;
     const dodge = Math.max(0, (defender.passMods?.dodge || 0) - (attacker.passMods?.accuracy || 0));
@@ -220,7 +254,7 @@ function calcDamage(attacker, defender, skill) {
 
 function pickTarget(match, attacker, explicitTarget) {
     const enemyTeam = attacker.team === 'A' ? match.teamB : match.teamA;
-    const alive = enemyTeam.filter(id => match.fighters[id]?.hp > 0);
+    const alive = enemyTeam.filter((id) => match.fighters[id]?.hp > 0);
     if (!alive.length) return null;
     if (explicitTarget && alive.includes(explicitTarget)) return match.fighters[explicitTarget];
     return match.fighters[alive[Math.floor(Math.random() * alive.length)]];
@@ -247,18 +281,28 @@ function rollChest(luck = 1) {
     else if (r < 0.08) rarity = 'lendario';
     else if (r < 0.2) rarity = 'epico';
     else if (r < 0.45) rarity = 'raro';
-    const names = { comum: 'Baú Comum', raro: 'Baú Raro', epico: 'Baú Épico', lendario: 'Baú Lendário', descritiva: 'Baú Descritivo' };
+    const names = {
+        comum: 'Baú Comum',
+        raro: 'Baú Raro',
+        epico: 'Baú Épico',
+        lendario: 'Baú Lendário',
+        descritiva: 'Baú Descritivo'
+    };
     let item = null;
     try {
         const items = require('./items');
-        const pool = Object.values(items.ITEMS || {}).filter(it => !it.consumable && (it.rarity === rarity || (rarity === 'descritiva' && it.rarity === 'lendario')));
+        const pool = Object.values(items.ITEMS || {}).filter(
+            (it) =>
+                !it.consumable &&
+                (it.rarity === rarity || (rarity === 'descritiva' && it.rarity === 'lendario'))
+        );
         if (pool.length) item = items.instantiateItem(pool[Math.floor(Math.random() * pool.length)].id);
     } catch (_) {}
     return { rarity, name: names[rarity] || 'Baú', item };
 }
 
 function rollPvpItems(luck = 1) {
-    const count = 3 + Math.floor(Math.random() * 3); // 3–5
+    const count = 3 + Math.floor(Math.random() * 3);
     const out = [];
     try {
         const items = require('./items');
@@ -297,15 +341,10 @@ function applyRewards(match, winners, losers) {
         let drops = rollPvpItems(luck);
 
         if (fun) {
-            // Diversão: XP leve, sem CP, sem itens, sem aposta
             xpGain = Math.floor(15 + avgLoserLevel * 4 + Math.random() * 12);
             cpGain = 0;
             drops = [];
-        } else if (match.mode === 'aposta' || match.mode === 'equipe_aposta') {
-            // Modo aposta: XP + CP + itens + pote
-            // (padrão)
         } else if (match.mode === 'equipe') {
-            // Equipes sem aposta: um pouco mais de CP (esforço em time)
             cpGain = Math.floor(cpGain * 1.15);
         }
 
@@ -364,14 +403,27 @@ function checkEnd(match) {
     return false;
 }
 
+function processTimeout(match) {
+    if (!match || match.status !== 'active') return false;
+    if (Date.now() <= (match.turnEndsAt || 0)) return false;
+    let steps = 0;
+    while (match.status === 'active' && Date.now() > (match.turnEndsAt || 0) && steps < 8) {
+        const cur = match.fighters[match.currentId];
+        const name = cur?.name || 'Jogador';
+        match.log.push({ t: Date.now(), text: `⏱️ Tempo de **${name}** esgotado — turno perdido.` });
+        if (checkEnd(match)) return true;
+        advanceTurn(match);
+        steps += 1;
+    }
+    return steps > 0;
+}
+
 function applyMove(matchId, playerId, { moveId, targetId } = {}) {
     const match = getMatch(matchId);
     if (!match) return { ok: false, error: 'Arena não encontrada.' };
     if (match.status !== 'active') return { ok: false, error: 'Batalha já terminou.' };
-    if (Date.now() > match.turnEndsAt && match.currentId !== playerId) {
-        match.log.push({ t: Date.now(), text: '⏱️ Tempo esgotado. Turno avançado.' });
-        advanceTurn(match);
-    }
+    processTimeout(match);
+    if (match.status !== 'active') return { ok: true, match: publicState(match, playerId) };
     if (match.currentId !== playerId) return { ok: false, error: 'Não é o seu turno.' };
     const attacker = match.fighters[playerId];
     if (!attacker || attacker.hp <= 0) return { ok: false, error: 'Você está fora de combate.' };
@@ -380,15 +432,15 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
     if (moveId === 'basic' || moveId === attacker.basicAttack?.id) {
         skill = { ...attacker.basicAttack, power: attacker.basicAttack?.power || 1 };
     } else {
-        skill = attacker.actives?.find(a => a.id === moveId);
+        skill = attacker.actives?.find((a) => a.id === moveId);
         if (!skill) return { ok: false, error: 'Habilidade não equipada.' };
         if ((attacker.cds[skill.id] || 0) > 0) return { ok: false, error: 'Em recarga.' };
         if (attacker.mana < (skill.mana || 0)) return { ok: false, error: 'Mana insuficiente.' };
     }
 
-    if (attacker.effects?.some(e => e.type === 'stun')) {
+    if (attacker.effects?.some((e) => e.type === 'stun')) {
         match.log.push({ t: Date.now(), text: `💫 ${attacker.name} está atordoado e perde o turno!` });
-        attacker.effects = attacker.effects.filter(e => e.type !== 'stun');
+        attacker.effects = attacker.effects.filter((e) => e.type !== 'stun');
         advanceTurn(match);
         return { ok: true, match: publicState(match, playerId) };
     }
@@ -398,13 +450,18 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
 
     if (skill.type === 'heal' || skill.self) {
         if (skill.type === 'heal') {
-            const heal = Math.floor((18 + (attacker.attrs.vida || 10) * 2.5 + attacker.level) * (skill.power || 1));
+            const heal = Math.floor(
+                (18 + (attacker.attrs.vida || 10) * 2.5 + attacker.level) * (skill.power || 1)
+            );
             const before = attacker.hp;
             attacker.hp = Math.min(attacker.maxHp, attacker.hp + heal);
-            match.log.push({ t: Date.now(), text: `💚 ${attacker.name} usou **${skill.name}** e recuperou ${attacker.hp - before} de vida.` });
+            match.log.push({
+                t: Date.now(),
+                text: `💚 ${attacker.name} usou **${skill.name}** e recuperou ${attacker.hp - before} de vida.`
+            });
             match.lastEffect = { type: 'heal', from: playerId, amount: attacker.hp - before };
         } else if (skill.effect) {
-            attacker.effects = attacker.effects.filter(e => e.type !== skill.effect);
+            attacker.effects = attacker.effects.filter((e) => e.type !== skill.effect);
             attacker.effects.push({ type: skill.effect, turns: skill.effectTurns || 2 });
             match.log.push({ t: Date.now(), text: `✨ ${attacker.name} usou **${skill.name}** (${skill.effect}).` });
             match.lastEffect = { type: skill.effect, from: playerId };
@@ -422,23 +479,39 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
         for (const defender of targets) {
             const result = calcDamage(attacker, defender, skill);
             if (result.dodged) {
-                match.log.push({ t: Date.now(), text: `🌀 ${defender.name} esquivou de **${skill.name}** de ${attacker.name}!` });
+                match.log.push({
+                    t: Date.now(),
+                    text: `🌀 ${defender.name} esquivou de **${skill.name}** de ${attacker.name}!`
+                });
                 match.lastEffect = { type: 'dodge', from: playerId, to: defender.id };
                 continue;
             }
             defender.hp = Math.max(0, defender.hp - result.dmg);
-            match.log.push({ t: Date.now(), text: `⚔️ ${attacker.name} usou **${skill.name}** e causou **${result.dmg}** em ${defender.name}.${result.crit ? ' 💥 CRÍTICO!' : ''}` });
+            match.log.push({
+                t: Date.now(),
+                text: `⚔️ ${attacker.name} usou **${skill.name}** e causou **${result.dmg}** em ${defender.name}.${result.crit ? ' 💥 CRÍTICO!' : ''}`
+            });
             if (skill.lifesteal) {
                 const heal = Math.floor(result.dmg * skill.lifesteal);
                 attacker.hp = Math.min(attacker.maxHp, attacker.hp + heal);
                 match.log.push({ t: Date.now(), text: `🩸 ${attacker.name} drenou ${heal} de vida.` });
             }
             if (skill.effect && Math.random() < (skill.effectChance || 0)) {
-                defender.effects = defender.effects.filter(e => e.type !== skill.effect);
+                defender.effects = defender.effects.filter((e) => e.type !== skill.effect);
                 defender.effects.push({ type: skill.effect, turns: skill.effectTurns || 1 });
-                match.log.push({ t: Date.now(), text: `✨ Efeito **${skill.effect}** aplicado em ${defender.name}.` });
+                match.log.push({
+                    t: Date.now(),
+                    text: `✨ Efeito **${skill.effect}** aplicado em ${defender.name}.`
+                });
             }
-            match.lastEffect = { type: 'hit', skill: skill.id, from: playerId, to: defender.id, dmg: result.dmg, crit: result.crit };
+            match.lastEffect = {
+                type: 'hit',
+                skill: skill.id,
+                from: playerId,
+                to: defender.id,
+                dmg: result.dmg,
+                crit: result.crit
+            };
         }
     }
     if (checkEnd(match)) return { ok: true, match: publicState(match, playerId) };
@@ -446,7 +519,34 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
     return { ok: true, match: publicState(match, playerId) };
 }
 
+function skipTurn(matchId, playerId) {
+    const match = getMatch(matchId);
+    if (!match) return { ok: false, error: 'Arena não encontrada.' };
+    processTimeout(match);
+    if (match.status !== 'active') return { ok: true, match: publicState(match, playerId) };
+    if (match.currentId !== playerId) return { ok: false, error: 'Não é o seu turno.' };
+    const name = match.fighters[playerId]?.name || 'Jogador';
+    match.log.push({ t: Date.now(), text: `⌛ **${name}** aguarda o turno (passou).` });
+    advanceTurn(match);
+    return { ok: true, match: publicState(match, playerId) };
+}
+
+function forfeit(matchId, playerId) {
+    const match = getMatch(matchId);
+    if (!match) return { ok: false, error: 'Arena não encontrada.' };
+    if (match.status !== 'active') return { ok: false, error: 'Batalha já terminou.' };
+    const f = match.fighters[playerId];
+    if (!f) return { ok: false, error: 'Você não está nesta luta.' };
+    f.hp = 0;
+    match.log.push({ t: Date.now(), text: `🚪 **${f.name}** desistiu da batalha.` });
+    if (!checkEnd(match)) {
+        if (match.currentId === playerId) advanceTurn(match);
+    }
+    return { ok: true, match: publicState(match, playerId) };
+}
+
 function publicState(match, asUserId) {
+    if (match && match.status === 'active') processTimeout(match);
     return {
         id: match.id,
         mode: match.mode,
@@ -465,9 +565,10 @@ function publicState(match, asUserId) {
         yourTurn: match.currentId === asUserId,
         rewards: match.rewards || null,
         chat: (match.chat || []).slice(-80),
-        youWon: match.status === 'finished' && asUserId
-            ? (match.winnerTeam === 'A' ? match.teamA : match.teamB).includes(asUserId)
-            : null
+        youWon:
+            match.status === 'finished' && asUserId
+                ? (match.winnerTeam === 'A' ? match.teamA : match.teamB).includes(asUserId)
+                : null
     };
 }
 
@@ -493,5 +594,8 @@ module.exports = {
     loadFighter,
     rollChest,
     rollPvpItems,
-    postChat
+    postChat,
+    processTimeout,
+    skipTurn,
+    forfeit
 };
