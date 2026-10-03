@@ -76,35 +76,22 @@ const EXCLUSIVES = [
         owner: '1393079977410428968',
         gear: [
             {
-                id: 'lamina_arcana',
-                name: 'Lâmina Arcana',
-                emoji: '🗡️',
+                id: 'espada_do_ceu',
+                name: 'Espada do Céu',
+                emoji: '⚔️',
                 category: 'arma',
                 rarity: 'lendaria',
                 classId: 'arcanjo_do_veu',
-                effects: {
-                    forca: 750,
-                    inteligencia: 800,
-                    dano: 700,
-                    danoMagico: 750,
-                    critFirstAttack: 0.3
-                },
-                desc: '30% crítico no 1º ataque. Força + Inteligência + dano físico/mágico.'
+                effects: { forca: 850, inteligencia: 800, dano: 900 }
             },
             {
-                id: 'armadura_de_corceus',
-                name: 'Armadura de Corcéus',
+                id: 'armadura_do_veu',
+                name: 'Armadura do Véu',
                 emoji: '🛡️',
                 category: 'armadura',
                 rarity: 'lendaria',
                 classId: 'arcanjo_do_veu',
-                effects: {
-                    defesa: 850,
-                    vida: 800,
-                    resistencia: 750,
-                    damageReduction: 0.3
-                },
-                desc: '30% redução de dano. Defesa + Vida + Resistência.'
+                effects: { defesa: 900, vida: 850, resistencia: 800, damageReduction: 0.3 }
             },
             {
                 id: 'colar_da_ressurreicao',
@@ -121,6 +108,47 @@ const EXCLUSIVES = [
                     sorte: 500
                 },
                 desc: '+1% vida máx. por kill. Ressuscita 1× com 10% HP máx.'
+            }
+        ]
+    },
+    {
+        classId: 'deus_criador',
+        owner: String(
+            process.env.OWNER_ID ||
+                process.env.BOT_OWNER_ID ||
+                process.env.ADMIN_ID ||
+                '1483097258944630897'
+        ),
+        gear: [
+            {
+                id: 'cetro_da_genese',
+                name: 'Cetro da Gênese',
+                emoji: '🪄',
+                category: 'arma',
+                rarity: 'mitica',
+                classId: 'deus_criador',
+                effects: { inteligencia: 1000, forca: 850, dano: 950, precisao: 700 },
+                desc: 'Arma de classe do Deus Criador.'
+            },
+            {
+                id: 'manto_cosmico',
+                name: 'Manto Cósmico',
+                emoji: '🧥',
+                category: 'armadura',
+                rarity: 'mitica',
+                classId: 'deus_criador',
+                effects: { defesa: 900, vida: 850, resistencia: 750, agilidade: 600 },
+                desc: 'Armadura de classe do Deus Criador.'
+            },
+            {
+                id: 'orbe_do_arquiteto',
+                name: 'Orbe do Arquiteto',
+                emoji: '🔮',
+                category: 'acessorio',
+                rarity: 'mitica',
+                classId: 'deus_criador',
+                effects: { inteligencia: 950, sorte: 800, manaBonus: 0.2, precisao: 700 },
+                desc: 'Acessório de classe do Deus Criador.'
             }
         ]
     }
@@ -171,9 +199,9 @@ function setup() {
             if (player.has(owner)) {
                 player.update(owner, { classId, class: classId });
                 grantGear(owner, ex.gear || []);
-                console.log(`[exclusiveClass] ${classId} → ${owner}`);
+                console.log('[exclusiveClass] ' + classId + ' → ' + owner);
             } else {
-                console.log(`[exclusiveClass] dono ${owner} ainda sem perfil (${classId})`);
+                console.log('[exclusiveClass] dono ' + owner + ' ainda sem perfil (' + classId + ')');
             }
         }
     } catch (e) {
