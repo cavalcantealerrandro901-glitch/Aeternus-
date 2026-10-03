@@ -12,36 +12,39 @@ const combatStats = require('./combatStats');
 const TURN_MS = 90000;
 const arenas = new Map();
 
+function resolveCid(classId) {
+    if (typeof classes.resolveClassId === 'function') return classes.resolveClassId(classId) || classId;
+    return classId;
+}
+
 function maxHp(attrs, level) {
     return Math.floor(80 + (attrs.vida || 10) * 35 + (attrs.defesa || 5) * 8 + (level || 0) * 12);
 }
 function maxMana(level, classId, manaBonus) {
-    const base = player.maxManaFromLevel(level, classes.resolveClassId(classId));
+    const base = player.maxManaFromLevel(level, resolveCid(classId));
     return Math.floor(base * (1 + (manaBonus || 0)));
 }
 
 function loadFighter(userId) {
     const prof = player.get(userId);
     if (!prof) return null;
-    const eff = combatStats.getEffectiveAttrs(userId);
-    const attrs = { ...(eff.attrs || {}) };
-    const classId = eff.classId || classes.resolveClassId(prof.classId);
-    const cls = eff.cls || (classId && classes.getClass(classId)) || {
-        id: classId || 'unknown',
-        name: 'Sem classe',
-        emoji: '❓',
-        type: 'melee',
-        bonus: {},
+    let eff;
+    try { eff = combatStats.getEffectiveAttrs(userId); } catch (_) { eff = null; }
+    const st = xp.get(userId) || { level: 0, attrs: {} };
+    const attrs = { ...((eff && eff.attrs) || st.attrs || {}) };
+    const classId = (eff && eff.classId) || resolveCid(prof.classId);
+    const cls = (eff && eff.cls) || (classId && classes.getClass(classId)) || {
+        id: classId || 'unknown', name: 'Sem classe', emoji: '❓', type: 'melee', bonus: {},
         basicAttack: { id: 'basico', name: 'Ataque', emoji: '⚔️', type: 'physical', power: 1, mana: 0 }
     };
-    const passMods = eff.passMods || {};
+    const passMods = (eff && eff.passMods) || {};
     let equipped = { active: [], passive: [] };
-    try {
-        equipped = combatStats.getLoadout(userId) || equipped;
-    } catch (_) {}
-    const stLevel = eff.level || 0;
+    try { equipped = combatStats.getLoadout(userId) || equipped; } catch (_) {
+        try { equipped = abilities.getEquipped?.(userId) || abilities.getEquippedAbilities?.(userId) || equipped; } catch (__) {}
+    }
+    const stLevel = (eff && eff.level) || st.level || 0;
     const hp = maxHp(attrs, stLevel);
-    const mana = maxMana(stLevel, classId, (passMods.manaBonus || 0) + (eff.extra?.manaBonus || 0));
+    const mana = maxMana(stLevel, classId, (passMods.manaBonus || 0) + ((eff && eff.extra && eff.extra.manaBonus) || 0));
     return {
         id: userId,
         name: prof.name || 'Guerreiro',
@@ -57,35 +60,17 @@ function loadFighter(userId) {
         actives: (equipped.active || []).filter(Boolean),
         passives: (equipped.passive || []).filter(Boolean),
         basicAttack: cls.basicAttack || { id: 'basico', name: 'Ataque', emoji: '⚔️', type: 'physical', power: 1, mana: 0 },
-        hp,
-        maxHp: hp,
-        mana,
-        maxMana: mana,
-        effects: [],
-        cds: {},
-        team: null
+        hp, maxHp: hp, mana, maxMana: mana,
+        effects: [], cds: {}, team: null
     };
 }
 
 function publicFighter(f) {
     if (!f) return null;
     return {
-        id: f.id,
-        name: f.name,
-        classId: f.classId,
-        className: f.className,
-        emoji: f.emoji,
-        type: f.type,
-        photo: f.photo,
-        battleAvatar: f.battleAvatar,
-        level: f.level,
-        attrs: f.attrs,
-        hp: f.hp,
-        maxHp: f.maxHp,
-        mana: f.mana,
-        maxMana: f.maxMana,
-        effects: f.effects,
-        team: f.team,
+        id: f.id, name: f.name, classId: f.classId, className: f.className, emoji: f.emoji, type: f.type,
+        photo: f.photo, battleAvatar: f.battleAvatar, level: f.level, attrs: f.attrs,
+        hp: f.hp, maxHp: f.maxHp, mana: f.mana, maxMana: f.maxMana, effects: f.effects, team: f.team,
         actives: (f.actives || []).map((a) => ({
             id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd,
             currentCd: f.cds?.[a.id] || 0, desc: a.desc
@@ -147,12 +132,6 @@ function applyDotAndRegen(fighter) {
         if (e.turns > 0) next.push(e);
     }
     fighter.effects = next;
-    const regen = fighter.passMods?.regenPct || 0;
-    if (regen > 0 && fighter.hp > 0) {
-        const h = Math.floor(fighter.maxHp * regen);
-        fighter.hp = Math.min(fighter.maxHp, fighter.hp + h);
-        if (h > 0) logs.push(`${fighter.name} regenera ${h} de vida.`);
-    }
     if (fighter.passMods?.manaRegen || fighter.passMods?.manaRegenPerTurn) {
         const r = fighter.passMods.manaRegen || fighter.passMods.manaRegenPerTurn || 0;
         fighter.mana = Math.min(fighter.maxMana, fighter.mana + r);
@@ -168,7 +147,6 @@ function calcDamage(attacker, defender, skill) {
             : (attacker.attrs.forca || 5) * 1.1 + (attacker.attrs.agilidade || 5) * 0.3;
     const defAttr = (defender.attrs.defesa || 5) + (defender.attrs.resistencia || 0) * 0.35 + (defender.attrs.vida || 5) * 0.1;
     let power = skill.power || 1;
-    if (attacker.effects?.some((e) => e.type === 'rage')) power *= 1.25;
     let raw = Math.max(4, (12 + atkAttr * 3.2) * power - defAttr * 1.4);
     if (skill.type === 'physical') raw *= 1 + (attacker.passMods?.physPower || 0);
     if (skill.type === 'magic') raw *= 1 + (attacker.passMods?.magicPower || 0);
@@ -315,13 +293,60 @@ function publicState(match, viewerId) {
         log: (match.log || []).slice(-40),
         teamA: match.teamA.map((id) => publicFighter(match.fighters[id])),
         teamB: match.teamB.map((id) => publicFighter(match.fighters[id])),
-        rewards: match.rewards, viewerId
+        rewards: match.rewards, chat: (match.chat || []).slice(-40), viewerId
     };
+}
+
+function skipTurn(matchId, playerId) {
+    const match = getMatch(matchId);
+    if (!match) return { ok: false, error: 'Arena não encontrada.' };
+    if (match.status !== 'active') return { ok: false, error: 'Batalha já terminou.' };
+    if (match.currentId !== playerId) return { ok: false, error: 'Não é o seu turno.' };
+    const f = match.fighters[playerId];
+    match.log.push({ t: Date.now(), text: `⏭️ **${f?.name || 'Jogador'}** passou o turno.` });
+    if (checkEnd(match)) return { ok: true, match: publicState(match, playerId) };
+    advanceTurn(match);
+    return { ok: true, match: publicState(match, playerId) };
+}
+
+function postChat(matchId, playerId, text) {
+    const match = getMatch(matchId);
+    if (!match) return { ok: false, error: 'Arena não encontrada.' };
+    const msg = String(text || '').trim().slice(0, 200);
+    if (!msg) return { ok: false, error: 'Mensagem vazia.' };
+    const f = match.fighters[playerId];
+    const name = f?.name || 'Espectador';
+    if (!Array.isArray(match.chat)) match.chat = [];
+    match.chat.push({ t: Date.now(), playerId: String(playerId || ''), name, text: msg });
+    if (match.chat.length > 80) match.chat = match.chat.slice(-80);
+    return { ok: true, match: publicState(match, playerId) };
+}
+
+function forfeit(matchId, playerId) {
+    const match = getMatch(matchId);
+    if (!match) return { ok: false, error: 'Arena não encontrada.' };
+    if (match.status !== 'active') return { ok: false, error: 'Batalha já terminou.' };
+    const f = match.fighters[playerId];
+    if (!f) return { ok: false, error: 'Você não está nesta arena.' };
+    f.hp = 0;
+    match.log.push({ t: Date.now(), text: `🏳️ **${f.name}** desistiu.` });
+    const team = f.team;
+    const enemy = team === 'A' ? 'B' : 'A';
+    const alive = (team === 'A' ? match.teamA : match.teamB).filter((id) => match.fighters[id]?.hp > 0);
+    if (!alive.length) {
+        match.status = 'finished';
+        match.winnerTeam = enemy;
+        match.log.push({ t: Date.now(), text: `🏆 Time ${enemy} venceu por desistência!` });
+    } else if (match.currentId === playerId) {
+        advanceTurn(match);
+    }
+    return { ok: true, match: publicState(match, playerId) };
 }
 
 function rollPvpItems() { return []; }
 
 module.exports = {
     TURN_MS, loadFighter, publicFighter, createMatch, getMatch, applyMove,
-    processTimeout, publicState, calcDamage, rollPvpItems, arenas
+    processTimeout, publicState, calcDamage, rollPvpItems, arenas,
+    postChat, forfeit, skipTurn
 };
