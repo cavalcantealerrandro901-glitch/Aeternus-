@@ -28,14 +28,12 @@ module.exports = {
         }
 
         if (sub === 'criar' || sub === 'create') {
-            // O.classeadmin criar id|Nome|emoji|tipo|desc|poder1|poder2|desv1|desv2
             const raw = args.slice(1).join(' ');
             const parts = raw.split('|').map((s) => s.trim());
             if (parts.length < 5) {
                 return message.reply(
                     'Uso:\n`O.classeadmin criar id|Nome|emoji|tipo|descrição|poder1|poder2|desv1|desv2`\n' +
-                        'Tipos: melee, magic, ranged, support, tank\n' +
-                        'Exemplo: `O.classeadmin criar monge_vento|Monge do Vento|🍃|melee|Combatente ágil|Soco ciclone|Meditação|Pouca armadura|Mana baixa`'
+                        'Tipos: melee, magic, ranged, support, tank'
                 );
             }
             try {
@@ -58,7 +56,7 @@ module.exports = {
 
         if (sub === 'remover' || sub === 'delete') {
             const id = args[1];
-            if (!classes.deleteCustomClass(id)) {
+            if (typeof classes.deleteCustomClass !== 'function' || !classes.deleteCustomClass(id)) {
                 return message.reply('Classe custom não encontrada (não remove classes base).');
             }
             return message.reply(`Removida classe custom \`${id}\`.`);
@@ -68,13 +66,49 @@ module.exports = {
             const user = message.mentions.users.first();
             const classId = args.find((a) => !a.startsWith('<@') && a !== sub);
             if (!user || !classId) {
-                return message.reply('Uso: `O.classeadmin setar @user <id_da_classe>`\nEx.: `O.classeadmin setar @voce deus_criador`');
+                return message.reply(
+                    'Uso: `O.classeadmin setar @user <id_da_classe>`\n' +
+                        'Ex.: `O.classeadmin setar @fulano arcanjo_do_veu`\n' +
+                        'Ex.: `O.classeadmin setar @voce deus_criador`'
+                );
             }
             const player = require('../utils/player');
-            if (!player.has(user.id)) return message.reply('Usuário sem perfil.');
+            if (!player.has(user.id)) {
+                return message.reply('Usuário sem perfil. Peça para usar `O.j criar` primeiro.');
+            }
             const r = player.changeClass(user.id, classId);
             if (!r.ok) return message.reply('❌ ' + r.error);
-            return message.reply(`✅ ${user.username} agora é ${r.class.emoji} **${r.class.name}**.`);
+
+            let gearNote = '';
+            try {
+                const excl = require('../systems/exclusiveClass');
+                const entry = (excl.EXCLUSIVES || []).find(
+                    (e) => String(e.classId) === String(r.class.id)
+                );
+                if (entry?.gear?.length) {
+                    excl.grantGear(user.id, entry.gear);
+                    gearNote =
+                        '\n🎒 Itens entregues: ' +
+                        entry.gear.map((g) => g.name || g.id).join(', ');
+                } else if (Array.isArray(r.class.classGear) && r.class.classGear.length) {
+                    const items = require('../utils/items');
+                    for (const id of r.class.classGear) {
+                        const inst =
+                            typeof items.instantiateItem === 'function'
+                                ? items.instantiateItem(id)
+                                : items.getItemDef?.(id);
+                        if (inst) player.addItem(user.id, { ...inst });
+                    }
+                    gearNote = '\n🎒 Itens do catálogo entregues.';
+                }
+            } catch (e) {
+                gearNote = '\n⚠️ Classe ok, mas itens: ' + (e.message || e);
+            }
+
+            return message.reply(
+                `✅ ${user.username} agora é ${r.class.emoji} **${r.class.name}** (\`${r.class.id}\`).` +
+                    gearNote
+            );
         }
 
         return message.reply(
