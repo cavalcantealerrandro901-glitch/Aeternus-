@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>✦ Masmorra — Aeternus</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:wght@400;600&display=swap');
+:root{--bg:#060508;--panel:#12101a;--gold:#a78bfa;--ink:#ede9fe;--muted:#a8a29e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;background:radial-gradient(ellipse 70% 40% at 50% 0%,#2e1065 0%,transparent 55%),var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,serif;display:flex;flex-direction:column}
+.hidden{display:none!important}button{font-family:inherit;cursor:pointer}
+.header{text-align:center;padding:.7rem 1rem .35rem;border-bottom:1px solid #7c3aed44}
+.header h1{font-family:Cinzel,serif;font-size:1.1rem;letter-spacing:.14em;color:var(--gold)}
+.obj{margin-top:.3rem;font-size:.92rem;color:var(--muted)}.obj strong{color:#fbbf24}
+.layout{display:grid;grid-template-columns:200px 1fr 200px;gap:.6rem;max-width:1100px;width:100%;margin:0 auto;padding:.6rem;flex:1}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid #7c3aed33;border-radius:12px;padding:.6rem .7rem}
+.panel h3{font-family:Cinzel,serif;font-size:.72rem;letter-spacing:.1em;color:var(--gold);margin-bottom:.4rem}
+.stat{font-size:.82rem;color:var(--muted);margin:.15rem 0}.stat strong{color:var(--ink)}
+.bar{height:8px;border-radius:4px;background:#000;margin:.2rem 0 .35rem;overflow:hidden}
+.bar>i{display:block;height:100%;transform-origin:left;transition:transform .3s}
+.bar.hp>i{background:linear-gradient(90deg,#15803d,#4ade80)}
+.bar.mana>i{background:linear-gradient(90deg,#1d4ed8,#60a5fa)}
+.map-wrap{display:flex;flex-direction:column;align-items:center;gap:.4rem}
+.map{display:grid;gap:2px;background:#0c0a12;padding:6px;border-radius:10px;border:1px solid #7c3aed44;touch-action:manipulation;user-select:none}
+.cell{width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;background:#1a1525}
+.cell.wall{background:#2a2438;cursor:not-allowed;opacity:.85}
+.cell.floor:hover{outline:1px solid #a78bfa88}
+.cell.exit{background:#3b1d6e}.cell.trap{background:#3f1a1a}
+.cell.player{background:#1e3a5f;box-shadow:0 0 0 2px #60a5fa}
+.cell.mob{background:#3f1515}.cell.boss{background:#4a1d1d;box-shadow:0 0 0 2px #fbbf24}
+.log{max-height:160px;overflow-y:auto;font-size:.8rem;line-height:1.35}
+.log .line{padding:.15rem 0;border-bottom:1px solid #ffffff08;color:var(--muted)}
+.skills{display:flex;flex-wrap:wrap;gap:.35rem}
+.skills button{background:#1a1525;border:1px solid #7c3aed55;color:var(--ink);border-radius:8px;padding:.4rem .55rem;font-size:.78rem}
+.skills button:disabled{opacity:.4}
+.footer{max-width:1100px;width:100%;margin:0 auto;padding:.4rem .6rem 1rem;display:flex;flex-wrap:wrap;gap:.4rem;justify-content:center}
+.footer button{font-family:Cinzel,serif;font-size:.75rem;padding:.5rem .9rem;border-radius:10px;border:1px solid #7c3aed55;background:#1a1028;color:var(--gold)}
+.footer button.danger{border-color:#7f1d1d;color:#fca5a5}
+.chat{max-width:1100px;width:100%;margin:0 auto;padding:0 .6rem .5rem}
+.chat-body{max-height:80px;overflow-y:auto;font-size:.82rem;margin-bottom:.3rem}
+.chat-row{display:flex;gap:.35rem}
+.chat-row input{flex:1;background:#0c0a12;border:1px solid #7c3aed33;border-radius:8px;color:var(--ink);padding:.4rem .55rem;font:inherit}
+.chat-row button{background:#1a1028;border:1px solid #7c3aed55;color:var(--gold);border-radius:8px;padding:.4rem .7rem;font-family:Cinzel,serif;font-size:.72rem}
+.lobby{max-width:400px;margin:3rem auto;padding:1.2rem;background:var(--panel);border:1px solid #7c3aed55;border-radius:14px}
+.lobby h2{font-family:Cinzel,serif;color:var(--gold);text-align:center;margin-bottom:.8rem}
+.lobby input{width:100%;margin:.3rem 0;padding:.5rem;border-radius:8px;border:1px solid #7c3aed33;background:#0c0a12;color:var(--ink)}
+.lobby button{width:100%;margin-top:.6rem;padding:.55rem;border-radius:10px;border:1px solid var(--gold);background:#1a1028;color:var(--gold);font-family:Cinzel,serif}
+.combat-banner{text-align:center;padding:.5rem;background:#3f1515cc;border:1px solid #f87171;border-radius:10px;margin-bottom:.4rem;font-family:Cinzel,serif;font-size:.85rem}
+.overlay{position:fixed;inset:0;background:#000c;display:flex;align-items:center;justify-content:center;z-index:50}
+.overlay .box{background:var(--panel);border:1px solid var(--gold);border-radius:14px;padding:1.2rem;max-width:340px;text-align:center}
+.overlay .box button{margin:.25rem;padding:.45rem .8rem;border-radius:8px;border:1px solid #7c3aed55;background:#1a1028;color:var(--gold);font-family:Cinzel,serif}
+</style>
+</head>
+<body>
+<div id="lobby" class="lobby">
+  <h2>✦ Masmorra ✦</h2>
+  <input id="idInput" placeholder="ID da run (dg_...)" />
+  <input id="asInput" placeholder="Seu Discord User ID" />
+  <button type="button" id="joinBtn">Entrar</button>
+</div>
+<div id="game" class="hidden">
+  <header class="header">
+    <h1>✦ MASMORRA AETERNUS ✦</h1>
+    <div class="obj">Piso <strong id="floorNum">1</strong> · <span id="objective">—</span></div>
+  </header>
+  <div class="layout">
+    <aside class="panel">
+      <h3>👤 PERSONAGEM</h3>
+      <div class="stat" id="pName">—</div>
+      <div class="stat" id="pClass">—</div>
+      <div class="stat">❤️ <strong id="pHp">0/0</strong></div>
+      <div class="bar hp"><i id="pHpBar"></i></div>
+      <div class="stat">🔵 <strong id="pMana">0/0</strong></div>
+      <div class="bar mana"><i id="pManaBar"></i></div>
+      <div class="stat" id="pAttrs"></div>
+      <div class="skills" id="skills" style="margin-top:.5rem"></div>
+    </aside>
+    <main class="map-wrap">
+      <div id="combatBanner" class="combat-banner hidden"></div>
+      <div class="map" id="map"></div>
+      <div style="font-size:.78rem;color:var(--muted)">Clique num tile para caminhar · monstro = combate</div>
+    </main>
+    <aside class="panel">
+      <h3>📜 LOG</h3>
+      <div class="log" id="log"></div>
+      <h3 style="margin-top:.6rem">🎯 PROGRESSO</h3>
+      <div class="stat" id="progText">👹 0 / 19</div>
+    </aside>
+  </div>
+  <div class="chat"><div class="panel">
+    <h3>💬 CHAT</h3>
+    <div class="chat-body" id="chatBody"></div>
+    <div class="chat-row">
+      <input id="chatInput" maxlength="300" placeholder="Mensagem…" />
+      <button type="button" id="chatBtn">Enviar</button>
+    </div>
+  </div></div>
+  <div class="footer">
+    <button type="button" id="advanceBtn" class="hidden">🔓 Próximo piso</button>
+    <button type="button" id="leaveBtn" class="danger">🚪 Sair da masmorra</button>
+  </div>
+</div>
+<div id="leaveConfirm" class="overlay hidden">
+  <div class="box">
+    <p style="margin-bottom:.8rem;color:var(--muted)">Sair da masmorra?</p>
+    <button type="button" id="leaveYes">Sair</button>
+    <button type="button" id="leaveNo">Cancelar</button>
+  </div>
+</div>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const qs=new URLSearchParams(location.search);
+  let matchId=qs.get('id')||qs.get('dungeon')||'';
+  let asUser=qs.get('as')||'';
+  let state=null, acting=false, pollT=null;
+  function scale(el,c,m){if(!el)return;el.style.transform='scaleX('+Math.max(0,Math.min(1,(c||0)/Math.max(1,m||1)))+')';}
+  function renderMap(s){
+    const map=$('map'); const W=s.width||14,H=s.height||10;
+    map.style.gridTemplateColumns='repeat('+W+',28px)'; map.innerHTML='';
+    const mobs={}; (s.monsters||[]).forEach(m=>{mobs[m.x+','+m.y]=m;});
+    const traps={}; (s.traps||[]).forEach(t=>{if(t.revealed)traps[t.x+','+t.y]=t;});
+    const px=s.player?.x, py=s.player?.y;
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      const cell=document.createElement('div');
+      const t=(s.tiles[y]&&s.tiles[y][x])||'floor';
+      cell.className='cell '+t;
+      const k=x+','+y; let icon='';
+      if(px===x&&py===y){cell.classList.add('player');icon=s.player?.emoji||'🧍';}
+      else if(mobs[k]){cell.classList.add(mobs[k].isBoss?'boss':'mob');icon=mobs[k].emoji||'👹';}
+      else if(traps[k]){icon=traps[k].triggered?'💥':'🪤';}
+      else if(t==='exit') icon='🚪';
+      cell.textContent=icon;
+      if(t!=='wall'&&s.phase==='explore'&&s.status==='active') cell.onclick=()=>walk(x,y);
+      map.appendChild(cell);
+    }
+  }
+  function render(s){
+    state=s; if(!s)return;
+    $('floorNum').textContent=s.floor; $('objective').textContent=s.objective||'—';
+    const p=s.player;
+    if(p){
+      $('pName').innerHTML='<strong>'+(p.name||'—')+'</strong>';
+      $('pClass').textContent=(p.emoji||'')+' '+(p.className||'')+' · Nv.'+(p.level||0);
+      $('pHp').textContent=(p.hp||0)+'/'+(p.maxHp||0);
+      $('pMana').textContent=(p.mana||0)+'/'+(p.maxMana||0);
+      scale($('pHpBar'),p.hp,p.maxHp); scale($('pManaBar'),p.mana,p.maxMana);
+      const a=p.attrs||{}; $('pAttrs').textContent='⚔️ '+(a.forca||0)+' · 🛡️ '+(a.defesa||0)+' · 💨 '+(a.agilidade||0);
+    }
+    const pr=s.progress||{};
+    $('progText').textContent='👹 '+(pr.monstersDefeated||0)+' / '+(pr.monstersTarget||19)+(pr.bossSpawned?(pr.bossDefeated?' · 👑 ✓':' · 👑 ativo'):'');
+    $('advanceBtn').classList.toggle('hidden',!pr.canAdvance);
+    const banner=$('combatBanner');
+    if(s.phase==='combat'&&s.combat?.enemy){
+      banner.classList.remove('hidden');
+      const e=s.combat.enemy;
+      banner.textContent=(e.emoji||'👹')+' '+e.name+' · HP '+e.hp+'/'+e.maxHp+(s.combat.yourTurn?' · SEU TURNO':'');
+    } else banner.classList.add('hidden');
+    const box=$('skills'); box.innerHTML='';
+    if(s.phase==='combat'&&p){
+      const myTurn=s.combat?.yourTurn;
+      const add=(id,label,dis)=>{const b=document.createElement('button');b.textContent=label;b.disabled=!myTurn||dis||acting;b.onclick=()=>combat(id);box.appendChild(b);};
+      if(p.basicAttack) add('basic',(p.basicAttack.emoji||'⚔️')+' '+(p.basicAttack.name||'Ataque'),false);
+      (p.actives||[]).forEach(a=>add(a.id,(a.emoji||'✨')+' '+a.name,(a.currentCd||0)>0||(p.mana||0)<(a.mana||0)));
+    } else box.innerHTML='<span style="font-size:.78rem;color:var(--muted)">Explore o mapa</span>';
+    $('log').innerHTML=(s.log||[]).slice(-30).map(l=>'<div class="line">'+(l.text||'')+'</div>').join('');
+    $('log').scrollTop=$('log').scrollHeight;
+    $('chatBody').innerHTML=(s.chat||[]).map(m=>'<div><strong style="color:var(--gold)">'+(m.name||'')+':</strong> '+m.text+'</div>').join('');
+    renderMap(s);
+  }
+  async function poll(){ if(!matchId)return; try{ const r=await fetch('/api/dungeon/'+encodeURIComponent(matchId)+'?as='+encodeURIComponent(asUser)); if(r.ok) render(await r.json()); }catch(_){ } }
+  async function walk(x,y){ if(acting||state?.phase!=='explore')return; acting=true; try{ const r=await fetch('/api/dungeon/'+encodeURIComponent(matchId)+'/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:asUser,x,y})}); const d=await r.json(); if(d.match) render(d.match); else if(d.error) alert(d.error); } finally{acting=false;} }
+  async function combat(moveId){ if(acting)return; acting=true; try{ const r=await fetch('/api/dungeon/'+encodeURIComponent(matchId)+'/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:asUser,moveId})}); const d=await r.json(); if(d.match) render(d.match); else if(d.error) alert(d.error); } finally{acting=false;} }
+  async function advance(){ const r=await fetch('/api/dungeon/'+encodeURIComponent(matchId)+'/advance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:asUser})}); const d=await r.json(); if(d.id){ matchId=d.id; history.replaceState({},'','?id='+matchId+'&as='+asUser); render(d.match); } else if(d.error) alert(d.error); }
+  async function leave(){ const r=await fetch('/api/dungeon/'+encodeURIComponent(matchId)+'/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:asUser})}); const d=await r.json(); if(d.match) render(d.match); $('leaveConfirm').classList.add('hidden'); }
+  async function chat(){ const text=$('chatInput').value.trim(); if(!text)return; $('chatInput').value=''; const r=await fetch('/api/dungeon/'+encodeURIComponent(matchId)+'/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:asUser,text})}); const d=await r.json(); if(d.chat) $('chatBody').innerHTML=d.chat.map(m=>'<div><strong style="color:var(--gold)">'+(m.name||'')+':</strong> '+m.text+'</div>').join(''); }
+  function enter(){ matchId=$('idInput').value.trim()||matchId; asUser=$('asInput').value.trim()||asUser; if(!matchId||!asUser){alert('ID e User ID');return;} $('lobby').classList.add('hidden'); $('game').classList.remove('hidden'); poll(); clearInterval(pollT); pollT=setInterval(poll,2000); }
+  $('joinBtn').onclick=enter; $('advanceBtn').onclick=advance; $('leaveBtn').onclick=()=>$('leaveConfirm').classList.remove('hidden'); $('leaveYes').onclick=leave; $('leaveNo').onclick=()=>$('leaveConfirm').classList.add('hidden'); $('chatBtn').onclick=chat;
+  if(matchId&&asUser){ $('idInput').value=matchId; $('asInput').value=asUser; enter(); }
+})();
+</script>
+</body>
+</html>
