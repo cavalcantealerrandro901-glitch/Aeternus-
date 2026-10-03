@@ -1,72 +1,23 @@
 const { SlashCommandBuilder } = require('discord.js');
-const ai = require('../utils/aeternusAI');
-
-async function runChat(userId, text, client, guild, channel, respond) {
-    const q = String(text || '').trim();
-    if (!q) {
-        return respond(
-            'Sou o **assistente do Aeternus** — fala natural, pode misturar assuntos.\n' +
-                'Ex.: `meu saldo e sonhos` · `explique arena` · `me atualiza` · `crie uma classe ninja`'
-        );
-    }
-
-    if (/^(limpar|clear|reset)$/i.test(q)) {
-        ai.clearHistory(userId);
-        return respond('Memória desta conversa apagada.');
-    }
-
-    const result = await ai.chat({
-        userId,
-        message: q,
-        client,
-        guild,
-        channel
-    });
-
-    if (!result.ok) return respond('❌ ' + (result.error || 'Falha interna.'));
-    return respond(result.text);
-}
 
 module.exports = {
     name: 'aeternus',
     aliases: ['ia', 'ai', 'assistente', 'ask', 'consciencia', 'consciência'],
-    description: 'Assistente do Aeternus — conversa livre sobre o bot',
+    description: 'Assistente (desativado)',
     data: new SlashCommandBuilder()
         .setName('aeternus')
-        .setDescription('Fale com o assistente do Aeternus')
+        .setDescription('Assistente do Aeternus (desativado)')
         .addStringOption((o) =>
-            o.setName('mensagem').setDescription('Pode falar solto, misturar assuntos').setRequired(true)
+            o.setName('mensagem').setDescription('Mensagem').setRequired(false)
         ),
 
-    async execute(message, args) {
-        const text = (args || []).join(' ').trim();
-        await runChat(
-            message.author.id,
-            text,
-            message.client,
-            message.guild,
-            message.channel,
-            (c) => message.reply({ content: c, allowedMentions: { repliedUser: false } })
-        );
+    async execute(message) {
+        return message.reply('🤖 O assistente/IA do Aeternus foi **desativado**.');
     },
 
-    async executeSlash(i) {
-        const text = i.options.getString('mensagem', true);
-        await i.deferReply();
-        await runChat(i.user.id, text, i.client, i.guild, i.channel, async (c) => {
-            await i.editReply({ content: c });
-        });
-    },
-
-    async handleMention(message, strippedText) {
-        await runChat(
-            message.author.id,
-            strippedText,
-            message.client,
-            message.guild,
-            message.channel,
-            (c) => message.reply({ content: c, allowedMentions: { repliedUser: false } })
-        );
-        return true;
+    async executeSlash(interaction) {
+        const reply = (p) =>
+            interaction.replied || interaction.deferred ? interaction.editReply(p) : interaction.reply(p);
+        return reply({ content: '🤖 O assistente/IA do Aeternus foi **desativado**.', ephemeral: true });
     }
 };
