@@ -179,7 +179,7 @@ const BASE_CLASSES = {
         maxHolders: 1,
         exclusive: true,
         boundUserId: process.env.OWNER_ID || process.env.BOT_OWNER_ID || process.env.ADMIN_ID || '1483097258944630897',
-        desc: 'Arquiteto do Aeternus. Exclusiva do criador.',
+        desc: 'Arquiteto do Aeternus. Exclusiva do criador (OWNER_ID).',
         uniqueAbilities: ['Gênese', 'Veredito Divino'],
         activeAbilities: ['Raio Primordial', 'Mão do Arquiteto', 'Véu do Cosmos', 'Decreto'],
         uniquePassives: ['Onisciência', 'Imortalidade Relativa', 'Autoridade'],
@@ -201,8 +201,7 @@ const BASE_CLASSES = {
         rarityName: 'Única',
         maxHolders: 1,
         exclusive: true,
-        boundUserId: process.env.OWNER_ID || process.env.BOT_OWNER_ID || process.env.ADMIN_ID || '1483097258944630897',
-        desc: 'Mensageiro da luz velada. Classe Única vinculada ao OWNER_ID.',
+        desc: 'Mensageiro da luz velada. Classe Única (1 titular) — para outro jogador, não o criador. Admin atribui o dono.',
         uniqueAbilities: [
             'Decreto Final [Épica · 1×/partida] — Após 1 turno, espada gigante do céu (dano massivo).',
             'Lâmina do Véu — Ataque básico de luz e aço (Força + Inteligência).'
@@ -220,7 +219,7 @@ const BASE_CLASSES = {
         ],
         passives: ['Asas do Véu', 'Presença Sagrada', 'Clareza Angelical', 'Foco Celeste', 'Equilíbrio do Véu'],
         powers: ['Julgamento Celestial', 'Barreira do Véu Sagrado', 'Toque da Restauração', 'Passo Etéreo'],
-        disadvantages: ['Exclusiva do OWNER_ID', 'Decreto Final 1×/partida'],
+        disadvantages: ['Única — 1 titular (outro jogador)', 'Decreto Final 1×/partida'],
         bonus: { forca: 3, defesa: 2, agilidade: 3, vida: 2 },
         manaMult: 1.25,
         color: 0xfde68a,
