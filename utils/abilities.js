@@ -1,36 +1,68 @@
-/**
- * Habilidades ativas (4 slots) e passivas (5 slots).
- * Cada habilidade pode ser restrita a uma ou mais classes (classIds).
- */
 const store = require('./store');
 const player = require('./player');
 const classesMod = require('./classes');
 
 const ABILITIES = {
+    // Guerreiro (básicas genéricas omitidas se não usadas)
+
+    // ── Ceifador Negro ──
     decapitacao: {
-        id: 'decapitacao', name: 'Decapitação', emoji: '⚰️', kind: 'active', unique: true,
-        type: 'physical', mana: 25, cd: 99, power: 2.2, oncePerMatch: true, consumeRandomAttr: true,
-        classIds: ['ceifador_negro'], desc: '[Épica · 1×/partida] Consome 1 atributo aleatório permanente. Dano brutal.'
-    },
-    dado_da_morte_hab: {
-        id: 'dado_da_morte_hab', name: 'Dado da Morte', emoji: '🎲', kind: 'active', unique: true,
-        type: 'magic', mana: 20, cd: 4, power: 1.0, diceOfDeath: true,
-        classIds: ['ceifador_negro'], desc: '[Épico] Dado 1–6 com efeitos extremos de vida.'
+        id: 'decapitacao',
+        name: 'Decapitação',
+        emoji: '⚰️',
+        kind: 'active',
+        type: 'physical',
+        mana: 25,
+        cd: 99,
+        power: 1.6,
+        unique: true,
+        oncePerBattle: true,
+        consumeRandomAttr: true,
+        classIds: ['ceifador_negro'],
+        desc: '[Épica · 1×/partida] Consome 1 ponto de atributo aleatório do usuário permanentemente.'
     },
     corte_fantasma: {
-        id: 'corte_fantasma', name: 'Corte Fantasma', emoji: '👻', kind: 'active',
-        type: 'physical', mana: 14, cd: 2, power: 1.25, trueDamage: 0.45, armorPen: 0.35,
-        classIds: ['ceifador_negro'], desc: '[Rara] Ignora parte da defesa e causa dano verdadeiro.'
+        id: 'corte_fantasma',
+        name: 'Corte Fantasma',
+        emoji: '👻',
+        kind: 'active',
+        type: 'physical',
+        mana: 14,
+        cd: 2,
+        power: 1.2,
+        trueDamagePct: 0.25,
+        classIds: ['ceifador_negro'],
+        desc: '[Rara] Ignora parte da defesa e causa dano verdadeiro.'
     },
     estocada_fantasma: {
-        id: 'estocada_fantasma', name: 'Estocada Fantasma', emoji: '🗡️', kind: 'active',
-        type: 'physical', mana: 12, cd: 2, power: 0.75, effect: 'break_def', effectChance: 1, effectTurns: 2,
-        classIds: ['ceifador_negro'], desc: '[Rara] Quebra a defesa do alvo.'
+        id: 'estocada_fantasma',
+        name: 'Estocada Fantasma',
+        emoji: '🗡️',
+        kind: 'active',
+        type: 'physical',
+        mana: 12,
+        cd: 2,
+        power: 0.75,
+        effect: 'break_def',
+        effectChance: 1,
+        effectTurns: 2,
+        classIds: ['ceifador_negro'],
+        desc: '[Rara] Quebra a defesa do alvo.'
     },
     manto_negro_hab: {
-        id: 'manto_negro_hab', name: 'Manto Negro', emoji: '🌑', kind: 'active',
-        type: 'buff', mana: 16, cd: 3, power: 0, effect: 'untouchable', effectTurns: 1, self: true,
-        classIds: ['ceifador_negro'], desc: 'Intocável por 1 turno.'
+        id: 'manto_negro_hab',
+        name: 'Manto Negro',
+        emoji: '🌑',
+        kind: 'active',
+        type: 'buff',
+        mana: 16,
+        cd: 3,
+        power: 0,
+        effect: 'untouchable',
+        effectTurns: 1,
+        self: true,
+        classIds: ['ceifador_negro'],
+        desc: 'Intocável por 1 turno.'
     },
 
     // ── Arcanjo do Véu ──
@@ -50,7 +82,7 @@ const ABILITIES = {
         effectTurns: 1,
         effectRequireAllHits: true,
         classIds: ['arcanjo_do_veu'],
-        desc: '3 lanças de luz perseguem o alvo. Se as 3 acertarem → atordoado 1 turno.'
+        desc: '3 lanças de luz. Se as 3 acertarem → atordoado 1 turno.'
     },
     barreira_veu_sagrado: {
         id: 'barreira_veu_sagrado',
@@ -66,7 +98,7 @@ const ABILITIES = {
         shieldPctMaxHp: 1.0,
         effectTurns: 2,
         classIds: ['arcanjo_do_veu'],
-        desc: 'Escudo por 2 turnos que absorve 100% do HP máximo em dano.'
+        desc: 'Escudo 2 turnos (100% HP máx.).'
     },
     toque_restauracao: {
         id: 'toque_restauracao',
@@ -79,9 +111,8 @@ const ABILITIES = {
         power: 0,
         healMissingPct: 0.6,
         cleanse: ['bleed', 'poison', 'sangramento', 'veneno'],
-        requireMissingHpPct: 0.6,
         classIds: ['arcanjo_do_veu'],
-        desc: 'Cura se o alvo tiver até 60% de vida perdida; remove sangramento e veneno.'
+        desc: 'Cura até 60% vida perdida; remove sangramento/veneno.'
     },
     passo_etereo: {
         id: 'passo_etereo',
@@ -97,23 +128,7 @@ const ABILITIES = {
         effectTurns: 1,
         dash: true,
         classIds: ['arcanjo_do_veu'],
-        desc: 'Some e avança — invulnerável durante o deslocamento (1 turno).'
-    },
-    decreto_final: {
-        id: 'decreto_final',
-        name: 'Decreto Final',
-        emoji: '⚔️',
-        kind: 'active',
-        unique: true,
-        type: 'magic',
-        mana: 30,
-        cd: 99,
-        power: 2.8,
-        oncePerMatch: true,
-        delayedTurns: 1,
-        aoe: true,
-        classIds: ['arcanjo_do_veu'],
-        desc: '[Única · 1×/partida] Marca a área; após 1 turno cai a Espada do Céu — dano massivo.'
+        desc: 'Invulnerável 1 turno.'
     },
     regeneracao_benefica: {
         id: 'regeneracao_benefica',
@@ -122,7 +137,7 @@ const ABILITIES = {
         kind: 'passive',
         unique: true,
         classIds: ['arcanjo_do_veu'],
-        desc: 'A cada 4 turnos regenera 8% da vida máxima.',
+        desc: 'A cada 4 turnos +8% HP máx.',
         mods: { regenEveryTurns: 4, regenPctMaxHp: 0.08 }
     },
     pele_de_luz: {
@@ -132,7 +147,7 @@ const ABILITIES = {
         kind: 'passive',
         unique: true,
         classIds: ['arcanjo_do_veu'],
-        desc: '15% a menos de dano de ataques à distância.',
+        desc: '−15% dano à distância.',
         mods: { rangedDamageTakenReduce: 0.15 }
     },
     eco_do_veu: {
@@ -142,8 +157,174 @@ const ABILITIES = {
         kind: 'passive',
         unique: true,
         classIds: ['arcanjo_do_veu'],
-        desc: 'A cada habilidade usada, próximo ataque +30% dano (acumula até 2×).',
+        desc: 'Após habilidade, próximo ataque +30% (até 2 stacks).',
         mods: { afterSkillAttackBonus: 0.3, afterSkillAttackStacks: 2 }
+    },
+
+    // ── Deus Criador ──
+    raio_primordial: {
+        id: 'raio_primordial',
+        name: 'Raio Primordial',
+        emoji: '⚡',
+        kind: 'active',
+        type: 'magic',
+        mana: 20,
+        cd: 2,
+        power: 1.45,
+        trueDamagePct: 0.2,
+        classIds: ['deus_criador'],
+        desc: '[Épica] Alto dano mágico + 20% dano verdadeiro.'
+    },
+    mao_do_arquiteto: {
+        id: 'mao_do_arquiteto',
+        name: 'Mão do Arquiteto',
+        emoji: '🖐️',
+        kind: 'active',
+        type: 'magic',
+        mana: 18,
+        cd: 3,
+        power: 1.1,
+        effect: 'break_def',
+        effectChance: 1,
+        effectTurns: 2,
+        classIds: ['deus_criador'],
+        desc: 'Dano sólido e quebra defesa por 2 turnos.'
+    },
+    veu_do_cosmos: {
+        id: 'veu_do_cosmos',
+        name: 'Véu do Cosmos',
+        emoji: '🌌',
+        kind: 'active',
+        type: 'buff',
+        mana: 22,
+        cd: 4,
+        power: 0,
+        self: true,
+        effect: 'untouchable',
+        effectTurns: 1,
+        classIds: ['deus_criador'],
+        desc: 'Intocável por 1 turno.'
+    },
+    decreto: {
+        id: 'decreto',
+        name: 'Decreto',
+        emoji: '📜',
+        kind: 'active',
+        type: 'magic',
+        mana: 24,
+        cd: 4,
+        power: 1.25,
+        effect: 'stun',
+        effectChance: 0.55,
+        effectTurns: 1,
+        classIds: ['deus_criador'],
+        desc: 'Dano mágico alto; chance de atordoar 1 turno.'
+    },
+    genese: {
+        id: 'genese',
+        name: 'Gênese',
+        emoji: '🪐',
+        kind: 'active',
+        type: 'heal',
+        mana: 28,
+        cd: 6,
+        power: 0,
+        self: true,
+        unique: true,
+        healMissingPct: 0.45,
+        cleanse: ['bleed', 'poison', 'sangramento', 'veneno', 'stun', 'break_def'],
+        classIds: ['deus_criador'],
+        desc: '[Única] Cura 45% da vida perdida e limpa efeitos negativos.'
+    },
+    veredito_divino: {
+        id: 'veredito_divino',
+        name: 'Veredito Divino',
+        emoji: '⚖️',
+        kind: 'active',
+        type: 'magic',
+        mana: 30,
+        cd: 7,
+        power: 1.8,
+        unique: true,
+        oncePerBattle: true,
+        trueDamagePct: 0.35,
+        classIds: ['deus_criador'],
+        desc: '[Única · 1×/batalha] Dano massivo + 35% verdadeiro.'
+    },
+    onisciencia: {
+        id: 'onisciencia',
+        name: 'Onisciência',
+        emoji: '👁️',
+        kind: 'passive',
+        unique: true,
+        classIds: ['deus_criador'],
+        desc: '+15% precisão; reduz dano de habilidades já vistas.',
+        mods: { precision: 0.15, skillFamiliarityReduce: 0.12 }
+    },
+    imortalidade_relativa: {
+        id: 'imortalidade_relativa',
+        name: 'Imortalidade Relativa',
+        emoji: '♾️',
+        kind: 'passive',
+        unique: true,
+        classIds: ['deus_criador'],
+        desc: '1× por batalha sobrevive a golpe fatal com 15% HP máx.',
+        mods: { surviveFatalOnce: true, surviveFatalHpPct: 0.15 }
+    },
+    autoridade: {
+        id: 'autoridade',
+        name: 'Autoridade',
+        emoji: '👑',
+        kind: 'passive',
+        unique: true,
+        classIds: ['deus_criador'],
+        desc: '+12% ofensivo e mana.',
+        mods: { allOffenseBonus: 0.12, manaBonus: 0.12 }
+    },
+    presenca_divina: {
+        id: 'presenca_divina',
+        name: 'Presença Divina',
+        emoji: '✨',
+        kind: 'passive',
+        classIds: ['deus_criador'],
+        desc: 'Inimigos começam com −5% atributos.',
+        mods: { enemyAttrDebuffStart: 0.05 }
+    },
+    criacao_constante: {
+        id: 'criacao_constante',
+        name: 'Criação Constante',
+        emoji: '🌀',
+        kind: 'passive',
+        classIds: ['deus_criador'],
+        desc: 'Regenera mana extra por turno.',
+        mods: { manaRegenPerTurn: 6 }
+    },
+    olhar_do_criador: {
+        id: 'olhar_do_criador',
+        name: 'Olhar do Criador',
+        emoji: '🔭',
+        kind: 'passive',
+        classIds: ['deus_criador'],
+        desc: '+10% dano no primeiro ataque da luta.',
+        mods: { firstAttackBonus: 0.1 }
+    },
+    equilibrio: {
+        id: 'equilibrio',
+        name: 'Equilíbrio',
+        emoji: '☯️',
+        kind: 'passive',
+        classIds: ['deus_criador'],
+        desc: 'Técnicas repetidas do inimigo −15% dano.',
+        mods: { repeatedSkillDamageReduce: 0.15 }
+    },
+    eco_do_eter: {
+        id: 'eco_do_eter',
+        name: 'Eco do Éter',
+        emoji: '💫',
+        kind: 'passive',
+        classIds: ['deus_criador'],
+        desc: '+3% em todos os atributos.',
+        mods: { allAttrBonus: 0.03 }
     }
 };
 
@@ -206,6 +387,10 @@ function sanitizeLoadout(userId) {
 function equipAbility(userId, abilityId, slot) {
     const ab = getAbility(abilityId);
     if (!ab) return { ok: false, error: 'Habilidade inválida.' };
+    const cls = classesMod.getClass((player.get(userId) || {}).classId);
+    if (ab.classIds && cls?.id && !ab.classIds.includes(cls.id)) {
+        return { ok: false, error: 'Esta habilidade não é da sua classe.' };
+    }
     const loadout = sanitizeLoadout(userId);
     const slots = ab.kind === 'active' ? loadout.active : loadout.passive;
     const max = ab.kind === 'active' ? ACTIVE_SLOTS : PASSIVE_SLOTS;
