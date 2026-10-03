@@ -127,7 +127,11 @@ const BASE_CLASSES = {
         manaMult: 1.1,
         color: 0x1f2937,
         basicAttack: { id: 'golpe_foice', name: 'Golpe de Foice', emoji: '⚰️', type: 'physical', power: 1.25, mana: 0 },
-        classGear: null
+        classGear: {
+            weapon: 'foice_grande',
+            armor: 'manto_negro_armadura',
+            accessory: 'dado_da_morte'
+        }
     },
     deus_criador: {
         id: 'deus_criador',
