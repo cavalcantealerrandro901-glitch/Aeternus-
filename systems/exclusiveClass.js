@@ -39,7 +39,7 @@ const EXCLUSIVES = [
         ]
     },
     {
-        classId: 'detetive_arcano',
+        classId: 'l_detetive_arcano',
         owner: '1460227733023096875',
         gear: [
             {
@@ -48,7 +48,7 @@ const EXCLUSIVES = [
                 emoji: '🦯',
                 category: 'arma',
                 rarity: 'mitica',
-                classId: 'detetive_arcano',
+                classId: 'l_detetive_arcano',
                 effects: { inteligencia: 950, agilidade: 700, forca: 500, dano: 800 }
             },
             {
@@ -57,7 +57,7 @@ const EXCLUSIVES = [
                 emoji: '🧥',
                 category: 'armadura',
                 rarity: 'lendaria',
-                classId: 'detetive_arcano',
+                classId: 'l_detetive_arcano',
                 effects: { defesa: 750, inteligencia: 650, sorte: 550, vida: 600 }
             },
             {
@@ -66,17 +66,61 @@ const EXCLUSIVES = [
                 emoji: '📓',
                 category: 'acessorio',
                 rarity: 'mitica',
-                classId: 'detetive_arcano',
+                classId: 'l_detetive_arcano',
                 effects: { inteligencia: 1000, sorte: 700, precisao: 800 }
+            }
+        ]
+    },
+    {
+        classId: 'arcanjo_do_veu',
+        owner: '1393079977410428968',
+        gear: [
+            {
+                id: 'lamina_arcana',
+                name: 'Lâmina Arcana',
+                emoji: '🗡️',
+                category: 'arma',
+                rarity: 'lendaria',
+                classId: 'arcanjo_do_veu',
+                effects: {
+                    forca: 750,
+                    inteligencia: 800,
+                    dano: 700,
+                    danoMagico: 750,
+                    critFirstAttack: 0.3
+                },
+                desc: '30% crítico no 1º ataque. Força + Inteligência + dano físico/mágico.'
             },
             {
-                id: 'lentes_analiticas',
-                name: 'Lentes Analíticas',
-                emoji: '🔎',
+                id: 'armadura_de_corceus',
+                name: 'Armadura de Corcéus',
+                emoji: '🛡️',
+                category: 'armadura',
+                rarity: 'lendaria',
+                classId: 'arcanjo_do_veu',
+                effects: {
+                    defesa: 850,
+                    vida: 800,
+                    resistencia: 750,
+                    damageReduction: 0.3
+                },
+                desc: '30% redução de dano. Defesa + Vida + Resistência.'
+            },
+            {
+                id: 'colar_da_ressurreicao',
+                name: 'Colar da Ressurreição',
+                emoji: '📿',
                 category: 'acessorio',
                 rarity: 'lendaria',
-                classId: 'detetive_arcano',
-                effects: { inteligencia: 850, precisao: 900, agilidade: 500 }
+                classId: 'arcanjo_do_veu',
+                effects: {
+                    vidaPerKillPct: 0.01,
+                    reviveOnce: true,
+                    reviveHpPct: 0.1,
+                    vida: 600,
+                    sorte: 500
+                },
+                desc: '+1% vida máx. por kill. Ressuscita 1× com 10% HP máx.'
             }
         ]
     }
@@ -91,20 +135,19 @@ function grantGear(userId, gearList) {
     for (const g of gearList) {
         const existing = byId.get(String(g.id));
         if (existing) {
-            // atualiza stats do item já existente
             Object.assign(existing, {
                 name: g.name,
                 emoji: g.emoji,
                 category: g.category,
                 rarity: g.rarity,
                 classId: g.classId,
-                effects: { ...(g.effects || {}) }
+                effects: { ...(g.effects || {}) },
+                desc: g.desc || existing.desc
             });
             continue;
         }
         player.addItem(userId, { ...g });
     }
-    // persiste inventário se houve upgrade in-place
     try {
         const data = player.all();
         if (data[userId] && Array.isArray(data[userId].inventory)) {
@@ -115,7 +158,13 @@ function grantGear(userId, gearList) {
 
 function setup() {
     try {
-        classes.enforceExclusiveOwners();
+        if (typeof classes.enforceExclusiveOwners === 'function') {
+            const all = player.all();
+            classes.enforceExclusiveOwners(all);
+            try {
+                player.save(all);
+            } catch (_) {}
+        }
         for (const ex of EXCLUSIVES) {
             const owner = String(ex.owner);
             const classId = ex.classId;
