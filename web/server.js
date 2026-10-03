@@ -21,7 +21,6 @@ function startWeb(client) {
             let fileName = req.path === '/' ? 'index.html' : req.path;
             if (!fileName.endsWith('.html')) fileName += '.html';
             let filePath = path.join(publicDir, fileName);
-
             if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
                 let content = fs.readFileSync(filePath, 'utf8');
                 if (!content.includes('dashboard.css')) {
@@ -76,7 +75,10 @@ function startWeb(client) {
             });
             const token = await tokenRes.json();
             if (!token.access_token) return res.redirect('/dashboard');
-            res.cookie('discord_token', token.access_token, { httpOnly: true, maxAge: 7 * 24 * 3600 * 1000 });
+            res.cookie('discord_token', token.access_token, {
+                httpOnly: true,
+                maxAge: 7 * 24 * 3600 * 1000
+            });
             res.redirect('/dashboard');
         } catch (e) {
             res.redirect('/dashboard');
@@ -95,7 +97,12 @@ function startWeb(client) {
     app.get('/api/guild/:id', (req, res) => {
         const g = client.guilds.cache.get(req.params.id);
         if (!g) return res.status(404).json({ error: 'guild' });
-        res.json({ id: g.id, name: g.name, prefix: getPrefix(req.params.id), settings: getSettings(req.params.id) });
+        res.json({
+            id: g.id,
+            name: g.name,
+            prefix: getPrefix(req.params.id),
+            settings: getSettings(req.params.id)
+        });
     });
 
     app.post('/api/guild/:id/prefix', (req, res) => {
@@ -114,6 +121,8 @@ function startWeb(client) {
 
     app.get('/wiki', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'wiki.html')));
     app.get('/arena', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'arena.html')));
+    app.get('/dungeon', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dungeon.html')));
+    app.get('/masmorra', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dungeon.html')));
     app.get('/editor', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'editor.html')));
 
     app.get('/api/arena/:id', (req, res) => {
@@ -180,10 +189,7 @@ function startWeb(client) {
 
     app.post('/api/dungeon/:id/move', (req, res) => {
         const body = req.body || {};
-        const result = dungeon.applyDungeonMove(req.params.id, body.playerId, {
-            moveId: body.moveId,
-            targetId: body.targetId
-        });
+        const result = dungeon.applyDungeonMove(req.params.id, body.playerId, body);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
@@ -202,6 +208,13 @@ function startWeb(client) {
     app.post('/api/dungeon/:id/chat', (req, res) => {
         const body = req.body || {};
         const result = dungeon.postDungeonChat(req.params.id, body.playerId, body.text);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
+    });
+
+    app.post('/api/dungeon/:id/leave', (req, res) => {
+        const body = req.body || {};
+        const result = dungeon.leaveDungeon(req.params.id, body.playerId);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
@@ -275,7 +288,6 @@ function startWeb(client) {
             (process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '').replace(/\/$/, '') ||
             'http://' + host + ':' + port;
         console.log('🌐 Painel:  ' + publicBase + '/dashboard');
-        console.log('🛠️  Editor:  ' + publicBase + '/editor.html');
         if (REDIRECT) console.log('[web] OAuth redirect:', REDIRECT);
     });
     return server;
