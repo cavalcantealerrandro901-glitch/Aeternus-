@@ -269,6 +269,101 @@ function redistribuirAttrs(userId) {
     };
 }
 
+function transferAttrPoints(fromId, toId, amount) {
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (n <= 0) return { ok: false, error: 'Quantidade inválida.' };
+    const a = loadCur(fromId);
+    if (a.cur.attrPoints < n) {
+        return { ok: false, error: 'Pontos insuficientes para transferir.' };
+    }
+    a.cur.attrPoints -= n;
+    saveCur(a.data, fromId, a.cur);
+    const b = loadCur(toId);
+    b.cur.attrPoints = Math.max(0, Math.floor(Number(b.cur.attrPoints || 0))) + n;
+    saveCur(b.data, toId, b.cur);
+    return { ok: true, amount: n, from: fromId, to: toId };
+}
+
+function scanInvalidAttrs(userId) {
+    const data = all();
+    const raw = data[userId] || {};
+    const attrs = raw.attrs && typeof raw.attrs === 'object' ? { ...raw.attrs } : {};
+    let orphan = 0;
+    const orphanKeys = [];
+    for (const [k, v] of Object.entries(attrs)) {
+        if (!ATTR_KEYS.includes(k)) {
+            const n = Math.floor(Number(v) || 0);
+            if (n !== 0) {
+                orphan += Math.abs(n);
+                orphanKeys.push(k);
+            }
+        }
+    }
+    let negative = 0;
+    for (const k of ATTR_KEYS) {
+        const n = Math.floor(Number(attrs[k] || 0));
+        if (n < 0) negative += Math.abs(n);
+    }
+    const apRaw = raw.attrPoints;
+    const apNum = Number(apRaw);
+    const apBroken =
+        apRaw != null &&
+        apRaw !== '' &&
+        (!Number.isFinite(apNum) || apNum < 0 || !Number.isInteger(apNum));
+    let recoverable = orphan + negative;
+    if (apBroken && Number.isFinite(apNum) && apNum < 0) {
+        recoverable += Math.abs(Math.floor(apNum));
+    }
+    return {
+        hasInvalid: recoverable > 0 || apBroken,
+        recoverable,
+        orphan,
+        negative,
+        orphanKeys,
+        apBroken,
+        currentValidPoints: Math.max(0, Math.floor(Number.isFinite(apNum) ? apNum : 0))
+    };
+}
+
+function convertInvalidAttrs(userId) {
+    const scan = scanInvalidAttrs(userId);
+    if (!scan.hasInvalid) {
+        return { ok: false, error: 'Nenhum ponto inválido encontrado.', converted: 0 };
+    }
+    const { data, cur } = loadCur(userId);
+    const attrs = cur.attrs && typeof cur.attrs === 'object' ? { ...cur.attrs } : {};
+    let gained = 0;
+    for (const k of Object.keys(attrs)) {
+        if (!ATTR_KEYS.includes(k)) {
+            const n = Math.floor(Number(attrs[k]) || 0);
+            gained += Math.abs(n);
+            delete attrs[k];
+        }
+    }
+    for (const k of ATTR_KEYS) {
+        const n = Math.floor(Number(attrs[k] || 0));
+        if (n < 0) {
+            gained += Math.abs(n);
+            attrs[k] = BASE_ATTR[k] ?? 0;
+        } else {
+            attrs[k] = n;
+        }
+    }
+    ensureAttrs({ attrs });
+    cur.attrs = attrs;
+    let ap = Number(cur.attrPoints);
+    if (!Number.isFinite(ap) || ap < 0) ap = 0;
+    ap = Math.floor(ap);
+    cur.attrPoints = ap + gained;
+    saveCur(data, userId, cur);
+    return {
+        ok: true,
+        converted: gained,
+        attrPoints: cur.attrPoints,
+        orphanKeys: scan.orphanKeys
+    };
+}
+
 module.exports = {
     all,
     get,
@@ -289,6 +384,9 @@ module.exports = {
     spendAttrPoint,
     spendAttrPoints,
     redistribuirAttrs,
+    transferAttrPoints,
+    scanInvalidAttrs,
+    convertInvalidAttrs,
     ATTR_KEYS,
     ATTR_LABEL,
     BASE_ATTR
