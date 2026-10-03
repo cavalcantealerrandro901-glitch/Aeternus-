@@ -3,8 +3,6 @@ const player = require('./player');
 const classesMod = require('./classes');
 
 const ABILITIES = {
-    // Guerreiro (básicas genéricas omitidas se não usadas)
-
     // ── Ceifador Negro ──
     decapitacao: {
         id: 'decapitacao',
@@ -63,6 +61,114 @@ const ABILITIES = {
         self: true,
         classIds: ['ceifador_negro'],
         desc: 'Intocável por 1 turno.'
+    },
+    veu_da_morte: {
+        id: 'veu_da_morte',
+        name: 'Véu da Morte',
+        emoji: '🌫️',
+        kind: 'active',
+        type: 'buff',
+        mana: 20,
+        cd: 5,
+        power: 0,
+        self: true,
+        unique: true,
+        effect: 'survive_fatal_window',
+        effectTurns: 2,
+        surviveFatalChanceMin: 0.05,
+        surviveFatalChanceMax: 0.5,
+        classIds: ['ceifador_negro'],
+        desc: '[Épica] Por 2 turnos, 5–50% de chance de sobreviver a um golpe fatal.'
+    },
+    dado_da_morte_hab: {
+        id: 'dado_da_morte_hab',
+        name: 'Dado da Morte',
+        emoji: '🎲',
+        kind: 'active',
+        type: 'magic',
+        mana: 22,
+        cd: 6,
+        power: 0,
+        unique: true,
+        oncePerBattle: true,
+        effect: 'death_dice',
+        classIds: ['ceifador_negro'],
+        desc: '[Épica · 1×/batalha] Dado 1–6: 4–6 oponente −50% HP máx (você cura 25% do dano); 1–2 você −50% HP máx; 3 ambos −25% HP máx.'
+    },
+    aura_da_morte: {
+        id: 'aura_da_morte',
+        name: 'Aura da Morte',
+        emoji: '☠️',
+        kind: 'passive',
+        unique: true,
+        classIds: ['ceifador_negro'],
+        desc: '[Épica] Inimigos recebem marca da morte: −1% HP máx por turno.',
+        mods: { deathMarkPctMaxHpPerTurn: 0.01 }
+    },
+    maldicao_do_ceifador: {
+        id: 'maldicao_do_ceifador',
+        name: 'Maldição do Ceifador',
+        emoji: '🖤',
+        kind: 'passive',
+        unique: true,
+        classIds: ['ceifador_negro'],
+        desc: '[Épica] Cada kill: −5% chance de atacar primeiro na próxima luta; +bônus em drops de monstros.',
+        mods: { killFirstStrikePenalty: 0.05, monsterDropBonus: 0.15 }
+    },
+    mao_negra: {
+        id: 'mao_negra',
+        name: 'Mão Negra',
+        emoji: '🖐️',
+        kind: 'passive',
+        unique: true,
+        classIds: ['ceifador_negro'],
+        desc: '[Épica] Sem arma: −30% dano. Com arma de classe: +30% dano.',
+        mods: { unarmedDamageMult: 0.7, classWeaponDamageMult: 1.3, classWeaponIds: ['foice_grande'] }
+    },
+    maldicao_de_nivel: {
+        id: 'maldicao_de_nivel',
+        name: 'Maldição de Nível',
+        emoji: '📉',
+        kind: 'passive',
+        classIds: ['ceifador_negro'],
+        desc: 'Inimigo ≥10 níveis abaixo: seus attrs −10%. Você ≥10 níveis abaixo: attrs +10%.',
+        mods: { levelGapAttrBonus: 0.1, levelGapThreshold: 10 }
+    },
+    presenca_funerea: {
+        id: 'presenca_funerea',
+        name: 'Presença Funérea',
+        emoji: '🌑',
+        kind: 'passive',
+        classIds: ['ceifador_negro'],
+        desc: 'Inimigos iniciam com −3% em todos os atributos.',
+        mods: { enemyAttrDebuffStart: 0.03 }
+    },
+    frio_do_tumulo: {
+        id: 'frio_do_tumulo',
+        name: 'Frio do Túmulo',
+        emoji: '❄️',
+        kind: 'passive',
+        classIds: ['ceifador_negro'],
+        desc: '−8% dano recebido de habilidades mágicas.',
+        mods: { magicDamageTakenReduce: 0.08 }
+    },
+    colheita_sombria: {
+        id: 'colheita_sombria',
+        name: 'Colheita Sombria',
+        emoji: '🌾',
+        kind: 'passive',
+        classIds: ['ceifador_negro'],
+        desc: 'Ao derrotar um inimigo, recupera 8% do HP máximo.',
+        mods: { onKillHealMaxHpPct: 0.08 }
+    },
+    silencio_do_veu: {
+        id: 'silencio_do_veu',
+        name: 'Silêncio do Véu',
+        emoji: '🤫',
+        kind: 'passive',
+        classIds: ['ceifador_negro'],
+        desc: '+5% chance de crítico e +5% precisão.',
+        mods: { critChance: 0.05, precision: 0.05 }
     },
 
     // ── Arcanjo do Véu ──
