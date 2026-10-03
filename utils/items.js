@@ -1,49 +1,49 @@
-const store = require('./store');
-
 const RARITY = {
     comum: { name: 'Comum', color: 0x9ca3af },
+    incomum: { name: 'Incomum', color: 0x22c55e },
     raro: { name: 'Raro', color: 0x3b82f6 },
     epico: { name: 'Épico', color: 0xa855f7 },
     lendario: { name: 'Lendário', color: 0xf59e0b },
-    mitico: { name: 'Mítico', color: 0xec4899 }
+    lendaria: { name: 'Lendária', color: 0xf59e0b },
+    mitica: { name: 'Mítica', color: 0xef4444 },
+    mitico: { name: 'Mítico', color: 0xef4444 }
 };
 
 const ITEMS = {
-    cajado_arcano: { id: 'cajado_arcano', name: 'Cajado Arcano', emoji: '🪄', category: 'arma', rarity: 'comum', classId: 'mago', effects: { mana: 2, forca: 1 } },
-    grimorio: { id: 'grimorio', name: 'Grimório Antigo', emoji: '📕', category: 'acessorio', rarity: 'comum', classId: 'mago', effects: { mana: 3 } },
-    orbe_mana: { id: 'orbe_mana', name: 'Orbe de Mana', emoji: '🔮', category: 'acessorio', rarity: 'raro', classId: 'mago', effects: { mana: 5, forca: 1 } },
-    arco_longo: { id: 'arco_longo', name: 'Arco Longo', emoji: '🏹', category: 'arma', rarity: 'comum', classId: 'arqueiro', effects: { agilidade: 2, forca: 1 } },
-    aljava: { id: 'aljava', name: 'Aljava Élfica', emoji: '🗡️', category: 'acessorio', rarity: 'comum', classId: 'arqueiro', effects: { agilidade: 1 } },
-    botas_vento: { id: 'botas_vento', name: 'Botas do Vento', emoji: '👟', category: 'armadura', rarity: 'raro', classId: 'arqueiro', effects: { agilidade: 3 } },
-    escudo_ferro: { id: 'escudo_ferro', name: 'Escudo de Ferro', emoji: '🛡️', category: 'armadura', rarity: 'comum', classId: 'tanque', effects: { defesa: 2 } },
-    armadura_pesada: { id: 'armadura_pesada', name: 'Armadura Pesada', emoji: '🧥', category: 'armadura', rarity: 'raro', classId: 'tanque', effects: { defesa: 3, vida: 1 } },
-    elmo_guerra: { id: 'elmo_guerra', name: 'Elmo de Guerra', emoji: '🎩', category: 'armadura', rarity: 'comum', classId: 'tanque', effects: { defesa: 1, vida: 1 } },
-    cajado_luz: { id: 'cajado_luz', name: 'Cajado da Luz', emoji: '✨', category: 'arma', rarity: 'comum', classId: 'healer', effects: { mana: 2, vida: 1 } },
-    pocao_sagrada: { id: 'pocao_sagrada', name: 'Poção Sagrada', emoji: '💊', category: 'consumivel', rarity: 'comum', classId: 'healer', effects: {}, consumable: true },
-    amuleto_vida: { id: 'amuleto_vida', name: 'Amuleto da Vida', emoji: '💚', category: 'acessorio', rarity: 'raro', classId: 'healer', effects: { vida: 3 } },
-    espada_aco: { id: 'espada_aco', name: 'Espada de Aço', emoji: '⚔️', category: 'arma', rarity: 'comum', classId: 'guerreiro', effects: { forca: 2 } },
-    machado: { id: 'machado', name: 'Machado de Batalha', emoji: '🪓', category: 'arma', rarity: 'raro', classId: 'guerreiro', effects: { forca: 3, vida: 1 } },
-    cinto_forca: { id: 'cinto_forca', name: 'Cinto da Força', emoji: '🎗️', category: 'acessorio', rarity: 'comum', classId: 'guerreiro', effects: { forca: 1 } },
-    adagas: { id: 'adagas', name: 'Adagas Gêmeas', emoji: '🗡️', category: 'arma', rarity: 'comum', classId: 'assassino', effects: { forca: 1, agilidade: 2 } },
-    capa_sombra: { id: 'capa_sombra', name: 'Capa das Sombras', emoji: '🧣', category: 'armadura', rarity: 'raro', classId: 'assassino', effects: { agilidade: 3 } },
-    veneno: { id: 'veneno', name: 'Frasco de Veneno', emoji: '☠️', category: 'consumivel', rarity: 'comum', classId: 'assassino', effects: {}, consumable: true },
-    orbe_eclipse: { id: 'orbe_eclipse', name: 'Orbe do Eclipse', emoji: '🌑', category: 'acessorio', rarity: 'epico', classId: 'mago', effects: { mana: 8, forca: 2 } },
-    arco_tempestade: { id: 'arco_tempestade', name: 'Arco da Tempestade', emoji: '⛈️', category: 'arma', rarity: 'epico', classId: 'arqueiro', effects: { agilidade: 4, forca: 2 } },
+    espada_ferro: {
+        id: 'espada_ferro',
+        name: 'Espada de Ferro',
+        emoji: '⚔️',
+        category: 'arma',
+        rarity: 'comum',
+        effects: { forca: 3 },
+        desc: 'Lâmina simples.'
+    },
+    escudo_madeira: {
+        id: 'escudo_madeira',
+        name: 'Escudo de Madeira',
+        emoji: '🛡️',
+        category: 'armadura',
+        rarity: 'comum',
+        effects: { defesa: 2 },
+        desc: 'Proteção leve.'
+    },
 
-    lamina_arcana: {
-        id: 'lamina_arcana',
-        name: 'Lâmina Arcana',
-        emoji: '🗡️',
+    // Arcanjo do Véu (exemplos legados)
+    espada_do_ceu: {
+        id: 'espada_do_ceu',
+        name: 'Espada do Céu',
+        emoji: '⚔️',
         category: 'arma',
         rarity: 'lendario',
         classId: 'arcanjo_do_veu',
         exclusive: true,
-        effects: { forca: 4, inteligencia: 4, dano: 3, danoMagico: 3, critFirstAttack: 0.3 },
-        desc: '30% crítico no 1º ataque. Dano físico/mágico + Força + Inteligência.'
+        effects: { forca: 6, inteligencia: 4 },
+        desc: 'Lâmina de luz e aço.'
     },
-    armadura_de_corceus: {
-        id: 'armadura_de_corceus',
-        name: 'Armadura de Corcéus',
+    armadura_do_veu: {
+        id: 'armadura_do_veu',
+        name: 'Armadura do Véu',
         emoji: '🛡️',
         category: 'armadura',
         rarity: 'lendario',
@@ -62,6 +62,40 @@ const ITEMS = {
         exclusive: true,
         effects: { vidaPerKillPct: 0.01, reviveOnce: true, reviveHpPct: 0.1 },
         desc: '+1% vida máx. por oponente derrotado. Ressuscita 1× com 10% do HP máximo.'
+    },
+
+    cetro_da_genese: {
+        id: 'cetro_da_genese',
+        name: 'Cetro da Gênese',
+        emoji: '🪄',
+        category: 'arma',
+        rarity: 'mitica',
+        classId: 'deus_criador',
+        exclusive: true,
+        effects: { inteligencia: 1000, forca: 850, dano: 950, precisao: 700 },
+        desc: 'Arma de classe do Deus Criador. Poder primordial canalizado.'
+    },
+    manto_cosmico: {
+        id: 'manto_cosmico',
+        name: 'Manto Cósmico',
+        emoji: '🧥',
+        category: 'armadura',
+        rarity: 'mitica',
+        classId: 'deus_criador',
+        exclusive: true,
+        effects: { defesa: 900, vida: 850, resistencia: 750, agilidade: 600 },
+        desc: 'Armadura de classe. Tecido de estrelas e vazio.'
+    },
+    orbe_do_arquiteto: {
+        id: 'orbe_do_arquiteto',
+        name: 'Orbe do Arquiteto',
+        emoji: '🔮',
+        category: 'acessorio',
+        rarity: 'mitica',
+        classId: 'deus_criador',
+        exclusive: true,
+        effects: { inteligencia: 950, sorte: 800, manaBonus: 0.2, precisao: 700 },
+        desc: 'Acessório de classe. Orbe que ecoa a vontade do criador.'
     },
 
     livro_forca: { id: 'livro_forca', name: 'Livro de Força', emoji: '📕', category: 'consumivel', rarity: 'raro', effects: {}, bookAttr: 'forca', consumable: true },
