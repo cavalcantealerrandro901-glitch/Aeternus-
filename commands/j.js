@@ -19,11 +19,12 @@ async function safeReply(interaction, payload) {
 }
 const {
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-    StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle,
+    ModalBuilder, TextInputBuilder, TextInputStyle,
     SlashCommandBuilder, MessageFlags
 } = require('discord.js');
 const player = require('../utils/player');
 const xp = require('../utils/xp');
+const combatStats = require('../utils/combatStats');
 const drafts = new Map();
 const photoWait = new Map();
 
@@ -74,6 +75,8 @@ function profileEmbed(user, profile, opts = {}) {
     }
     const cls = profile.classId ? player.getClass(profile.classId) : null;
     const st = xp.get(user.id) || { level: 0, xp: 0, attrs: {} };
+    let eff = null;
+    try { eff = combatStats.getEffectiveAttrs(user.id); } catch (_) {}
     const photo = profile.photoUrl || user.displayAvatarURL({ size: 256 });
     const hasName = !!(profile.name && String(profile.name).trim());
     const displayName = hasName ? String(profile.name).trim() : null;
@@ -88,11 +91,14 @@ function profileEmbed(user, profile, opts = {}) {
             guildLine = '**' + tag + (g.name || 'Guilda') + '** · Nv.' + (g.level || 1);
         }
     } catch (_) {}
-    const a = st.attrs || {};
-    let manaMax = 20 + Number(st.level || 0) * 4;
+    const a = (eff && eff.attrs) || st.attrs || {};
+    const showLevel = eff ? eff.level : st.level;
+    const showXp = eff ? eff.xp : st.xp;
+    let manaMax = 20 + Number(showLevel || 0) * 4;
     try {
-        if (typeof player.maxManaFromLevel === 'function') manaMax = player.maxManaFromLevel(st.level, profile.classId);
-        else if (typeof xp.maxMana === 'function') manaMax = xp.maxMana(user.id);
+        if (typeof player.maxManaFromLevel === 'function') manaMax = player.maxManaFromLevel(showLevel, profile.classId);
+        const mb = Number(eff?.extra?.manaBonus || eff?.passMods?.manaBonus || 0);
+        if (mb) manaMax = Math.floor(manaMax * (1 + mb));
     } catch (_) {}
     const classLine = cls ? '**Classe:** ' + (cls.emoji || '⚔️') + ' ' + cls.name : '**Classe:** _Sem classe_';
     const classDesc = cls?.desc ? '_' + String(cls.desc).slice(0, 220) + '_' : null;
@@ -103,16 +109,16 @@ function profileEmbed(user, profile, opts = {}) {
         .setDescription([
             !hasName ? '_Use `O.j editar nome <nome>` para definir seu nome._' : null,
             classLine, classDesc, '',
-            '🎚️ **Nível** ' + Number(st.level || 0) + ' · **XP** ' + Number(st.xp || 0).toLocaleString('pt-BR'),
+            '🎚️ **Nível** ' + Number(showLevel || 0) + ' · **XP** ' + Number(showXp || 0).toLocaleString('pt-BR'),
             '', '💙 **Mana máx:** ' + Number(manaMax).toLocaleString('pt-BR'),
             '', '✨ **Éter** ' + Number(eterBal).toLocaleString('pt-BR') + ' · 💠 **cristais** ' + Number(cristaisBal).toLocaleString('pt-BR'),
             '', '🏰 **Guilda:** ' + guildLine,
-            '', '─────────────────────────────', '**Atributos**', '',
+            '', '─────────────────────────────', '**Atributos** _(base + classe + equipamento)_', '',
             '💪 **força:** ' + Number(a.forca ?? 0),
             '⚡ **agilidade:** ' + Number(a.agilidade ?? 0),
             '🛡️ **defesa:** ' + Number(a.defesa ?? 0),
             '🧠 **inteligência:** ' + Number(a.inteligencia ?? 0),
-            '✨ **vitalidade:** ' + Number(a.vitalidade ?? a.vida ?? 0),
+            '✨ **vitalidade:** ' + Number(a.vida ?? 0),
             '🍀 **sorte:** ' + Number(a.sorte ?? 0),
             '─────────────────────────────'
         ].filter((x) => x != null).join('\n'));
@@ -123,7 +129,8 @@ function profileEmbed(user, profile, opts = {}) {
 
 function atributosPayload(user) {
     const st = xp.get(user.id);
-    const attrs = st.attrs || {};
+    let attrs = st.attrs || {};
+    try { attrs = (combatStats.getEffectiveAttrs(user.id) || {}).attrs || attrs; } catch (_) {}
     const points = Number(st.attrPoints || 0);
     const profile = player.get(user.id);
     const cls = profile ? player.getClass(profile.classId) : null;
@@ -137,7 +144,7 @@ function atributosPayload(user) {
         .setDescription([
             '👤 **' + nome + '**',
             (cls?.emoji || '⚔️') + ' **' + (cls?.name || 'Sem classe') + '** · Nv **' + Number(st.level || 0) + '**',
-            '', '⚔️ **ATRIBUTOS**', ...attrLines, '',
+            '', '⚔️ **ATRIBUTOS** _(efetivos)_', ...attrLines, '',
             points > 0 ? '✦ Pontos disponíveis: **' + points + '**' : '✦ Pontos disponíveis: **0**'
         ].join('\n'))
         .setFooter({ text: '+1 · Gastar vários · Redistribuir' });
@@ -235,19 +242,15 @@ module.exports = {
 
     async handleComponent(interaction) {
         const id = String(interaction.customId || '');
-
         if (id.startsWith('j:attrfix:')) {
             const ownerId = id.split(':')[2];
-            if (String(interaction.user.id) !== String(ownerId)) {
-                return safeReply(interaction, { content: 'Só o dono pode aceitar.', flags: MessageFlags.Ephemeral });
-            }
+            if (String(interaction.user.id) !== String(ownerId)) return safeReply(interaction, { content: 'Só o dono pode aceitar.', flags: MessageFlags.Ephemeral });
             const res = typeof xp.convertInvalidAttrs === 'function' ? xp.convertInvalidAttrs(ownerId) : { ok: false, error: 'Indisponível.' };
             if (!res.ok) return safeReply(interaction, { content: String(res.error || 'Nada a converter.'), flags: MessageFlags.Ephemeral });
             const payload = atributosPayload(interaction.user);
             payload.content = '🎁 Convertidos **' + (res.converted || 0) + '** → **' + res.attrPoints + '** pontos livres válidos.';
             return safeUpdate(interaction, payload);
         }
-
         if (id.startsWith('j:attrplus:')) {
             const parts = id.split(':');
             const attrKey = normalizeAttrKey(parts[2]);
@@ -261,7 +264,6 @@ module.exports = {
             payload.content = '✅ **' + meta.emoji + ' ' + meta.label + '** +1';
             return safeUpdate(interaction, payload);
         }
-
         if (id.startsWith('j:attrdist:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) return safeReply(interaction, { content: 'Só o dono.', flags: MessageFlags.Ephemeral });
@@ -278,7 +280,6 @@ module.exports = {
             rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('j:attrcancel:' + ownerId).setLabel('Cancelar').setStyle(ButtonStyle.Danger)));
             return safeUpdate(interaction, { content: '**' + pts + '** pts — escolha o atributo:', embeds: [], components: rows });
         }
-
         if (id.startsWith('j:attrpick:')) {
             const parts = id.split(':');
             const attrKey = normalizeAttrKey(parts[2]);
@@ -294,7 +295,6 @@ module.exports = {
             qtyRow.addComponents(new ButtonBuilder().setCustomId('j:attrcancel:' + ownerId).setLabel('Cancelar').setStyle(ButtonStyle.Danger));
             return safeUpdate(interaction, { content: meta.emoji + ' **' + meta.label + '** — quantos?', embeds: [], components: [qtyRow] });
         }
-
         if (id.startsWith('j:attrqty:')) {
             const parts = id.split(':');
             const attrKey = normalizeAttrKey(parts[2]);
@@ -308,13 +308,11 @@ module.exports = {
             payload.content = '✅ +' + spent.spent + ' em ' + meta.emoji + ' ' + meta.label;
             return safeUpdate(interaction, payload);
         }
-
         if (id.startsWith('j:attrcancel:') || id.startsWith('j:attrrefresh:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) return safeReply(interaction, { content: 'Só o dono.', flags: MessageFlags.Ephemeral });
             return safeUpdate(interaction, atributosPayload(interaction.user));
         }
-
         if (id.startsWith('j:attrredis:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) return safeReply(interaction, { content: 'Só o dono.', flags: MessageFlags.Ephemeral });
@@ -323,7 +321,6 @@ module.exports = {
             await safeUpdate(interaction, atributosPayload(interaction.user));
             return interaction.followUp({ content: res.refund > 0 ? '🔄 **' + res.refund + '** pontos devolvidos.' : '🔄 Já na base.', flags: MessageFlags.Ephemeral }).catch(() => {});
         }
-
         if (id === 'j:start') return beginCreate(interaction);
     },
 
