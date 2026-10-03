@@ -124,7 +124,10 @@ function startWeb(client) {
 
     app.post('/api/arena/:id/move', (req, res) => {
         const body = req.body || {};
-        const result = arenaEngine.applyMove(req.params.id, body.playerId, { moveId: body.moveId, targetId: body.targetId });
+        const result = arenaEngine.applyMove(req.params.id, body.playerId, {
+            moveId: body.moveId,
+            targetId: body.targetId
+        });
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
@@ -133,9 +136,40 @@ function startWeb(client) {
         const body = req.body || {};
         const teamA = Array.isArray(body.teamA) ? body.teamA : [body.aId].filter(Boolean);
         const teamB = Array.isArray(body.teamB) ? body.teamB : [body.bId].filter(Boolean);
-        const result = arenaEngine.createMatch({ mode: body.mode, teamA, teamB, bet: body.bet });
+        const result = arenaEngine.createMatch({
+            mode: body.mode,
+            teamA,
+            teamB,
+            bet: body.bet,
+            fun: body.fun
+        });
         if (!result.ok) return res.status(400).json(result);
-        return res.json({ ok: true, id: result.match.id, state: arenaEngine.publicState(result.match, body.as || teamA[0]) });
+        return res.json({
+            ok: true,
+            id: result.match.id,
+            state: arenaEngine.publicState(result.match, body.as || teamA[0])
+        });
+    });
+
+    app.post('/api/arena/:id/chat', (req, res) => {
+        const body = req.body || {};
+        const result = arenaEngine.postChat(req.params.id, body.playerId, body.text);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
+    });
+
+    app.post('/api/arena/:id/skip', (req, res) => {
+        const body = req.body || {};
+        const result = arenaEngine.skipTurn(req.params.id, body.playerId);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
+    });
+
+    app.post('/api/arena/:id/forfeit', (req, res) => {
+        const body = req.body || {};
+        const result = arenaEngine.forfeit(req.params.id, body.playerId);
+        if (!result.ok) return res.status(400).json(result);
+        return res.json(result);
     });
 
     app.get('/api/dungeon/:id', (req, res) => {
@@ -146,7 +180,10 @@ function startWeb(client) {
 
     app.post('/api/dungeon/:id/move', (req, res) => {
         const body = req.body || {};
-        const result = dungeon.applyDungeonMove(req.params.id, body.playerId, { moveId: body.moveId, targetId: body.targetId });
+        const result = dungeon.applyDungeonMove(req.params.id, body.playerId, {
+            moveId: body.moveId,
+            targetId: body.targetId
+        });
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
@@ -155,14 +192,11 @@ function startWeb(client) {
         const body = req.body || {};
         const result = dungeon.startFloor(body.userId, body.floor);
         if (!result.ok) return res.status(400).json(result);
-        return res.json({ ok: true, id: result.match.id, state: dungeon.publicDungeon(result.match, body.userId) });
-    });
-
-    app.post('/api/arena/:id/chat', (req, res) => {
-        const body = req.body || {};
-        const result = arenaEngine.postChat(req.params.id, body.playerId, body.text);
-        if (!result.ok) return res.status(400).json(result);
-        return res.json(result);
+        return res.json({
+            ok: true,
+            id: result.match.id,
+            state: dungeon.publicDungeon(result.match, body.userId)
+        });
     });
 
     app.post('/api/dungeon/:id/chat', (req, res) => {
@@ -176,7 +210,11 @@ function startWeb(client) {
         const body = req.body || {};
         const result = dungeon.advanceFloor(req.params.id, body.playerId || body.userId);
         if (!result.ok) return res.status(400).json(result);
-        return res.json({ ok: true, id: result.match.id, match: dungeon.publicDungeon(result.match, body.playerId || body.userId) });
+        return res.json({
+            ok: true,
+            id: result.match.id,
+            match: dungeon.publicDungeon(result.match, body.playerId || body.userId)
+        });
     });
 
     app.get('/avatar', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'avatar.html')));
@@ -193,7 +231,11 @@ function startWeb(client) {
     });
 
     registerAvatarRoutes(app);
-    try { registerEditorRoutes(app); } catch (e) { console.warn('[web] editor routes:', e.message); }
+    try {
+        registerEditorRoutes(app);
+    } catch (e) {
+        console.warn('[web] editor routes:', e.message);
+    }
 
     app.post('/api/avatar/save', (req, res) => {
         try {
@@ -231,10 +273,9 @@ function startWeb(client) {
     const server = app.listen(port, host, () => {
         const publicBase =
             (process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL || '').replace(/\/$/, '') ||
-            ('http://' + host + ':' + port);
+            'http://' + host + ':' + port;
         console.log('🌐 Painel:  ' + publicBase + '/dashboard');
         console.log('🛠️  Editor:  ' + publicBase + '/editor.html');
-        console.log('   (também /editor)');
         if (REDIRECT) console.log('[web] OAuth redirect:', REDIRECT);
     });
     return server;
