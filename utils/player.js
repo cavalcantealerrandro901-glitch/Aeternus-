@@ -40,22 +40,32 @@ function has(userId) { const p = all()[userId]; return !!(p && p.name && p.class
 function get(userId) { return all()[userId] || null; }
 function getClass(classId) { return classesMod.getClass(classId); }
 
+function safeResolveClassId(classId) {
+    if (typeof classesMod.resolveClassId === 'function') {
+        return classesMod.resolveClassId(classId) || classId || 'guerreiro';
+    }
+    const id = String(classId || 'guerreiro').trim() || 'guerreiro';
+    return classesMod.getClass(id) ? id : 'guerreiro';
+}
+
 function maxManaFromLevel(level, classId) {
     const lv = Math.max(0, Number(level) || 0);
-    const resolved = classesMod.resolveClassId(classId);
+    const resolved = safeResolveClassId(classId);
     const mult = (resolved && classesMod.getClass(resolved)?.manaMult) || 1;
     return Math.floor((20 + lv * 4) * mult);
 }
 
-function create(userId, { name, classId, photoUrl }) {
-    const resolved = classesMod.resolveClassId(classId);
+function create(userId, { name, classId, photoUrl } = {}) {
+    const resolved = safeResolveClassId(classId || 'guerreiro');
     if (!classesMod.getClass(resolved)) throw new Error('Classe inválida');
     const data = all();
-    const claim = classesMod.canClaim(resolved, userId, data);
+    const claim = typeof classesMod.canClaim === 'function'
+        ? classesMod.canClaim(resolved, userId, data)
+        : { ok: true };
     if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
     const profile = {
         userId,
-        name: String(name).slice(0, 32),
+        name: String(name || 'Aventureiro').slice(0, 32),
         classId: resolved,
         photoUrl: photoUrl || null,
         inventory: [],
@@ -73,8 +83,10 @@ function update(userId, patch) {
     const data = all();
     if (!data[userId]) return null;
     if (patch && patch.classId != null) {
-        const resolved = classesMod.resolveClassId(patch.classId);
-        const claim = classesMod.canClaim(resolved, userId, data);
+        const resolved = safeResolveClassId(patch.classId);
+        const claim = typeof classesMod.canClaim === 'function'
+            ? classesMod.canClaim(resolved, userId, data)
+            : { ok: true };
         if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
         patch = { ...patch, classId: resolved };
     }
@@ -131,7 +143,7 @@ function itemCategory(item) {
 }
 
 function rollClassItem(classId) {
-    return itemsCatalog.rollDropItem?.(classesMod.resolveClassId(classId || 'guerreiro'));
+    return itemsCatalog.rollDropItem?.(safeResolveClassId(classId || 'guerreiro'));
 }
 
 function getInventory(userId, category) {
@@ -226,7 +238,6 @@ function useItem(userId, index1) {
     return { ok: false, error: 'Use o comando O.usar para consumíveis.' };
 }
 
-/** Bônus de equipamento — mesmas chaves de ATTR_KEYS do combate. */
 function getEquipmentBonuses(userId) {
     const eq = getEquipped(userId);
     const bonus = {
@@ -258,10 +269,12 @@ function count() { return Object.keys(all()).filter((id) => has(id)).length; }
 function changeClass(userId, classId) {
     const data = all();
     if (!data[userId]) return { ok: false, error: 'Sem perfil.' };
-    const resolved = classesMod.resolveClassId(classId);
+    const resolved = safeResolveClassId(classId);
     const cls = classesMod.getClass(resolved);
     if (!cls) return { ok: false, error: 'Classe inválida.' };
-    const claim = classesMod.canClaim(resolved, userId, data);
+    const claim = typeof classesMod.canClaim === 'function'
+        ? classesMod.canClaim(resolved, userId, data)
+        : { ok: true };
     if (!claim.ok) return { ok: false, error: claim.reason || 'Classe indisponível.' };
     data[userId].classId = resolved;
     save(data);
