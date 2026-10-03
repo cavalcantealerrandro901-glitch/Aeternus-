@@ -1,7 +1,5 @@
 const store = require('./store');
 
-/** @typedef {{ id: string, name: string, emoji?: string, type?: string, rarity?: string, rarityName?: string, exclusive?: boolean, maxHolders?: number, boundUserId?: string|null, desc?: string, uniqueAbilities?: string[], activeAbilities?: string[], uniquePassives?: string[], passives?: string[], powers?: string[], disadvantages?: string[], bonus?: object, manaMult?: number, color?: number, basicAttack?: object, classGear?: object|null }} ClassDef */
-
 const BASE_CLASSES = {
     guerreiro: {
         id: 'guerreiro',
@@ -104,7 +102,11 @@ const BASE_CLASSES = {
         manaMult: 1.2,
         color: 0xef4444,
         basicAttack: { id: 'golpe_bengala', name: 'Golpe de Bengala', emoji: '🪄', type: 'magic', power: 1.15, mana: 0 },
-        classGear: null
+        classGear: {
+            weapon: 'bengala_investigador',
+            armor: 'capa_detetive_arcano',
+            accessory: 'caderno_deducoes'
+        }
     },
     ceifador_negro: {
         id: 'ceifador_negro',
@@ -181,7 +183,11 @@ const BASE_CLASSES = {
         manaMult: 1.25,
         color: 0xfde68a,
         basicAttack: { id: 'lamina_veu', name: 'Lâmina do Véu', emoji: '⚔️', type: 'magic', power: 1.1, mana: 0 },
-        classGear: null
+        classGear: {
+            weapon: 'espada_do_ceu',
+            armor: 'armadura_do_veu',
+            accessory: 'colar_da_ressurreicao'
+        }
     }
 };
 
