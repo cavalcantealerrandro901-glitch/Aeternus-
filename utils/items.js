@@ -29,7 +29,6 @@ const ITEMS = {
         desc: 'Proteção leve.'
     },
 
-    // Arcanjo do Véu (exemplos legados)
     espada_do_ceu: {
         id: 'espada_do_ceu',
         name: 'Espada do Céu',
@@ -62,6 +61,40 @@ const ITEMS = {
         exclusive: true,
         effects: { vidaPerKillPct: 0.01, reviveOnce: true, reviveHpPct: 0.1 },
         desc: '+1% vida máx. por oponente derrotado. Ressuscita 1× com 10% do HP máximo.'
+    },
+
+    foice_grande: {
+        id: 'foice_grande',
+        name: 'Foice Grande',
+        emoji: '🪓',
+        category: 'arma',
+        rarity: 'mitica',
+        classId: 'ceifador_negro',
+        exclusive: true,
+        effects: { forca: 900, agilidade: 650, dano: 850 },
+        desc: 'Arma de classe do Ceifador Negro.'
+    },
+    manto_negro_armadura: {
+        id: 'manto_negro_armadura',
+        name: 'Manto Negro',
+        emoji: '🧥',
+        category: 'armadura',
+        rarity: 'lendaria',
+        classId: 'ceifador_negro',
+        exclusive: true,
+        effects: { defesa: 800, agilidade: 500, vida: 750 },
+        desc: 'Armadura de classe do Ceifador Negro.'
+    },
+    dado_da_morte: {
+        id: 'dado_da_morte',
+        name: 'Dado da Morte',
+        emoji: '🎲',
+        category: 'acessorio',
+        rarity: 'mitica',
+        classId: 'ceifador_negro',
+        exclusive: true,
+        effects: { sorte: 700, forca: 600, critico: 550 },
+        desc: 'Acessório de classe do Ceifador Negro.'
     },
 
     cetro_da_genese: {
