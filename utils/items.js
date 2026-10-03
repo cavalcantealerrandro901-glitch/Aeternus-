@@ -37,8 +37,8 @@ const ITEMS = {
         rarity: 'lendario',
         classId: 'arcanjo_do_veu',
         exclusive: true,
-        effects: { forca: 6, inteligencia: 4 },
-        desc: 'Lâmina de luz e aço.'
+        effects: { forca: 850, inteligencia: 800, dano: 900 },
+        desc: 'Arma de classe do Arcanjo do Véu.'
     },
     armadura_do_veu: {
         id: 'armadura_do_veu',
@@ -48,8 +48,8 @@ const ITEMS = {
         rarity: 'lendario',
         classId: 'arcanjo_do_veu',
         exclusive: true,
-        effects: { defesa: 5, vida: 4, resistencia: 4, damageReduction: 0.3 },
-        desc: '30% redução de dano. Defesa + Vida + Resistência.'
+        effects: { defesa: 900, vida: 850, resistencia: 800, damageReduction: 0.3 },
+        desc: 'Armadura de classe do Arcanjo. 30% redução de dano.'
     },
     colar_da_ressurreicao: {
         id: 'colar_da_ressurreicao',
@@ -59,8 +59,42 @@ const ITEMS = {
         rarity: 'lendario',
         classId: 'arcanjo_do_veu',
         exclusive: true,
-        effects: { vidaPerKillPct: 0.01, reviveOnce: true, reviveHpPct: 0.1 },
-        desc: '+1% vida máx. por oponente derrotado. Ressuscita 1× com 10% do HP máximo.'
+        effects: { vidaPerKillPct: 0.01, reviveOnce: true, reviveHpPct: 0.1, vida: 600, sorte: 500 },
+        desc: 'Acessório de classe do Arcanjo. +1% vida máx. por kill; ressuscita 1× com 10% HP.'
+    },
+
+    bengala_investigador: {
+        id: 'bengala_investigador',
+        name: 'Bengala do Investigador',
+        emoji: '🦯',
+        category: 'arma',
+        rarity: 'mitica',
+        classId: 'l_detetive_arcano',
+        exclusive: true,
+        effects: { inteligencia: 950, agilidade: 700, forca: 500, dano: 800 },
+        desc: 'Arma de classe de L — O Detetive Arcano.'
+    },
+    capa_detetive_arcano: {
+        id: 'capa_detetive_arcano',
+        name: 'Capa do Detetive Arcano',
+        emoji: '🧥',
+        category: 'armadura',
+        rarity: 'lendaria',
+        classId: 'l_detetive_arcano',
+        exclusive: true,
+        effects: { defesa: 750, inteligencia: 650, sorte: 550, vida: 600 },
+        desc: 'Armadura de classe de L — O Detetive Arcano.'
+    },
+    caderno_deducoes: {
+        id: 'caderno_deducoes',
+        name: 'Caderno de Deduções',
+        emoji: '📓',
+        category: 'acessorio',
+        rarity: 'mitica',
+        classId: 'l_detetive_arcano',
+        exclusive: true,
+        effects: { inteligencia: 1000, sorte: 700, precisao: 800 },
+        desc: 'Acessório de classe de L — O Detetive Arcano.'
     },
 
     foice_grande: {
@@ -106,7 +140,7 @@ const ITEMS = {
         classId: 'deus_criador',
         exclusive: true,
         effects: { inteligencia: 1000, forca: 850, dano: 950, precisao: 700 },
-        desc: 'Arma de classe do Deus Criador. Poder primordial canalizado.'
+        desc: 'Arma de classe do Deus Criador.'
     },
     manto_cosmico: {
         id: 'manto_cosmico',
@@ -117,7 +151,7 @@ const ITEMS = {
         classId: 'deus_criador',
         exclusive: true,
         effects: { defesa: 900, vida: 850, resistencia: 750, agilidade: 600 },
-        desc: 'Armadura de classe. Tecido de estrelas e vazio.'
+        desc: 'Armadura de classe do Deus Criador.'
     },
     orbe_do_arquiteto: {
         id: 'orbe_do_arquiteto',
@@ -128,7 +162,7 @@ const ITEMS = {
         classId: 'deus_criador',
         exclusive: true,
         effects: { inteligencia: 950, sorte: 800, manaBonus: 0.2, precisao: 700 },
-        desc: 'Acessório de classe. Orbe que ecoa a vontade do criador.'
+        desc: 'Acessório de classe do Deus Criador.'
     },
 
     livro_forca: { id: 'livro_forca', name: 'Livro de Força', emoji: '📕', category: 'consumivel', rarity: 'raro', effects: {}, bookAttr: 'forca', consumable: true },
