@@ -6,7 +6,10 @@ const RARITY = {
     lendario: { name: 'Lendário', color: 0xf59e0b },
     lendaria: { name: 'Lendária', color: 0xf59e0b },
     mitica: { name: 'Mítica', color: 0xef4444 },
-    mitico: { name: 'Mítico', color: 0xef4444 }
+    mitico: { name: 'Mítico', color: 0xef4444 },
+    cosmico: { name: 'Cósmico', color: 0x06b6d4 },
+    cosmica: { name: 'Cósmica', color: 0x06b6d4 },
+    unica: { name: 'Única', color: 0xf43f5e }
 };
 
 const ITEMS = {
