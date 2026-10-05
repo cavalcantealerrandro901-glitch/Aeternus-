@@ -7,6 +7,7 @@ const player = require('../utils/player');
 const xp = require('../utils/xp');
 const { registerAvatarRoutes } = require('../utils/avatarApi');
 const { registerEditorRoutes } = require('./editorRoutes');
+const { setupAuth, requireGuildManager } = require('./auth');
 
 function startWeb(client) {
     const app = express();
@@ -46,55 +47,9 @@ function startWeb(client) {
             ? process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '') + '/auth/discord/callback'
             : null);
 
-    app.get('/login', (req, res) => {
-        if (!CLIENT_ID || !REDIRECT) return res.status(500).send('OAuth não configurado');
-        const url =
-            'https://discord.com/api/oauth2/authorize?client_id=' +
-            CLIENT_ID +
-            '&redirect_uri=' +
-            encodeURIComponent(REDIRECT) +
-            '&response_type=code&scope=identify%20guilds';
-        res.redirect(url);
-    });
+    setupAuth(app, client);
 
-    app.get('/auth/discord/callback', async (req, res) => {
-        try {
-            const code = req.query.code;
-            if (!code) return res.redirect('/dashboard');
-            const body = new URLSearchParams({
-                client_id: CLIENT_ID,
-                client_secret: CLIENT_SECRET,
-                grant_type: 'authorization_code',
-                code: String(code),
-                redirect_uri: REDIRECT
-            });
-            const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body
-            });
-            const token = await tokenRes.json();
-            if (!token.access_token) return res.redirect('/dashboard');
-            res.cookie('discord_token', token.access_token, {
-                httpOnly: true,
-                maxAge: 7 * 24 * 3600 * 1000
-            });
-            res.redirect('/dashboard');
-        } catch (e) {
-            res.redirect('/dashboard');
-        }
-    });
-
-    app.get('/logout', (req, res) => {
-        res.clearCookie('discord_token');
-        res.redirect('/dashboard');
-    });
-
-    app.get('/api/me', (req, res) => {
-        res.json({ ok: true, bot: client?.user?.tag || null });
-    });
-
-    app.get('/api/guild/:id', (req, res) => {
+    app.get('/api/guild/:id', requireGuildManager, (req, res) => {
         const g = client.guilds.cache.get(req.params.id);
         if (!g) return res.status(404).json({ error: 'guild' });
         res.json({
@@ -105,13 +60,13 @@ function startWeb(client) {
         });
     });
 
-    app.post('/api/guild/:id/prefix', (req, res) => {
+    app.post('/api/guild/:id/prefix', requireGuildManager, (req, res) => {
         const prefix = String(req.body?.prefix || 'O.').slice(0, 8);
         setSettings(req.params.id, { prefix });
         res.json({ ok: true, prefix });
     });
 
-    app.post('/api/guild/:id/settings', (req, res) => {
+    app.post('/api/guild/:id/settings', requireGuildManager, (req, res) => {
         setSettings(req.params.id, req.body || {});
         res.json({ ok: true });
     });
