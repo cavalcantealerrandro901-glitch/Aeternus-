@@ -51,6 +51,47 @@
             </div>
         </section>
 
+        <section id="selected-server" class="hidden">
+            <div class="section-heading">
+                <div>
+                    <span class="admin-badge">SERVIDOR SELECIONADO</span>
+                    <h2 id="selected-server-name">Servidor</h2>
+                    <p id="selected-server-id"></p>
+                </div>
+                <a id="open-server-panel" class="btn btn-primary" href="#">🔗 Abrir painel</a>
+            </div>
+
+            <div class="admin-settings-grid">
+                <article class="admin-card admin-setting-card">
+                    <div class="admin-icon">🎁</div>
+                    <h2>Daily</h2>
+                    <p>Defina a faixa de éter usada pelo comando diário deste servidor.</p>
+                    <div class="setting-row">
+                        <label>Mínimo</label>
+                        <input id="daily-min" type="number" min="0" step="1">
+                    </div>
+                    <div class="setting-row">
+                        <label>Máximo</label>
+                        <input id="daily-max" type="number" min="0" step="1">
+                    </div>
+                    <button id="save-daily" class="btn btn-primary">Salvar Daily</button>
+                    <span id="daily-status" class="setting-status"></span>
+                </article>
+
+                <article class="admin-card admin-setting-card">
+                    <div class="admin-icon">🛒</div>
+                    <h2>Loja</h2>
+                    <p>Controle a loja deste servidor e veja quantos VIPs estão cadastrados.</p>
+                    <div class="shop-summary">
+                        <strong id="shop-status">Carregando...</strong>
+                        <span id="shop-vips">0 VIPs</span>
+                    </div>
+                    <button id="toggle-shop" class="btn btn-secondary">Alterar loja</button>
+                    <span id="shop-feedback" class="setting-status"></span>
+                </article>
+            </div>
+        </section>
+
         <section id="error-state" class="admin-card hidden">
             <div class="admin-icon">⚠️</div>
             <h2>Não foi possível carregar</h2>
