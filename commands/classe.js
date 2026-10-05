@@ -4,7 +4,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    StringSelectMenuBuilder
+    StringSelectMenuBuilder,
+    SlashCommandBuilder
 } = require('discord.js');
 const classes = require('../utils/classes');
 const player = require('../utils/player');
@@ -149,8 +150,13 @@ async function dmAllPlayers(client, cls) {
 module.exports = {
     name: 'classe',
     aliases: ['classes'],
-    description: 'Classes: criar, listar e escolher por prefixo',
-    slash: false,
+    description: 'Consultar e escolher classes',
+    data: new SlashCommandBuilder()
+        .setName('classe')
+        .setDescription('Consultar e escolher classes')
+        .addSubcommand((s) => s.setName('listar').setDescription('Listar as classes disponíveis'))
+        .addSubcommand((s) => s.setName('escolher').setDescription('Escolher sua classe')),
+
 
     async execute(message, args) {
         const sub = String(args[0] || 'listar').toLowerCase();
@@ -254,6 +260,27 @@ module.exports = {
             'O.classe listar — listar as classes',
             'O.classe criar ... — criar uma classe (administrador)'
         ].join('\n'));
+    },
+
+    async executeSlash(interaction) {
+        const sub = interaction.options.getSubcommand();
+        if (sub === 'listar') {
+            const list = classes.listSelectableClasses();
+            const lines = list
+                .map((c) => String(c.emoji || '✨') + ' **' + c.name + '** · ' + (c.rarityName || c.rarity || 'Comum') + ' · ' + c.id)
+                .join('\\n')
+                .slice(0, 3900);
+            return interaction.reply({
+                embeds: [
+                    new EmbedBuilder()
+                        .setColor(0xc9a227)
+                        .setTitle('📜 Classes Aeternus')
+                        .setDescription(lines || '_Nenhuma classe disponível._')
+                        .setFooter({ text: 'Use /classe escolher para fazer sua escolha' })
+                ]
+            });
+        }
+        if (sub === 'escolher') return interaction.reply(chooseStartPayload());
     },
 
     async handleComponent(interaction) {
