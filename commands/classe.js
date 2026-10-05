@@ -119,7 +119,7 @@ async function dmAllPlayers(client, cls) {
                     `📜 **Nova classe criada:** ${cls.emoji} **${cls.name}** (${cls.rarityName || cls.rarity})`,
                     '',
                     'Clique em **Escolher esta classe** para equipá-la agora.',
-                    'Se você ainda usa uma **classe antiga**, pode trocar sem perder o perfil.',
+                    'Sua classe é permanente depois de escolhida.',
                     'Também pode ver todas com `/classe escolher` ou o botão **Ver todas**.'
                 ].join('\n'),
                 embeds: [emb],
@@ -207,7 +207,7 @@ const data = new SlashCommandBuilder()
     .addSubcommand((s) =>
         s
             .setName('escolher')
-            .setDescription('Escolher ou trocar sua classe (também para classes antigas)')
+            .setDescription('Escolher sua classe (a escolha é permanente)')
     )
     .addSubcommand((s) =>
         s
@@ -280,7 +280,7 @@ module.exports = {
                         .setColor(0xc9a227)
                         .setTitle('📜 Classes Aeternus')
                         .setDescription(lines || '_Nenhuma_')
-                        .setFooter({ text: 'Use /classe escolher para trocar' })
+                        .setFooter({ text: 'Use /classe escolher para fazer sua escolha permanente' })
                 ],
                 ephemeral: true
             });
@@ -322,7 +322,7 @@ module.exports = {
                 .slice(0, 1900);
             return message.reply({ embeds: [new EmbedBuilder().setColor(0xc9a227).setTitle('📜 Classes').setDescription(lines)] });
         }
-        return message.reply('Use o slash **`/classe criar`** (admin) ou **`/classe escolher`**.');
+        return message.reply('Use o slash **`/classe criar`** (admin) ou **`/classe escolher`** para fazer sua escolha permanente.');
     },
 
     async handleComponent(interaction) {
@@ -342,6 +342,10 @@ module.exports = {
                 });
             }
             const resolved = classes.resolveClassId(classId);
+            const current = player.get(interaction.user.id);
+            if (current?.classId) {
+                return interaction.reply({ content: `🔒 Sua classe já foi escolhida: **${player.getClass(current.classId)?.name || current.classId}**. Ela é permanente e não pode ser trocada.`, ephemeral: true });
+            }
             const claim = classes.canClaim(resolved, interaction.user.id, player.all());
             if (!claim.ok) {
                 return interaction.reply({ content: '🔒 ' + claim.reason, ephemeral: true });
@@ -362,6 +366,10 @@ module.exports = {
                 return interaction.reply({ content: 'Crie o perfil com `O.j criar`.', ephemeral: true });
             }
             const resolved = classes.resolveClassId(classId);
+            const current = player.get(interaction.user.id);
+            if (current?.classId) {
+                return interaction.reply({ content: `🔒 Sua classe já foi escolhida: **${player.getClass(current.classId)?.name || current.classId}**. Ela é permanente e não pode ser trocada.`, ephemeral: true });
+            }
             const claim = classes.canClaim(resolved, interaction.user.id, player.all());
             if (!claim.ok) {
                 return interaction.reply({ content: '🔒 ' + claim.reason, ephemeral: true });
