@@ -6,14 +6,13 @@ const {
     SlashCommandBuilder
 } = require('discord.js');
 const shop = require('../utils/shop');
-const flocos = require('../utils/flocos');
-const cristais = require('../utils/cristais');
+const { getSettings } = require('../utils/settings');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
 }
-function coin(c) {
-    return c === 'flocos' ? '❄️' : '💠';
+function coin() {
+    return '✨';
 }
 
 function parseCat(raw) {
@@ -34,7 +33,7 @@ function parseCat(raw) {
 }
 
 function balLine(user) {
-    return `❄️ **${fmt(flocos.get(user.id))}** · 💠 **${fmt(cristais.get(user.id))}**`;
+    return `✨ **${fmt(eter.get(user.id))} ÉTER**`;
 }
 
 function menuEmbed(user) {
@@ -58,7 +57,7 @@ function menuEmbed(user) {
             ].join('\n')
         )
         .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'O.loja vip · decoração · itens · efeitos' })
+        .setFooter({ text: 'O.loja · catálogo Aeternus' })
         .setTimestamp();
 }
 
@@ -90,11 +89,13 @@ function menuRows(guildId) {
 }
 
 function vipEmbed(user, guild) {
+    const settings = getSettings(guild?.id);
+    if (settings.shop?.enabled === false) return null;
     const list = shop.guildVips(guild?.id);
     const lines = list.length
         ? list.map(
               (v, i) =>
-                  `**${i + 1}. ${v.name}**\n└ ${coin(v.currency)} **${fmt(v.price)}** · ${v.desc}${v.durationDays ? ` · ${v.durationDays}d` : ''}`
+                  `**${i + 1}. ${v.name}**\n└ ${coin()} **${fmt(v.price)}** · ${v.desc}${v.durationDays ? ` · ${v.durationDays}d` : ''}`
           )
         : [
               '_Nenhum VIP à venda neste servidor._',
@@ -248,10 +249,11 @@ function efeitosRows(guildId) {
 
 function build(cat, user, guild) {
     const gid = guild?.id;
-    if (cat === 'vip') return { embeds: [vipEmbed(user, guild)], components: vipRows(gid) };
+    if (cat === 'vip') { const e = vipEmbed(user, guild); return e ? { embeds: [e], components: vipRows(gid) } : { embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('Loja desativada').setDescription('A loja deste servidor está desativada no painel.')] };
     if (cat === 'decoracao') return { embeds: [decorEmbed(user)], components: decorRows(gid) };
     if (cat === 'itens') return { embeds: [itensEmbed(user)], components: itensRows(gid) };
     if (cat === 'efeitos') return { embeds: [efeitosEmbed(user)], components: efeitosRows(gid) };
+    if (getSettings(gid).shop?.enabled === false) return { embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('Loja desativada').setDescription('A loja deste servidor está desativada no painel.')] };
     return { embeds: [menuEmbed(user)], components: menuRows(gid) };
 }
 
