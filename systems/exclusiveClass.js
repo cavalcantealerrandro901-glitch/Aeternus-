@@ -43,16 +43,36 @@ const EXCLUSIVES = [
         owner: '1460227733023096875',
         gear: [
             {
-                id: 'bengala_investigador',
-                name: 'Bengala do Investigador',
-                emoji: '🦯',
+                id: 'olho_infinito_absoluto',
+                name: 'Olho do Infinito Absoluto',
+                emoji: '👁️',
                 category: 'arma',
                 rarity: 'cosmica',
                 classId: 'l_detetive_arcano',
-                effects: { dano: 950, velocidade: 950, alcance: 950 }
+                effects: { percepcao: 900, precisao: 800, deteccao: 700 }
             },
             {
-                id: 'capa_detetive_arcano',
+                id: 'escudo_deducao_cosmica_suprema',
+                name: 'Escudo da Dedução Cósmica Suprema',
+                emoji: '🛡️',
+                category: 'armadura',
+                rarity: 'cosmica',
+                classId: 'l_detetive_arcano',
+                effects: { defesa: 1200, resistencia: 1000, reflexo: 900, danoRetorno: 950 }
+            },
+            {
+                id: 'reliquia_verdade_absoluta',
+                name: 'Relíquia da Verdade Absoluta',
+                emoji: '🕯️',
+                category: 'acessorio',
+                rarity: 'cosmica',
+                classId: 'l_detetive_arcano',
+                effects: { investigacao: 1100, inteligencia: 950, penetracao: 900 }
+            }
+        ]
+    },
+    {
+        classId: 'arcanjo_do_veu',
                 name: 'Escudo da Dedução Cósmica Suprema',
                 emoji: '🛡️',
                 category: 'armadura',
