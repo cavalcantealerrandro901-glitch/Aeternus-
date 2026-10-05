@@ -241,9 +241,26 @@ function spendAttrPoints(userId, key, amount) {
         };
     }
     cur.attrPoints -= n;
-    cur.attrs[k] = Math.max(0, Math.floor(Number(cur.attrs[k] || 0)) + n);
+
+    // Cada ponto investido gera entre +3 e +5 no atributo escolhido.
+    // Assim, 1 ponto = +3 a +5; quantidades maiores acumulam o mesmo ganho por ponto.
+    let gained = 0;
+    for (let i = 0; i < n; i++) {
+        gained += 3 + Math.floor(Math.random() * 3);
+    }
+
+    cur.attrs[k] = Math.max(0, Math.floor(Number(cur.attrs[k] || 0)) + gained);
     saveCur(data, userId, cur);
-    return { ok: true, spent: n, key: k, attrs: { ...cur.attrs }, attrPoints: cur.attrPoints };
+    return {
+        ok: true,
+        spent: n,
+        gained,
+        minGained: n * 3,
+        maxGained: n * 5,
+        key: k,
+        attrs: { ...cur.attrs },
+        attrPoints: cur.attrPoints
+    };
 }
 
 function redistribuirAttrs(userId) {
