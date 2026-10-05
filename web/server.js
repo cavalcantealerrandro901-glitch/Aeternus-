@@ -49,7 +49,7 @@ function startWeb(client) {
 
     setupAuth(app, client);
 
-    app.get('/api/dashboard/guilds', requireAuth, async (req, res) => { try { const guilds = req.auth.session.guilds || await fetchGuildsForSession(req.auth.session); const list = guilds.filter(g => client.guilds.cache.has(g.id)).map(g => ({ id: g.id, name: g.name, icon: g.icon || null })); return res.json({ ok: true, guilds: list }); } catch (_) { return res.status(500).json({ ok: false, error: 'guilds_failed' }); } });
+    app.get('/api/dashboard/guilds', requireAuth, async (req, res) => { try { const guilds = req.auth.session.guilds || await fetchGuildsForSession(req.auth.session); const list = guilds.filter(g => { const p = BigInt(String(g.permissions || '0')); const ADMINISTRATOR = 1n << 3n; const MANAGE_GUILD = 1n << 5n; return client.guilds.cache.has(g.id) && (((p & ADMINISTRATOR) !== 0n) || ((p & MANAGE_GUILD) !== 0n)); }).map(g => ({ id: g.id, name: g.name, icon: g.icon || null })); return res.json({ ok: true, guilds: list }); } catch (_) { return res.status(500).json({ ok: false, error: 'guilds_failed' }); } });
 
     app.get('/api/dashboard/guild/:id/daily', requireGuildManager, (req, res) => {
         const settings = getSettings(req.params.id);
