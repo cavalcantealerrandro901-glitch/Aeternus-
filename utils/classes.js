@@ -40,14 +40,37 @@ const BASE_CLASSES = {
     l_detetive_arcano: {
         id: 'l_detetive_arcano', name: 'L — O Detetive Arcano', emoji: '🕵️', type: 'magic', rarity: 'unica', rarityName: 'Única',
         maxHolders: 1, exclusive: true, boundUserId: '1460227733023096875',
-        desc: 'Mente analítica. Classe Única (1 titular).',
+        desc: 'Classe Única do Detetive Arcano.',
         uniqueAbilities: ['Xeque-Mate', 'Dedução Impossível'],
-        activeAbilities: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador'],
-        uniquePassives: ['Um Passo à Frente', 'Gênio da Dedução', 'A Verdade Sempre Aparece'],
-        passives: ['Mente Analítica', 'Memória Fotográfica', 'Suspeita Constante', 'Raciocínio Reverso', 'Instinto Investigativo'],
-        powers: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador'],
+        activeAbilities: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador', 'Xeque-Mate', 'Dedução Impossível'],
+        uniquePassives: [],
+        passives: ['Mente Analítica Absoluta', 'Memória Fotográfica Infinita', 'Suspeita Onisciente', 'Raciocínio Reverso Absoluto', 'Um Passo à Frente', 'A Verdade Sempre Aparece'],
+        powers: ['Cartas da Dedução', 'Correntes da Suspeita', 'Olho Analítico', 'Bengala do Investigador', 'Xeque-Mate', 'Dedução Impossível'],
         disadvantages: ['Classe exclusiva (1 titular)'],
         bonus: { forca: 2, defesa: 2, agilidade: 3, vida: 2 }, manaMult: 1.2, color: 0xef4444,
+        classBonuses: {
+            abilities: {
+                'Cartas da Dedução': { dano: 950, precisao: 950, penetracao: 950 },
+                'Correntes da Suspeita': { dano: 950, controle: 950, velocidade: 950, forca: 950 },
+                'Olho Analítico': { dano: 950, percepcao: 950, analise: 950, deteccao: 950 },
+                'Bengala do Investigador': { dano: 950, velocidade: 950, alcance: 950 },
+                'Xeque-Mate': { dano: 1200, precisao: 950, penetracao: 950, previsao: 950 },
+                'Dedução Impossível': { dano: 1200, investigacao: 950, percepcao: 950, revelacao: 950 }
+            },
+            passives: {
+                'Mente Analítica Absoluta': { adaptacao: 950, resistencia: 950, analise: 950 },
+                'Memória Fotográfica Infinita': { memoria: 950, reconhecimento: 950, precisao: 950 },
+                'Suspeita Onisciente': { percepcao: 950, deteccao: 950, reacao: 950 },
+                'Raciocínio Reverso Absoluto': { resistencia: 950, adaptacao: 950, defesa: 950 },
+                'Um Passo à Frente': { previsao: 950, reacao: 950, evasao: 950 },
+                'A Verdade Sempre Aparece': { deteccao: 950, resistenciaMental: 950, revelacao: 950 }
+            }
+        },
+        cosmicItems: {
+            'Olho do Infinito Absoluto': { percepcao: 900, precisao: 800, deteccao: 700 },
+            'Escudo da Dedução Cósmica Suprema': { defesa: 1200, resistencia: 1000, reflexo: 900, danoRetorno: 950 },
+            'Relíquia da Verdade Absoluta': { investigacao: 1100, inteligencia: 950, penetracao: 900 }
+        },
         basicAttack: { id: 'golpe_bengala', name: 'Golpe de Bengala', emoji: '🪄', type: 'magic', power: 1.15, mana: 0 },
         classGear: { weapon: 'bengala_investigador', armor: 'capa_detetive_arcano', accessory: 'caderno_deducoes' }
     },
