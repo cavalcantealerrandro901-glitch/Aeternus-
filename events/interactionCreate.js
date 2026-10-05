@@ -1,3 +1,4 @@
+const classAdvancement = require('../utils/classAdvancement');
 const autoRepair = require('../utils/autoRepair');
 const { Collection } = require('discord.js');
 
@@ -80,6 +81,7 @@ module.exports = {
                 if (typeof cmd.executeSlash === 'function') {
                     try {
                         await cmd.executeSlash(interaction, client);
+                        try { const notice = classAdvancement.notifyCommand(interaction.user.id); if (notice && interaction.channel) await interaction.channel.send(notice); } catch (_) {}
                     } catch (err) {
                         if (err && (err.code === 10062 || err.code === 40060)) return;
                         await autoRepair.handleCommandError({
@@ -99,6 +101,7 @@ module.exports = {
                 if (typeof cmd.execute === 'function') {
                     try {
                         await bridgeSlashToPrefix(interaction, cmd, client);
+                        try { const notice = classAdvancement.notifyCommand(interaction.user.id); if (notice && interaction.channel) await interaction.channel.send(notice); } catch (_) {}
                     } catch (err) {
                         if (err && (err.code === 10062 || err.code === 40060)) return;
                         await autoRepair.handleCommandError({
