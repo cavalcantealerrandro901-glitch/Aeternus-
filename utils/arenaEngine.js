@@ -196,6 +196,11 @@ function checkEnd(match) {
     if (!aAlive.length || !bAlive.length) {
         match.status = 'finished';
         match.winnerTeam = aAlive.length ? 'A' : 'B';
+        try {
+            const winners = match.winnerTeam === 'A' ? match.teamA : match.teamB;
+            const adv = require('./classAdvancement');
+            for (const uid of winners) adv.recordEvent(uid, { type: 'pvp_win', amount: 1 });
+        } catch (_) {}
         match.log.push({ t: Date.now(), text: `🏆 Time ${match.winnerTeam} venceu!` });
         return true;
     }
