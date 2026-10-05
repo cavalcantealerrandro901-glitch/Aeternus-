@@ -15,7 +15,8 @@ const TOTAL = COLS * ROWS;
 const MAX_BOMBS = 11;
 const MIN_BET = 100;
 const MAX_BET = 10_000_000;
-const HOUSE = 0.95;
+const HOUSE = 0.96;
+const MAX_MULT = 25000;
 const IDLE_MS = 7 * 60 * 1000;
 const BOMB_CHANCE = 0.26;
 
@@ -24,31 +25,31 @@ const processing = new Set();
 
 let matchCounter = 0;
 
-function opensBeforeMult(bombs) {
-    const b = Math.max(1, Math.min(Number(bombs) || 1, MAX_BOMBS));
-    return Math.max(1, 8 - b);
-}
-
+// Multiplicador clássico de Mines: risco justo × house edge
 function multAt(opened, bombs) {
     const o = Math.max(0, Math.floor(Number(opened) || 0));
     if (o <= 0) return 1;
-    const b = Math.max(1, Math.min(Number(bombs) || 1, TOTAL - 1));
-    const threshold = opensBeforeMult(b);
+
+    const b = Math.max(
+        1,
+        Math.min(Number(bombs) || 1, TOTAL - 1)
+    );
+
     let m = 1;
+
     for (let i = 0; i < o; i++) {
         const tilesLeft = TOTAL - i;
         const safeLeft = TOTAL - b - i;
+
         if (safeLeft <= 0 || tilesLeft <= 0) break;
-        const riskBoost = 1 + (b - 1) * 0.08;
-        m *= (tilesLeft / safeLeft) * riskBoost;
+
+        m *= tilesLeft / safeLeft;
     }
+
     m *= HOUSE;
-    if (o < threshold) {
-        const t = o / threshold;
-        m = 1 + (Math.max(m, 1) - 1) * t * 0.15;
-        return Number(Math.max(1, m).toFixed(2));
-    }
-    return Number(Math.max(1.05, m).toFixed(2));
+    m = Math.min(m, MAX_MULT);
+
+    return Number(Math.max(1, m).toFixed(2));
 }
 
 function potentialAt(amount, opened, bombs) {
