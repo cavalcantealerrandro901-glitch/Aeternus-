@@ -68,11 +68,14 @@ function maxManaFromLevel(level, classId) {
 }
 
 function create(userId, { name, classId, photoUrl } = {}) {
-    const resolved = safeResolveClassId(classId || 'guerreiro');
-    if (!classesMod.getClass(resolved)) throw new Error('Classe inválida');
+    const explicitClass = classId != null && String(classId).trim() !== '';
+    const resolved = explicitClass ? safeResolveClassId(classId) : null;
+    if (explicitClass && !classesMod.getClass(resolved)) throw new Error('Classe inválida');
     const data = all();
-    const claim = typeof classesMod.canClaim === 'function' ? classesMod.canClaim(resolved, userId, data) : { ok: true };
-    if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
+    if (explicitClass) {
+        const claim = typeof classesMod.canClaim === 'function' ? classesMod.canClaim(resolved, userId, data) : { ok: true };
+        if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
+    }
     const profile = { userId, name: String(name || 'Aventureiro').slice(0, 32), classId: resolved, photoUrl: photoUrl || null, inventory: [], equipped: { arma: null, armadura: null, acessorio: null }, materials: {}, createdAt: Date.now(), updatedAt: Date.now() };
     data[userId] = profile; save(data); return profile;
 }
@@ -81,6 +84,9 @@ function update(userId, patch) {
     const data = all();
     if (!data[userId]) return null;
     if (patch && patch.classId != null) {
+        if (data[userId].classId) {
+            return null;
+        }
         const resolved = safeResolveClassId(patch.classId);
         const claim = typeof classesMod.canClaim === 'function' ? classesMod.canClaim(resolved, userId, data) : { ok: true };
         if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
@@ -288,6 +294,7 @@ function listMissing(userIds) { return userIds.filter((id) => !has(id)); }
 function count() { return Object.keys(all()).filter((id) => has(id)).length; }
 function changeClass(userId, classId) {
     const data = all(); if (!data[userId]) return { ok: false, error: 'Sem perfil.' };
+    if (data[userId].classId) return { ok: false, error: 'Sua classe já foi escolhida e é permanente.' };
     const resolved = safeResolveClassId(classId); const cls = classesMod.getClass(resolved); if (!cls) return { ok: false, error: 'Classe inválida.' };
     const claim = typeof classesMod.canClaim === 'function' ? classesMod.canClaim(resolved, userId, data) : { ok: true };
     if (!claim.ok) return { ok: false, error: claim.reason || 'Classe indisponível.' };
