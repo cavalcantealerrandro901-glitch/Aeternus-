@@ -269,7 +269,7 @@ module.exports = {
             const list = classes.listSelectableClasses();
             const lines = list
                 .map((c) => String(c.emoji || '✨') + ' **' + c.name + '** · ' + (c.rarityName || c.rarity || 'Comum') + ' · ' + c.id)
-                .join('\\n')
+                .join('\n')
                 .slice(0, 3900);
             return interaction.reply({
                 embeds: [
