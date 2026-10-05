@@ -33,10 +33,10 @@ function build(user, member, guild) {
 
 module.exports = {
     name: 'userinfo',
-    aliases: ['whois', 'ui', 'user'],
+    aliases: ['whois', 'ui', 'user', 'usuario', 'usuário'],
     description: 'Info do usuário',
     data: new SlashCommandBuilder()
-        .setName('userinfo')
+        .setName('usuario')
         .setDescription('Informações de um usuário')
         .addUserOption((o) => o.setName('usuario').setDescription('Usuário').setRequired(false)),
 
