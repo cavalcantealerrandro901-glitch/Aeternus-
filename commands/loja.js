@@ -6,6 +6,7 @@ const {
     SlashCommandBuilder
 } = require('discord.js');
 const shop = require('../utils/shop');
+const eter = require('../utils/eter');
 const { getSettings } = require('../utils/settings');
 
 function fmt(n) {
