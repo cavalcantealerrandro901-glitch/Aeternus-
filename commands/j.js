@@ -318,7 +318,7 @@ module.exports = {
             const spent = xp.spendAttrPoints(ownerId, attrKey, amount);
             if (!spent?.ok) return safeReply(interaction, { content: String(spent?.error || 'Falha.'), flags: MessageFlags.Ephemeral });
             const payload = atributosPayload(interaction.user);
-            payload.content = '✅ +' + spent.spent + ' em ' + meta.emoji + ' ' + meta.label;
+            payload.content = '✅ **1 ponto** investido em ' + meta.emoji + ' **' + meta.label + '** → **+' + spent.gained + '** atributo(s).';
             return safeUpdate(interaction, payload);
         }
         if (id.startsWith('j:attrcancel:') || id.startsWith('j:attrrefresh:')) {
@@ -372,7 +372,7 @@ module.exports = {
             }
 
             const payload = atributosPayload(interaction.user);
-            payload.content = '✅ **' + spent.spent + '** ponto(s) distribuído(s) em ' + meta.emoji + ' **' + meta.label + '**.';
+            payload.content = '✅ **' + spent.spent + '** ponto(s) investido(s) em ' + meta.emoji + ' **' + meta.label + '** → **+' + spent.gained + '** atributo(s).';
             return interaction.reply(payload);
         }
 
