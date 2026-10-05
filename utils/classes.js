@@ -248,7 +248,7 @@ const COMMON_CLASSES = {
         basicAttack: { id: 'cacador_ataque_basico', name: 'Ataque Básico', emoji: '🐺', type: 'ranged', power: 1, mana: 0 }, classGear: { weapon: 'arco_da_cacada', armor: 'armadura_do_rastreador', accessory: 'presa_do_rastreador' }
     },
     espadachim_sombrio_sangue: {
-        id: 'espadachim_sombrio', name: 'Espadachim Sombrio', emoji: '🩸', type: 'melee', rarity: 'comum', rarityName: 'Comum',
+        id: 'espadachim_sombrio_sangue', name: 'Espadachim Sombrio', emoji: '🩸', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim que utiliza energia sombria.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
