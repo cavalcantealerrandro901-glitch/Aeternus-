@@ -333,6 +333,34 @@ const COMMON_CLASSES = {
     }
 };
 
+const COMMON_CLASS_ABILITIES = require('./commonClassAbilities');
+
+for (const [classId, data] of Object.entries(COMMON_CLASS_ABILITIES)) {
+    const cls = COMMON_CLASSES[classId];
+    if (!cls) continue;
+
+    cls.activeAbilities = Array.isArray(data.a) ? [...data.a] : [];
+    cls.uniqueAbilities = Array.isArray(data.u) ? [...data.u] : [];
+    cls.powers = [...cls.activeAbilities];
+    cls.passives = Array.isArray(data.p) ? [...data.p] : [];
+    cls.bonus = { ...(data.b || {}) };
+
+    const abilityBonuses = {};
+    (data.a || []).forEach((name, index) => {
+        abilityBonuses[name] = { ...((data.ab || [])[index] || {}) };
+    });
+
+    const passiveBonuses = {};
+    (data.p || []).forEach((name, index) => {
+        passiveBonuses[name] = { ...((data.pb || [])[index] || {}) };
+    });
+
+    cls.classBonuses = {
+        abilities: abilityBonuses,
+        passives: passiveBonuses
+    };
+}
+
 function loadCustom() {
     try { return store.load('custom_classes.json', {}) || {}; } catch (_) { return {}; }
 }
