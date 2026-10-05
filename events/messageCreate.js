@@ -1,3 +1,4 @@
+const classAdvancement = require('../utils/classAdvancement');
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getPrefix, getSettings } = require('../utils/settings');
 const xp = require('../utils/xp');
@@ -108,6 +109,7 @@ module.exports = {
                     const cmd = resolveCommand(client, name);
                     if (cmd?.execute) {
                         await cmd.execute(message, parts, client);
+                        try { const notice = classAdvancement.notifyCommand(message.author.id); if (notice) await message.channel.send(notice); } catch (_) {}
                     }
                 }
             } catch (e) {
