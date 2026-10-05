@@ -21,10 +21,10 @@ function build(g) {
 
 module.exports = {
     name: 'serverinfo',
-    aliases: ['si', 'server'],
+    aliases: ['si', 'server', 'servidor', 'serverinfo'],
     description: 'Info do servidor',
     data: new SlashCommandBuilder()
-        .setName('serverinfo')
+        .setName('servidor')
         .setDescription('Informações do servidor'),
 
     async execute(message) {
