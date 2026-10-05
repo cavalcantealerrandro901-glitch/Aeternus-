@@ -8,6 +8,7 @@ const {
 const player = require('../utils/player');
 const classes = require('../utils/classes');
 const abilities = require('../utils/abilities');
+const combatStats = require('../utils/combatStats');
 
 function classLabel(userId) {
     const p = player.get(userId);
@@ -89,6 +90,13 @@ function panel(userId) {
             : `**${i + 1}.** _(vazio)_`;
     });
 
+    const stats = combatStats.getEffectiveAttrs(userId);
+    const cls = stats.cls;
+    const classBonus = cls?.classBonuses?.passives || {};
+    const bonusLines = Object.entries(classBonus).map(([name, b]) => {
+        const values = Object.entries(b).map(([k, v]) => `+${Number(v).toLocaleString('pt-BR')} ${k}`).join(' | ');
+        return `${name}: ${values}`;
+    });
     const lore = classLoreLines(userId);
     const emb = new EmbedBuilder()
         .setColor(0x7c3aed)
@@ -100,6 +108,7 @@ function panel(userId) {
                 '',
                 '**Loadout atual**',
                 lines.join('\n'),
+                bonusLines.length ? '\n**📊 Bônus das passivas da classe**\n' + bonusLines.join('\n') : '',
                 lore.length ? '\n' + lore.join('\n') : ''
             ]
                 .filter(Boolean)
