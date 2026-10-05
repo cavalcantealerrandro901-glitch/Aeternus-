@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel — Aeternus</title>
+    <title>Painel de Administração — Aeternus</title>
     <link rel="stylesheet" href="dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -11,54 +11,54 @@
     <header class="header">
         <nav class="navbar">
             <div class="logo"><a href="index.html"><span class="logo-accent">AET</span>ERNUS</a></div>
-            <a href="editor.html" class="btn btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">🛠️ Editor</a>
-            <a href="index.html" class="btn btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">← Início</a>
+            <div class="admin-user" id="admin-user">Carregando...</div>
+            <a href="/logout" class="btn btn-secondary admin-logout">Sair</a>
         </nav>
     </header>
 
-    <main class="container">
-        <section class="hero" style="margin-bottom: 2rem;">
-            <h1>📊 Painel do Herói</h1>
-            <p>Acompanhe o seu progresso, nível e recursos acumulados.</p>
-            <p style="margin-top:1rem"><a href="editor.html" class="btn btn-primary">Abrir Editor / Terminal / JARVIS</a></p>
+    <main class="admin-container">
+        <section class="admin-hero">
+            <span class="admin-badge">✦ AETERNUS • ADMINISTRAÇÃO</span>
+            <h1>Selecione um servidor</h1>
+            <p>Escolha o servidor que deseja administrar.</p>
         </section>
 
-        <section class="features">
-            <div class="feature-card">
-                <div class="card-icon">⚡</div>
-                <h3>Nível & XP</h3>
-                <div class="card-description">
-                    <p>Nível Atual: <strong>42</strong></p>
-                    <p>XP: 8.450 / 10.000</p>
-                    <p>Próximo Raste: Guardião Astral</p>
-                </div>
-            </div>
+        <section id="login-state" class="admin-card hidden">
+            <div class="admin-icon">🔐</div>
+            <h2>Login necessário</h2>
+            <p>Entre com sua conta do Discord para acessar o painel.</p>
+            <a href="/login" class="btn btn-primary">Entrar com Discord</a>
+        </section>
 
-            <div class="feature-card">
-                <div class="card-icon">💰</div>
-                <h3>Recursos</h3>
-                <div class="card-description">
-                    <p>Moedas de Ouro: <strong>12.500</strong></p>
-                    <p>Gemas Divinas: <strong>320</strong></p>
-                    <p>Fragmentos de Alma: <strong>45</strong></p>
-                </div>
-            </div>
+        <section id="loading-state" class="admin-card">
+            <div class="loader"></div>
+            <p>Carregando seus servidores...</p>
+        </section>
 
-            <div class="feature-card">
-                <div class="card-icon">🏆</div>
-                <h3>Estatísticas de Batalha</h3>
-                <div class="card-description">
-                    <p>Vitórias na Arena: <strong>128</strong></p>
-                    <p>Derrotas: <strong>19</strong></p>
-                    <p>Taxa de Vitórias: <strong>87.1%</strong></p>
+        <section id="server-state" class="hidden">
+            <div class="section-heading">
+                <div>
+                    <h2>Seus servidores</h2>
+                    <p>O Aeternus precisa estar presente no servidor.</p>
                 </div>
+                <button id="refresh-servers" class="btn btn-secondary">↻ Atualizar</button>
             </div>
+            <div id="server-grid" class="server-grid"></div>
+            <div id="empty-state" class="admin-card hidden">
+                <div class="admin-icon">🛡️</div>
+                <h2>Nenhum servidor disponível</h2>
+                <p>Você precisa administrar um servidor onde o Aeternus esteja presente.</p>
+            </div>
+        </section>
+
+        <section id="error-state" class="admin-card hidden">
+            <div class="admin-icon">⚠️</div>
+            <h2>Não foi possível carregar</h2>
+            <p id="error-message">Tente novamente.</p>
+            <button id="retry" class="btn btn-primary">Tentar novamente</button>
         </section>
     </main>
 
-    <footer>
-        <p>&copy; 2026 <strong>Aeternus</strong>. Todos os direitos reservados.</p>
-    </footer>
     <script src="dashboard-app.js"></script>
 </body>
 </html>
