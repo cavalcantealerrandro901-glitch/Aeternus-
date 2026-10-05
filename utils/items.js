@@ -174,6 +174,9 @@ const ITEMS = {
     livro_vida: { id: 'livro_vida', name: 'Livro de Vida', emoji: '📙', category: 'consumivel', rarity: 'raro', effects: {}, bookAttr: 'vida', consumable: true }
 };
 
+const COMMON_CLASS_ITEMS = require('./commonClassItems');
+for (const item of COMMON_CLASS_ITEMS) ITEMS[item.id] = item;
+
 const RECIPES = {};
 const TRADE_SHOP = [];
 
@@ -195,6 +198,7 @@ function instantiateItem(id, overrides = {}) {
         effects: { ...(def.effects || {}) },
         desc: def.desc || '',
         exclusive: !!def.exclusive,
+        uniqueAbility: def.uniqueAbility ? { ...def.uniqueAbility } : null,
         bookAttr: def.bookAttr || undefined,
         consumable: !!def.consumable,
         ...overrides
