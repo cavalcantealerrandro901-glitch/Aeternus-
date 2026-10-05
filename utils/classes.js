@@ -341,6 +341,10 @@ for (const [classId, data] of Object.entries(COMMON_CLASS_ABILITIES)) {
 
     cls.activeAbilities = Array.isArray(data.a) ? [...data.a] : [];
     cls.uniqueAbilities = Array.isArray(data.u) ? [...data.u] : [];
+    cls.uniqueAbilityBonuses = {};
+    (data.u || []).forEach((name, index) => {
+        cls.uniqueAbilityBonuses[name] = { ...((data.ub || [])[index] || {}) };
+    });
     cls.powers = [...cls.activeAbilities];
     cls.passives = Array.isArray(data.p) ? [...data.p] : [];
     cls.bonus = { ...(data.b || {}) };
@@ -357,7 +361,8 @@ for (const [classId, data] of Object.entries(COMMON_CLASS_ABILITIES)) {
 
     cls.classBonuses = {
         abilities: abilityBonuses,
-        passives: passiveBonuses
+        passives: passiveBonuses,
+        unique: { ...cls.uniqueAbilityBonuses }
     };
 }
 
