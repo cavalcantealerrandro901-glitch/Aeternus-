@@ -150,6 +150,7 @@ module.exports = {
     name: 'classe',
     aliases: ['classes'],
     description: 'Classes: criar, listar e escolher por prefixo',
+    slash: false,
 
     async execute(message, args) {
         const sub = String(args[0] || 'listar').toLowerCase();
