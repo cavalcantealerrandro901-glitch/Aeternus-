@@ -349,19 +349,38 @@ module.exports = {
             }
 
             const raw = String(interaction.fields.getTextInputValue('quantidade') || '').trim();
-            if (!/^\\d+$/.test(raw)) {
-                return interaction.reply({ content: '❌ Digite apenas um número inteiro válido.', flags: MessageFlags.Ephemeral });
+
+            // Revalidação completa no momento do depósito.
+            // Isso impede que um valor antigo ou incompatível seja aplicado.
+            if (!raw || !/^\\d+$/.test(raw)) {
+                return interaction.reply({
+                    content: '❌ O valor informado não é válido. Digite apenas um número inteiro positivo.',
+                    flags: MessageFlags.Ephemeral
+                });
             }
 
             const amount = Number(raw);
-            const available = Number(xp.get(ownerId).attrPoints || 0);
+            const current = xp.get(ownerId) || {};
+            const available = Number(current.attrPoints || 0);
+            const attrs = current.attrs || {};
+
+            if (!Object.prototype.hasOwnProperty.call(attrs, attrKey)) {
+                return interaction.reply({
+                    content: '❌ Esse atributo não é compatível com o sistema atual.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
 
             if (!Number.isSafeInteger(amount) || amount < 1) {
-                return interaction.reply({ content: '❌ A quantidade precisa ser pelo menos **1**.', flags: MessageFlags.Ephemeral });
+                return interaction.reply({
+                    content: '❌ A quantidade precisa ser um número inteiro maior que **0**.',
+                    flags: MessageFlags.Ephemeral
+                });
             }
+
             if (amount > available) {
                 return interaction.reply({
-                    content: '❌ Você tentou distribuir **' + amount + '** pontos, mas possui apenas **' + available + '** disponíveis.',
+                    content: '❌ Valor incompatível: você informou **' + amount + '**, mas possui apenas **' + available + '** ponto(s) disponíveis.',
                     flags: MessageFlags.Ephemeral
                 });
             }
