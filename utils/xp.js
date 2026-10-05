@@ -250,6 +250,15 @@ function spendAttrPoints(userId, key, amount) {
     }
 
     cur.attrs[k] = Math.max(0, Math.floor(Number(cur.attrs[k] || 0)) + gained);
+
+    // Mantém um registro separado do que foi investido manualmente.
+    // Isso permite redistribuir somente os pontos gastos pelo jogador,
+    // sem devolver atributos ganhos por nível, classe ou equipamento.
+    cur.attrInvested = cur.attrInvested && typeof cur.attrInvested === 'object' ? cur.attrInvested : {};
+    cur.attrManualGain = cur.attrManualGain && typeof cur.attrManualGain === 'object' ? cur.attrManualGain : {};
+    cur.attrInvested[k] = Math.max(0, Math.floor(Number(cur.attrInvested[k] || 0))) + n;
+    cur.attrManualGain[k] = Math.max(0, Math.floor(Number(cur.attrManualGain[k] || 0))) + gained;
+
     saveCur(data, userId, cur);
     return {
         ok: true,
@@ -265,18 +274,32 @@ function spendAttrPoints(userId, key, amount) {
 
 function redistribuirAttrs(userId) {
     const { data, cur } = loadCur(userId);
+    const invested = cur.attrInvested && typeof cur.attrInvested === 'object' ? cur.attrInvested : {};
+    const manualGain = cur.attrManualGain && typeof cur.attrManualGain === 'object' ? cur.attrManualGain : {};
+
+    // Devolve somente os pontos realmente gastos pelo jogador.
+    // Não usa a diferença entre atributo atual e atributo base, pois essa
+    // diferença também pode conter ganhos de nível, classe ou equipamento.
     let refund = 0;
     for (const k of ATTR_KEYS) {
-        const base = BASE_ATTR[k] ?? 0;
-        const val = Math.floor(Number(cur.attrs[k] || 0));
-        if (val > base) {
-            refund += val - base;
-            cur.attrs[k] = base;
-        } else {
-            cur.attrs[k] = Math.max(base, val);
+        const spent = Math.max(0, Math.floor(Number(invested[k] || 0)));
+        const gained = Math.max(0, Math.floor(Number(manualGain[k] || 0)));
+
+        refund += spent;
+
+        if (gained > 0) {
+            const current = Math.max(0, Math.floor(Number(cur.attrs[k] || 0)));
+            cur.attrs[k] = Math.max(0, current - gained);
         }
+
+        invested[k] = 0;
+        manualGain[k] = 0;
     }
-    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)) + refund);
+
+    cur.attrInvested = invested;
+    cur.attrManualGain = manualGain;
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + refund;
+
     saveCur(data, userId, cur);
     return {
         ok: true,
