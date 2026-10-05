@@ -1,16 +1,47 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const player = require('../utils/player');
 
+function format(n) {
+    return Number(n || 0).toLocaleString('pt-BR');
+}
+
+function executeSale(userId, quantityArg, slotArg) {
+    const slot = Number(slotArg);
+    if (!Number.isInteger(slot) || slot < 1) {
+        return { error: 'Informe um número de slot válido.' };
+    }
+
+    const raw = String(quantityArg || '').toLowerCase();
+    const quantity = raw === 'all' ? Infinity : Number(quantityArg);
+
+    if (raw !== 'all' && (!Number.isInteger(quantity) || quantity < 1)) {
+        return { error: 'A quantidade deve ser um número inteiro positivo ou **all**.' };
+    }
+
+    return player.sellItem(userId, slot, quantity);
+}
+
+function successMessage(result, slot) {
+    return '💰 **Slot #' + String(slot).padStart(2, '0') + ' vendido.**\n' +
+        (result.item.emoji || '📦') + ' **' + result.item.name + '** ×' + result.quantity +
+        ' por **✨ ' + format(result.totalValue) + ' Éter**.';
+}
+
 module.exports = {
-    name: 'deletar',
-    aliases: ['del', 'deletaritem', 'deletarslot'],
-    description: 'Deletar um slot inteiro do inventário',
+    name: 'vender',
+    aliases: ['venderslot', 'sellslot'],
+    description: 'Vender itens de um slot do inventário',
     data: new SlashCommandBuilder()
-        .setName('deletar')
-        .setDescription('Deletar um slot inteiro do inventário')
+        .setName('vender')
+        .setDescription('Vender itens do inventário')
         .addSubcommand((s) => s
             .setName('slot')
-            .setDescription('Remove todo o conteúdo de um slot')
+            .setDescription('Vender uma quantidade de um slot')
+            .addStringOption((o) => o
+                .setName('quantidade')
+                .setDescription('Quantidade a vender ou all')
+                .setRequired(true)
+            )
             .addIntegerOption((o) => o
                 .setName('numero')
                 .setDescription('Número do slot')
@@ -21,39 +52,28 @@ module.exports = {
 
     async execute(message, args) {
         if (String(args[0] || '').toLowerCase() !== 'slot') {
-            return message.reply('Use **O.deletar slot <número>**. Exemplo: **O.deletar slot 3**.');
+            return message.reply('Use **O.vender slot <quantidade|all> <número do slot>**. Exemplo: **O.vender slot 2 3** ou **O.vender slot all 3**.');
         }
 
-        const number = Number(args[1]);
-        if (!Number.isInteger(number) || number < 1) {
-            return message.reply('Informe um número de slot válido.');
-        }
+        const result = executeSale(message.author.id, args[1], args[2]);
+        if (result.error) return message.reply(result.error);
+        if (!result.ok) return message.reply(result.error || 'Não foi possível vender o item.');
 
-        const result = player.removeItemAt(message.author.id, number - 1);
-        if (!result) return message.reply('Esse slot não existe no seu inventário.');
-
-        return message.reply(
-            '🗑️ **Slot #' + String(number).padStart(2, '0') + ' removido.**\n' +
-            (result.emoji || '📦') + ' **' + result.name + '** ×' + (result.quantity || 1) +
-            ' foi removido permanentemente do inventário.'
-        );
+        return message.reply(successMessage(result, Number(args[2])));
     },
 
     async executeSlash(interaction) {
-        const number = interaction.options.getInteger('numero');
-        const result = player.removeItemAt(interaction.user.id, number - 1);
+        const quantity = interaction.options.getString('quantidade');
+        const slot = interaction.options.getInteger('numero');
+        const result = executeSale(interaction.user.id, quantity, slot);
 
-        if (!result) {
+        if (result.error || !result.ok) {
             return interaction.reply({
-                content: 'Esse slot não existe no seu inventário.',
+                content: result.error || 'Não foi possível vender o item.',
                 flags: MessageFlags.Ephemeral
             });
         }
 
-        return interaction.reply(
-            '🗑️ **Slot #' + String(number).padStart(2, '0') + ' removido.**\n' +
-            (result.emoji || '📦') + ' **' + result.name + '** ×' + (result.quantity || 1) +
-            ' foi removido permanentemente do inventário.'
-        );
+        return interaction.reply(successMessage(result, slot));
     }
 };
