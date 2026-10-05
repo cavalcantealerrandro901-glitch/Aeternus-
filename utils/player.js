@@ -24,10 +24,11 @@ const ITEM_CATEGORIES = [
     { value: 'todos', name: 'Todos' }
 ];
 
-const CLASS_ITEMS = {
-    ceifador_negro: ['foice_grande', 'manto_negro_armadura', 'dado_da_morte'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean),
-    l_detetive_arcano: ['bengala_investigador', 'capa_detetive_arcano', 'caderno_deducoes'].map((id) => itemsCatalog.getItemDef(id)).filter(Boolean)
-};
+const CLASS_ITEMS = Object.fromEntries(
+    Object.values(classesMod.allClasses())
+        .filter((cls) => cls && cls.id)
+        .map((cls) => [cls.id, itemsCatalog.listItems({ classId: cls.id })])
+);
 
 function all() { return store.load('players.json', {}); }
 function save(data) { store.save('players.json', data); }
