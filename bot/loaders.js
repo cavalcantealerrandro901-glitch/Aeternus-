@@ -60,7 +60,7 @@ const PREFIX_ONLY = new Set([
     'abraco', 'beijo', 'tapa', 'carinho', 'cutucar', 'morder', 'bonk', 'highfive',
     'chorar', 'dancar', 'cafune', 'acenar', 'corar', 'sorrir', 'rir', 'maos',
     'lambida', 'yeet', 'matar', 'piscadela',
-    'avatar', 'serverinfo', 'userinfo', 'reload', 'topxp', 'toptapa', 'classe'
+    'avatar', 'serverinfo', 'userinfo', 'reload', 'topxp', 'toptapa'
 ]);
 
 const COMMANDS_DIR = path.join(__dirname, '..', 'commands');
