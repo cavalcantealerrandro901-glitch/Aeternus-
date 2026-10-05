@@ -10,6 +10,7 @@ const {
 const classes = require('../utils/classes');
 const player = require('../utils/player');
 const store = require('../utils/store');
+const items = require('../utils/items');
 
 function truncField(s, max = 1020) {
     const t = String(s || '');
@@ -43,7 +44,7 @@ function classEmbed(cls) {
     const pa = (cls.passives || []).filter((x) => x && x !== '—');
     if (ua.length)
         emb.addFields({
-            name: '👁️ Habilidades únicas (2)',
+            name: '👁️ Habilidades únicas (3)',
             value: truncField(ua.map((x, i) => `${i + 1}. ${x}`).join('\n'))
         });
     if (aa.length)
@@ -66,20 +67,31 @@ function classEmbed(cls) {
     }
     if (cls.classGear) {
         const g = cls.classGear;
-        emb.addFields({
-            name: '🎒 Equipamento de classe',
-            value: truncField(
-                [
-                    g.arma ? `Arma: \`${g.arma}\`` : null,
-                    g.armadura ? `Armadura: \`${g.armadura}\`` : null,
-                    g.acessorio ? `Acessório: \`${g.acessorio}\`` : null
-                ]
-                    .filter(Boolean)
-                    .join(' · ')
-            )
-        });
-    }
-    if (cls.boundUserId) {
+        const gearLines = [
+            ['⚔️ Arma', g.arma],
+            ['🛡️ Armadura', g.armadura],
+            ['💍 Acessório', g.acessorio]
+        ]
+            .filter(([, id]) => id)
+            .map(([label, id]) => {
+                const item = items.getItemDef(id);
+                if (!item) return `${label}: \`${id}\``;
+                const stats = Object.entries(item.effects || {})
+                    .map(([k, v]) => `${k} ${v >= 0 ? '+' : ''}${v}`)
+                    .join(' · ');
+                const ability = item.uniqueAbility?.name
+                    ? `\n↳ ✦ ${item.uniqueAbility.name}`
+                    : '';
+                return `${label}: ${item.emoji || '📦'} **${item.name}**${stats ? ` — ${stats}` : ''}${ability}`;
+            });
+
+        if (gearLines.length) {
+            emb.addFields({
+                name: '🎒 Itens exclusivos da classe',
+                value: truncField(gearLines.join('\n'), 1020)
+            });
+        }
+    }    if (cls.boundUserId) {
         emb.addFields({
             name: '🔗 Vinculada',
             value: `Somente <@${cls.boundUserId}> pode usar esta classe.`
@@ -297,7 +309,8 @@ module.exports = {
         }
 
         if (sub === 'escolher') {
-            return showChooseMenu(interaction);
+            const payload = chooseStartPayload();
+            return interaction.reply(payload);
         }
 
         if (sub === 'remover') {
@@ -327,6 +340,9 @@ module.exports = {
 
     async handleComponent(interaction) {
         const id = interaction.customId || '';
+        if (id === 'classe:abrir') {
+            return showChooseMenu(interaction, true);
+        }
         if (id === 'classe:lista') {
             return showChooseMenu(interaction, true);
         }
@@ -353,9 +369,14 @@ module.exports = {
             player.update(interaction.user.id, { classId: resolved });
             const c = classes.getClass(resolved);
             return interaction.reply({
-                content: `✅ Classe definida: **${c.emoji} ${c.name}** (${c.rarityName || c.rarity || 'Comum'})${
-                    c.exclusive || c.maxHolders === 1 ? '\n🔒 Classe **exclusiva** — só você pode usá-la.' : ''
-                }`,
+                content: [
+                    `# ✦ ${c.emoji || '✨'} ${String(c.name).toUpperCase()}`,
+                    '',
+                    '## CLASSE ESCOLHIDA',
+                    '',
+                    `Você escolheu **${c.name}**. Esta escolha é permanente.`,
+                    c.exclusive || c.maxHolders === 1 ? '🔒 **Classe exclusiva — só você pode usá-la.**' : '✨ Sua classe está pronta para ser usada.'
+                ].join('\n'),
                 embeds: [classEmbed(c)],
                 ephemeral: true
             });
@@ -377,15 +398,47 @@ module.exports = {
             player.update(interaction.user.id, { classId: resolved });
             const c = classes.getClass(resolved);
             return interaction.update({
-                content: `✅ Classe definida: **${c.emoji} ${c.name}**${
-                    c.exclusive || c.maxHolders === 1 ? ' · 🔒 exclusiva' : ''
-                }`,
+                content: [
+                    `# ✦ ${c.emoji || '✨'} ${String(c.name).toUpperCase()}`,
+                    '',
+                    '## CLASSE ESCOLHIDA',
+                    '',
+                    `Você escolheu **${c.name}**. Esta escolha é permanente.`,
+                    c.exclusive || c.maxHolders === 1 ? '🔒 **Classe exclusiva — só você pode usá-la.**' : '✨ Sua classe está pronta para ser usada.'
+                ].join('\n'),
                 embeds: [classEmbed(c)],
                 components: []
             });
         }
     }
 };
+
+function chooseStartPayload() {
+    return {
+        content: [
+            '# ✦ ESCOLHA SUA CLASSE',
+            '',
+            '## 🜂 O SEU CAMINHO COMEÇA AQUI',
+            '',
+            'Sua escolha define a classe que acompanhará seu personagem.',
+            '',
+            '⭐ **Raridade disponível:** Comum',
+            '🔒 **A escolha é permanente.**',
+            '',
+            'Pressione o botão abaixo para abrir o menu de classes.'
+        ].join('\n'),
+        components: [
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('classe:abrir')
+                    .setLabel('Selecionar uma classe')
+                    .setStyle(ButtonStyle.Primary)
+                    .setEmoji('⚔️')
+            )
+        ],
+        ephemeral: true
+    };
+}
 
 async function showChooseMenu(interaction, isUpdate = false) {
     const list = classes.listSelectableClasses();
@@ -404,7 +457,7 @@ async function showChooseMenu(interaction, isUpdate = false) {
             new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId('classe:sel:common')
-                    .setPlaceholder(i === 0 ? 'Escolha uma classe Comum' : 'Mais classes Comuns')
+                    .setPlaceholder(i === 0 ? 'Selecione uma classe Comum' : 'Mais classes Comuns')
                     .addOptions(chunk)
             )
         );
@@ -412,19 +465,17 @@ async function showChooseMenu(interaction, isUpdate = false) {
 
     const payload = {
         content: [
-            '📜 **Seleção de classe**',
+            '# ✦ SELECIONE SUA CLASSE',
             '',
-            '🎲 Sua classe será escolhida entre as classes da sua raridade.',
-            '⭐ **Raridade atual:** Comum',
-            '',
-            'Escolha uma classe abaixo. **A escolha será permanente.**'
-        ].join('\\n'),
+            'Escolha uma das classes disponíveis para a sua raridade.',
+            '🔒 Depois de escolhida, a classe será permanente.'
+        ].join('\n'),
         components: rows,
         ephemeral: true
     };
 
     if (!rows.length) {
-        payload.content = '📜 **Seleção de classe**\\n\\nNenhuma classe Comum está disponível no momento.';
+        payload.content = '# ✦ SELECIONE SUA CLASSE\n\nNenhuma classe Comum está disponível no momento.';
     }
 
     if (isUpdate && interaction.isMessageComponent()) return interaction.update(payload);
