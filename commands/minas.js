@@ -421,45 +421,6 @@ function controlsRow(game) {
         game.dead ||
         game.cashed;
 
-    return new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId(
-                    'minas:random:' +
-                    game.id
-                )
-                .setLabel(
-                    'Aleatório'
-                )
-                .setStyle(
-                    ButtonStyle.Primary
-                )
-                .setDisabled(
-                    ended
-                ),
-
-            new ButtonBuilder()
-                .setCustomId(
-                    'minas:refresh:' +
-                    game.id
-                )
-                .setLabel(
-                    'Atualizar'
-                )
-                .setStyle(
-                    ButtonStyle.Secondary
-                )
-                .setDisabled(
-                    ended
-                )
-        );
-}
-
-function cashRow(game) {
-    const ended =
-        game.dead ||
-        game.cashed;
-
     const opened =
         game.opened.size;
 
@@ -476,6 +437,24 @@ function cashRow(game) {
         .addComponents(
             new ButtonBuilder()
                 .setCustomId(
+                    'minas:random:' +
+                    game.id
+                )
+                .setLabel('Aleatório')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(ended),
+
+            new ButtonBuilder()
+                .setCustomId(
+                    'minas:refresh:' +
+                    game.id
+                )
+                .setLabel('Atualizar')
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(ended),
+
+            new ButtonBuilder()
+                .setCustomId(
                     'minas:cash:' +
                     game.id
                 )
@@ -483,40 +462,28 @@ function cashRow(game) {
                     game.fun
                         ? 'Encerrar'
                         : 'Sacar • ' +
-                            fmt(value) +
-                            ' ✨'
+                          fmt(value) +
+                          ' ✨'
                 )
-                .setStyle(
-                    ButtonStyle.Success
-                )
+                .setStyle(ButtonStyle.Success)
                 .setDisabled(
                     ended ||
                     (
-                        !game.fun &&
                         opened <= 0
                     )
                 )
         );
 }
 
-function fullComponents(
-    game,
-    reveal = false
-) {
+function fullComponents(game, reveal = false) {
     const ended =
         game.dead ||
         game.cashed ||
         reveal;
 
     return [
-        ...boardRows(
-            game,
-            ended
-        ),
-
-        controlsRow(game),
-
-        cashRow(game)
+        ...boardRows(game, ended),
+        controlsRow(game)
     ];
 }
 
