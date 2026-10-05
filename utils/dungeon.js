@@ -352,6 +352,7 @@ function endCombatVictory(match, playerId) {
         match.monsters = (match.monsters || []).filter((m) => m.id !== enemyId);
         if (!enemy.isBoss) {
             match.monstersDefeated = (match.monstersDefeated || 0) + 1;
+            try { require('./classAdvancement').recordEvent(playerId, { type: 'monster_defeated', name: enemy.name.replace(/ \\(\\d+\\)$/, ''), boss: false, region: enemy.region || null }); } catch (_) {}
             match.log.push({
                 t: Date.now(),
                 text: `💀 **${enemy.name}** derrotado. Monstros: **${match.monstersDefeated}/${match.monstersTarget}**`
@@ -359,12 +360,14 @@ function endCombatVictory(match, playerId) {
             if (match.monstersDefeated >= match.monstersTarget && !match.bossSpawned) spawnBoss(match);
         } else {
             match.bossDefeated = true;
+            try { require('./classAdvancement').recordEvent(playerId, { type: 'monster_defeated', name: enemy.name, boss: true, region: enemy.region || null }); } catch (_) {}
             match.canAdvance = true;
             match.log.push({
                 t: Date.now(),
                 text: `👑 Boss derrotado! Piso **${match.floor}** concluído.`
             });
             applyFloorRewards(match, playerId);
+            try { require('./classAdvancement').recordEvent(playerId, { type: 'dungeon_floor', floor: match.floor }); } catch (_) {}
             const prog = getProgress(playerId);
             if (match.floor > prog.highest) prog.highest = match.floor;
             prog.currentFloor = Math.min(MAX_IMPLEMENTED, match.floor + 1);
@@ -608,6 +611,15 @@ function publicDungeon(match, asUserId) {
         chat: (match.chat || []).slice(-80),
         rewards: match.rewards || null,
         objective: objectiveText(match)
+    };
+}
+
+function getMissionSources() {
+    return {
+        monsters: MOB_POOL.map((m) => m.name),
+        bosses: BOSS_POOL.map((m) => m.name),
+        regions: [...new Set(MOB_POOL.flatMap((m) => Array.isArray(m.regions) ? m.regions : (m.region ? [m.region] : [])))],
+        floors: Array.from({ length: MAX_IMPLEMENTED }, (_, i) => i + 1)
     };
 }
 
