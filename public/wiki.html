@@ -64,17 +64,17 @@ footer{text-align:center;padding:2rem;color:#475569;font-size:.8rem;position:rel
     <a href="#guildas">Guildas</a>
     <a href="#economia">Economia</a>
     <a href="#jogos">Jogos</a>
-    <a href="#comandos">Comandos</a>
+    <a href="#comandos">Comandos</a><a href="#admin">Painel Admin</a>
   </div>
 
   <section id="inicio">
     <h2>🌌 O que é o Aeternus?</h2>
-    <p>Bot Discord de RPG + economia + cassino. Dados no <strong>MongoDB</strong>. Prefixo <code>O.</code> e slash commands.</p>
+    <p>Bot Discord com RPG, economia, moderação, sistemas sociais e interfaces web. Dados persistentes no <strong>MongoDB</strong>. Prefixo <code>O.</code> e slash commands.</p>
     <div class="grid">
       <div class="gc"><strong>⚔️ RPG</strong>Classes, atributos, habilidades, arena e masmorra.</div>
       <div class="gc"><strong>🏰 Guildas</strong>Clãs com baú, banco, cargo-tag e convites.</div>
       <div class="gc"><strong>✨ Economia</strong>Éter, cristais (CP), banco, daily e loja.</div>
-      <div class="gc"><strong>🎮 Jogos</strong>Mines, blackjack e mais — com <code>all</code>/<code>half</code>/<code>k</code>/<code>m</code>.</div>
+      <div class="gc"><strong>🎮 Jogos</strong>Experiências interativas e sistemas de entretenimento integrados ao bot.</div>
     </div>
   </section>
 
@@ -97,13 +97,8 @@ footer{text-align:center;padding:2rem;color:#475569;font-size:.8rem;position:rel
   <section id="combate">
     <h2>⚔️ Combate</h2>
     <h3>Arena / PvP</h3>
-    <ul>
-      <li><code>O.pvp diversao @user</code> — sem aposta</li>
-      <li><code>O.pvp aposta @user 1k</code> — aposta 1v1</li>
-      <li><code>O.pvp equipes @a @b</code> — times</li>
-      <li><code>O.pvp equipes-aposta ...</code> — times + aposta</li>
-    </ul>
-    <p>Interface web com cartas, botões e chat. Aceita <code>all</code>, <code>half</code>, <code>k</code>, <code>m</code>, <code>b</code>.</p>
+    <p>O Aeternus possui uma arena web para batalhas entre jogadores, com turnos, HP, mana, habilidades, efeitos e chat durante a partida.</p>
+    <p>A identidade do jogador é validada pelo servidor através da sessão autenticada.</p>
     <h3>Masmorra</h3>
     <p><code>O.masmorra</code> — pisos com várias ondas de monstros e boss no final. Botão para o próximo piso ao vencer.</p>
     <h3>Recompensas</h3>
@@ -152,6 +147,14 @@ footer{text-align:center;padding:2rem;color:#475569;font-size:.8rem;position:rel
     <p><code>O.blackjack</code> · <code>O.cara</code> · <code>O.dado</code> e mais na categoria Jogos da ajuda.</p>
   </section>
 
+  <section id="admin">
+    <h2>🛠️ Painel de Administração</h2>
+    <p>O Aeternus possui uma interface web própria para administração do servidor. Esta área está sendo construída por etapas.</p>
+    <div class="card"><h3>1. Login com Discord</h3><p>O administrador entra usando a autenticação do Discord. O painel cria uma sessão para identificar o usuário.</p></div>
+    <div class="card"><h3>2. Seleção do servidor</h3><p>Depois do login, o painel carrega os servidores da conta e mostra os servidores onde o Aeternus está conectado e que podem ser administrados.</p></div>
+    <div class="card"><h3>3. Servidor selecionado</h3><p>O administrador escolhe um servidor e ele fica marcado como selecionado. As próximas versões poderão abrir as configurações específicas desse servidor.</p></div>
+  </section>
+
   <section id="comandos">
     <h2>📜 Atalhos úteis</h2>
     <div class="grid">
@@ -163,7 +166,7 @@ footer{text-align:center;padding:2rem;color:#475569;font-size:.8rem;position:rel
     <p>Detalhes de cada comando: <code>O.ajuda &lt;comando&gt;</code></p>
   </section>
 </div>
-<footer>Aeternus · Wiki Oficial · Atualizada com RPG, guildas, mines e economia</footer>
+<footer>Aeternus · Wiki Oficial · Atualizada com RPG, economia, segurança web e painel de administração</footer>
     <script src="dashboard-app.js"></script>
 </body>
 </html>
