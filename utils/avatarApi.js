@@ -1,12 +1,16 @@
 const path = require('path');
 const fs = require('fs');
 const player = require('./player');
+const { requireAuth } = require('../web/auth');
 
 function registerAvatarRoutes(app) {
-    app.post('/api/avatar/upload', (req, res) => {
+    app.post('/api/avatar/upload', requireAuth, (req, res) => {
         try {
             const body = req.body || {};
-            const userId = String(body.userId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'anon';
+            const userId = String(req.auth.user.id);
+            if (body.userId && String(body.userId) !== userId) {
+                return res.status(403).json({ error: 'Você só pode enviar avatar para sua própria conta.' });
+            }
             const dataUrl = String(body.dataUrl || '');
             const m = dataUrl.match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,([A-Za-z0-9+/=]+)$/i);
             if (!m) {
@@ -37,7 +41,7 @@ function registerAvatarRoutes(app) {
         }
     });
 
-    app.post('/api/avatar/generate', (req, res) => {
+    app.post('/api/avatar/generate', requireAuth, (req, res) => {
         try {
             const body = req.body || {};
             const description = String(body.description || '').trim().slice(0, 400);
