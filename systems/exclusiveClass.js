@@ -47,27 +47,36 @@ const EXCLUSIVES = [
                 name: 'Bengala do Investigador',
                 emoji: '🦯',
                 category: 'arma',
-                rarity: 'mitica',
+                rarity: 'cosmica',
                 classId: 'l_detetive_arcano',
-                effects: { inteligencia: 950, agilidade: 700, forca: 500, dano: 800 }
+                effects: { dano: 950, velocidade: 950, alcance: 950 }
             },
             {
                 id: 'capa_detetive_arcano',
-                name: 'Capa do Detetive Arcano',
-                emoji: '🧥',
+                name: 'Escudo da Dedução Cósmica Suprema',
+                emoji: '🛡️',
                 category: 'armadura',
-                rarity: 'lendaria',
+                rarity: 'cosmica',
                 classId: 'l_detetive_arcano',
-                effects: { defesa: 750, inteligencia: 650, sorte: 550, vida: 600 }
+                effects: { defesa: 1200, resistencia: 1000, reflexo: 900, danoRetorno: 950 }
             },
             {
                 id: 'caderno_deducoes',
-                name: 'Caderno de Deduções',
-                emoji: '📓',
+                name: 'Olho do Infinito Absoluto',
+                emoji: '👁️',
                 category: 'acessorio',
-                rarity: 'mitica',
+                rarity: 'cosmica',
                 classId: 'l_detetive_arcano',
-                effects: { inteligencia: 1000, sorte: 700, precisao: 800 }
+                effects: { percepcao: 900, precisao: 800, deteccao: 700 }
+            },
+            {
+                id: 'reliquia_verdade_absoluta',
+                name: 'Relíquia da Verdade Absoluta',
+                emoji: '🕯️',
+                category: 'acessorio',
+                rarity: 'cosmica',
+                classId: 'l_detetive_arcano',
+                effects: { investigacao: 1100, inteligencia: 950, penetracao: 900 }
             }
         ]
     },
