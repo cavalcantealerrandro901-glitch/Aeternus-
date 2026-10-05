@@ -7,7 +7,7 @@ const player = require('../utils/player');
 const xp = require('../utils/xp');
 const { registerAvatarRoutes } = require('../utils/avatarApi');
 const { registerEditorRoutes } = require('./editorRoutes');
-const { setupAuth, requireAuth, requireGuildManager } = require('./auth');
+const { setupAuth, requireAuth, requireGuildManager, fetchGuildsForSession } = require('./auth');
 
 function startWeb(client) {
     const app = express();
@@ -48,6 +48,8 @@ function startWeb(client) {
             : null);
 
     setupAuth(app, client);
+
+    app.get('/api/dashboard/guilds', requireAuth, async (req, res) => { try { const guilds = req.auth.session.guilds || await fetchGuildsForSession(req.auth.session); const list = guilds.filter(g => client.guilds.cache.has(g.id)).map(g => ({ id: g.id, name: g.name, icon: g.icon || null })); return res.json({ ok: true, guilds: list }); } catch (_) { return res.status(500).json({ ok: false, error: 'guilds_failed' }); } });
 
     app.get('/api/guild/:id', requireGuildManager, (req, res) => {
         const g = client.guilds.cache.get(req.params.id);
