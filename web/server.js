@@ -71,6 +71,25 @@ function startWeb(client) {
         res.json({ ok: true });
     });
 
+    // Limite simples de requisições por sessão/IP para APIs de jogo.
+    const rateBuckets = new Map();
+    function rateLimit(max = 60, windowMs = 60_000) {
+        return (req, res, next) => {
+            const key = String(req.auth?.user?.id || req.ip || 'unknown');
+            const now = Date.now();
+            let bucket = rateBuckets.get(key);
+            if (!bucket || now - bucket.start >= windowMs) {
+                bucket = { start: now, count: 0 };
+                rateBuckets.set(key, bucket);
+            }
+            bucket.count++;
+            if (bucket.count > max) {
+                return res.status(429).json({ ok: false, error: 'Muitas requisições. Tente novamente em alguns segundos.' });
+            }
+            next();
+        };
+    }
+
     const arenaEngine = require('../utils/arenaEngine');
     const dungeon = require('../utils/dungeon');
 
@@ -80,7 +99,7 @@ function startWeb(client) {
     app.get('/masmorra', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dungeon.html')));
     app.get('/editor', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'editor.html')));
 
-    app.get('/api/arena/:id', requireAuth, (req, res) => {
+    app.get('/api/arena/:id', requireAuth, rateLimit(), (req, res) => {
         const match = arenaEngine.getMatch(req.params.id);
         if (!match) return res.status(404).json({ error: 'Arena não encontrada' });
         const userId = String(req.auth.user.id);
@@ -89,7 +108,7 @@ function startWeb(client) {
         return res.json(arenaEngine.publicState(match, userId));
     });
 
-    app.post('/api/arena/:id/move', requireAuth, (req, res) => {
+    app.post('/api/arena/:id/move', requireAuth, rateLimit(30), (req, res) => {
         const body = req.body || {};
         const result = arenaEngine.applyMove(req.params.id, req.auth.user.id, {
             moveId: body.moveId,
@@ -99,7 +118,7 @@ function startWeb(client) {
         return res.json(result);
     });
 
-    app.post('/api/arena/create', requireAuth, (req, res) => {
+    app.post('/api/arena/create', requireAuth, rateLimit(10), (req, res) => {
         const body = req.body || {};
         const teamA = Array.isArray(body.teamA) ? body.teamA : [body.aId].filter(Boolean);
         const teamB = Array.isArray(body.teamB) ? body.teamB : [body.bId].filter(Boolean);
@@ -121,28 +140,28 @@ function startWeb(client) {
         });
     });
 
-    app.post('/api/arena/:id/chat', requireAuth, (req, res) => {
+    app.post('/api/arena/:id/chat', requireAuth, rateLimit(20), (req, res) => {
         const body = req.body || {};
         const result = arenaEngine.postChat(req.params.id, req.auth.user.id, body.text);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/arena/:id/skip', requireAuth, (req, res) => {
+    app.post('/api/arena/:id/skip', requireAuth, rateLimit(20), (req, res) => {
         const body = req.body || {};
         const result = arenaEngine.skipTurn(req.params.id, req.auth.user.id);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/arena/:id/forfeit', requireAuth, (req, res) => {
+    app.post('/api/arena/:id/forfeit', requireAuth, rateLimit(10), (req, res) => {
         const body = req.body || {};
         const result = arenaEngine.forfeit(req.params.id, req.auth.user.id);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.get('/api/dungeon/:id', requireAuth, (req, res) => {
+    app.get('/api/dungeon/:id', requireAuth, rateLimit(), (req, res) => {
         const match = dungeon.getDungeonMatch(req.params.id);
         if (!match) return res.status(404).json({ error: 'Masmorra não encontrada' });
         const userId = String(req.auth.user.id);
@@ -151,14 +170,14 @@ function startWeb(client) {
         return res.json(dungeon.publicDungeon(match, userId));
     });
 
-    app.post('/api/dungeon/:id/move', requireAuth, (req, res) => {
+    app.post('/api/dungeon/:id/move', requireAuth, rateLimit(30), (req, res) => {
         const body = req.body || {};
         const result = dungeon.applyDungeonMove(req.params.id, req.auth.user.id, body);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/dungeon/start', requireAuth, (req, res) => {
+    app.post('/api/dungeon/start', requireAuth, rateLimit(10), (req, res) => {
         const body = req.body || {};
         const result = dungeon.startFloor(req.auth.user.id, body.floor);
         if (!result.ok) return res.status(400).json(result);
@@ -169,21 +188,21 @@ function startWeb(client) {
         });
     });
 
-    app.post('/api/dungeon/:id/chat', requireAuth, (req, res) => {
+    app.post('/api/dungeon/:id/chat', requireAuth, rateLimit(20), (req, res) => {
         const body = req.body || {};
         const result = dungeon.postDungeonChat(req.params.id, req.auth.user.id, body.text);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/dungeon/:id/leave', requireAuth, (req, res) => {
+    app.post('/api/dungeon/:id/leave', requireAuth, rateLimit(10), (req, res) => {
         const body = req.body || {};
         const result = dungeon.leaveDungeon(req.params.id, req.auth.user.id);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/dungeon/:id/advance', requireAuth, (req, res) => {
+    app.post('/api/dungeon/:id/advance', requireAuth, rateLimit(10), (req, res) => {
         const body = req.body || {};
         const result = dungeon.advanceFloor(req.params.id, req.auth.user.id);
         if (!result.ok) return res.status(400).json(result);
