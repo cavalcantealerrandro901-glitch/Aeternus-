@@ -94,14 +94,17 @@ function buildEmbed(user, category, page, selectedIndex) {
         });
     }
 
-    emb.addFields({ name: '📦 Mochila', value: slice.length ? ' ' : '_Inventário vazio._', inline: false });
+    emb.addFields({ name: '📦 Mochila', value: slice.length ? 'Cada item ocupa uma caixa/slot abaixo.' : '_Inventário vazio._', inline: false });
 
     for (const it of slice) {
         const selected = Number(selectedIndex) === Number(it.globalIndex);
         const unit = player.getSellValue(it);
         emb.addFields({
             name: '#' + String(it.globalIndex).padStart(2, '0') + ' · ' + (selected ? '🔹 ' : '▫️ ') + (it.emoji || '🎁') + ' ' + it.name,
-            value: '**×' + (it.quantity || 1) + '** · _' + rarityTag(it) + '_\n💰 ✨ ' + fmt(unit) + ' cada' + effectsLine(it),
+            value: '╭──────────────────╮\n' +
+                '│ **×' + (it.quantity || 1) + '** · _' + rarityTag(it) + '_\n' +
+                '│ 💰 ✨ ' + fmt(unit) + ' cada' + effectsLine(it) + '\n' +
+                '╰──────────────────╯',
             inline: true
         });
     }
