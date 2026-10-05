@@ -13,6 +13,8 @@ const COLS = 4;
 const ROWS = 4;
 const TOTAL = COLS * ROWS;
 const MAX_BOMBS = 11;
+const MIN_BET = 100;
+const MAX_BET = 10_000_000;
 const HOUSE = 0.95;
 const IDLE_MS = 7 * 60 * 1000;
 const BOMB_CHANCE = 0.26;
@@ -366,6 +368,7 @@ module.exports = {
                     'Aposta: `O.minas <bombas> <valor>`',
                     '',
                     'Bombas: 1 a 11',
+                    'Aposta: 100 a 10.000.000 ✨',
                     'Grade: 4×4',
                     'Moeda: ✨ Éter'
                 ].join('\n')
@@ -378,7 +381,11 @@ module.exports = {
         } else {
             const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
             if (!bet.ok) return message.reply('❌ ' + bet.error);
-            if (bet.amount <= 0) return message.reply('❌ Valor inválido.');
+            if (bet.amount < MIN_BET || bet.amount > MAX_BET) {
+                return message.reply(
+                    '❌ Aposta entre ' + fmt(MIN_BET) + ' e ' + fmt(MAX_BET) + ' ✨.'
+                );
+            }
             eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
             game = makeGame(message.author.id, bet.amount, bombsRaw, false);
         }
@@ -464,7 +471,6 @@ module.exports = {
                 clearTimer(game);
                 games.delete(game.id);
 
-                // Painel antigo: tabuleiro final sem botão Novamente
                 await interaction
                     .update({
                         content: '<@' + game.userId + '>',
