@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('selected-server-name').textContent = guild.name;
         document.getElementById('selected-server-id').textContent = 'ID: ' + guild.id;
         document.getElementById('open-server-panel').href = '/admin/' + encodeURIComponent(guild.id);
+        document.getElementById('open-shop-panel').href = '/itens?guild=' + encodeURIComponent(guild.id);
 
         const daily = await api('/api/dashboard/guild/' + encodeURIComponent(guild.id) + '/daily');
         document.getElementById('daily-min').value = daily.dailyMin;
