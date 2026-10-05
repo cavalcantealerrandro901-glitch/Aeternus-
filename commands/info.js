@@ -74,7 +74,7 @@ function botEmbed(client) {
 
 module.exports = {
     name: 'info',
-    aliases: ['informacao', 'informações', 'infos'],
+    aliases: ['informacao', 'informações', 'infos', 'usuario', 'usuário', 'servidor', 'server', 'cargo-info', 'cargoinfo', 'roleinfo'],
     description: 'Informações do Aeternus',
     data: new SlashCommandBuilder()
         .setName('info')
