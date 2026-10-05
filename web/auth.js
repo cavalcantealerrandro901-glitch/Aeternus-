@@ -298,5 +298,6 @@ module.exports = {
     requireAuth,
     requireEditorOwner,
     requireGuildManager,
-    getConfig
+    getConfig,
+    fetchGuildsForSession
 };
