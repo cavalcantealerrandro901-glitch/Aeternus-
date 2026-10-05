@@ -51,6 +51,51 @@ function startWeb(client) {
 
     app.get('/api/dashboard/guilds', requireAuth, async (req, res) => { try { const guilds = req.auth.session.guilds || await fetchGuildsForSession(req.auth.session); const list = guilds.filter(g => client.guilds.cache.has(g.id)).map(g => ({ id: g.id, name: g.name, icon: g.icon || null })); return res.json({ ok: true, guilds: list }); } catch (_) { return res.status(500).json({ ok: false, error: 'guilds_failed' }); } });
 
+    app.get('/api/dashboard/guild/:id/daily', requireGuildManager, (req, res) => {
+        const settings = getSettings(req.params.id);
+        const min = Math.max(0, Math.floor(Number(settings.economy?.dailyMin) || 0));
+        const max = Math.max(min, Math.floor(Number(settings.economy?.dailyMax) || min));
+        return res.json({ ok: true, dailyMin: min, dailyMax: max });
+    });
+
+    app.post('/api/dashboard/guild/:id/daily', requireGuildManager, (req, res) => {
+        const body = req.body || {};
+        const min = Math.max(0, Math.floor(Number(body.dailyMin)));
+        const max = Math.max(min, Math.floor(Number(body.dailyMax)));
+        if (!Number.isFinite(min) || !Number.isFinite(max) || max > 100000000) {
+            return res.status(400).json({ ok: false, error: 'Valores de daily inválidos.' });
+        }
+        const settings = setSettings(req.params.id, {
+            economy: { dailyMin: min, dailyMax: max }
+        });
+        return res.json({
+            ok: true,
+            dailyMin: settings.economy.dailyMin,
+            dailyMax: settings.economy.dailyMax
+        });
+    });
+
+    app.get('/api/dashboard/guild/:id/shop', requireGuildManager, (req, res) => {
+        const settings = getSettings(req.params.id);
+        const shop = settings.shop || {};
+        return res.json({
+            ok: true,
+            enabled: shop.enabled !== false,
+            vipCount: Array.isArray(shop.vips) ? shop.vips.length : 0
+        });
+    });
+
+    app.post('/api/dashboard/guild/:id/shop', requireGuildManager, (req, res) => {
+        const enabled = req.body?.enabled !== false;
+        const settings = setSettings(req.params.id, { shop: { enabled } });
+        return res.json({
+            ok: true,
+            enabled: settings.shop?.enabled !== false
+        });
+    });
+
+    app.get('/admin/:id', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html')));
+
     app.get('/api/guild/:id', requireGuildManager, (req, res) => {
         const g = client.guilds.cache.get(req.params.id);
         if (!g) return res.status(404).json({ error: 'guild' });
