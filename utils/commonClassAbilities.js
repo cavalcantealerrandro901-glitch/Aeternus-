@@ -1,4 +1,4 @@
-/* Habilidades e atributos das 30 classes Comuns. */
+/* Habilidades das 30 classes Comuns: 4 ativas, 5 passivas e 3 únicas por classe. */
 module.exports = {
     "guerreiro": {
         "a": [
@@ -10,7 +10,9 @@ module.exports = {
         "p": [
             "Pele de Ferro",
             "Postura de Combate",
-            "Vontade de Ferro"
+            "Vontade de Ferro",
+            "Tenacidade",
+            "Contra-Impacto"
         ],
         "b": {
             "forca": 8,
@@ -53,6 +55,45 @@ module.exports = {
             {
                 "vida": 8,
                 "resistencia": 8
+            },
+            {
+                "defesa": 5,
+                "vida": 4
+            },
+            {
+                "forca": 5,
+                "resistencia": 4
+            }
+        ],
+        "u": [
+            "Mestre da Lâmina",
+            "Último Bastião",
+            "Golpe do Campeão"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -66,7 +107,9 @@ module.exports = {
         "p": [
             "Mente Arcana",
             "Fluxo de Mana",
-            "Concentração"
+            "Concentração",
+            "Clareza Arcana",
+            "Reserva Etérea"
         ],
         "b": {
             "inteligencia": 10,
@@ -108,6 +151,45 @@ module.exports = {
             {
                 "precisao": 7,
                 "dano": 5
+            },
+            {
+                "inteligencia": 6,
+                "precisao": 4
+            },
+            {
+                "mana": 8,
+                "resistencia": 3
+            }
+        ],
+        "u": [
+            "Arquimago",
+            "Domínio Arcano",
+            "Apogeu Mágico"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -121,7 +203,9 @@ module.exports = {
         "p": [
             "Núcleo Flamejante",
             "Pele Incandescente",
-            "Combustão Arcana"
+            "Combustão Arcana",
+            "Brasas Eternas",
+            "Fúria Ígnea"
         ],
         "b": {
             "inteligencia": 9,
@@ -163,6 +247,45 @@ module.exports = {
             {
                 "dano": 10,
                 "precisao": 4
+            },
+            {
+                "dano": 7,
+                "inteligencia": 5
+            },
+            {
+                "dano": 5,
+                "resistencia": 5
+            }
+        ],
+        "u": [
+            "Coração do Inferno",
+            "Senhor das Chamas",
+            "Cataclismo Ígneo"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -176,7 +299,9 @@ module.exports = {
         "p": [
             "Núcleo Glacial",
             "Frieza Arcana",
-            "Cristalização"
+            "Cristalização",
+            "Frio Profundo",
+            "Manto de Geada"
         ],
         "b": {
             "inteligencia": 9,
@@ -218,6 +343,45 @@ module.exports = {
             {
                 "defesa": 6,
                 "vida": 5
+            },
+            {
+                "resistencia": 7,
+                "defesa": 4
+            },
+            {
+                "controle": 5,
+                "vida": 4
+            }
+        ],
+        "u": [
+            "Senhor do Inverno",
+            "Coração Glacial",
+            "Era Congelada"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -231,7 +395,9 @@ module.exports = {
         "p": [
             "Corpo Mineral",
             "Núcleo Denso",
-            "Fortaleza Natural"
+            "Fortaleza Natural",
+            "Peso da Montanha",
+            "Pele de Granito"
         ],
         "b": {
             "inteligencia": 7,
@@ -273,6 +439,45 @@ module.exports = {
             {
                 "resistencia": 9,
                 "dano": 4
+            },
+            {
+                "defesa": 7,
+                "vida": 5
+            },
+            {
+                "resistencia": 6,
+                "defesa": 4
+            }
+        ],
+        "u": [
+            "Senhor da Terra",
+            "Titã de Pedra",
+            "Continente Vivo"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -286,7 +491,9 @@ module.exports = {
         "p": [
             "Corpo Leve",
             "Correnteza Aérea",
-            "Instinto do Vendaval"
+            "Instinto do Vendaval",
+            "Passos Leves",
+            "Fluxo do Ar"
         ],
         "b": {
             "inteligencia": 8,
@@ -328,6 +535,45 @@ module.exports = {
             {
                 "evasao": 8,
                 "velocidade": 6
+            },
+            {
+                "agilidade": 7,
+                "evasao": 5
+            },
+            {
+                "agilidade": 6,
+                "velocidade": 5
+            }
+        ],
+        "u": [
+            "Mestre dos Ventos",
+            "Soberano Celeste",
+            "Tempestade Eterna"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -341,7 +587,9 @@ module.exports = {
         "p": [
             "Fluxo Vital",
             "Pele Aquática",
-            "Reserva das Marés"
+            "Reserva das Marés",
+            "Corrente Vital",
+            "Maré Serena"
         ],
         "b": {
             "inteligencia": 8,
@@ -383,6 +631,45 @@ module.exports = {
             {
                 "mana": 10,
                 "vida": 5
+            },
+            {
+                "vida": 7,
+                "resistencia": 5
+            },
+            {
+                "defesa": 5,
+                "mana": 7
+            }
+        ],
+        "u": [
+            "Senhor das Marés",
+            "Abismo Vivo",
+            "Dilúvio Primordial"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -396,7 +683,9 @@ module.exports = {
         "p": [
             "Vitalidade Natural",
             "Crescimento",
-            "Pacto Verde"
+            "Pacto Verde",
+            "Regeneração Verde",
+            "Raízes Antigas"
         ],
         "b": {
             "inteligencia": 7,
@@ -438,6 +727,45 @@ module.exports = {
             {
                 "dano": 6,
                 "vida": 6
+            },
+            {
+                "vida": 8,
+                "resistencia": 5
+            },
+            {
+                "vida": 6,
+                "dano": 4
+            }
+        ],
+        "u": [
+            "Avatar da Floresta",
+            "Vida Ancestral",
+            "Domínio Verde"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -451,7 +779,9 @@ module.exports = {
         "p": [
             "Núcleo Elétrico",
             "Condutor Arcano",
-            "Reflexo Voltaico"
+            "Reflexo Voltaico",
+            "Carga Estática",
+            "Reflexo do Raio"
         ],
         "b": {
             "inteligencia": 9,
@@ -493,6 +823,45 @@ module.exports = {
             {
                 "evasao": 6,
                 "agilidade": 6
+            },
+            {
+                "agilidade": 6,
+                "precisao": 5
+            },
+            {
+                "dano": 6,
+                "evasao": 5
+            }
+        ],
+        "u": [
+            "Senhor do Trovão",
+            "Céu Tempestuoso",
+            "Raio Primordial"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -506,7 +875,9 @@ module.exports = {
         "p": [
             "Aura Solar",
             "Pureza",
-            "Brilho Interior"
+            "Brilho Interior",
+            "Radiação Benigna",
+            "Fé Solar"
         ],
         "b": {
             "inteligencia": 9,
@@ -548,6 +919,45 @@ module.exports = {
             {
                 "inteligencia": 7,
                 "vida": 5
+            },
+            {
+                "resistencia": 6,
+                "vida": 5
+            },
+            {
+                "inteligencia": 6,
+                "precisao": 4
+            }
+        ],
+        "u": [
+            "Avatar da Luz",
+            "Sol Eterno",
+            "Julgamento Solar"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -561,7 +971,9 @@ module.exports = {
         "p": [
             "Manto Sombrio",
             "Presença do Vazio",
-            "Predador Noturno"
+            "Predador Noturno",
+            "Véu Profundo",
+            "Instinto Noturno"
         ],
         "b": {
             "inteligencia": 8,
@@ -603,6 +1015,45 @@ module.exports = {
             {
                 "dano": 7,
                 "agilidade": 6
+            },
+            {
+                "evasao": 7,
+                "resistencia": 5
+            },
+            {
+                "agilidade": 6,
+                "dano": 5
+            }
+        ],
+        "u": [
+            "Senhor das Sombras",
+            "Abismo Sombrio",
+            "Eclipse Absoluto"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 6,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -616,7 +1067,9 @@ module.exports = {
         "p": [
             "Olho de Águia",
             "Passo Leve",
-            "Mira Fria"
+            "Mira Fria",
+            "Mão Firme",
+            "Caçador Nato"
         ],
         "b": {
             "precisao": 10,
@@ -658,6 +1111,45 @@ module.exports = {
             {
                 "precisao": 8,
                 "dano": 5
+            },
+            {
+                "precisao": 7,
+                "agilidade": 5
+            },
+            {
+                "dano": 5,
+                "precisao": 6
+            }
+        ],
+        "u": [
+            "Olho do Mestre",
+            "Flecha Suprema",
+            "Caçador Perfeito"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -671,7 +1163,9 @@ module.exports = {
         "p": [
             "Furtividade",
             "Reflexos Rápidos",
-            "Oportunista"
+            "Oportunista",
+            "Passo Silencioso",
+            "Golpe Oportuno"
         ],
         "b": {
             "agilidade": 10,
@@ -713,6 +1207,45 @@ module.exports = {
             {
                 "dano": 9,
                 "sorte": 6
+            },
+            {
+                "agilidade": 7,
+                "evasao": 6
+            },
+            {
+                "dano": 7,
+                "sorte": 5
+            }
+        ],
+        "u": [
+            "Mestre do Silêncio",
+            "Sombra Absoluta",
+            "Execução Perfeita"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -726,7 +1259,9 @@ module.exports = {
         "p": [
             "Fortaleza",
             "Guardião Nato",
-            "Última Defesa"
+            "Última Defesa",
+            "Escudo Vivo",
+            "Muralha Interior"
         ],
         "b": {
             "defesa": 12,
@@ -768,6 +1303,45 @@ module.exports = {
             {
                 "defesa": 8,
                 "vida": 10
+            },
+            {
+                "defesa": 7,
+                "vida": 6
+            },
+            {
+                "resistencia": 7,
+                "defesa": 5
+            }
+        ],
+        "u": [
+            "Guardião Supremo",
+            "Bastião Eterno",
+            "Muralha Absoluta"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -781,7 +1355,9 @@ module.exports = {
         "p": [
             "Fúria Natural",
             "Pele Grossa",
-            "Instinto Selvagem"
+            "Instinto Selvagem",
+            "Adrenalina",
+            "Resistência Selvagem"
         ],
         "b": {
             "forca": 12,
@@ -823,6 +1399,45 @@ module.exports = {
             {
                 "forca": 8,
                 "agilidade": 5
+            },
+            {
+                "forca": 7,
+                "dano": 5
+            },
+            {
+                "vida": 7,
+                "resistencia": 5
+            }
+        ],
+        "u": [
+            "Fúria Suprema",
+            "Berserker Ancestral",
+            "Força Selvagem"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -836,7 +1451,9 @@ module.exports = {
         "p": [
             "Corpo Treinado",
             "Ritmo de Combate",
-            "Reflexo Marcial"
+            "Reflexo Marcial",
+            "Disciplina Marcial",
+            "Fôlego de Combate"
         ],
         "b": {
             "forca": 9,
@@ -878,6 +1495,45 @@ module.exports = {
             {
                 "evasao": 6,
                 "forca": 6
+            },
+            {
+                "agilidade": 7,
+                "defesa": 4
+            },
+            {
+                "vida": 6,
+                "forca": 5
+            }
+        ],
+        "u": [
+            "Mestre Marcial",
+            "Punho Supremo",
+            "Corpo Perfeito"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -891,7 +1547,9 @@ module.exports = {
         "p": [
             "Corpo de Ferreiro",
             "Armadura Reforçada",
-            "Mestre da Forja"
+            "Mestre da Forja",
+            "Metal Vivo",
+            "Forja Resistente"
         ],
         "b": {
             "forca": 8,
@@ -933,6 +1591,45 @@ module.exports = {
             {
                 "defesa": 8,
                 "dano": 5
+            },
+            {
+                "defesa": 7,
+                "resistencia": 6
+            },
+            {
+                "forca": 6,
+                "vida": 5
+            }
+        ],
+        "u": [
+            "Mestre da Forja",
+            "Forja Ancestral",
+            "Arsenal Perfeito"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -946,7 +1643,9 @@ module.exports = {
         "p": [
             "Rastreador Nato",
             "Instinto de Caça",
-            "Caçador de Monstros"
+            "Caçador de Monstros",
+            "Rastreador Perfeito",
+            "Predador Nato"
         ],
         "b": {
             "precisao": 9,
@@ -988,6 +1687,45 @@ module.exports = {
             {
                 "dano": 10,
                 "precisao": 5
+            },
+            {
+                "precisao": 7,
+                "dano": 5
+            },
+            {
+                "sorte": 6,
+                "agilidade": 5
+            }
+        ],
+        "u": [
+            "Mestre Rastreador",
+            "Predador Supremo",
+            "Caçada Perfeita"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1001,7 +1739,9 @@ module.exports = {
         "p": [
             "Sangue de Guerra",
             "Aura Carmesim",
-            "Predador Carmesim"
+            "Predador Carmesim",
+            "Frenesi Carmesim",
+            "Sede de Batalha"
         ],
         "b": {
             "forca": 11,
@@ -1043,6 +1783,45 @@ module.exports = {
             {
                 "dano": 7,
                 "forca": 7
+            },
+            {
+                "forca": 7,
+                "dano": 6
+            },
+            {
+                "vida": 6,
+                "agilidade": 5
+            }
+        ],
+        "u": [
+            "Rei Carmesim",
+            "Sangue Ancestral",
+            "Dança da Morte"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1056,7 +1835,9 @@ module.exports = {
         "p": [
             "Fluxo Híbrido",
             "Lâmina Encantada",
-            "Equilíbrio Arcano"
+            "Equilíbrio Arcano",
+            "Sintonia Arcana",
+            "Lâmina Equilibrada"
         ],
         "b": {
             "forca": 7,
@@ -1099,6 +1880,45 @@ module.exports = {
             {
                 "defesa": 5,
                 "mana": 8
+            },
+            {
+                "inteligencia": 6,
+                "forca": 5
+            },
+            {
+                "dano": 5,
+                "mana": 6
+            }
+        ],
+        "u": [
+            "Mestre do Éter",
+            "Lâmina Suprema",
+            "Equilíbrio Perfeito"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1112,7 +1932,9 @@ module.exports = {
         "p": [
             "Sangue Vulcânico",
             "Armadura Magmática",
-            "Fúria Incandescente"
+            "Fúria Incandescente",
+            "Brasa Viva",
+            "Sangue Vulcânico"
         ],
         "b": {
             "forca": 10,
@@ -1154,6 +1976,45 @@ module.exports = {
             {
                 "forca": 8,
                 "dano": 7
+            },
+            {
+                "dano": 7,
+                "forca": 5
+            },
+            {
+                "vida": 6,
+                "resistencia": 5
+            }
+        ],
+        "u": [
+            "Rei da Lava",
+            "Coração Vulcânico",
+            "Erupção Suprema"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1167,7 +2028,9 @@ module.exports = {
         "p": [
             "Sangue Frio",
             "Armadura Glacial",
-            "Coração de Gelo"
+            "Coração de Gelo",
+            "Frio Absoluto",
+            "Geada Persistente"
         ],
         "b": {
             "forca": 9,
@@ -1209,6 +2072,45 @@ module.exports = {
             {
                 "dano": 7,
                 "resistencia": 7
+            },
+            {
+                "resistencia": 7,
+                "defesa": 5
+            },
+            {
+                "controle": 5,
+                "dano": 5
+            }
+        ],
+        "u": [
+            "Rei do Inverno",
+            "Gelo Absoluto",
+            "Era Glacial"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1222,7 +2124,9 @@ module.exports = {
         "p": [
             "Pele Rochosa",
             "Peso do Monólito",
-            "Vontade de Pedra"
+            "Vontade de Pedra",
+            "Fundação de Pedra",
+            "Peso Titânico"
         ],
         "b": {
             "forca": 9,
@@ -1264,6 +2168,45 @@ module.exports = {
             {
                 "vida": 9,
                 "resistencia": 9
+            },
+            {
+                "defesa": 8,
+                "resistencia": 6
+            },
+            {
+                "vida": 7,
+                "agilidade": -1
+            }
+        ],
+        "u": [
+            "Titã do Monólito",
+            "Corpo de Montanha",
+            "Impacto Primordial"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1277,7 +2220,9 @@ module.exports = {
         "p": [
             "Corpo Celeste",
             "Velocidade do Vento",
-            "Instinto Aéreo"
+            "Instinto Aéreo",
+            "Corrente Favorável",
+            "Passo do Céu"
         ],
         "b": {
             "forca": 8,
@@ -1319,6 +2264,45 @@ module.exports = {
             {
                 "evasao": 8,
                 "precisao": 6
+            },
+            {
+                "agilidade": 7,
+                "evasao": 5
+            },
+            {
+                "velocidade": 7,
+                "precisao": 5
+            }
+        ],
+        "u": [
+            "Mestre Celeste",
+            "Lâmina do Céu",
+            "Tempestade Suprema"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1332,7 +2316,9 @@ module.exports = {
         "p": [
             "Sangue Condutor",
             "Reflexo Elétrico",
-            "Carga Tempestuosa"
+            "Carga Tempestuosa",
+            "Carga Elétrica",
+            "Reflexo Trovejante"
         ],
         "b": {
             "forca": 10,
@@ -1374,6 +2360,45 @@ module.exports = {
             {
                 "dano": 7,
                 "precisao": 7
+            },
+            {
+                "agilidade": 7,
+                "dano": 5
+            },
+            {
+                "precisao": 6,
+                "evasao": 5
+            }
+        ],
+        "u": [
+            "Rei do Relâmpago",
+            "Lâmina Voltaica Suprema",
+            "Tempestade Primordial"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1387,7 +2412,9 @@ module.exports = {
         "p": [
             "Corpo Fluido",
             "Maré Protetora",
-            "Pressão Abissal"
+            "Pressão Abissal",
+            "Fluxo Profundo",
+            "Pressão das Marés"
         ],
         "b": {
             "forca": 9,
@@ -1429,6 +2456,45 @@ module.exports = {
             {
                 "dano": 8,
                 "penetracao": 6
+            },
+            {
+                "resistencia": 7,
+                "vida": 5
+            },
+            {
+                "dano": 5,
+                "defesa": 5
+            }
+        ],
+        "u": [
+            "Rei das Marés",
+            "Lâmina Abissal Suprema",
+            "Oceano Primordial"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1442,7 +2508,9 @@ module.exports = {
         "p": [
             "Vitalidade Verde",
             "Casca Viva",
-            "Espírito da Floresta"
+            "Espírito da Floresta",
+            "Broto Eterno",
+            "Casca Natural"
         ],
         "b": {
             "forca": 9,
@@ -1484,6 +2552,45 @@ module.exports = {
             {
                 "vida": 8,
                 "dano": 6
+            },
+            {
+                "vida": 8,
+                "resistencia": 5
+            },
+            {
+                "defesa": 6,
+                "vida": 6
+            }
+        ],
+        "u": [
+            "Rei da Floresta",
+            "Lâmina Ancestral",
+            "Avatar Verdejante"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1497,7 +2604,9 @@ module.exports = {
         "p": [
             "Aura Radiante",
             "Pureza da Lâmina",
-            "Espírito Solar"
+            "Espírito Solar",
+            "Luz Interior",
+            "Bênção Solar"
         ],
         "b": {
             "forca": 8,
@@ -1539,6 +2648,45 @@ module.exports = {
             {
                 "vida": 7,
                 "resistencia": 6
+            },
+            {
+                "resistencia": 6,
+                "inteligencia": 5
+            },
+            {
+                "vida": 6,
+                "dano": 5
+            }
+        ],
+        "u": [
+            "Rei da Aurora",
+            "Lâmina Solar Suprema",
+            "Luz Primordial"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1552,7 +2700,9 @@ module.exports = {
         "p": [
             "Manto do Eclipse",
             "Predador das Sombras",
-            "Véu Sombrio"
+            "Véu Sombrio",
+            "Sombra Persistente",
+            "Instinto do Eclipse"
         ],
         "b": {
             "forca": 9,
@@ -1594,6 +2744,45 @@ module.exports = {
             {
                 "resistencia": 7,
                 "evasao": 6
+            },
+            {
+                "evasao": 7,
+                "agilidade": 6
+            },
+            {
+                "dano": 6,
+                "resistencia": 5
+            }
+        ],
+        "u": [
+            "Rei do Eclipse",
+            "Lâmina do Vazio",
+            "Noite Primordial"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     },
@@ -1607,7 +2796,9 @@ module.exports = {
         "p": [
             "Conhecimento Alquímico",
             "Mistura Instável",
-            "Mestre dos Elixires"
+            "Mestre dos Elixires",
+            "Reação Perfeita",
+            "Catalisador"
         ],
         "b": {
             "inteligencia": 9,
@@ -1649,6 +2840,45 @@ module.exports = {
             {
                 "inteligencia": 7,
                 "mana": 8
+            },
+            {
+                "inteligencia": 7,
+                "sorte": 5
+            },
+            {
+                "mana": 7,
+                "dano": 4
+            }
+        ],
+        "u": [
+            "Mestre da Transmutação",
+            "Alquimia Ancestral",
+            "Pedra Filosofal"
+        ],
+        "ub": [
+            {
+                "dano": 8,
+                "forca": 6,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 20
+            },
+            {
+                "dano": 10,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 40
+            },
+            {
+                "dano": 12,
+                "forca": 4,
+                "inteligencia": 3,
+                "precisao": 5,
+                "mana": 0,
+                "nivel": 60
             }
         ]
     }
