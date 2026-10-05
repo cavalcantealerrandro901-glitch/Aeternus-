@@ -261,14 +261,10 @@ function removeItemAt(userId, index0) {
     const item = inv[index0];
     if (!item) return null;
     const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
-    if (qty > 1) {
-        item.quantity = qty - 1;
-    } else {
-        inv.splice(index0, 1);
-    }
+    inv.splice(index0, 1);
     data[userId].updatedAt = Date.now();
     save(data);
-    return { ...item, quantity: 1 };
+    return { ...item, quantity: qty };
 }
 function equipItem(userId, index1) {
     const p = get(userId);
