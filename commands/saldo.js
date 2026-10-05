@@ -18,22 +18,27 @@ function globalRank(userId) {
 
 function buildText(viewer, target) {
     const bal = eter.get(target.id);
-    const rank = globalRank(target.id);
-    const rankStr = rank != null ? String(rank) : '—';
+    const rank = bal > 0 ? globalRank(target.id) : null;
 
-    if (String(viewer.id) === String(target.id)) {
-        return [
-            target + ' Você possui ✨ **' + fmt(bal) + '** éter',
-            'e está em **#' + rankStr + '** global.',
-            '',
-            'Comandos disponíveis: `/minas` e `/ver-saldo`.'
-        ].join('\n');
+    const lines = [
+        '╭────────────────────────────╮',
+        '│ ✦ AETERNUS • CARTEIRA',
+        '├────────────────────────────┤',
+        '│ 👤 ' + target,
+        '│',
+        '│ ✨ **' + fmt(bal) + ' ÉTER**',
+        '├────────────────────────────┤'
+    ];
+
+    if (rank != null) {
+        lines.push(
+            '│ 🏆 RANKING GLOBAL',
+            '│ #**' + rank + '**'
+        );
     }
 
-    return [
-        viewer + ' O ' + target + ' possui ✨ **' + fmt(bal) + '** éter',
-        'e você sabia que ' + target + ' está em **#' + rankStr + '** lugar do rank global?'
-    ].join('\n');
+    lines.push('╰────────────────────────────╯');
+    return lines.join('\n');
 }
 
 async function run(viewer, target, reply) {
