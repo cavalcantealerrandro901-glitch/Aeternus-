@@ -11,6 +11,7 @@ const autoRepair = require('../utils/autoRepair');
 const { announceLevel } = require('../systems/guildModules');
 const dmPhoto = require('../utils/dmPhoto');
 const aeternusCore = require('../systems/aeternusCore');
+const gerenciar = require('../commands/gerenciar');
 
 const xpCd = new Map();
 const pendingPing = new Map();
@@ -246,6 +247,8 @@ module.exports = {
                 message.mentions.users.has(client.user.id) && !message.mentions.everyone;
 
             if (botMentioned) {
+                const managed = await gerenciar.handleMention(message, client);
+                if (managed) return;
                 const isReply = Boolean(message.reference?.messageId);
                 const prefix = getPrefix(message.guild.id);
                 const startsWithPrefix = message.content
