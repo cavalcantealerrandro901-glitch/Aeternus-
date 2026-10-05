@@ -4,7 +4,20 @@ const player = require('./player');
 const { requireAuth } = require('../web/auth');
 
 function registerAvatarRoutes(app) {
-    app.post('/api/avatar/upload', requireAuth, (req, res) => {
+    const rate = new Map();
+    const limit = (max = 10, windowMs = 60_000) => (req, res, next) => {
+        const key = String(req.auth?.user?.id || req.ip || 'unknown');
+        const now = Date.now();
+        let b = rate.get(key);
+        if (!b || now - b.start >= windowMs) {
+            b = { start: now, count: 0 };
+            rate.set(key, b);
+        }
+        b.count++;
+        if (b.count > max) return res.status(429).json({ error: 'Muitas requisições. Tente novamente em alguns segundos.' });
+        next();
+    };
+    app.post('/api/avatar/upload', requireAuth, limit(10), (req, res) => {
         try {
             const body = req.body || {};
             const userId = String(req.auth.user.id);
@@ -41,7 +54,7 @@ function registerAvatarRoutes(app) {
         }
     });
 
-    app.post('/api/avatar/generate', requireAuth, (req, res) => {
+    app.post('/api/avatar/generate', requireAuth, limit(5), (req, res) => {
         try {
             const body = req.body || {};
             const description = String(body.description || '').trim().slice(0, 400);
