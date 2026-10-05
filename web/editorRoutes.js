@@ -4,6 +4,7 @@ const ai = require('../utils/aeternusAI');
 const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { requireAuth, requireEditorOwner } = require('./auth');
 
 function panelAuth(req, res, next) {
     const secret = String(process.env.PANEL_SECRET || process.env.EDITOR_SECRET || '').trim();
@@ -284,6 +285,8 @@ async function askAI(message, fileContext, { wantWrite, fallbackPath, isFix }) {
 function registerEditorRoutes(app) {
     const r = express.Router();
     r.use(panelAuth);
+    r.use(requireAuth);
+    r.use(requireEditorOwner);
 
     r.get('/tree', (req, res) => {
         try {
