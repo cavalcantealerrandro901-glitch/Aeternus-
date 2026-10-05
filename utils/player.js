@@ -8,22 +8,12 @@ const INVENTORY_LEVEL_STEP = 20;
 const INVENTORY_CAPACITY_STEP = 5;
 const SELL_VALUES = { comum:30000, incomum:75000, raro:150000, epico:300000, lendario:750000, lendaria:750000, mitico:1500000, mitica:1500000, cosmico:3000000, cosmica:3000000, unica:5000000 };
 
-const CLASSES = new Proxy(
-    {},
-    {
-        get(_, prop) {
-            if (prop === 'toJSON' || prop === Symbol.toStringTag) return undefined;
-            return classesMod.allClasses()[prop];
-        },
-        ownKeys() { return Object.keys(classesMod.allClasses()); },
-        getOwnPropertyDescriptor(_, prop) {
-            const all = classesMod.allClasses();
-            if (prop in all) return { enumerable: true, configurable: true, value: all[prop] };
-            return undefined;
-        },
-        has(_, prop) { return prop in classesMod.allClasses(); }
-    }
-);
+const CLASSES = new Proxy({}, {
+    get(_, prop) { if (prop === 'toJSON' || prop === Symbol.toStringTag) return undefined; return classesMod.allClasses()[prop]; },
+    ownKeys() { return Object.keys(classesMod.allClasses()); },
+    getOwnPropertyDescriptor(_, prop) { const all = classesMod.allClasses(); if (prop in all) return { enumerable: true, configurable: true, value: all[prop] }; return undefined; },
+    has(_, prop) { return prop in classesMod.allClasses(); }
+});
 
 const ITEM_CATEGORIES = [
     { value: 'arma', name: 'Armas' },
@@ -46,9 +36,7 @@ function get(userId) { return all()[userId] || null; }
 function getClass(classId) { return classesMod.getClass(classId); }
 
 function safeResolveClassId(classId) {
-    if (typeof classesMod.resolveClassId === 'function') {
-        return classesMod.resolveClassId(classId) || classId || 'guerreiro';
-    }
+    if (typeof classesMod.resolveClassId === 'function') return classesMod.resolveClassId(classId) || classId || 'guerreiro';
     const id = String(classId || 'guerreiro').trim() || 'guerreiro';
     return classesMod.getClass(id) ? id : 'guerreiro';
 }
@@ -58,6 +46,19 @@ function getInventoryCapacity(userId) { const level=getPlayerLevel(userId); retu
 function getInventoryUsed(userId) { return normalizeInventory(userId).length; }
 function getInventorySpace(userId) { const capacity=getInventoryCapacity(userId); const used=getInventoryUsed(userId); return {used,capacity,free:Math.max(0,capacity-used),level:getPlayerLevel(userId)}; }
 function getSellValue(item) { const rarity=String(item?.rarity||itemsCatalog.getItemDef(item?.id)?.rarity||'comum').toLowerCase(); return SELL_VALUES[rarity]||SELL_VALUES.comum; }
+
+/**
+ * Itens acumuláveis ficam em uma única pilha.
+ * Itens não acumuláveis ocupam um slot individual, mesmo tendo o mesmo ID.
+ * Por padrão, consumíveis são acumuláveis; equipamentos e itens especiais não.
+ * Um item pode sobrescrever isso usando stackable: true/false.
+ */
+function isStackable(item) {
+    if (item?.stackable !== undefined) return item.stackable === true;
+    const def = item?.id ? itemsCatalog.getItemDef(item.id) : null;
+    if (def?.stackable !== undefined) return def.stackable === true;
+    return String(item?.category || def?.category || '').toLowerCase() === 'consumivel';
+}
 
 function maxManaFromLevel(level, classId) {
     const lv = Math.max(0, Number(level) || 0);
@@ -70,24 +71,10 @@ function create(userId, { name, classId, photoUrl } = {}) {
     const resolved = safeResolveClassId(classId || 'guerreiro');
     if (!classesMod.getClass(resolved)) throw new Error('Classe inválida');
     const data = all();
-    const claim = typeof classesMod.canClaim === 'function'
-        ? classesMod.canClaim(resolved, userId, data)
-        : { ok: true };
+    const claim = typeof classesMod.canClaim === 'function' ? classesMod.canClaim(resolved, userId, data) : { ok: true };
     if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
-    const profile = {
-        userId,
-        name: String(name || 'Aventureiro').slice(0, 32),
-        classId: resolved,
-        photoUrl: photoUrl || null,
-        inventory: [],
-        equipped: { arma: null, armadura: null, acessorio: null },
-        materials: {},
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-    };
-    data[userId] = profile;
-    save(data);
-    return profile;
+    const profile = { userId, name: String(name || 'Aventureiro').slice(0, 32), classId: resolved, photoUrl: photoUrl || null, inventory: [], equipped: { arma: null, armadura: null, acessorio: null }, materials: {}, createdAt: Date.now(), updatedAt: Date.now() };
+    data[userId] = profile; save(data); return profile;
 }
 
 function update(userId, patch) {
@@ -95,74 +82,48 @@ function update(userId, patch) {
     if (!data[userId]) return null;
     if (patch && patch.classId != null) {
         const resolved = safeResolveClassId(patch.classId);
-        const claim = typeof classesMod.canClaim === 'function'
-            ? classesMod.canClaim(resolved, userId, data)
-            : { ok: true };
+        const claim = typeof classesMod.canClaim === 'function' ? classesMod.canClaim(resolved, userId, data) : { ok: true };
         if (!claim.ok) throw new Error(claim.reason || 'Classe indisponível');
         patch = { ...patch, classId: resolved };
     }
-    data[userId] = { ...data[userId], ...patch, updatedAt: Date.now() };
-    save(data);
-    return data[userId];
+    data[userId] = { ...data[userId], ...patch, updatedAt: Date.now() }; save(data); return data[userId];
 }
 
-function getBattleAvatar(userId) {
-    const p = get(userId);
-    return (p && p.battleAvatar) || null;
-}
+function getBattleAvatar(userId) { const p = get(userId); return (p && p.battleAvatar) || null; }
 function setBattleAvatar(userId, avatar) {
     if (!get(userId)) return null;
     const imageUrl = String(avatar.imageUrl || avatar.url || '').trim().slice(0, 800);
     const description = String(avatar.description || avatar.prompt || '').trim().slice(0, 500);
     const sourceUrl = String(avatar.sourceUrl || '').trim().slice(0, 800) || null;
     if (!imageUrl) return null;
-    return update(userId, {
-        battleAvatar: { type: avatar.type || 'ai3d', description, imageUrl, sourceUrl, updatedAt: Date.now() },
-        battlePhotoUrl: imageUrl
-    });
+    return update(userId, { battleAvatar: { type: avatar.type || 'ai3d', description, imageUrl, sourceUrl, updatedAt: Date.now() }, battlePhotoUrl: imageUrl });
 }
-function getBattlePhoto(userId) {
-    const p = get(userId);
-    if (!p) return null;
-    if (p.battleAvatar && p.battleAvatar.imageUrl) return p.battleAvatar.imageUrl;
-    if (p.battlePhotoUrl) return p.battlePhotoUrl;
-    return p.photoUrl || null;
-}
+function getBattlePhoto(userId) { const p = get(userId); if (!p) return null; if (p.battleAvatar?.imageUrl) return p.battleAvatar.imageUrl; if (p.battlePhotoUrl) return p.battlePhotoUrl; return p.photoUrl || null; }
 
 function normalizeInventory(userId) {
-    const data = all();
-    const p = data[userId];
-    if (!p) return [];
+    const data = all(); const p = data[userId]; if (!p) return [];
     if (!Array.isArray(p.inventory)) p.inventory = [];
-    const merged = [];
-    const byId = new Map();
-    let changed = false;
+    const merged = []; const byId = new Map(); let changed = false;
 
     for (const raw of p.inventory) {
         const item = { ...raw };
         const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
-        item.quantity = qty;
+        item.quantity = isStackable(item) ? qty : 1;
         if (!item.uid) item.uid = crypto.randomBytes(6).toString('hex');
         if (!item.gotAt) item.gotAt = Date.now();
         if (!item.category) item.category = itemCategory(item);
 
-        if (item.id) {
+        if (item.id && isStackable(item)) {
             const key = String(item.id);
             const existing = byId.get(key);
-            if (existing) {
-                existing.quantity += qty;
-                changed = true;
-                continue;
-            }
+            if (existing) { existing.quantity += qty; changed = true; continue; }
             byId.set(key, item);
         }
         merged.push(item);
     }
 
-    if (changed || merged.length !== p.inventory.length) {
-        p.inventory = merged;
-        p.updatedAt = Date.now();
-        save(data);
+    if (changed || merged.length !== p.inventory.length || p.inventory.some((x,i) => x.quantity !== merged[i]?.quantity)) {
+        p.inventory = merged; p.updatedAt = Date.now(); save(data);
     }
     return merged;
 }
@@ -172,20 +133,30 @@ function addItem(userId, item, quantity = 1) {
     if (!data[userId]) return null;
     if (!Array.isArray(data[userId].inventory)) data[userId].inventory = [];
     const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+    const stackable = isStackable(item);
     const id = item?.id ? String(item.id) : null;
-    let entry = id ? data[userId].inventory.find((x) => String(x.id) === id) : null;
+    let entry = stackable && id ? data[userId].inventory.find((x) => String(x.id) === id && isStackable(x)) : null;
+
     if (entry) {
         entry.quantity = Math.max(1, Math.floor(Number(entry.quantity) || 1)) + qty;
         entry.category = entry.category || itemCategory(entry);
     } else {
-        if (data[userId].inventory.length >= getInventoryCapacity(userId)) return null;
-        entry = { ...item, uid: item.uid || crypto.randomBytes(6).toString('hex'), gotAt: item.gotAt || Date.now(), quantity: qty };
-        if (!entry.category) entry.category = itemCategory(entry);
-        data[userId].inventory.push(entry);
+        const amountOfSlots = stackable ? 1 : qty;
+        if (data[userId].inventory.length + amountOfSlots > getInventoryCapacity(userId)) return null;
+        if (stackable) {
+            entry = { ...item, uid: item.uid || crypto.randomBytes(6).toString('hex'), gotAt: item.gotAt || Date.now(), quantity: qty };
+            if (!entry.category) entry.category = itemCategory(entry);
+            data[userId].inventory.push(entry);
+        } else {
+            for (let i = 0; i < qty; i++) {
+                const single = { ...item, uid: crypto.randomBytes(6).toString('hex'), gotAt: item.gotAt || Date.now(), quantity: 1 };
+                if (!single.category) single.category = itemCategory(single);
+                data[userId].inventory.push(single);
+            }
+            entry = data[userId].inventory[data[userId].inventory.length - qty];
+        }
     }
-    data[userId].updatedAt = Date.now();
-    save(data);
-    return data[userId];
+    data[userId].updatedAt = Date.now(); save(data); return data[userId];
 }
 
 function sellItem(userId, index1, quantity) {
@@ -195,18 +166,20 @@ function sellItem(userId, index1, quantity) {
     const idx = Math.floor(Number(index1) || 0) - 1;
     if (idx < 0 || idx >= inv.length) return { ok:false, error:'Item inválido.' };
     const item = inv[idx];
-    const totalQty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    const totalQty = isStackable(item) ? Math.max(1, Math.floor(Number(item.quantity) || 1)) : 1;
     const qty = quantity == null ? totalQty : Math.max(1, Math.min(totalQty, Math.floor(Number(quantity) || 1)));
     const unitValue = getSellValue(item);
     const totalValue = unitValue * qty;
-    if (qty >= totalQty) inv.splice(idx,1);
-    else item.quantity = totalQty - qty;
-    data[userId].updatedAt = Date.now();
-    save(data);
-    const eter = require('./eter');
-    eter.add(userId,totalValue,{reason:'venda de item'});
-    return { ok:true, item:{...item,quantity:qty}, quantity:qty, unitValue, totalValue, remaining:qty>=totalQty?0:totalQty-qty };
+    inv.splice(idx,1);
+    if (isStackable(item) && qty < totalQty) {
+        const remaining = { ...item, quantity: totalQty - qty };
+        inv.splice(idx,0,remaining);
+    }
+    data[userId].updatedAt = Date.now(); save(data);
+    const eter = require('./eter'); eter.add(userId,totalValue,{reason:'venda de item'});
+    return { ok:true, item:{...item,quantity:qty}, quantity:qty, unitValue, totalValue, remaining:isStackable(item)?Math.max(0,totalQty-qty):0 };
 }
+
 function itemCategory(item) {
     if (item?.category) return item.category;
     const def = item?.id ? itemsCatalog.getItemDef(item.id) : null;
@@ -219,18 +192,11 @@ function itemCategory(item) {
     return 'especial';
 }
 
-function rollClassItem(classId) {
-    return itemsCatalog.rollDropItem?.(safeResolveClassId(classId || 'guerreiro'));
-}
+function rollClassItem(classId) { return itemsCatalog.rollDropItem?.(safeResolveClassId(classId || 'guerreiro')); }
 
 function getInventory(userId, category) {
     let list = normalizeInventory(userId);
-    list = list.map((it) => ({
-        ...it,
-        quantity: Math.max(1, Math.floor(Number(it.quantity) || 1)),
-        category: it.category || itemCategory(it),
-        rarity: it.rarity || itemsCatalog.getItemDef(it.id)?.rarity || 'comum'
-    }));
+    list = list.map((it) => ({ ...it, quantity: isStackable(it) ? Math.max(1, Math.floor(Number(it.quantity) || 1)) : 1, category: it.category || itemCategory(it), rarity: it.rarity || itemsCatalog.getItemDef(it.id)?.rarity || 'comum' }));
     if (category && category !== 'todos') list = list.filter((it) => String(it.category) === String(category));
     return list;
 }
@@ -241,107 +207,78 @@ function ensureEquipped(p) {
     for (const s of ['arma', 'armadura', 'acessorio']) if (!(s in p.equipped)) p.equipped[s] = null;
     return p.equipped;
 }
-function getEquipped(userId) {
-    const p = get(userId);
-    if (!p) return { arma: null, armadura: null, acessorio: null };
-    return { ...ensureEquipped(p) };
-}
-function equipSlotFor(item) {
-    const cat = itemCategory(item);
-    if (cat === 'arma') return 'arma';
-    if (cat === 'armadura') return 'armadura';
-    if (cat === 'acessorio') return 'acessorio';
-    return null;
-}
+function getEquipped(userId) { const p = get(userId); if (!p) return { arma: null, armadura: null, acessorio: null }; return { ...ensureEquipped(p) }; }
+function equipSlotFor(item) { const cat = itemCategory(item); if (cat === 'arma') return 'arma'; if (cat === 'armadura') return 'armadura'; if (cat === 'acessorio') return 'acessorio'; return null; }
+
 function removeItemAt(userId, index0) {
-    const data = all();
-    if (!data[userId] || !Array.isArray(data[userId].inventory)) return null;
-    const inv = data[userId].inventory;
-    if (index0 < 0 || index0 >= inv.length) return null;
-    const item = inv[index0];
-    if (!item) return null;
-    const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
-    inv.splice(index0, 1);
-    data[userId].updatedAt = Date.now();
-    save(data);
-    return { ...item, quantity: qty };
+    const data = all(); if (!data[userId] || !Array.isArray(data[userId].inventory)) return null;
+    const inv = data[userId].inventory; if (index0 < 0 || index0 >= inv.length) return null;
+    const item = inv[index0]; if (!item) return null;
+    const qty = isStackable(item) ? Math.max(1, Math.floor(Number(item.quantity) || 1)) : 1;
+    inv.splice(index0, 1); data[userId].updatedAt = Date.now(); save(data); return { ...item, quantity: qty };
 }
+
 function equipItem(userId, index1) {
     const p = get(userId);
     if (!p) return { ok: false, error: 'Sem perfil de jogador. Use `O.j criar`.' };
-    const inv = getInventory(userId, 'todos');
-    const idx = Math.floor(Number(index1) || 0) - 1;
+    const inv = getInventory(userId, 'todos'); const idx = Math.floor(Number(index1) || 0) - 1;
     if (idx < 0 || idx >= inv.length) return { ok: false, error: 'Número inválido. Veja `O.inventario`.' };
-    const item = inv[idx];
-    const slot = equipSlotFor(item);
+    const item = inv[idx]; const slot = equipSlotFor(item);
     if (!slot) return { ok: false, error: 'Este item não pode ser equipado. Use `O.usar` se for consumível/livro.' };
-    const data = all();
-    const raw = data[userId].inventory || [];
+    const data = all(); const raw = data[userId].inventory || [];
     const rawIndex = item.uid ? raw.findIndex((x) => x.uid === item.uid) : idx;
     if (rawIndex < 0 || rawIndex >= raw.length) return { ok: false, error: 'Não foi possível remover o item do inventário.' };
 
-    const stack = raw[rawIndex];
-    const removed = { ...stack, quantity: 1 };
-    const stackQty = Math.max(1, Math.floor(Number(stack.quantity) || 1));
-    if (stackQty > 1) stack.quantity = stackQty - 1;
-    else raw.splice(rawIndex, 1);
+    const stack = raw[rawIndex]; const removed = { ...stack, quantity: 1 };
+    const stackQty = isStackable(stack) ? Math.max(1, Math.floor(Number(stack.quantity) || 1)) : 1;
+    if (stackQty > 1) stack.quantity = stackQty - 1; else raw.splice(rawIndex, 1);
 
-    ensureEquipped(data[userId]);
-    const previous = data[userId].equipped[slot];
+    ensureEquipped(data[userId]); const previous = data[userId].equipped[slot];
     data[userId].equipped[slot] = { ...removed, equippedAt: Date.now() };
     if (previous) {
-        const back = { ...previous };
-        delete back.equippedAt;
-        raw.push(back);
+        const back = { ...previous }; delete back.equippedAt;
+        if (isStackable(back)) {
+            const existing = raw.find((x) => back.id && String(x.id) === String(back.id) && isStackable(x));
+            if (existing) existing.quantity = Math.max(1, Math.floor(Number(existing.quantity) || 1)) + 1;
+            else raw.push({ ...back, quantity: 1, uid: back.uid || crypto.randomBytes(6).toString('hex'), gotAt: back.gotAt || Date.now() });
+        } else {
+            raw.push({ ...back, quantity: 1, uid: back.uid || crypto.randomBytes(6).toString('hex'), gotAt: back.gotAt || Date.now() });
+        }
     }
-    data[userId].updatedAt = Date.now();
-    save(data);
+    data[userId].updatedAt = Date.now(); save(data);
     return { ok: true, slot, item: data[userId].equipped[slot], previous: previous || null };
 }
+
 function unequipSlot(userId, slot) {
     const s = String(slot || '').toLowerCase();
     if (!['arma', 'armadura', 'acessorio'].includes(s)) return { ok: false, error: 'Slot inválido. Use: arma, armadura ou acessorio.' };
-    const data = all();
-    if (!data[userId]) return { ok: false, error: 'Sem perfil.' };
-    ensureEquipped(data[userId]);
-    const item = data[userId].equipped[s];
+    const data = all(); if (!data[userId]) return { ok: false, error: 'Sem perfil.' };
+    ensureEquipped(data[userId]); const item = data[userId].equipped[s];
     if (!item) return { ok: false, error: `Nada equipado em **${s}**.` };
     data[userId].equipped[s] = null;
     if (!Array.isArray(data[userId].inventory)) data[userId].inventory = [];
-    const back = { ...item };
-    delete back.equippedAt;
-    const existing = data[userId].inventory.find((x) => back.id && String(x.id) === String(back.id));
-    if (existing) existing.quantity = Math.max(1, Math.floor(Number(existing.quantity) || 1)) + 1;
-    else data[userId].inventory.push({ ...back, quantity: 1, uid: back.uid || crypto.randomBytes(6).toString('hex'), gotAt: back.gotAt || Date.now() });
-    data[userId].updatedAt = Date.now();
-    save(data);
+    const back = { ...item }; delete back.equippedAt;
+    if (isStackable(back)) {
+        const existing = data[userId].inventory.find((x) => back.id && String(x.id) === String(back.id) && isStackable(x));
+        if (existing) existing.quantity = Math.max(1, Math.floor(Number(existing.quantity) || 1)) + 1;
+        else data[userId].inventory.push({ ...back, quantity: 1, uid: back.uid || crypto.randomBytes(6).toString('hex'), gotAt: back.gotAt || Date.now() });
+    } else {
+        data[userId].inventory.push({ ...back, quantity: 1, uid: back.uid || crypto.randomBytes(6).toString('hex'), gotAt: back.gotAt || Date.now() });
+    }
+    data[userId].updatedAt = Date.now(); save(data);
     return { ok: true, slot: s, item: back };
 }
-function useItem(userId, index1) {
-    return { ok: false, error: 'Use o comando O.usar para consumíveis.' };
-}
+function useItem(userId, index1) { return { ok: false, error: 'Use o comando O.usar para consumíveis.' }; }
 
 function getEquipmentBonuses(userId) {
     const eq = getEquipped(userId);
-    const bonus = {
-        forca: 0, defesa: 0, agilidade: 0, vida: 0,
-        inteligencia: 0, sorte: 0, precisao: 0, resistencia: 0,
-        dano: 0, critico: 0, mana: 0, manaBonus: 0
-    };
-    const alias = (k) => {
-        if (k === 'vitalidade' || k === 'constituicao') return 'vida';
-        if (k === 'espirito') return 'inteligencia';
-        if (k === 'crit') return 'critico';
-        return k;
-    };
+    const bonus = { forca: 0, defesa: 0, agilidade: 0, vida: 0, inteligencia: 0, sorte: 0, precisao: 0, resistencia: 0, dano: 0, critico: 0, mana: 0, manaBonus: 0 };
+    const alias = (k) => { if (k === 'vitalidade' || k === 'constituicao') return 'vida'; if (k === 'espirito') return 'inteligencia'; if (k === 'crit') return 'critico'; return k; };
     for (const slot of ['arma', 'armadura', 'acessorio']) {
-        const it = eq[slot];
-        if (!it?.effects || typeof it.effects !== 'object') continue;
+        const it = eq[slot]; if (!it?.effects || typeof it.effects !== 'object') continue;
         for (const [k0, v] of Object.entries(it.effects)) {
             if (typeof v !== 'number' || !Number.isFinite(v)) continue;
-            const k = alias(k0);
-            if (bonus[k] !== undefined) bonus[k] += v;
-            else if (k === 'manaBonus') bonus.manaBonus += v;
+            const k = alias(k0); if (bonus[k] !== undefined) bonus[k] += v; else if (k === 'manaBonus') bonus.manaBonus += v;
         }
     }
     return bonus;
@@ -350,24 +287,15 @@ function getEquipmentBonuses(userId) {
 function listMissing(userIds) { return userIds.filter((id) => !has(id)); }
 function count() { return Object.keys(all()).filter((id) => has(id)).length; }
 function changeClass(userId, classId) {
-    const data = all();
-    if (!data[userId]) return { ok: false, error: 'Sem perfil.' };
-    const resolved = safeResolveClassId(classId);
-    const cls = classesMod.getClass(resolved);
-    if (!cls) return { ok: false, error: 'Classe inválida.' };
-    const claim = typeof classesMod.canClaim === 'function'
-        ? classesMod.canClaim(resolved, userId, data)
-        : { ok: true };
+    const data = all(); if (!data[userId]) return { ok: false, error: 'Sem perfil.' };
+    const resolved = safeResolveClassId(classId); const cls = classesMod.getClass(resolved); if (!cls) return { ok: false, error: 'Classe inválida.' };
+    const claim = typeof classesMod.canClaim === 'function' ? classesMod.canClaim(resolved, userId, data) : { ok: true };
     if (!claim.ok) return { ok: false, error: claim.reason || 'Classe indisponível.' };
-    data[userId].classId = resolved;
-    save(data);
-    return { ok: true, class: cls };
+    data[userId].classId = resolved; save(data); return { ok: true, class: cls };
 }
 
 module.exports = {
-    CLASSES, changeClass, CLASS_ITEMS, ITEM_CATEGORIES,
-    all, save, has, get, getClass, create, update, addItem, sellItem, getSellValue, getInventoryCapacity, getInventoryUsed, getInventorySpace, removeItemAt,
-    rollClassItem, getInventory, itemCategory, maxManaFromLevel, listMissing, count,
-    getEquipped, equipItem, unequipSlot, useItem, getEquipmentBonuses, equipSlotFor,
-    ensureEquipped, normalizeInventory, getBattleAvatar, setBattleAvatar, getBattlePhoto
+    CLASSES, changeClass, CLASS_ITEMS, ITEM_CATEGORIES, all, save, has, get, getClass, create, update, addItem, sellItem, getSellValue, getInventoryCapacity, getInventoryUsed, getInventorySpace, removeItemAt,
+    rollClassItem, getInventory, itemCategory, maxManaFromLevel, listMissing, count, getEquipped, equipItem, unequipSlot, useItem, getEquipmentBonuses, equipSlotFor,
+    ensureEquipped, normalizeInventory, getBattleAvatar, setBattleAvatar, getBattlePhoto, isStackable
 };
