@@ -62,10 +62,73 @@ const ABILITIES = {
     eco_do_eter: { id: 'eco_do_eter', name: 'Eco do Éter', emoji: '💫', kind: 'passive', classIds: ['deus_criador'], desc: '+3% todos attrs.', mods: { allAttrBonus: 0.03 } }
 };
 
+function slugifyAbility(value) {
+    return String(value || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+function registerClassAbilities() {
+    for (const cls of Object.values(classesMod.allClasses ? classesMod.allClasses() : {})) {
+        if (!cls || !cls.id || !Array.isArray(cls.activeAbilities)) continue;
+        const data = cls.classBonuses || {};
+        const activeBonuses = data.abilities || {};
+        const passiveBonuses = data.passives || {};
+
+        cls.activeAbilities.slice(0, 4).forEach((name, index) => {
+            const id = 'class_' + cls.id + '_active_' + index + '_' + slugifyAbility(name);
+            const b = activeBonuses[name] || {};
+            ABILITIES[id] = {
+                id, name, emoji: cls.emoji || '⚔️', kind: 'active',
+                type: /mago|luz|sombra|alquimista|magico/i.test(cls.name) ? 'magic' : 'physical',
+                mana: 10 + index * 4, cd: index === 0 ? 1 : index + 1,
+                power: 1 + index * 0.18 + Math.max(0, Number(b.dano || 0)) / 100,
+                classIds: [cls.id], desc: 'Habilidade ativa de ' + cls.name + '.',
+                classAttributes: { ...b }, classAbilityIndex: index
+            };
+        });
+
+        (cls.passives || []).slice(0, 5).forEach((name, index) => {
+            const id = 'class_' + cls.id + '_passive_' + index + '_' + slugifyAbility(name);
+            const b = passiveBonuses[name] || {};
+            const mods = {};
+            if (Number(b.dano) > 0) mods.physPower = Math.min(0.35, Number(b.dano) / 1000);
+            if (Number(b.inteligencia) > 0) mods.magicPower = Math.min(0.35, Number(b.inteligencia) / 1000);
+            if (Number(b.agilidade) > 0) mods.agilidadeBonus = Math.min(0.25, Number(b.agilidade) / 1000);
+            if (Number(b.precisao) > 0) mods.accuracy = Math.min(0.25, Number(b.precisao) / 1000);
+            if (Number(b.evasao) > 0) mods.dodge = Math.min(0.25, Number(b.evasao) / 1000);
+            if (Number(b.resistencia) > 0) mods.dmgReducePhys = Math.min(0.25, Number(b.resistencia) / 1000);
+            ABILITIES[id] = {
+                id, name, emoji: cls.emoji || '✨', kind: 'passive',
+                classIds: [cls.id], desc: 'Passiva de ' + cls.name + '.',
+                classAttributes: { ...b }, mods, classAbilityIndex: index
+            };
+        });
+
+        (cls.uniqueAbilities || []).slice(0, 3).forEach((name, index) => {
+            const id = 'class_' + cls.id + '_unique_' + index + '_' + slugifyAbility(name);
+            const b = cls.uniqueAbilityBonuses?.[name] || {};
+            ABILITIES[id] = {
+                id, name, emoji: '⭐', kind: 'unique', unique: true,
+                type: /mago|luz|sombra|alquimista|magico/i.test(cls.name) ? 'magic' : 'physical',
+                mana: 18 + index * 6, cd: 99, power: 1.7 + index * 0.2,
+                oncePerBattle: true, classIds: [cls.id],
+                desc: 'Habilidade única de ' + cls.name + '.',
+                classAttributes: { ...b }, classAbilityIndex: index
+            };
+        });
+    }
+}
+
 const ACTIVE_SLOTS = 4;
 const PASSIVE_SLOTS = 5;
+const UNIQUE_SLOTS = 3;
+
+registerClassAbilities();
 
 function getAbility(id) { return ABILITIES[id] || null; }
+function listForPlayer(userId, kind) { return listByKind(kind, userId); }
+
 function listByKind(kind, userId) {
     const cls = userId ? classesMod.getClass((player.get(userId) || {}).classId) : null;
     const classId = cls?.id;
@@ -78,14 +141,15 @@ function listByKind(kind, userId) {
 }
 function loadLoadout(userId) {
     const data = store.load('ability_loadouts.json', {});
-    const cur = data[userId] || { active: [null, null, null, null], passive: [null, null, null, null, null] };
+    const cur = data[userId] || { active: [null, null, null, null], passive: [null, null, null, null, null], unique: [null, null, null] };
     if (!Array.isArray(cur.active)) cur.active = [null, null, null, null];
     if (!Array.isArray(cur.passive)) cur.passive = [null, null, null, null, null];
+    if (!Array.isArray(cur.unique)) cur.unique = [null, null, null];
     return cur;
 }
 function saveLoadout(userId, loadout) {
     const data = store.load('ability_loadouts.json', {});
-    data[userId] = { active: (loadout.active || []).slice(0, ACTIVE_SLOTS), passive: (loadout.passive || []).slice(0, PASSIVE_SLOTS) };
+    data[userId] = { active: (loadout.active || []).slice(0, ACTIVE_SLOTS), passive: (loadout.passive || []).slice(0, PASSIVE_SLOTS), unique: (loadout.unique || []).slice(0, UNIQUE_SLOTS) };
     store.save('ability_loadouts.json', data);
 }
 function sanitizeLoadout(userId) {
@@ -93,7 +157,7 @@ function sanitizeLoadout(userId) {
     const cls = classesMod.getClass((player.get(userId) || {}).classId);
     const classId = cls?.id;
     let changed = false;
-    for (const kind of ['active', 'passive']) {
+    for (const kind of ['active', 'passive', 'unique']) {
         const slots = loadout[kind];
         for (let i = 0; i < slots.length; i++) {
             const id = slots[i];
@@ -111,8 +175,8 @@ function equipAbility(userId, abilityId, slot) {
     const cls = classesMod.getClass((player.get(userId) || {}).classId);
     if (ab.classIds && cls?.id && !ab.classIds.includes(cls.id)) return { ok: false, error: 'Esta habilidade não é da sua classe.' };
     const loadout = sanitizeLoadout(userId);
-    const slots = ab.kind === 'active' ? loadout.active : loadout.passive;
-    const max = ab.kind === 'active' ? ACTIVE_SLOTS : PASSIVE_SLOTS;
+    const slots = ab.kind === 'active' ? loadout.active : ab.kind === 'unique' ? loadout.unique : loadout.passive;
+    const max = ab.kind === 'active' ? ACTIVE_SLOTS : ab.kind === 'unique' ? UNIQUE_SLOTS : PASSIVE_SLOTS;
     const idx = Math.max(0, Math.min(max - 1, Number(slot) || 0));
     slots[idx] = abilityId;
     saveLoadout(userId, loadout);
@@ -131,6 +195,7 @@ function getEquipped(userId) {
     return {
         active: loadout.active.map((id) => (id ? getAbility(id) : null)),
         passive: loadout.passive.map((id) => (id ? getAbility(id) : null)),
+        unique: loadout.unique.map((id) => (id ? getAbility(id) : null)),
         loadout
     };
 }
@@ -149,7 +214,7 @@ function sumPassiveMods(userId) {
 function getEquippedAbilities(userId) { return getEquipped(userId); }
 
 module.exports = {
-    ABILITIES, ACTIVE_SLOTS, PASSIVE_SLOTS, getAbility, listByKind,
+    ABILITIES, ACTIVE_SLOTS, PASSIVE_SLOTS, UNIQUE_SLOTS, listForPlayer, getAbility, listByKind,
     loadLoadout, saveLoadout, sanitizeLoadout, equipAbility, unequipAbility,
     getEquipped, getEquippedAbilities, sumPassiveMods
 };
