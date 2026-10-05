@@ -126,210 +126,210 @@ const COMMON_CLASSES = {
         selectionPool: 'common', desc: 'Combate corpo a corpo.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'guerreiro_ataque_basico', name: 'Ataque Básico', emoji: '⚔️', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'guerreiro_ataque_basico', name: 'Ataque Básico', emoji: '⚔️', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'lamina_do_primeiro_corte', armor: 'armadura_do_primeiro_corte', accessory: 'medalhao_do_duelista' }
     },
     mago: {
         id: 'mago', name: 'Mago', emoji: '🔮', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Manipulação de energia arcana.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_ataque_basico', name: 'Ataque Básico', emoji: '🔮', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_ataque_basico', name: 'Ataque Básico', emoji: '🔮', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'grimorio_arcano', armor: 'manto_do_arcano', accessory: 'anel_do_conhecimento' }
     },
     mago_fogo: {
         id: 'mago_fogo', name: 'Mago de Fogo', emoji: '🔥', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia elemental de fogo.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_fogo_ataque_basico', name: 'Ataque Básico', emoji: '🔥', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_fogo_ataque_basico', name: 'Ataque Básico', emoji: '🔥', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_da_chama_eterna', armor: 'manto_da_chama', accessory: 'coracao_incandescente' }
     },
     mago_gelo: {
         id: 'mago_gelo', name: 'Mago de Gelo', emoji: '🧊', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia elemental de gelo.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_gelo_ataque_basico', name: 'Ataque Básico', emoji: '🧊', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_gelo_ataque_basico', name: 'Ataque Básico', emoji: '🧊', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_do_gelo_eterno', armor: 'manto_do_inverno', accessory: 'cristal_congelado' }
     },
     mago_terra: {
         id: 'mago_terra', name: 'Mago de Terra', emoji: '🪨', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia elemental de terra.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_terra_ataque_basico', name: 'Ataque Básico', emoji: '🪨', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_terra_ataque_basico', name: 'Ataque Básico', emoji: '🪨', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_da_terra_profunda', armor: 'manto_do_monolito', accessory: 'nucleo_de_pedra' }
     },
     mago_vento: {
         id: 'mago_vento', name: 'Mago de Vento', emoji: '🌪️', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia elemental de vento.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_vento_ataque_basico', name: 'Ataque Básico', emoji: '🌪️', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_vento_ataque_basico', name: 'Ataque Básico', emoji: '🌪️', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_dos_ventos', armor: 'manto_do_vendaval', accessory: 'anel_da_corrente_celeste' }
     },
     mago_agua: {
         id: 'mago_agua', name: 'Mago de Água', emoji: '💧', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia elemental de água.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_agua_ataque_basico', name: 'Ataque Básico', emoji: '💧', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_agua_ataque_basico', name: 'Ataque Básico', emoji: '💧', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_da_mare', armor: 'manto_das_mares', accessory: 'perola_abissal' }
     },
     mago_natureza: {
         id: 'mago_natureza', name: 'Mago da Natureza', emoji: '🌿', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia ligada à natureza.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_natureza_ataque_basico', name: 'Ataque Básico', emoji: '🌿', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_natureza_ataque_basico', name: 'Ataque Básico', emoji: '🌿', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_da_natureza_viva', armor: 'manto_da_floresta', accessory: 'semente_ancestral' }
     },
     mago_trovao: {
         id: 'mago_trovao', name: 'Mago de Trovão', emoji: '⚡', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia elemental de trovão.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_trovao_ataque_basico', name: 'Ataque Básico', emoji: '⚡', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_trovao_ataque_basico', name: 'Ataque Básico', emoji: '⚡', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_do_relampago', armor: 'manto_da_tempestade', accessory: 'nucleo_do_trovao' }
     },
     mago_luz: {
         id: 'mago_luz', name: 'Mago de Luz', emoji: '☀️', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia de luz.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_luz_ataque_basico', name: 'Ataque Básico', emoji: '☀️', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_luz_ataque_basico', name: 'Ataque Básico', emoji: '☀️', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_do_primeiro_sol', armor: 'manto_solar', accessory: 'fragmento_solar' }
     },
     mago_sombra: {
         id: 'mago_sombra', name: 'Mago de Sombra', emoji: '🌑', type: 'magic', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em magia de sombra.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'mago_sombra_ataque_basico', name: 'Ataque Básico', emoji: '🌑', type: 'magic', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'mago_sombra_ataque_basico', name: 'Ataque Básico', emoji: '🌑', type: 'magic', power: 1, mana: 0 }, classGear: { weapon: 'cajado_do_eclipse', armor: 'manto_das_trevas', accessory: 'nucleo_sombrio' }
     },
     arqueiro: {
         id: 'arqueiro', name: 'Arqueiro', emoji: '🏹', type: 'ranged', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Combate à distância com arco.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'arqueiro_ataque_basico', name: 'Ataque Básico', emoji: '🏹', type: 'ranged', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'arqueiro_ataque_basico', name: 'Ataque Básico', emoji: '🏹', type: 'ranged', power: 1, mana: 0 }, classGear: { weapon: 'arco_do_olho_preciso', armor: 'armadura_do_rastreador', accessory: 'olho_do_cacador' }
     },
     ladino: {
         id: 'ladino', name: 'Ladino', emoji: '🗝️', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Mobilidade, furtividade e ataques oportunos.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'ladino_ataque_basico', name: 'Ataque Básico', emoji: '🗝️', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'ladino_ataque_basico', name: 'Ataque Básico', emoji: '🗝️', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'adaga_do_silencio', armor: 'armadura_do_silencio', accessory: 'medalhao_das_sombras' }
     },
     guardiao: {
         id: 'guardiao', name: 'Guardião', emoji: '🛡️', type: 'tank', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Defesa e proteção.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'guardiao_ataque_basico', name: 'Ataque Básico', emoji: '🛡️', type: 'tank', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'guardiao_ataque_basico', name: 'Ataque Básico', emoji: '🛡️', type: 'tank', power: 1, mana: 0 }, classGear: { weapon: 'escudo_do_bastiao', armor: 'armadura_do_bastiao', accessory: 'emblema_do_guardiao' }
     },
     barbaro: {
         id: 'barbaro', name: 'Bárbaro', emoji: '🪓', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Força bruta e combate agressivo.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'barbaro_ataque_basico', name: 'Ataque Básico', emoji: '🪓', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'barbaro_ataque_basico', name: 'Ataque Básico', emoji: '🪓', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'machado_da_furia', armor: 'couraca_da_furia', accessory: 'totem_da_furia' }
     },
     lutador: {
         id: 'lutador', name: 'Lutador', emoji: '🥊', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Combate físico baseado em técnica e impacto.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'lutador_ataque_basico', name: 'Ataque Básico', emoji: '🥊', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'lutador_ataque_basico', name: 'Ataque Básico', emoji: '🥊', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'manoplas_do_impacto', armor: 'couraca_do_impacto', accessory: 'bracelete_do_combate' }
     },
     ferreiro: {
         id: 'ferreiro', name: 'Ferreiro', emoji: '🔨', type: 'support', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em forja e equipamentos.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'ferreiro_ataque_basico', name: 'Ataque Básico', emoji: '🔨', type: 'support', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'ferreiro_ataque_basico', name: 'Ataque Básico', emoji: '🔨', type: 'support', power: 1, mana: 0 }, classGear: { weapon: 'martelo_da_forja', armor: 'armadura_da_forja', accessory: 'nucleo_da_fornalha' }
     },
     cacador: {
         id: 'cacador', name: 'Caçador', emoji: '🐺', type: 'ranged', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Rastreamento e combate contra alvos.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'cacador_ataque_basico', name: 'Ataque Básico', emoji: '🐺', type: 'ranged', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'cacador_ataque_basico', name: 'Ataque Básico', emoji: '🐺', type: 'ranged', power: 1, mana: 0 }, classGear: { weapon: 'arco_da_cacada', armor: 'armadura_do_rastreador', accessory: 'presa_do_rastreador' }
     },
-    espadachim_sombrio: {
+    espadachim_sombrio_sangue: {
         id: 'espadachim_sombrio', name: 'Espadachim Sombrio', emoji: '🩸', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim que utiliza energia sombria.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_sombrio_ataque_basico', name: 'Ataque Básico', emoji: '🩸', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_sombrio_ataque_basico', name: 'Ataque Básico', emoji: '🩸', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'lamina_do_sangue_negro', armor: 'armadura_do_sangue_negro', accessory: 'medalhao_carmesim' }
     },
     espadachim_magico: {
         id: 'espadachim_magico', name: 'Espadachim Mágico', emoji: '✨', type: 'hybrid', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Combinação de espada e magia.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_magico_ataque_basico', name: 'Ataque Básico', emoji: '✨', type: 'hybrid', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_magico_ataque_basico', name: 'Ataque Básico', emoji: '✨', type: 'hybrid', power: 1, mana: 0 }, classGear: { weapon: 'espada_do_eter_arcano', armor: 'armadura_do_eter_arcano', accessory: 'nucleo_arcano' }
     },
     espadachim_flamejante: {
         id: 'espadachim_flamejante', name: 'Espadachim Flamejante', emoji: '🌋', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim especializado em energia flamejante.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_flamejante_ataque_basico', name: 'Ataque Básico', emoji: '🌋', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_flamejante_ataque_basico', name: 'Ataque Básico', emoji: '🌋', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'lamina_da_erupcao', armor: 'armadura_da_erupcao', accessory: 'nucleo_vulcanico' }
     },
     espadachim_glacial: {
         id: 'espadachim_glacial', name: 'Espadachim Glacial', emoji: '❄️', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim especializado em energia glacial.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_glacial_ataque_basico', name: 'Ataque Básico', emoji: '❄️', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_glacial_ataque_basico', name: 'Ataque Básico', emoji: '❄️', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'espada_do_inverno_eterno', armor: 'armadura_do_inverno_eterno', accessory: 'cristal_glacial' }
     },
     espadachim_rochoso: {
         id: 'espadachim_rochoso', name: 'Espadachim Rochoso', emoji: '🗿', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim especializado em poder terrestre.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_rochoso_ataque_basico', name: 'Ataque Básico', emoji: '🗿', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_rochoso_ataque_basico', name: 'Ataque Básico', emoji: '🗿', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'lamina_do_monolito', armor: 'armadura_do_monolito', accessory: 'fragmento_do_monolito' }
     },
     espadachim_vendaval: {
         id: 'espadachim_vendaval', name: 'Espadachim do Vendaval', emoji: '🌬️', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim especializado em velocidade e vento.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_vendaval_ataque_basico', name: 'Ataque Básico', emoji: '🌬️', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_vendaval_ataque_basico', name: 'Ataque Básico', emoji: '🌬️', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'espada_da_corrente_celeste', armor: 'armadura_da_corrente_celeste', accessory: 'anel_do_vendaval' }
     },
     espadachim_trovao: {
         id: 'espadachim_trovao', name: 'Espadachim do Trovão', emoji: '🌩️', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim especializado em energia elétrica.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_trovao_ataque_basico', name: 'Ataque Básico', emoji: '🌩️', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_trovao_ataque_basico', name: 'Ataque Básico', emoji: '🌩️', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'lamina_do_relampago', armor: 'armadura_do_relampago', accessory: 'nucleo_tempestuoso' }
     },
     espadachim_aquatico: {
         id: 'espadachim_aquatico', name: 'Espadachim Aquático', emoji: '🫧', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim especializado em energia aquática.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_aquatico_ataque_basico', name: 'Ataque Básico', emoji: '🫧', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_aquatico_ataque_basico', name: 'Ataque Básico', emoji: '🫧', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'espada_da_mare_profunda', armor: 'armadura_da_mare_profunda', accessory: 'perola_da_mare' }
     },
     espadachim_natural: {
         id: 'espadachim_natural', name: 'Espadachim Natural', emoji: '🍃', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim ligado à força da natureza.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_natural_ataque_basico', name: 'Ataque Básico', emoji: '🍃', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_natural_ataque_basico', name: 'Ataque Básico', emoji: '🍃', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'lamina_da_floresta_viva', armor: 'armadura_da_floresta_viva', accessory: 'broto_ancestral' }
     },
     espadachim_luminoso: {
         id: 'espadachim_luminoso', name: 'Espadachim Luminoso', emoji: '🌅', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim especializado em energia luminosa.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_luminoso_ataque_basico', name: 'Ataque Básico', emoji: '🌅', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_luminoso_ataque_basico', name: 'Ataque Básico', emoji: '🌅', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'espada_do_primeiro_raio', armor: 'armadura_do_primeiro_raio', accessory: 'fragmento_do_amanhecer' }
     },
     espadachim_sombrio: {
         id: 'espadachim_sombrio', name: 'Espadachim Sombrio', emoji: '🌘', type: 'melee', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Espadachim especializado em sombras.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'espadachim_sombrio_ataque_basico', name: 'Ataque Básico', emoji: '🌘', type: 'melee', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'espadachim_sombrio_ataque_basico', name: 'Ataque Básico', emoji: '🌘', type: 'melee', power: 1, mana: 0 }, classGear: { weapon: 'lamina_do_eclipse', armor: 'armadura_do_eclipse', accessory: 'fragmento_do_eclipse' }
     },
     alquimista: {
         id: 'alquimista', name: 'Alquimista', emoji: '🧪', type: 'support', rarity: 'comum', rarityName: 'Comum',
         selectionPool: 'common', desc: 'Especialista em alquimia e preparação de recursos.',
         uniqueAbilities: [], activeAbilities: [], uniquePassives: [], passives: [], powers: [], disadvantages: [],
         bonus: {}, manaMult: 1, color: 0xc9a227,
-        basicAttack: { id: 'alquimista_ataque_basico', name: 'Ataque Básico', emoji: '🧪', type: 'support', power: 1, mana: 0 }, classGear: null
+        basicAttack: { id: 'alquimista_ataque_basico', name: 'Ataque Básico', emoji: '🧪', type: 'support', power: 1, mana: 0 }, classGear: { weapon: 'maleta_da_grande_alquimia', armor: 'manto_da_grande_alquimia', accessory: 'nucleo_alquimico' }
     }
 };
 
