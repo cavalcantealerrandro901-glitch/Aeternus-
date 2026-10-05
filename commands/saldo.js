@@ -42,7 +42,7 @@ async function run(viewer, target, reply) {
 
 module.exports = {
     name: 'saldo',
-    aliases: ['balance', 'money', 'éter', 'eter'],
+    aliases: ['balance', 'money', 'éter', 'eter', 'bal', 'atm'],
     description: 'Ver saldo',
     data: new SlashCommandBuilder()
         .setName('ver-saldo')
