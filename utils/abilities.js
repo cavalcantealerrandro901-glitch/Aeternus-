@@ -192,11 +192,17 @@ function unequipAbility(userId, kind, slot) {
 }
 function getEquipped(userId) {
     const loadout = sanitizeLoadout(userId);
+    const cls = classesMod.getClass((player.get(userId) || {}).classId);
+    const uniqueByClass = Object.values(ABILITIES)
+        .filter((a) => a.kind === 'unique' && cls?.id && a.classIds?.includes(cls.id))
+        .sort((a, b) => (a.classAbilityIndex || 0) - (b.classAbilityIndex || 0))
+        .slice(0, UNIQUE_SLOTS);
+    const uniqueIds = loadout.unique.map((id, i) => id || uniqueByClass[i]?.id || null);
     return {
         active: loadout.active.map((id) => (id ? getAbility(id) : null)),
         passive: loadout.passive.map((id) => (id ? getAbility(id) : null)),
-        unique: loadout.unique.map((id) => (id ? getAbility(id) : null)),
-        loadout
+        unique: uniqueIds.map((id) => (id ? getAbility(id) : null)),
+        loadout: { ...loadout, unique: uniqueIds }
     };
 }
 function sumPassiveMods(userId) {
