@@ -59,9 +59,10 @@ function loadFighter(userId) {
         passMods,
         actives: (equipped.active || []).filter(Boolean),
         passives: (equipped.passive || []).filter(Boolean),
+        unique: (equipped.unique || []).filter(Boolean),
         basicAttack: cls.basicAttack || { id: 'basico', name: 'Ataque', emoji: '⚔️', type: 'physical', power: 1, mana: 0 },
         hp, maxHp: hp, mana, maxMana: mana,
-        effects: [], cds: {}, team: null
+        effects: [], cds: {}, usedUniques: [], team: null
     };
 }
 
@@ -76,6 +77,7 @@ function publicFighter(f) {
             currentCd: f.cds?.[a.id] || 0, desc: a.desc
         })),
         passives: (f.passives || []).map((a) => ({ id: a.id, name: a.name, emoji: a.emoji, desc: a.desc })),
+        unique: (f.unique || []).map((a) => ({ id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd, currentCd: f.cds?.[a.id] || 0, desc: a.desc, oncePerBattle: !!a.oncePerBattle })),
         basicAttack: f.basicAttack
     };
 }
@@ -235,9 +237,10 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
     if (moveId === 'basic' || moveId === attacker.basicAttack?.id) {
         skill = { ...attacker.basicAttack, power: attacker.basicAttack?.power || 1 };
     } else {
-        skill = attacker.actives?.find((a) => a.id === moveId);
+        skill = attacker.actives?.find((a) => a.id === moveId) || attacker.unique?.find((a) => a.id === moveId);
         if (!skill) return { ok: false, error: 'Habilidade não equipada.' };
         if ((attacker.cds[skill.id] || 0) > 0) return { ok: false, error: 'Em recarga.' };
+        if (skill.oncePerBattle && attacker.usedUniques?.includes(skill.id)) return { ok: false, error: 'Essa habilidade única já foi usada nesta batalha.' };
         if (attacker.mana < (skill.mana || 0)) return { ok: false, error: 'Mana insuficiente.' };
     }
 
@@ -250,6 +253,10 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
 
     attacker.mana -= skill.mana || 0;
     if (skill.cd) attacker.cds[skill.id] = skill.cd;
+    if (skill.unique && skill.oncePerBattle) {
+        if (!Array.isArray(attacker.usedUniques)) attacker.usedUniques = [];
+        attacker.usedUniques.push(skill.id);
+    }
 
     if (skill.type === 'heal' || skill.self) {
         if (skill.type === 'heal') {
