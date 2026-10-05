@@ -23,6 +23,9 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
+            return i.reply({ content: '❌ Sem permissão (Gerenciar Mensagens).', ephemeral: true });
+        }
         const text = i.options.getString('mensagem', true).slice(0, 2000);
         await i.reply({ content: '✅', ephemeral: true });
         await i.channel.send(text);
