@@ -14,6 +14,9 @@ const shop = require('../utils/shop');
 const profile = require('../utils/profile');
 const profileCard = require('../utils/profileCard');
 const snapshot = require('../utils/userSnapshot');
+const combatStats = require('../utils/combatStats');
+const classes = require('../utils/classes');
+const abilities = require('../utils/abilities');
 
 function buttons(guildId, isOwner) {
     const decorUrl = shop.decorPanelUrl(guildId);
@@ -110,8 +113,22 @@ module.exports = {
             });
             const file = await buildAttachment(target);
             const isOwner = message.author.id === target.id;
+            const combat = combatStats.getEffectiveAttrs(target.id);
+            const cls = combat.cls;
+            const eq = abilities.getEquippedAbilities?.(target.id) || { active: [], passive: [] };
+            const activeNames = (eq.active || []).filter(Boolean).map((a) => `${a.emoji || '⚔️'} ${a.name}`).join(' · ') || 'Nenhuma equipada';
+            const passiveNames = (eq.passive || []).filter(Boolean).map((a) => `${a.emoji || '✨'} ${a.name}`).join(' · ') || 'Nenhuma equipada';
+            const attrs = combat.attrs;
+            const info = [
+                `✦ **AETERNUS • PERFIL DO JOGADOR**`,
+                `${cls?.emoji || '🧭'} **${cls?.name || 'Sem classe'}** · **Nível ${combat.level}**`,
+                `⚔️ **Atributos:** FOR ${attrs.forca} · DEF ${attrs.defesa} · AGI ${attrs.agilidade} · VIDA ${attrs.vida}`,
+                `🔮 **Místicos:** INT ${attrs.inteligencia} · SOR ${attrs.sorte} · PRE ${attrs.precisao} · RES ${attrs.resistencia}`,
+                `⚔️ **Habilidades:** ${activeNames}`,
+                `🧠 **Passivas:** ${passiveNames}`
+            ].join('\\n');
             await wait.edit({
-                content: null,
+                content: info,
                 files: [file],
                 components: buttons(message.guild?.id, isOwner)
             });
