@@ -1,3 +1,4 @@
+
 const {
     EmbedBuilder,
     ActionRowBuilder,
@@ -11,7 +12,7 @@ const player = require('../utils/player');
 const items = require('../utils/items');
 
 const COLOR = 0x34d399;
-const PER_PAGE = 8;
+const PER_PAGE = 6;
 
 const CAT_LABEL = {
     todos: 'Todos',
@@ -29,148 +30,176 @@ function rarityTag(it) {
     return items.RARITY?.[r]?.name || r;
 }
 
+function fmt(n) {
+    return Number(n || 0).toLocaleString('pt-BR');
+}
+
 function effectsLine(it) {
     if (!it?.effects || typeof it.effects !== 'object') return '';
     const fx = Object.entries(it.effects)
-        .filter(([, v]) => typeof v === 'number')
-        .map(([k, v]) => `+${v} ${k}`)
+        .filter(([, v]) => typeof v === 'number' && Number.isFinite(v))
+        .map(([k, v]) => '+' + v + ' ' + k)
         .join(' · ');
-    return fx ? ` · _${fx}_` : '';
+    return fx ? '\n' + fx : '';
 }
 
-function equippedBlock(userId) {
-    const eq = player.getEquipped(userId);
-    const line = (slot, label) => {
-        const it = eq[slot];
-        if (!it) return `• **${label}:** _vazio_`;
-        return `• **${label}:** ${it.emoji || '🎁'} **${it.name}**${effectsLine(it)}`;
-    };
-    return [
-        line('arma', 'Arma'),
-        line('armadura', 'Armadura'),
-        line('acessorio', 'Acessório')
-    ].join('\n');
-}
-
-/** Lista com índice global (1-based) igual ao usado em O.usar / O.equipar */
 function listWithIndex(userId, category) {
     const full = player.getInventory(userId, 'todos');
-    const mapped = full.map((it, i) => ({
-        ...it,
-        globalIndex: i + 1
-    }));
+    const mapped = full.map((it, i) => ({ ...it, globalIndex: i + 1 }));
     if (!category || category === 'todos') return mapped;
     return mapped.filter((it) => String(it.category) === String(category));
 }
 
-function buildEmbed(user, category, page) {
+function buildEmbed(user, category, page, selectedIndex) {
     const profile = player.get(user.id);
     const emb = new EmbedBuilder()
         .setColor(COLOR)
         .setAuthor({
-            name: `${user.username} · Inventário`,
+            name: user.username + ' · Inventário',
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setThumbnail(
-            profile?.photoUrl || user.displayAvatarURL({ size: 128, extension: 'png' })
-        )
-        .setTimestamp();
+        .setThumbnail(profile?.photoUrl || user.displayAvatarURL({ size: 128, extension: 'png' }));
 
     if (!profile || !profile.name) {
         emb.setTitle('🎒 Inventário');
-        emb.setDescription(
-            `${user} ainda não tem perfil de jogador.\nUse **\`O.j criar\`** para começar.`
-        );
+        emb.setDescription(user + ' ainda não tem perfil de jogador.\nUse O.j criar para começar.');
         return emb;
     }
 
     const cat = CAT_LABEL[category] ? category : 'todos';
     const list = listWithIndex(user.id, cat);
     const totalPages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-    const p = Math.min(Math.max(0, page), totalPages - 1);
+    const p = Math.min(Math.max(0, Number(page) || 0), totalPages - 1);
     const slice = list.slice(p * PER_PAGE, p * PER_PAGE + PER_PAGE);
+    const space = player.getInventorySpace(user.id);
 
-    emb.setTitle(`🎒 ${profile.name} · ${CAT_LABEL[cat] || cat}`);
+    emb.setTitle('🎒 ' + profile.name + ' · Inventário');
+    emb.setDescription(
+        '**📦 Mochila · ' + space.used + '/' + space.capacity + ' espaços**\n' +
+        'Nível **' + space.level + '** · +5 espaços a cada 20 níveis\n\n' +
+        '**⚔️ Equipamentos**'
+    );
 
-    const parts = [];
-    parts.push('**⚔️ Equipado**');
-    parts.push(equippedBlock(user.id));
-    parts.push('');
-    parts.push('**📦 Mochila**');
+    const eq = player.getEquipped(user.id);
+    for (const [slot, label, emoji] of [
+        ['arma', 'Arma', '⚔️'],
+        ['armadura', 'Armadura', '🛡️'],
+        ['acessorio', 'Acessório', '💍']
+    ]) {
+        const it = eq[slot];
+        emb.addFields({
+            name: emoji + ' ' + label,
+            value: it ? '**' + it.name + '**\n_' + rarityTag(it) + '_' : '_Vazio_',
+            inline: true
+        });
+    }
 
-    if (!list.length) {
-        parts.push(
-            cat === 'todos'
-                ? '_Inventário vazio._\nItens podem dropar ao subir de nível · `O.craft` · `O.loja` · `O.troca`'
-                : `_Nenhum item em **${CAT_LABEL[cat]}**._`
-        );
-    } else {
-        for (const it of slice) {
-            const rr = rarityTag(it);
-            const desc = it.desc ? `\n└─ ${String(it.desc).slice(0, 80)}` : '';
-            parts.push(
-                `**#${it.globalIndex}** ${it.emoji || '🎁'} **${it.name}** · _${rr}_ · \`${it.category || '?'}\`${effectsLine(it)}${desc}`
-            );
+    emb.addFields({ name: '📦 Mochila', value: slice.length ? ' ' : '_Inventário vazio._', inline: false });
+
+    for (const it of slice) {
+        const selected = Number(selectedIndex) === Number(it.globalIndex);
+        const unit = player.getSellValue(it);
+        emb.addFields({
+            name: (selected ? '🔹 ' : '▫️ ') + (it.emoji || '🎁') + ' ' + it.name,
+            value: '**×' + (it.quantity || 1) + '** · _' + rarityTag(it) + '_\n💰 ✨ ' + fmt(unit) + ' cada' + effectsLine(it),
+            inline: true
+        });
+    }
+
+    if (selectedIndex) {
+        const selected = list.find((it) => Number(it.globalIndex) === Number(selectedIndex));
+        if (selected) {
+            emb.addFields({
+                name: '🔎 Item selecionado',
+                value: (selected.emoji || '🎁') + ' **' + selected.name + '** · ×' + (selected.quantity || 1) +
+                    '\nVenda total: **✨ ' + fmt(player.getSellValue(selected) * (selected.quantity || 1)) + ' Éter**',
+                inline: false
+            });
         }
     }
 
-    emb.setDescription(parts.join('\n').slice(0, 4090));
-    emb.setFooter({
-        text: `${list.length} item(ns) · pág. ${p + 1}/${totalPages} · O.usar # · O.equipar # · O.desequipar <slot>`
-    });
-
+    emb.setFooter({ text: 'Página ' + (p + 1) + '/' + totalPages + ' · selecione um item para usar as ações abaixo' });
     return emb;
 }
 
-function navComponents(ownerId, category, page, totalPages) {
+function components(ownerId, category, page, totalPages, selectedIndex) {
     const cat = CAT_LABEL[category] ? category : 'todos';
+    const list = listWithIndex(ownerId, cat);
+    const p = Math.min(Math.max(0, Number(page) || 0), Math.max(0, totalPages - 1));
+    const slice = list.slice(p * PER_PAGE, p * PER_PAGE + PER_PAGE);
     const rows = [];
 
-    const select = new StringSelectMenuBuilder()
-        .setCustomId(`inv:cat:${ownerId}`)
-        .setPlaceholder('Categoria')
-        .addOptions(
-            CAT_ORDER.map((c) => ({
+    rows.push(new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId('inv:cat:' + ownerId)
+            .setPlaceholder('📂 Categoria')
+            .addOptions(CAT_ORDER.map((c) => ({
                 label: CAT_LABEL[c],
                 value: c,
                 default: c === cat
-            }))
-        );
-    rows.push(new ActionRowBuilder().addComponents(select));
+            })))
+    ));
 
-    rows.push(
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`inv:prev:${ownerId}:${cat}:${page}`)
-                .setLabel('Voltar')
-                .setEmoji('◀️')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(page <= 0),
-            new ButtonBuilder()
-                .setCustomId(`inv:page:${ownerId}:${cat}:${page}`)
-                .setLabel(`${page + 1}/${Math.max(1, totalPages)}`)
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(true),
-            new ButtonBuilder()
-                .setCustomId(`inv:next:${ownerId}:${cat}:${page}`)
-                .setLabel('Próximo')
-                .setEmoji('▶️')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(page >= totalPages - 1)
-        )
-    );
+    if (slice.length) {
+        rows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('inv:item:' + ownerId + ':' + cat + ':' + p)
+                .setPlaceholder('🎒 Selecione um item')
+                .addOptions(slice.map((it) => ({
+                    label: String(it.name).slice(0, 100),
+                    value: String(it.globalIndex),
+                    description: ('×' + (it.quantity || 1) + ' · ' + rarityTag(it) + ' · ✨ ' + fmt(player.getSellValue(it)) + ' cada').slice(0, 100),
+                    default: Number(selectedIndex) === Number(it.globalIndex)
+                })))
+        ));
+    }
+
+    rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('inv:equip:' + ownerId + ':' + cat + ':' + p + ':' + (selectedIndex || 0))
+            .setLabel('Equipar')
+            .setEmoji('⚔️')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!selectedIndex),
+        new ButtonBuilder()
+            .setCustomId('inv:sell:' + ownerId + ':' + cat + ':' + p + ':' + (selectedIndex || 0))
+            .setLabel('Vender')
+            .setEmoji('💰')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(!selectedIndex)
+    ));
+
+    rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('inv:prev:' + ownerId + ':' + cat + ':' + p)
+            .setLabel('Voltar')
+            .setEmoji('◀️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(p <= 0),
+        new ButtonBuilder()
+            .setCustomId('inv:page:' + ownerId + ':' + cat + ':' + p)
+            .setLabel((p + 1) + '/' + Math.max(1, totalPages))
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true),
+        new ButtonBuilder()
+            .setCustomId('inv:next:' + ownerId + ':' + cat + ':' + p)
+            .setLabel('Próximo')
+            .setEmoji('▶️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(p >= totalPages - 1)
+    ));
 
     return rows;
 }
 
-function payload(user, category, page) {
+function payload(user, category, page, selectedIndex) {
     const cat = CAT_LABEL[category] ? category : 'todos';
     const list = listWithIndex(user.id, cat);
     const totalPages = Math.max(1, Math.ceil(list.length / PER_PAGE));
     const p = Math.min(Math.max(0, Number(page) || 0), totalPages - 1);
     return {
-        embeds: [buildEmbed(user, cat, p)],
-        components: navComponents(user.id, cat, p, totalPages)
+        embeds: [buildEmbed(user, cat, p, selectedIndex || null)],
+        components: components(user.id, cat, p, totalPages, selectedIndex || null)
     };
 }
 
@@ -183,17 +212,11 @@ module.exports = {
             .setName('inventario')
             .setDescription('Ver inventário de itens')
             .addStringOption((o) => {
-                o.setName('categoria')
-                    .setDescription('Filtrar por categoria')
-                    .setRequired(false);
-                for (const c of CAT_ORDER) {
-                    o.addChoices({ name: CAT_LABEL[c], value: c });
-                }
+                o.setName('categoria').setDescription('Filtrar por categoria').setRequired(false);
+                for (const c of CAT_ORDER) o.addChoices({ name: CAT_LABEL[c], value: c });
                 return o;
             })
-            .addUserOption((o) =>
-                o.setName('usuario').setDescription('Ver inventário de outro').setRequired(false)
-            );
+            .addUserOption((o) => o.setName('usuario').setDescription('Ver inventário de outro').setRequired(false));
         return b;
     })(),
 
@@ -203,20 +226,18 @@ module.exports = {
         if (a0 && !a0.startsWith('<@')) {
             if (CAT_LABEL[a0]) category = a0;
             else {
-                const known = Object.entries(CAT_LABEL).find(
-                    ([, name]) => name.toLowerCase() === a0
-                );
+                const known = Object.entries(CAT_LABEL).find(([, name]) => name.toLowerCase() === a0);
                 if (known) category = known[0];
             }
         }
         const user = message.mentions.users.first() || message.author;
-        return message.reply(payload(user, category, 0));
+        return message.reply(payload(user, category, 0, null));
     },
 
     async executeSlash(i) {
         const category = i.options.getString('categoria') || 'todos';
         const user = i.options.getUser('usuario') || i.user;
-        return i.reply(payload(user, category, 0));
+        return i.reply(payload(user, category, 0, null));
     },
 
     async handleComponent(interaction) {
@@ -229,7 +250,7 @@ module.exports = {
 
         if (String(interaction.user.id) !== String(ownerId)) {
             return interaction.reply({
-                content: 'Só quem abriu o inventário pode navegar.',
+                content: 'Só quem abriu o inventário pode usar estes controles.',
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -237,8 +258,41 @@ module.exports = {
         const user = interaction.user;
 
         if (action === 'cat' && interaction.isStringSelectMenu()) {
-            const category = interaction.values[0] || 'todos';
-            return interaction.update(payload(user, category, 0));
+            return interaction.update(payload(user, interaction.values[0] || 'todos', 0, null));
+        }
+
+        if (action === 'item' && interaction.isStringSelectMenu()) {
+            const category = parts[3] || 'todos';
+            const page = Math.max(0, Number(parts[4]) || 0);
+            const selectedIndex = Number(interaction.values[0]) || null;
+            return interaction.update(payload(user, category, page, selectedIndex));
+        }
+
+        if (action === 'equip' || action === 'sell') {
+            const category = parts[3] || 'todos';
+            const page = Math.max(0, Number(parts[4]) || 0);
+            const selectedIndex = Number(parts[5]) || 0;
+
+            if (!selectedIndex) {
+                return interaction.reply({ content: 'Selecione um item primeiro.', flags: MessageFlags.Ephemeral });
+            }
+
+            if (action === 'equip') {
+                const result = player.equipItem(user.id, selectedIndex);
+                if (!result.ok) {
+                    return interaction.reply({ content: result.error || 'Não foi possível equipar.', flags: MessageFlags.Ephemeral });
+                }
+                return interaction.update(payload(user, category, page, null));
+            }
+
+            const result = player.sellItem(user.id, selectedIndex);
+            if (!result.ok) {
+                return interaction.reply({ content: result.error || 'Não foi possível vender.', flags: MessageFlags.Ephemeral });
+            }
+
+            const msg = '💰 ' + (result.item.emoji || '📦') + ' **' + result.item.name +
+                '** ×' + result.quantity + ' vendido por **✨ ' + fmt(result.totalValue) + ' Éter**.';
+            return interaction.update({ ...payload(user, category, page, null), content: msg });
         }
 
         if (action === 'prev' || action === 'next' || action === 'page') {
@@ -246,7 +300,7 @@ module.exports = {
             let page = Math.max(0, Math.floor(Number(parts[4]) || 0));
             if (action === 'prev') page -= 1;
             if (action === 'next') page += 1;
-            return interaction.update(payload(user, category, page));
+            return interaction.update(payload(user, category, page, null));
         }
     }
 };
