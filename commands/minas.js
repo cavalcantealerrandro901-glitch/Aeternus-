@@ -436,7 +436,9 @@ module.exports = {
 
                 if (game.resultMessageId) {
                     try {
-                        const channel = await client.channels.fetch(game.channelId).catch(() => null);
+                        const channel = await client.channels
+                            .fetch(game.channelId)
+                            .catch(() => null);
                         if (channel) {
                             const resultMsg = await channel.messages
                                 .fetch(game.resultMessageId)
@@ -462,20 +464,43 @@ module.exports = {
                 clearTimer(game);
                 games.delete(game.id);
 
-                const newGame = makeGame(game.userId, game.amount, game.bombCount, game.fun, {
-                    channelId: game.channelId,
-                    messageId: game.messageId
-                });
-
+                // Painel antigo: tabuleiro final sem botão Novamente
                 await interaction
                     .update({
+                        content: '<@' + game.userId + '>',
+                        embeds: [panelEmbed(game)],
+                        components: boardRows(game, true)
+                    })
+                    .catch(() => {});
+
+                const channel =
+                    interaction.channel ||
+                    (await client.channels.fetch(game.channelId).catch(() => null));
+
+                if (!channel) return;
+
+                const newGame = makeGame(
+                    game.userId,
+                    game.amount,
+                    game.bombCount,
+                    game.fun,
+                    { channelId: channel.id }
+                );
+
+                const msg = await channel
+                    .send({
                         content: '<@' + newGame.userId + '>',
                         embeds: [panelEmbed(newGame)],
                         components: fullComponents(newGame)
                     })
-                    .catch(() => {});
+                    .catch(() => null);
 
-                touch(newGame, client);
+                if (msg) {
+                    newGame.channelId = msg.channel.id;
+                    newGame.messageId = msg.id;
+                    touch(newGame, client);
+                }
+
                 return;
             }
 
