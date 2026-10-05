@@ -214,7 +214,9 @@ function setupAuth(app, client) {
             if (!cfg.clientId || !cfg.clientSecret || !cfg.redirect) {
                 return res.status(500).send('OAuth Discord não configurado');
             }
-            if (!code || !state || !savedState || !crypto.timingSafeEqual(Buffer.from(state), Buffer.from(savedState))) {
+            const stateMatches = state && savedState && state.length === savedState.length &&
+                crypto.timingSafeEqual(Buffer.from(state), Buffer.from(savedState));
+            if (!code || !stateMatches) {
                 return res.status(400).send('OAuth state inválido');
             }
 
