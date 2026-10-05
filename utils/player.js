@@ -118,13 +118,67 @@ function getBattlePhoto(userId) {
     return p.photoUrl || null;
 }
 
-function addItem(userId, item) {
+function normalizeInventory(userId) {
+    const data = all();
+    const p = data[userId];
+    if (!p) return [];
+    if (!Array.isArray(p.inventory)) p.inventory = [];
+    const merged = [];
+    const byId = new Map();
+    let changed = false;
+
+    for (const raw of p.inventory) {
+        const item = { ...raw };
+        const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+        item.quantity = qty;
+        if (!item.uid) item.uid = crypto.randomBytes(6).toString('hex');
+        if (!item.gotAt) item.gotAt = Date.now();
+        if (!item.category) item.category = itemCategory(item);
+
+        if (item.id) {
+            const key = String(item.id);
+            const existing = byId.get(key);
+            if (existing) {
+                existing.quantity += qty;
+                changed = true;
+                continue;
+            }
+            byId.set(key, item);
+        }
+        merged.push(item);
+    }
+
+    if (changed || merged.length !== p.inventory.length) {
+        p.inventory = merged;
+        p.updatedAt = Date.now();
+        save(data);
+    }
+    return merged;
+}
+
+function addItem(userId, item, quantity = 1) {
     const data = all();
     if (!data[userId]) return null;
     if (!Array.isArray(data[userId].inventory)) data[userId].inventory = [];
-    const entry = { ...item, uid: item.uid || crypto.randomBytes(6).toString('hex'), gotAt: item.gotAt || Date.now() };
-    if (!entry.category) entry.category = itemCategory(entry);
-    data[userId].inventory.push(entry);
+
+    const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+    const id = item?.id ? String(item.id) : null;
+    let entry = id ? data[userId].inventory.find((x) => String(x.id) === id) : null;
+
+    if (entry) {
+        entry.quantity = Math.max(1, Math.floor(Number(entry.quantity) || 1)) + qty;
+        entry.category = entry.category || itemCategory(entry);
+    } else {
+        entry = {
+            ...item,
+            uid: item.uid || crypto.randomBytes(6).toString('hex'),
+            gotAt: item.gotAt || Date.now(),
+            quantity: qty
+        };
+        if (!entry.category) entry.category = itemCategory(entry);
+        data[userId].inventory.push(entry);
+    }
+
     data[userId].updatedAt = Date.now();
     save(data);
     return data[userId];
@@ -147,11 +201,10 @@ function rollClassItem(classId) {
 }
 
 function getInventory(userId, category) {
-    const p = get(userId);
-    if (!p) return [];
-    let list = Array.isArray(p.inventory) ? [...p.inventory] : [];
+    let list = normalizeInventory(userId);
     list = list.map((it) => ({
         ...it,
+        quantity: Math.max(1, Math.floor(Number(it.quantity) || 1)),
         category: it.category || itemCategory(it),
         rarity: it.rarity || itemsCatalog.getItemDef(it.id)?.rarity || 'comum'
     }));
@@ -182,10 +235,17 @@ function removeItemAt(userId, index0) {
     if (!data[userId] || !Array.isArray(data[userId].inventory)) return null;
     const inv = data[userId].inventory;
     if (index0 < 0 || index0 >= inv.length) return null;
-    const [item] = inv.splice(index0, 1);
+    const item = inv[index0];
+    if (!item) return null;
+    const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    if (qty > 1) {
+        item.quantity = qty - 1;
+    } else {
+        inv.splice(index0, 1);
+    }
     data[userId].updatedAt = Date.now();
     save(data);
-    return item;
+    return { ...item, quantity: 1 };
 }
 function equipItem(userId, index1) {
     const p = get(userId);
@@ -198,13 +258,15 @@ function equipItem(userId, index1) {
     if (!slot) return { ok: false, error: 'Este item não pode ser equipado. Use `O.usar` se for consumível/livro.' };
     const data = all();
     const raw = data[userId].inventory || [];
-    let removed = null;
-    if (item.uid) {
-        const i = raw.findIndex((x) => x.uid === item.uid);
-        if (i >= 0) removed = raw.splice(i, 1)[0];
-    }
-    if (!removed && idx < raw.length) removed = raw.splice(idx, 1)[0];
-    if (!removed) return { ok: false, error: 'Não foi possível remover o item do inventário.' };
+    const rawIndex = item.uid ? raw.findIndex((x) => x.uid === item.uid) : idx;
+    if (rawIndex < 0 || rawIndex >= raw.length) return { ok: false, error: 'Não foi possível remover o item do inventário.' };
+
+    const stack = raw[rawIndex];
+    const removed = { ...stack, quantity: 1 };
+    const stackQty = Math.max(1, Math.floor(Number(stack.quantity) || 1));
+    if (stackQty > 1) stack.quantity = stackQty - 1;
+    else raw.splice(rawIndex, 1);
+
     ensureEquipped(data[userId]);
     const previous = data[userId].equipped[slot];
     data[userId].equipped[slot] = { ...removed, equippedAt: Date.now() };
@@ -229,7 +291,9 @@ function unequipSlot(userId, slot) {
     if (!Array.isArray(data[userId].inventory)) data[userId].inventory = [];
     const back = { ...item };
     delete back.equippedAt;
-    data[userId].inventory.push(back);
+    const existing = data[userId].inventory.find((x) => back.id && String(x.id) === String(back.id));
+    if (existing) existing.quantity = Math.max(1, Math.floor(Number(existing.quantity) || 1)) + 1;
+    else data[userId].inventory.push({ ...back, quantity: 1, uid: back.uid || crypto.randomBytes(6).toString('hex'), gotAt: back.gotAt || Date.now() });
     data[userId].updatedAt = Date.now();
     save(data);
     return { ok: true, slot: s, item: back };
@@ -286,5 +350,5 @@ module.exports = {
     all, save, has, get, getClass, create, update, addItem, removeItemAt,
     rollClassItem, getInventory, itemCategory, maxManaFromLevel, listMissing, count,
     getEquipped, equipItem, unequipSlot, useItem, getEquipmentBonuses, equipSlotFor,
-    ensureEquipped, getBattleAvatar, setBattleAvatar, getBattlePhoto
+    ensureEquipped, normalizeInventory, getBattleAvatar, setBattleAvatar, getBattlePhoto
 };
