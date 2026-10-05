@@ -148,8 +148,22 @@ module.exports = {
             });
             const file = await buildAttachment(target);
             const isOwner = interaction.user.id === target.id;
+            const combat = combatStats.getEffectiveAttrs(target.id);
+            const cls = combat.cls;
+            const eq = abilities.getEquippedAbilities?.(target.id) || { active: [], passive: [] };
+            const activeNames = (eq.active || []).filter(Boolean).map((a) => `${a.emoji || '⚔️'} ${a.name}`).join(' · ') || 'Nenhuma equipada';
+            const passiveNames = (eq.passive || []).filter(Boolean).map((a) => `${a.emoji || '✨'} ${a.name}`).join(' · ') || 'Nenhuma equipada';
+            const attrs = combat.attrs;
+            const info = [
+                `✦ **AETERNUS • PERFIL DO JOGADOR**`,
+                `${cls?.emoji || '🧭'} **${cls?.name || 'Sem classe'}** · **Nível ${combat.level}**`,
+                `⚔️ **Atributos:** FOR ${attrs.forca} · DEF ${attrs.defesa} · AGI ${attrs.agilidade} · VIDA ${attrs.vida}`,
+                `🔮 **Místicos:** INT ${attrs.inteligencia} · SOR ${attrs.sorte} · PRE ${attrs.precisao} · RES ${attrs.resistencia}`,
+                `⚔️ **Habilidades:** ${activeNames}`,
+                `🧠 **Passivas:** ${passiveNames}`
+            ].join('\\n');
             await interaction.editReply({
-                content: null,
+                content: info,
                 files: [file],
                 components: buttons(interaction.guild?.id, isOwner)
             });
