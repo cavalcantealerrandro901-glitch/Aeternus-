@@ -3,6 +3,11 @@ const itemsCatalog = require('./items');
 const crypto = require('crypto');
 const classesMod = require('./classes');
 
+const INVENTORY_BASE_CAPACITY = 10;
+const INVENTORY_LEVEL_STEP = 20;
+const INVENTORY_CAPACITY_STEP = 5;
+const SELL_VALUES = { comum:30000, incomum:75000, raro:150000, epico:300000, lendario:750000, lendaria:750000, mitico:1500000, mitica:1500000, cosmico:3000000, cosmica:3000000, unica:5000000 };
+
 const CLASSES = new Proxy(
     {},
     {
@@ -47,6 +52,12 @@ function safeResolveClassId(classId) {
     const id = String(classId || 'guerreiro').trim() || 'guerreiro';
     return classesMod.getClass(id) ? id : 'guerreiro';
 }
+
+function getPlayerLevel(userId) { try { const xp=require('./xp'); return Math.max(1, Number(xp.get(userId)?.level)||1); } catch (_) { return 1; } }
+function getInventoryCapacity(userId) { const level=getPlayerLevel(userId); return INVENTORY_BASE_CAPACITY + Math.floor(Math.max(0,level-1)/INVENTORY_LEVEL_STEP)*INVENTORY_CAPACITY_STEP; }
+function getInventoryUsed(userId) { return normalizeInventory(userId).length; }
+function getInventorySpace(userId) { const capacity=getInventoryCapacity(userId); const used=getInventoryUsed(userId); return {used,capacity,free:Math.max(0,capacity-used),level:getPlayerLevel(userId)}; }
+function getSellValue(item) { const rarity=String(item?.rarity||itemsCatalog.getItemDef(item?.id)?.rarity||'comum').toLowerCase(); return SELL_VALUES[rarity]||SELL_VALUES.comum; }
 
 function maxManaFromLevel(level, classId) {
     const lv = Math.max(0, Number(level) || 0);
@@ -160,30 +171,42 @@ function addItem(userId, item, quantity = 1) {
     const data = all();
     if (!data[userId]) return null;
     if (!Array.isArray(data[userId].inventory)) data[userId].inventory = [];
-
     const qty = Math.max(1, Math.floor(Number(quantity) || 1));
     const id = item?.id ? String(item.id) : null;
     let entry = id ? data[userId].inventory.find((x) => String(x.id) === id) : null;
-
     if (entry) {
         entry.quantity = Math.max(1, Math.floor(Number(entry.quantity) || 1)) + qty;
         entry.category = entry.category || itemCategory(entry);
     } else {
-        entry = {
-            ...item,
-            uid: item.uid || crypto.randomBytes(6).toString('hex'),
-            gotAt: item.gotAt || Date.now(),
-            quantity: qty
-        };
+        if (data[userId].inventory.length >= getInventoryCapacity(userId)) return null;
+        entry = { ...item, uid: item.uid || crypto.randomBytes(6).toString('hex'), gotAt: item.gotAt || Date.now(), quantity: qty };
         if (!entry.category) entry.category = itemCategory(entry);
         data[userId].inventory.push(entry);
     }
-
     data[userId].updatedAt = Date.now();
     save(data);
     return data[userId];
 }
 
+function sellItem(userId, index1, quantity) {
+    const data = all();
+    if (!data[userId] || !Array.isArray(data[userId].inventory)) return { ok:false, error:'Sem perfil de jogador.' };
+    const inv = data[userId].inventory;
+    const idx = Math.floor(Number(index1) || 0) - 1;
+    if (idx < 0 || idx >= inv.length) return { ok:false, error:'Item inválido.' };
+    const item = inv[idx];
+    const totalQty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    const qty = quantity == null ? totalQty : Math.max(1, Math.min(totalQty, Math.floor(Number(quantity) || 1)));
+    const unitValue = getSellValue(item);
+    const totalValue = unitValue * qty;
+    if (qty >= totalQty) inv.splice(idx,1);
+    else item.quantity = totalQty - qty;
+    data[userId].updatedAt = Date.now();
+    save(data);
+    const eter = require('./eter');
+    eter.add(userId,totalValue,{reason:'venda de item'});
+    return { ok:true, item:{...item,quantity:qty}, quantity:qty, unitValue, totalValue, remaining:qty>=totalQty?0:totalQty-qty };
+}
 function itemCategory(item) {
     if (item?.category) return item.category;
     const def = item?.id ? itemsCatalog.getItemDef(item.id) : null;
@@ -347,7 +370,7 @@ function changeClass(userId, classId) {
 
 module.exports = {
     CLASSES, changeClass, CLASS_ITEMS, ITEM_CATEGORIES,
-    all, save, has, get, getClass, create, update, addItem, removeItemAt,
+    all, save, has, get, getClass, create, update, addItem, sellItem, getSellValue, getInventoryCapacity, getInventoryUsed, getInventorySpace, removeItemAt,
     rollClassItem, getInventory, itemCategory, maxManaFromLevel, listMissing, count,
     getEquipped, equipItem, unequipSlot, useItem, getEquipmentBonuses, equipSlotFor,
     ensureEquipped, normalizeInventory, getBattleAvatar, setBattleAvatar, getBattlePhoto
