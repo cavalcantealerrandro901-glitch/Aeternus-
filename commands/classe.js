@@ -403,7 +403,7 @@ async function showChooseMenu(interaction, isUpdate = false) {
         rows.push(
             new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
-                    .setCustomId('classe:sel')
+                    .setCustomId('classe:sel:common')
                     .setPlaceholder(i === 0 ? 'Escolha uma classe Comum' : 'Mais classes Comuns')
                     .addOptions(chunk)
             )
