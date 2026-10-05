@@ -100,7 +100,7 @@ function buildEmbed(user, category, page, selectedIndex) {
         const selected = Number(selectedIndex) === Number(it.globalIndex);
         const unit = player.getSellValue(it);
         emb.addFields({
-            name: (selected ? '🔹 ' : '▫️ ') + (it.emoji || '🎁') + ' ' + it.name,
+            name: '#' + String(it.globalIndex).padStart(2, '0') + ' · ' + (selected ? '🔹 ' : '▫️ ') + (it.emoji || '🎁') + ' ' + it.name,
             value: '**×' + (it.quantity || 1) + '** · _' + rarityTag(it) + '_\n💰 ✨ ' + fmt(unit) + ' cada' + effectsLine(it),
             inline: true
         });
@@ -146,7 +146,7 @@ function components(ownerId, category, page, totalPages, selectedIndex) {
                 .setCustomId('inv:item:' + ownerId + ':' + cat + ':' + p)
                 .setPlaceholder('🎒 Selecione um item')
                 .addOptions(slice.map((it) => ({
-                    label: String(it.name).slice(0, 100),
+                    label: '#' + String(it.globalIndex).padStart(2, '0') + ' · ' + String(it.name).slice(0, 88),
                     value: String(it.globalIndex),
                     description: ('×' + (it.quantity || 1) + ' · ' + rarityTag(it) + ' · ✨ ' + fmt(player.getSellValue(it)) + ' cada').slice(0, 100),
                     default: Number(selectedIndex) === Number(it.globalIndex)
