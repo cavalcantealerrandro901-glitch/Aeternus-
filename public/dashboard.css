@@ -611,3 +611,31 @@ header, main, container, footer, .container, .header, section, div:not(#global-e
     position: relative;
     z-index: 1;
 }
+
+/* ===== PAINEL DE ADMINISTRAÇÃO ===== */
+.admin-container{width:min(1100px,calc(100% - 32px));margin:0 auto;padding:70px 0;min-height:calc(100vh - 80px);position:relative;z-index:2}
+.admin-hero{text-align:center;margin:20px auto 45px;max-width:700px}
+.admin-badge{display:inline-block;padding:7px 13px;border:1px solid rgba(139,61,255,.35);background:rgba(139,61,255,.12);border-radius:999px;color:#c4a2ff;font-size:.76rem;font-weight:800;letter-spacing:1px}
+.admin-hero h1{font-size:clamp(2rem,6vw,3.1rem);margin:18px 0 10px;font-weight:800}
+.admin-hero p,.section-heading p,.admin-card p{color:var(--text-secondary);line-height:1.6}
+.admin-user{margin-left:auto;margin-right:12px;color:var(--text-secondary);font-size:.88rem;font-weight:700}
+.admin-logout{padding:.55rem 1rem}
+.hidden{display:none!important}
+.section-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}
+.section-heading h2{font-size:1.25rem;margin-bottom:4px}
+.server-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.server-card{background:rgba(19,19,31,.9);border:1px solid var(--border-color);border-radius:18px;padding:20px;transition:.2s;display:flex;align-items:center;gap:15px}
+.server-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 30px rgba(0,0,0,.3)}
+.server-icon{width:58px;height:58px;border-radius:16px;object-fit:cover;background:#202033;display:grid;place-items:center;font-size:1.5rem;flex:0 0 auto}
+.server-info{min-width:0;flex:1}
+.server-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px}
+.server-meta{font-size:.78rem;color:var(--text-secondary)}
+.server-open{margin-top:12px;width:100%;padding:9px 12px;border-radius:9px;border:1px solid rgba(139,61,255,.35);background:rgba(139,61,255,.1);color:#c4a2ff;font-weight:800;cursor:pointer}
+.server-open:hover{background:var(--accent);color:white}
+.server-card-body{width:100%}
+.admin-card{background:rgba(19,19,31,.9);border:1px solid var(--border-color);border-radius:18px;padding:35px;text-align:center;max-width:620px;margin:0 auto}
+.admin-icon{font-size:2.2rem;margin-bottom:12px}
+.admin-card h2{margin-bottom:8px}
+.loader{width:34px;height:34px;border:3px solid #28283d;border-top-color:var(--accent);border-radius:50%;animation:adminSpin .8s linear infinite;margin:0 auto 15px}
+@keyframes adminSpin{to{transform:rotate(360deg)}}
+@media(max-width:650px){.navbar{padding:.8rem 1rem}.admin-user{display:none}.admin-container{padding:45px 0}.section-heading{align-items:flex-start;flex-direction:column}.server-grid{grid-template-columns:1fr}}
