@@ -250,7 +250,7 @@ function efeitosRows(guildId) {
 
 function build(cat, user, guild) {
     const gid = guild?.id;
-    if (cat === 'vip') { const e = vipEmbed(user, guild); return e ? { embeds: [e], components: vipRows(gid) } : { embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('Loja desativada').setDescription('A loja deste servidor está desativada no painel.')] };
+    if (cat === 'vip') { const e = vipEmbed(user, guild); return e ? { embeds: [e], components: vipRows(gid) } : { embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('Loja desativada').setDescription('A loja deste servidor está desativada no painel.')] }; }
     if (cat === 'decoracao') return { embeds: [decorEmbed(user)], components: decorRows(gid) };
     if (cat === 'itens') return { embeds: [itensEmbed(user)], components: itensRows(gid) };
     if (cat === 'efeitos') return { embeds: [efeitosEmbed(user)], components: efeitosRows(gid) };
