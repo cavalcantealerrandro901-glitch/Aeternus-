@@ -72,7 +72,7 @@ const BASE_CLASSES = {
             'Relíquia da Verdade Absoluta': { investigacao: 1100, inteligencia: 950, penetracao: 900 }
         },
         basicAttack: { id: 'golpe_bengala', name: 'Golpe de Bengala', emoji: '🪄', type: 'magic', power: 1.15, mana: 0 },
-        classGear: { weapon: 'bengala_investigador', armor: 'capa_detetive_arcano', accessory: 'caderno_deducoes' }
+        classGear: { weapon: 'olho_infinito_absoluto', armor: 'escudo_deducao_cosmica_suprema', accessory: 'reliquia_verdade_absoluta' }
     },
     ceifador_negro: {
         id: 'ceifador_negro', name: 'Ceifador Negro', emoji: '💀', type: 'melee', rarity: 'unica', rarityName: 'Única',
