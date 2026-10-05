@@ -221,6 +221,21 @@ function saveCur(data, userId, cur) {
     store.save('xp.json', data);
 }
 
+function addAttrPoints(userId, amount) {
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (n <= 0) return { ok: false, error: 'Quantidade inválida.', added: 0 };
+
+    const { data, cur } = loadCur(userId);
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + n;
+    saveCur(data, userId, cur);
+
+    return {
+        ok: true,
+        added: n,
+        attrPoints: cur.attrPoints
+    };
+}
+
 function spendAttrPoint(userId, key) {
     return spendAttrPoints(userId, key, 1);
 }
@@ -422,6 +437,7 @@ module.exports = {
     dailyMultiplier,
     rollAttrGain,
     spendAttrPoint,
+    addAttrPoints,
     spendAttrPoints,
     redistribuirAttrs,
     transferAttrPoints,
