@@ -388,11 +388,45 @@ module.exports = {
 };
 
 async function showChooseMenu(interaction, isUpdate = false) {
+    const list = classes.listSelectableClasses();
+    const options = list.slice(0, 30).map((c) => ({
+        label: String(c.name).slice(0, 100),
+        value: c.id,
+        emoji: c.emoji || '✨',
+        description: String(c.desc || 'Classe Comum').slice(0, 100)
+    }));
+
+    const rows = [];
+    for (let i = 0; i < options.length; i += 15) {
+        const chunk = options.slice(i, i + 15);
+        if (!chunk.length) continue;
+        rows.push(
+            new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('classe:sel')
+                    .setPlaceholder(i === 0 ? 'Escolha uma classe Comum' : 'Mais classes Comuns')
+                    .addOptions(chunk)
+            )
+        );
+    }
+
     const payload = {
-        content: '📜 **Seleção de classe**\\n\\nNenhuma classe está disponível para escolha no momento.\\n\\nAs classes serão criadas e adicionadas ao sistema posteriormente.',
-        components: [],
+        content: [
+            '📜 **Seleção de classe**',
+            '',
+            '🎲 Sua classe será escolhida entre as classes da sua raridade.',
+            '⭐ **Raridade atual:** Comum',
+            '',
+            'Escolha uma classe abaixo. **A escolha será permanente.**'
+        ].join('\\n'),
+        components: rows,
         ephemeral: true
     };
+
+    if (!rows.length) {
+        payload.content = '📜 **Seleção de classe**\\n\\nNenhuma classe Comum está disponível no momento.';
+    }
+
     if (isUpdate && interaction.isMessageComponent()) return interaction.update(payload);
     if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
     return interaction.reply(payload);
