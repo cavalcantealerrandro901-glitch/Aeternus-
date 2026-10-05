@@ -1,5 +1,4 @@
 const {
-    SlashCommandBuilder,
     PermissionFlagsBits,
     EmbedBuilder,
     ActionRowBuilder,
@@ -91,7 +90,7 @@ function classEmbed(cls) {
                 value: truncField(gearLines.join('\n'), 1020)
             });
         }
-    }    if (cls.boundUserId) {
+    }\n    if (cls.boundUserId) {
         emb.addFields({
             name: '🔗 Vinculada',
             value: `Somente <@${cls.boundUserId}> pode usar esta classe.`
@@ -132,7 +131,7 @@ async function dmAllPlayers(client, cls) {
                     '',
                     'Clique em **Escolher esta classe** para equipá-la agora.',
                     'Sua classe é permanente depois de escolhida.',
-                    'Também pode ver todas com `/classe escolher` ou o botão **Ver todas**.'
+                    'Também pode ver todas com O.classe listar ou o botão **Ver todas**.'
                 ].join('\n'),
                 embeds: [emb],
                 components: [row]
@@ -146,196 +145,114 @@ async function dmAllPlayers(client, cls) {
     return { ok, fail, total: ids.length };
 }
 
-const data = new SlashCommandBuilder()
-    .setName('classe')
-    .setDescription('Gerenciar e escolher classes Aeternus')
-    .addSubcommand((s) =>
-        s
-            .setName('criar')
-            .setDescription('Admin: criar nova classe (enviada no PV dos jogadores)')
-            .addStringOption((o) => o.setName('nome').setDescription('Nome da classe').setRequired(true))
-            .addStringOption((o) => o.setName('descricao').setDescription('Descrição de como funciona').setRequired(true))
-            .addStringOption((o) =>
-                o
-                    .setName('raridade')
-                    .setDescription('Tipo/raridade')
-                    .setRequired(true)
-                    .addChoices(
-                        { name: 'Comum', value: 'comum' },
-                        { name: 'Incomum', value: 'incomum' },
-                        { name: 'Rara', value: 'rara' },
-                        { name: 'Épica', value: 'epica' },
-                        { name: 'Lendária', value: 'lendaria' },
-                        { name: 'Única', value: 'unica' },
-                        { name: 'Mítica', value: 'mitica' }
-                    )
-            )
-            .addStringOption((o) =>
-                o
-                    .setName('tipo')
-                    .setDescription('Estilo de combate')
-                    .setRequired(true)
-                    .addChoices(
-                        { name: 'Corpo a corpo', value: 'melee' },
-                        { name: 'Magia', value: 'magic' },
-                        { name: 'Longo alcance', value: 'ranged' },
-                        { name: 'Suporte', value: 'support' },
-                        { name: 'Tank', value: 'tank' }
-                    )
-            )
-            .addStringOption((o) =>
-                o
-                    .setName('unicas')
-                    .setDescription('2 habilidades únicas (separe com | )')
-                    .setRequired(true)
-            )
-            .addStringOption((o) =>
-                o
-                    .setName('ativas')
-                    .setDescription('4 habilidades ativas (separe com | )')
-                    .setRequired(true)
-            )
-            .addStringOption((o) =>
-                o
-                    .setName('passivas_unicas')
-                    .setDescription('3 passivas únicas (separe com | )')
-                    .setRequired(true)
-            )
-            .addStringOption((o) =>
-                o
-                    .setName('passivas')
-                    .setDescription('5 passivas (separe com | )')
-                    .setRequired(true)
-            )
-            .addStringOption((o) => o.setName('emoji').setDescription('Emoji da classe').setRequired(false))
-            .addStringOption((o) =>
-                o.setName('desvantagens').setDescription('Desvantagens (separe com | )').setRequired(false)
-            )
-            .addBooleanOption((o) =>
-                o.setName('avisar').setDescription('Enviar no PV de todos os jogadores?').setRequired(false)
-            )
-    )
-    .addSubcommand((s) => s.setName('lista').setDescription('Lista todas as classes'))
-    .addSubcommand((s) =>
-        s
-            .setName('escolher')
-            .setDescription('Escolher sua classe (a escolha é permanente)')
-    )
-    .addSubcommand((s) =>
-        s
-            .setName('ver')
-            .setDescription('Ver detalhes de uma classe')
-            .addStringOption((o) => o.setName('id').setDescription('ID ou nome da classe').setRequired(true))
-    )
-    .addSubcommand((s) =>
-        s
-            .setName('remover')
-            .setDescription('Admin: remove classe custom')
-            .addStringOption((o) => o.setName('id').setDescription('ID da classe').setRequired(true))
-    );
 
 module.exports = {
     name: 'classe',
-    aliases: ['classes', 'classeadmin', 'criarclasse'],
-    description: 'Classes: criar (slash), listar e escolher',
-    data,
+    aliases: ['classes'],
+    description: 'Classes: criar, listar e escolher por prefixo',
 
-    async executeSlash(interaction) {
-        const sub = interaction.options.getSubcommand();
+    async execute(message, args) {
+        const sub = String(args[0] || 'listar').toLowerCase();
 
-        if (sub === 'criar') {
-            if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-                return interaction.reply({ content: 'Apenas administradores.', ephemeral: true });
-            }
-            await interaction.deferReply({ ephemeral: true });
-            try {
-                const cls = classes.createClass({
-                    name: interaction.options.getString('nome'),
-                    desc: interaction.options.getString('descricao'),
-                    rarity: interaction.options.getString('raridade'),
-                    type: interaction.options.getString('tipo'),
-                    uniqueAbilities: interaction.options.getString('unicas'),
-                    activeAbilities: interaction.options.getString('ativas'),
-                    uniquePassives: interaction.options.getString('passivas_unicas'),
-                    passives: interaction.options.getString('passivas'),
-                    emoji: interaction.options.getString('emoji') || '✨',
-                    disadvantages: interaction.options.getString('desvantagens') || ''
-                });
-                const avisar = interaction.options.getBoolean('avisar');
-                let dmInfo = '';
-                if (avisar !== false) {
-                    const r = await dmAllPlayers(interaction.client, cls);
-                    dmInfo = `\n📬 PV enviado: **${r.ok}** · falhou: **${r.fail}**`;
-                }
-                return interaction.editReply({
-                    content: `✅ Classe **${cls.emoji} ${cls.name}** (\`${cls.id}\`) criada.${dmInfo}`,
-                    embeds: [classEmbed(cls)],
-                    components: [pickButtons(cls.id)]
-                });
-            } catch (e) {
-                return interaction.editReply({ content: '❌ ' + e.message });
-            }
-        }
-
-        if (sub === 'lista') {
+        if (sub === 'listar' || sub === 'lista' || sub === 'list') {
             const list = classes.listSelectableClasses();
             const lines = list
-                .map(
-                    (c) =>
-                        `${c.emoji || '✨'} **${c.name}** · ${c.rarityName || c.rarity || 'Comum'} · \`${c.id}\`${c.custom ? ' · custom' : ''}`
-                )
+                .map((c) => String(c.emoji || '✨') + ' **' + c.name + '** · ' + (c.rarityName || c.rarity || 'Comum') + ' · ' + c.id + (c.custom ? ' · custom' : ''))
                 .join('\n')
                 .slice(0, 3900);
-            return interaction.reply({
+            return message.reply({
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xc9a227)
                         .setTitle('📜 Classes Aeternus')
-                        .setDescription(lines || '_Nenhuma_')
-                        .setFooter({ text: 'Use /classe escolher para fazer sua escolha permanente' })
-                ],
-                ephemeral: true
+                        .setDescription(lines || '_Nenhuma classe disponível._')
+                        .setFooter({ text: 'Use O.classe escolher para fazer sua escolha permanente' })
+                ]
             });
         }
 
-        if (sub === 'ver') {
-            const q = interaction.options.getString('id').toLowerCase();
-            const list = classes.listSelectableClasses();
-            const cls =
-                classes.getClass(q) ||
-                list.find((c) => c.id === q || c.name.toLowerCase() === q || c.name.toLowerCase().includes(q));
-            if (!cls) return interaction.reply({ content: 'Classe não encontrada.', ephemeral: true });
-            return interaction.reply({ embeds: [classEmbed(cls)], components: [pickButtons(cls.id)], ephemeral: true });
+        if (sub === 'escolher' || sub === 'escolha') {
+            return message.reply(chooseStartPayload());
         }
 
-        if (sub === 'escolher') {
-            const payload = chooseStartPayload();
-            return interaction.reply(payload);
-        }
-
-        if (sub === 'remover') {
-            if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-                return interaction.reply({ content: 'Apenas administradores.', ephemeral: true });
+        if (sub === 'criar') {
+            if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+                return message.reply('❌ Apenas administradores podem criar classes.');
             }
-            const id = interaction.options.getString('id');
-            if (!classes.deleteCustomClass(id)) {
-                return interaction.reply({ content: 'Classe custom não encontrada.', ephemeral: true });
-            }
-            return interaction.reply({ content: `Removida \`${id}\`.`, ephemeral: true });
-        }
-    },
 
-    async execute(message, args) {
-        const sub = String(args[0] || 'lista').toLowerCase();
-        if (sub === 'lista' || sub === 'list') {
-            const list = classes.listSelectableClasses();
-            const lines = list
-                .map((c) => `${c.emoji} **${c.name}** · ${c.rarityName || 'Comum'} · \`${c.id}\``)
-                .join('\n')
-                .slice(0, 1900);
-            return message.reply({ embeds: [new EmbedBuilder().setColor(0xc9a227).setTitle('📜 Classes').setDescription(lines)] });
+            const raw = args.slice(1).join(' ').trim();
+            const parts = parseQuotedArgs(raw);
+
+            if (parts.length < 8) {
+                return message.reply([
+                    '❌ Formato incorreto.',
+                    '',
+                    'Use: O.classe criar "Nome" "Descrição" raridade tipo "únicas|..." "ativas|..." "passivas únicas|..." "passivas|..." emoji "desvantagens|..."',
+                    '',
+                    'Exemplo: O.classe criar "Cavaleiro Arcano" "Um guerreiro que combina espada e magia." rara melee "Mestre da Lâmina|Último Bastião|Golpe do Campeão" "Investida|Corte Arcano|Barreira|Ruptura" "Vontade Arcana|Defesa Mística|Sentido Arcano" "Tenacidade|Foco|Resistência|Concentração|Disciplina" ⚔️ "Custo de mana"',
+                    '',
+                    'Use | para separar habilidades, passivas e desvantagens.'
+                ].join('\n'));
+            }
+
+            const [name, desc, rarity, type, uniqueAbilities, activeAbilities, uniquePassives, passives, emoji = '✨', disadvantages = ''] = parts;
+            const validRarities = ['comum', 'incomum', 'rara', 'epica', 'lendaria', 'unica', 'mitica'];
+            const validTypes = ['melee', 'magic', 'ranged', 'support', 'tank'];
+
+            if (!validRarities.includes(String(rarity).toLowerCase())) {
+                return message.reply('❌ Raridade inválida. Use: comum, incomum, rara, epica, lendaria, unica ou mitica.');
+            }
+            if (!validTypes.includes(String(type).toLowerCase())) {
+                return message.reply('❌ Tipo inválido. Use: melee, magic, ranged, support ou tank.');
+            }
+
+            try {
+                const cls = classes.createClass({
+                    name,
+                    desc,
+                    rarity: String(rarity).toLowerCase(),
+                    type: String(type).toLowerCase(),
+                    uniqueAbilities,
+                    activeAbilities,
+                    uniquePassives,
+                    passives,
+                    emoji: emoji || '✨',
+                    disadvantages
+                });
+
+                let dmInfo = '';
+                try {
+                    const r = await dmAllPlayers(message.client, cls);
+                    dmInfo = '\n📬 PV enviado: **' + r.ok + '** · falhou: **' + r.fail + '**';
+                } catch (e) {
+                    dmInfo = '\n⚠️ Não foi possível enviar os PVs: ' + e.message;
+                }
+
+                return message.reply({
+                    content: [
+                        '# ✦ NOVA CLASSE',
+                        '',
+                        '✅ **' + cls.emoji + ' ' + cls.name + '** criada com sucesso.',
+                        '🆔 ID: ' + cls.id,
+                        '⭐ Raridade: **' + (cls.rarityName || cls.rarity) + '**',
+                        dmInfo.trim()
+                    ].filter(Boolean).join('\n'),
+                    embeds: [classEmbed(cls)],
+                    components: [pickButtons(cls.id)]
+                });
+            } catch (e) {
+                return message.reply('❌ ' + e.message);
+            }
         }
-        return message.reply('Use o slash **`/classe criar`** (admin) ou **`/classe escolher`** para fazer sua escolha permanente.');
+
+        return message.reply([
+            '❌ Subcomando de classe não reconhecido.',
+            '',
+            'Comandos disponíveis:',
+            'O.classe escolher — escolher sua classe',
+            'O.classe listar — listar as classes',
+            'O.classe criar ... — criar uma classe (administrador)'
+        ].join('\n'));
     },
 
     async handleComponent(interaction) {
@@ -412,6 +329,16 @@ module.exports = {
         }
     }
 };
+
+function parseQuotedArgs(input) {
+    const out = [];
+    const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+    let m;
+    while ((m = re.exec(String(input || '')))) {
+        out.push(m[1] ?? m[2] ?? m[3]);
+    }
+    return out;
+}
 
 function chooseStartPayload() {
     return {
