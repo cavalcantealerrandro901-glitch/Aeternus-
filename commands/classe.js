@@ -401,7 +401,7 @@ async function showChooseMenu(interaction, isUpdate = false) {
             }))
         );
     const payload = {
-        content: 'Escolha sua classe (quem tinha classe antiga também pode trocar):',
+        content: 'Escolha sua classe. Depois da escolha, ela será permanente:',
         components: [new ActionRowBuilder().addComponents(menu)],
         ephemeral: true
     };
