@@ -289,6 +289,10 @@ function setupAuth(app, client) {
     });
 }
 
+async function fetchGuildsForSession(session) {
+    return fetchGuilds(session);
+}
+
 module.exports = {
     setupAuth,
     requireAuth,
