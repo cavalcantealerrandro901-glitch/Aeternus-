@@ -7,7 +7,7 @@ const player = require('../utils/player');
 const xp = require('../utils/xp');
 const { registerAvatarRoutes } = require('../utils/avatarApi');
 const { registerEditorRoutes } = require('./editorRoutes');
-const { setupAuth, requireGuildManager } = require('./auth');
+const { setupAuth, requireAuth, requireGuildManager } = require('./auth');
 
 function startWeb(client) {
     const app = express();
@@ -80,15 +80,18 @@ function startWeb(client) {
     app.get('/masmorra', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dungeon.html')));
     app.get('/editor', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'editor.html')));
 
-    app.get('/api/arena/:id', (req, res) => {
+    app.get('/api/arena/:id', requireAuth, (req, res) => {
         const match = arenaEngine.getMatch(req.params.id);
         if (!match) return res.status(404).json({ error: 'Arena não encontrada' });
-        return res.json(arenaEngine.publicState(match, req.query.as || null));
+        const userId = String(req.auth.user.id);
+        const isParticipant = [...(match.teamA || []), ...(match.teamB || [])].some((p) => String(p.id) === userId);
+        if (!isParticipant) return res.status(403).json({ error: 'Você não participa desta batalha.' });
+        return res.json(arenaEngine.publicState(match, userId));
     });
 
-    app.post('/api/arena/:id/move', (req, res) => {
+    app.post('/api/arena/:id/move', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = arenaEngine.applyMove(req.params.id, body.playerId, {
+        const result = arenaEngine.applyMove(req.params.id, req.auth.user.id, {
             moveId: body.moveId,
             targetId: body.targetId
         });
@@ -96,99 +99,106 @@ function startWeb(client) {
         return res.json(result);
     });
 
-    app.post('/api/arena/create', (req, res) => {
+    app.post('/api/arena/create', requireAuth, (req, res) => {
         const body = req.body || {};
         const teamA = Array.isArray(body.teamA) ? body.teamA : [body.aId].filter(Boolean);
         const teamB = Array.isArray(body.teamB) ? body.teamB : [body.bId].filter(Boolean);
+        const callerId = String(req.auth.user.id);
+        const isParticipant = [...teamA, ...teamB].some((id) => String(id) === callerId);
+        if (!isParticipant) return res.status(403).json({ error: 'Você precisa participar da batalha que está criando.' });
         const result = arenaEngine.createMatch({
             mode: body.mode,
             teamA,
             teamB,
-            bet: body.bet,
+            bet: undefined,
             fun: body.fun
         });
         if (!result.ok) return res.status(400).json(result);
         return res.json({
             ok: true,
             id: result.match.id,
-            state: arenaEngine.publicState(result.match, body.as || teamA[0])
+            state: arenaEngine.publicState(result.match, callerId)
         });
     });
 
-    app.post('/api/arena/:id/chat', (req, res) => {
+    app.post('/api/arena/:id/chat', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = arenaEngine.postChat(req.params.id, body.playerId, body.text);
+        const result = arenaEngine.postChat(req.params.id, req.auth.user.id, body.text);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/arena/:id/skip', (req, res) => {
+    app.post('/api/arena/:id/skip', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = arenaEngine.skipTurn(req.params.id, body.playerId);
+        const result = arenaEngine.skipTurn(req.params.id, req.auth.user.id);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/arena/:id/forfeit', (req, res) => {
+    app.post('/api/arena/:id/forfeit', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = arenaEngine.forfeit(req.params.id, body.playerId);
+        const result = arenaEngine.forfeit(req.params.id, req.auth.user.id);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.get('/api/dungeon/:id', (req, res) => {
+    app.get('/api/dungeon/:id', requireAuth, (req, res) => {
         const match = dungeon.getDungeonMatch(req.params.id);
         if (!match) return res.status(404).json({ error: 'Masmorra não encontrada' });
-        return res.json(dungeon.publicDungeon(match, req.query.as || null));
+        const userId = String(req.auth.user.id);
+        const isParticipant = [...(match.players || []), ...(match.team || [])].some((p) => String(p.id || p) === userId);
+        if (!isParticipant && String(match.userId || '') !== userId) return res.status(403).json({ error: 'Você não participa desta masmorra.' });
+        return res.json(dungeon.publicDungeon(match, userId));
     });
 
-    app.post('/api/dungeon/:id/move', (req, res) => {
+    app.post('/api/dungeon/:id/move', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = dungeon.applyDungeonMove(req.params.id, body.playerId, body);
+        const result = dungeon.applyDungeonMove(req.params.id, req.auth.user.id, body);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/dungeon/start', (req, res) => {
+    app.post('/api/dungeon/start', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = dungeon.startFloor(body.userId, body.floor);
+        const result = dungeon.startFloor(req.auth.user.id, body.floor);
         if (!result.ok) return res.status(400).json(result);
         return res.json({
             ok: true,
             id: result.match.id,
-            state: dungeon.publicDungeon(result.match, body.userId)
+            state: dungeon.publicDungeon(result.match, req.auth.user.id)
         });
     });
 
-    app.post('/api/dungeon/:id/chat', (req, res) => {
+    app.post('/api/dungeon/:id/chat', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = dungeon.postDungeonChat(req.params.id, body.playerId, body.text);
+        const result = dungeon.postDungeonChat(req.params.id, req.auth.user.id, body.text);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/dungeon/:id/leave', (req, res) => {
+    app.post('/api/dungeon/:id/leave', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = dungeon.leaveDungeon(req.params.id, body.playerId);
+        const result = dungeon.leaveDungeon(req.params.id, req.auth.user.id);
         if (!result.ok) return res.status(400).json(result);
         return res.json(result);
     });
 
-    app.post('/api/dungeon/:id/advance', (req, res) => {
+    app.post('/api/dungeon/:id/advance', requireAuth, (req, res) => {
         const body = req.body || {};
-        const result = dungeon.advanceFloor(req.params.id, body.playerId || body.userId);
+        const result = dungeon.advanceFloor(req.params.id, req.auth.user.id);
         if (!result.ok) return res.status(400).json(result);
         return res.json({
             ok: true,
             id: result.match.id,
-            match: dungeon.publicDungeon(result.match, body.playerId || body.userId)
+            match: dungeon.publicDungeon(result.match, req.auth.user.id)
         });
     });
 
     app.get('/avatar', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'avatar.html')));
 
-    app.get('/api/avatar/:userId', (req, res) => {
+    app.get('/api/avatar/:userId', requireAuth, (req, res) => {
         try {
+            if (String(req.params.userId) !== String(req.auth.user.id)) return res.status(403).json({ error: 'Você só pode acessar seu próprio avatar.' });
             const av = player.getBattleAvatar
                 ? player.getBattleAvatar(req.params.userId)
                 : (player.get(req.params.userId) || {}).battleAvatar || null;
@@ -205,11 +215,11 @@ function startWeb(client) {
         console.warn('[web] editor routes:', e.message);
     }
 
-    app.post('/api/avatar/save', (req, res) => {
+    app.post('/api/avatar/save', requireAuth, (req, res) => {
         try {
             const body = req.body || {};
-            const userId = String(body.userId || '').trim();
-            if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+            const userId = String(req.auth.user.id);
+            if (body.userId && String(body.userId) !== userId) return res.status(403).json({ error: 'Você só pode salvar seu próprio avatar.' });
             if (!player.has(userId)) {
                 return res.status(400).json({ error: 'Crie o personagem no bot primeiro (O.j criar).' });
             }
