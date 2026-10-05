@@ -288,12 +288,25 @@ module.exports = {
             if (!meta || String(interaction.user.id) !== String(ownerId)) return safeReply(interaction, { content: 'Inválido.', flags: MessageFlags.Ephemeral });
             const pts = Number(xp.get(ownerId).attrPoints || 0);
             if (pts <= 0) return safeUpdate(interaction, atributosPayload(interaction.user));
-            const qtyRow = new ActionRowBuilder();
-            for (const n of [1, 2, 3, 5, 10].filter((x) => x <= pts)) {
-                qtyRow.addComponents(new ButtonBuilder().setCustomId('j:attrqty:' + attrKey + ':' + ownerId + ':' + n).setLabel('+' + n).setStyle(ButtonStyle.Success));
-            }
-            qtyRow.addComponents(new ButtonBuilder().setCustomId('j:attrcancel:' + ownerId).setLabel('Cancelar').setStyle(ButtonStyle.Danger));
-            return safeUpdate(interaction, { content: meta.emoji + ' **' + meta.label + '** — quantos?', embeds: [], components: [qtyRow] });
+
+            const modal = new ModalBuilder()
+                .setCustomId('j:attramount:' + attrKey + ':' + ownerId)
+                .setTitle('Distribuir pontos — ' + meta.label);
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('quantidade')
+                        .setLabel('Quantidade de pontos')
+                        .setPlaceholder('Digite um número válido (1 a ' + pts + ')')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(true)
+                        .setMinLength(1)
+                        .setMaxLength(String(pts).length)
+                )
+            );
+
+            return interaction.showModal(modal);
         }
         if (id.startsWith('j:attrqty:')) {
             const parts = id.split(':');
@@ -325,6 +338,44 @@ module.exports = {
     },
 
     async handleModal(interaction) {
+        if (interaction.customId.startsWith('j:attramount:')) {
+            const parts = interaction.customId.split(':');
+            const attrKey = normalizeAttrKey(parts[2]);
+            const ownerId = parts[3];
+            const meta = ATTR_META.find((a) => a.key === attrKey);
+
+            if (!meta || String(interaction.user.id) !== String(ownerId)) {
+                return interaction.reply({ content: 'Solicitação inválida.', flags: MessageFlags.Ephemeral });
+            }
+
+            const raw = String(interaction.fields.getTextInputValue('quantidade') || '').trim();
+            if (!/^\\d+$/.test(raw)) {
+                return interaction.reply({ content: '❌ Digite apenas um número inteiro válido.', flags: MessageFlags.Ephemeral });
+            }
+
+            const amount = Number(raw);
+            const available = Number(xp.get(ownerId).attrPoints || 0);
+
+            if (!Number.isSafeInteger(amount) || amount < 1) {
+                return interaction.reply({ content: '❌ A quantidade precisa ser pelo menos **1**.', flags: MessageFlags.Ephemeral });
+            }
+            if (amount > available) {
+                return interaction.reply({
+                    content: '❌ Você tentou distribuir **' + amount + '** pontos, mas possui apenas **' + available + '** disponíveis.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const spent = xp.spendAttrPoints(ownerId, attrKey, amount);
+            if (!spent?.ok) {
+                return interaction.reply({ content: String(spent?.error || 'Não foi possível distribuir os pontos.'), flags: MessageFlags.Ephemeral });
+            }
+
+            const payload = atributosPayload(interaction.user);
+            payload.content = '✅ **' + spent.spent + '** ponto(s) distribuído(s) em ' + meta.emoji + ' **' + meta.label + '**.';
+            return interaction.reply(payload);
+        }
+
         if (interaction.customId !== 'j:name') return;
         const nome = interaction.fields.getTextInputValue('nome').trim();
         if (nome.length < 2) return interaction.reply({ content: 'Nome muito curto.', flags: MessageFlags.Ephemeral });
