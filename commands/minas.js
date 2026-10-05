@@ -372,7 +372,7 @@ function boardRows(game, reveal = false) {
             const bomb =
                 game.bombs.has(i);
 
-            let label = '❔';
+            let label = String(i + 1);
             let style =
                 ButtonStyle.Secondary;
 
@@ -386,7 +386,7 @@ function boardRows(game, reveal = false) {
                     style =
                         ButtonStyle.Success;
                 } else {
-                    label = '❔';
+                    label = String(i + 1);
                 }
             } else if (opened) {
                 label = '💎';
