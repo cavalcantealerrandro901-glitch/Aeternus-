@@ -32,7 +32,6 @@ function parseAmount(input, balance = null) {
         return Math.max(0, Math.floor((Number(balance) * Math.min(100, p)) / 100));
     }
 
-    // Separar sufixo k/m/b/t/mil/kk
     let suf = '';
     const sufM = s.match(/^(.*?)(kk|k|m|b|t|mil)$/i);
     if (sufM) {
@@ -41,15 +40,11 @@ function parseAmount(input, balance = null) {
     }
     if (!s) return NaN;
 
-    // Normalizar número
-    // 1.000.000 ou 1.000 → milhar BR
     if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
         s = s.replace(/\./g, '');
     } else if (s.includes(',') && s.includes('.')) {
-        // 1.234,56
         s = s.replace(/\./g, '').replace(',', '.');
     } else if (s.includes(',')) {
-        // 1,5
         s = s.replace(',', '.');
     }
 
@@ -82,7 +77,7 @@ function looksLikeAmount(input) {
     return false;
 }
 
-function resolveBet(input, balance, { min = 1, label = 'saldo' } = {}) {
+function resolveBet(input, balance, { min = 1, max = null, label = 'saldo' } = {}) {
     const bal = Math.max(0, Math.floor(Number(balance) || 0));
     const amount = parseAmount(input, bal);
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -93,6 +88,12 @@ function resolveBet(input, balance, { min = 1, label = 'saldo' } = {}) {
     }
     if (amount < min) {
         return { ok: false, error: `Aposta mínima: **${min.toLocaleString('pt-BR')}**.` };
+    }
+    if (max != null && Number.isFinite(Number(max)) && amount > Number(max)) {
+        return {
+            ok: false,
+            error: `Aposta máxima: **${Number(max).toLocaleString('pt-BR')}**.`
+        };
     }
     if (amount > bal) {
         return {
