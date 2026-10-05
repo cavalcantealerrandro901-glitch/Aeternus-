@@ -388,21 +388,9 @@ module.exports = {
 };
 
 async function showChooseMenu(interaction, isUpdate = false) {
-    const list = classes.listSelectableClasses().slice(0, 25);
-    const menu = new StringSelectMenuBuilder()
-        .setCustomId('classe:sel:pick')
-        .setPlaceholder('Escolha sua classe')
-        .addOptions(
-            list.map((c) => ({
-                label: c.name.slice(0, 100),
-                value: c.id,
-                description: `${c.rarityName || c.rarity || 'Comum'} · ${(c.desc || '').slice(0, 40)}`,
-                emoji: c.emoji && c.emoji.length <= 2 ? c.emoji : undefined
-            }))
-        );
     const payload = {
-        content: 'Escolha sua classe. Depois da escolha, ela será permanente:',
-        components: [new ActionRowBuilder().addComponents(menu)],
+        content: '📜 **Seleção de classe**\\n\\nNenhuma classe está disponível para escolha no momento.\\n\\nAs classes serão criadas e adicionadas ao sistema posteriormente.',
+        components: [],
         ephemeral: true
     };
     if (isUpdate && interaction.isMessageComponent()) return interaction.update(payload);
