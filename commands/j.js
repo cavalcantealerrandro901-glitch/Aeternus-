@@ -352,7 +352,7 @@ module.exports = {
 
             // Revalidação completa no momento do depósito.
             // Isso impede que um valor antigo ou incompatível seja aplicado.
-            if (!raw || !/^\\d+$/.test(raw)) {
+            if (!raw || !/^\d+$/.test(raw)) {
                 return interaction.reply({
                     content: '❌ O valor informado não é válido. Digite apenas um número inteiro positivo.',
                     flags: MessageFlags.Ephemeral
