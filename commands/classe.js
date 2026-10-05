@@ -91,7 +91,8 @@ function classEmbed(cls) {
                 value: truncField(gearLines.join('\n'), 1020)
             });
         }
-    }\n    if (cls.boundUserId) {
+    }
+    if (cls.boundUserId) {
         emb.addFields({
             name: '🔗 Vinculada',
             value: `Somente <@${cls.boundUserId}> pode usar esta classe.`
