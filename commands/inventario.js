@@ -112,10 +112,15 @@ function buildEmbed(user, category, page, selectedIndex) {
     if (selectedIndex) {
         const selected = list.find((it) => Number(it.globalIndex) === Number(selectedIndex));
         if (selected) {
+            const ability = selected.uniqueAbility;
+            const abilityLine = ability?.name
+                ? '\n\n✨ **Habilidade única · ' + ability.name + '**\n' + String(ability.description || '')
+                : '';
             emb.addFields({
                 name: '🔎 Item selecionado',
                 value: (selected.emoji || '🎁') + ' **' + selected.name + '** · ×' + (selected.quantity || 1) +
-                    '\nVenda total: **✨ ' + fmt(player.getSellValue(selected) * (selected.quantity || 1)) + ' Éter**',
+                    '\nVenda total: **✨ ' + fmt(player.getSellValue(selected) * (selected.quantity || 1)) + ' Éter**' +
+                    abilityLine,
                 inline: false
             });
         }
