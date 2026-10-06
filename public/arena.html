@@ -135,11 +135,7 @@ button{font-family:inherit;cursor:pointer}
 <body>
 <div id="lobby" class="lobby">
   <h2>✦ Arena PvP ✦</h2>
-  <label>ID da batalha</label>
-  <input id="matchIdInput" placeholder="match id" />
-  <label>Seu Discord User ID</label>
-  <input id="asInput" placeholder="seu user id" />
-  <button type="button" id="joinBtn">Entrar na batalha</button>
+  <p style="text-align:center;color:var(--muted);line-height:1.5">A arena usa sua sessão do Discord automaticamente.<br>Abra esta página pelo botão enviado pelo <strong style="color:var(--gold)">Aeternus</strong>.</p>
 </div>
 <div id="battle" class="hidden">
   <header class="header">
@@ -289,6 +285,7 @@ button{font-family:inherit;cursor:pointer}
       });
     }
     (me.actives || []).forEach((a) => skills.push(a));
+    (me.unique || []).forEach((a) => skills.push({ ...a, unique: true }));
     skills.forEach((sk) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -300,7 +297,7 @@ button{font-family:inherit;cursor:pointer}
       btn.innerHTML =
         '<div class="sn">' + (sk.emoji || '✨') + ' ' + (sk.name || sk.id) + '</div>' +
         '<div class="sd">' + (sk.desc || 'Habilidade') + '</div>' +
-        '<div class="sm">MP ' + needMana + '</div>' +
+        '<div class="sm">MP ' + needMana + (sk.unique ? ' · ÚNICA' : '') + '</div>' +
         (cd > 0 ? '<div class="scd">CD ' + cd + '</div>' : '');
       btn.onclick = () => doMove(sk.id === me.basicAttack?.id ? 'basic' : sk.id);
       box.appendChild(btn);
@@ -315,7 +312,7 @@ button{font-family:inherit;cursor:pointer}
     const box = $('chatBody');
     box.innerHTML = (list || [])
       .map((m) => {
-        const mine = String(m.from) === String(asUser);
+        const mine = String(m.playerId) === String(asUser);
         return (
           '<div class="chat-msg"><span class="who">' +
           (mine ? 'Você' : m.name || 'Jogador') +
@@ -330,6 +327,7 @@ button{font-family:inherit;cursor:pointer}
   function render(s) {
     state = s;
     if (!s) return;
+    if (s.viewerId) asUser = String(s.viewerId);
     const { left, right } = pickSides(s);
     fillFighter('A', left);
     fillFighter('B', right);
@@ -444,12 +442,7 @@ button{font-family:inherit;cursor:pointer}
     else if (data.error) alert(data.error);
   }
   function enter() {
-    matchId = $('matchIdInput').value.trim() || matchId;
-    asUser = $('asInput').value.trim() || asUser;
-    if (!matchId || !asUser) {
-      alert('Informe o ID da batalha e seu User ID');
-      return;
-    }
+    if (!matchId) return;
     $('lobby').classList.add('hidden');
     $('battle').classList.remove('hidden');
     poll();
@@ -467,11 +460,7 @@ button{font-family:inherit;cursor:pointer}
   $('chatInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendChat();
   });
-  if (matchId && asUser) {
-    $('matchIdInput').value = matchId;
-    $('asInput').value = asUser;
-    enter();
-  }
+  if (matchId) enter();
 })();
 </script>
     <script src="dashboard-app.js"></script>
