@@ -434,18 +434,20 @@ function createClass(definition) {
         rarityName: rarityNames[rarity] || rarity,
         selectionPool: rarity === 'comum' ? 'common' : rarity,
         desc: String(definition.desc || ''),
-        uniqueAbilities: Array.isArray(definition.uniqueAbilities) ? definition.uniqueAbilities : [],
-        activeAbilities: Array.isArray(definition.activeAbilities) ? definition.activeAbilities : [],
+        uniqueAbilities: Array.isArray(definition.uniqueAbilities) ? definition.uniqueAbilities.map((x) => x.name || x) : [],
+        activeAbilities: Array.isArray(definition.activeAbilities) ? definition.activeAbilities.map((x) => x.name || x) : [],
         powers: Array.isArray(definition.activeAbilities) ? definition.activeAbilities.map((x) => x.name || x) : [],
-        uniquePassives: Array.isArray(definition.uniquePassives) ? definition.uniquePassives : [],
-        passives: Array.isArray(definition.passives) ? definition.passives : [],
-        disadvantages: Array.isArray(definition.disadvantages) ? definition.disadvantages : [],
+        uniquePassives: Array.isArray(definition.uniquePassives) ? definition.uniquePassives.map((x) => x.name || x) : [],
+        passives: Array.isArray(definition.passives) ? definition.passives.map((x) => x.name || x) : [],
+        disadvantages: Array.isArray(definition.disadvantages) ? definition.disadvantages.map((x) => x.name || x) : [],
         bonus: definition.bonus && typeof definition.bonus === 'object' ? definition.bonus : {},
         attributes: definition.attributes && typeof definition.attributes === 'object' ? definition.attributes : {},
         manaMult: Number(definition.manaMult) > 0 ? Number(definition.manaMult) : 1,
         color: Number.isFinite(Number(definition.color)) ? Number(definition.color) : 0xc9a227,
         classBonuses: definition.classBonuses || {},
         uniqueAbilityBonuses: definition.uniqueAbilityBonuses || {},
+        abilityDetails: definition.abilityDetails || {},
+        disadvantageDetails: definition.disadvantageDetails || {},
         exclusiveItems: Array.isArray(definition.exclusiveItems) ? definition.exclusiveItems : [],
         classGear: definition.classGear || null,
         basicAttack: definition.basicAttack || {
@@ -458,6 +460,15 @@ function createClass(definition) {
     custom[id] = cls;
     saveCustom(custom);
     return cls;
+}
+
+function updateCustomClass(id, patch) {
+    const custom = loadCustom();
+    const key = String(id || '').trim();
+    if (!custom[key]) return null;
+    custom[key] = { ...custom[key], ...(patch || {}) };
+    saveCustom(custom);
+    return custom[key];
 }
 
 function listSelectableClasses() {
@@ -483,5 +494,5 @@ function enforceExclusiveOwners(playersMap) {
 
 module.exports = {
     BASE_CLASSES, COMMON_CLASSES, allClasses, getClass, resolveClassId, canClaim,
-    createClass, listSelectableClasses, listClassesForUser, enforceExclusiveOwners, loadCustom
+    createClass, updateCustomClass, listSelectableClasses, listClassesForUser, enforceExclusiveOwners, loadCustom
 };
