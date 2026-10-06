@@ -1,7 +1,7 @@
 const axios = require('axios');
 
-const MODEL = process.env.AETERNUS_CLASS_MODEL || 'gpt-6-luna';
-const API_URL = 'https://api.openai.com/v1/responses';
+const MODEL = process.env.AETERNUS_CLASS_MODEL || 'openai/gpt-oss-120b';
+const API_URL = 'https://api.groq.com/openai/v1/responses';
 
 const ATTRS = ['forca', 'defesa', 'agilidade', 'vida', 'inteligencia', 'sorte', 'precisao', 'resistencia'];
 
@@ -20,7 +20,7 @@ const schema = {
         activeAbilities: { type: 'array', minItems: 4, maxItems: 4, items: { $ref: '#/$defs/ability' } },
         uniquePassives: { type: 'array', minItems: 3, maxItems: 3, items: { $ref: '#/$defs/passive' } },
         passives: { type: 'array', minItems: 5, maxItems: 5, items: { $ref: '#/$defs/passive' } },
-        disadvantages: { type: 'array', minItems: 1, items: { type: 'object', additionalProperties: false, required: ['name', 'description', 'attributes'], properties: { name: {type:'string'}, description:{type:'string'}, attributes:{type:'object', additionalProperties:{type:'number'}} } } },
+        disadvantages: { type: 'array', minItems: 1, items: { type: 'object', additionalProperties: false, required: ['name', 'description', 'attributes'], properties: { name:{type:'string'}, description:{type:'string'}, attributes:{type:'object', additionalProperties:{type:'number'}} } } },
         items: { type: 'array', minItems: 3, maxItems: 3, items: { $ref: '#/$defs/item' } }
     },
     $defs: {
@@ -115,8 +115,8 @@ function validateGenerated(data) {
 }
 
 async function generateClass(description) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('OPENAI_API_KEY não configurada. Configure a chave da OpenAI no ambiente do Aeternus.');
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new Error('GROQ_API_KEY não configurada. Configure a chave da Groq no ambiente do Aeternus.');
 
     const instructions = [
         'Você é o gerador oficial de classes do jogo Aeternus.',
@@ -144,7 +144,7 @@ async function generateClass(description) {
     });
 
     const raw = response.data?.output_text;
-    if (!raw) throw new Error('A OpenAI não retornou o JSON da classe.');
+    if (!raw) throw new Error('A Groq não retornou o JSON da classe.');
     let data;
     try { data = JSON.parse(raw); } catch (_) { throw new Error('A resposta da IA não veio em JSON válido.'); }
     validateGenerated(data);
