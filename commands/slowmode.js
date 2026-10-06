@@ -34,6 +34,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
         const sec = i.options.getInteger('segundos', true);
         try {
             await i.channel.setRateLimitPerUser(sec);
