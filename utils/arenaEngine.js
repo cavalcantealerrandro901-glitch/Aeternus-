@@ -294,6 +294,7 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
             match.lastEffect = { type: 'damage', id: Date.now(), fighterId: defender.id, attackerId: attacker.id, amount: result.dmg, crit: !!result.crit };
             match.log.push({
                 t: Date.now(),
+                kind: 'attack',
                 text: `⚔️ ${attacker.name} **${skill.name}** → **${result.dmg}**${result.crit ? ' CRIT' : ''} em ${defender.name}.`
             });
         }
