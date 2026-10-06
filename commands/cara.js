@@ -3,7 +3,7 @@ const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
 const MIN_BET = 1_000;
-const MAX_BET = 20_000_000;
+const MAX_BET = 35_000_000;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -13,7 +13,7 @@ async function run(userId, side, amountRaw, reply) {
     const s = String(side || '').toLowerCase();
     if (!['cara', 'coroa'].includes(s)) {
         return reply(
-            'Uso: `O.cara cara|coroa <valor>` · aposta **1.000** a **20.000.000** ✨'
+            'Uso: `O.cara cara|coroa <valor>` · aposta **1.000** a **35.000.000** ✨'
         );
     }
     const bal = eter.get(userId);
@@ -42,10 +42,10 @@ async function run(userId, side, amountRaw, reply) {
 module.exports = {
     name: 'cara',
     aliases: ['coinflip', 'cf', 'coroa'],
-    description: 'Cara ou coroa (aposta 1k–20m)',
+    description: 'Cara ou coroa (aposta 1k–35m)',
     data: new SlashCommandBuilder()
         .setName('cara-coroa')
-        .setDescription('Cara ou coroa (1.000 a 20.000.000 ✨)')
+        .setDescription('Cara ou coroa (1.000 a 35.000.000 ✨)')
         .addStringOption((o) =>
             o
                 .setName('lado')
@@ -54,7 +54,7 @@ module.exports = {
                 .addChoices({ name: 'Cara', value: 'cara' }, { name: 'Coroa', value: 'coroa' })
         )
         .addStringOption((o) =>
-            o.setName('valor').setDescription('Valor (1k a 20m)').setRequired(true)
+            o.setName('valor').setDescription('Valor (1k a 35m)').setRequired(true)
         ),
 
     async execute(message, args) {
