@@ -87,7 +87,7 @@ const CATEGORIES = {
             { name: 'habilidades', desc: 'Equipa ativas', usage: 'habilidades', example: 'O.habilidades', about: '4 slots de habilidades ativas da sua classe para a arena.' },
             { name: 'passivas', desc: 'Equipa passivas', usage: 'passivas', example: 'O.passivas', about: '5 slots de passivas da sua classe.' },
             { name: 'guild', desc: 'Sistema de guildas', usage: 'guild [criar|info|convidar|…]', example: 'O.guild criar', about: 'Cria guilda no PV (nome, tag, descrição, boas-vindas, imagem), banco, ranking.' },
-            { name: 'arena', desc: 'PvP', usage: 'arena|pvp [diversao|aposta|equipes] @user', example: 'O.pvp aposta @user 1k', about: 'Modos: diversão, aposta 1v1, equipes e equipes+aposta.' },
+            { name: 'arena', desc: 'PvP 1v1', usage: 'arena|pvp @user', example: 'O.pvp @user', about: 'Inicia uma arena PvP 1v1 no painel web, usando os ataques da classe.' },
             { name: 'masmorra', desc: 'Masmorra PvE', usage: 'masmorra', example: 'O.masmorra', about: 'Pisos com várias ondas de monstros e boss no final.' },
             { name: 'xp', desc: 'XP e nível', usage: 'xp [@user|rank|info]', example: 'O.xp', about: 'XP cumulativo: 1000 XP = 1 nível (não gasta). +5 pontos de atributo por nível.' },
             { name: 'dar', desc: 'Dar itens/XP (admin)', usage: 'dar @user <tipo> …', example: 'O.dar @user xp 500', about: 'Admin: XP, itens, livros, atributos, etc.' },
