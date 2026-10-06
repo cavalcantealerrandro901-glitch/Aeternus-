@@ -56,7 +56,7 @@ function loadFighter(userId) {
         battleAvatar: player.getBattleAvatar?.(userId),
         level: stLevel || 0,
         attrs,
-        passMods,
+        passMods,\n        classColor: Number(cls.color || 0xc9a227),
         actives: (equipped.active || []).filter(Boolean),
         passives: (equipped.passive || []).filter(Boolean),
         unique: (equipped.unique || []).filter(Boolean),
@@ -71,14 +71,14 @@ function publicFighter(f) {
     return {
         id: f.id, name: f.name, classId: f.classId, className: f.className, emoji: f.emoji, type: f.type,
         photo: f.photo, battleAvatar: f.battleAvatar, level: f.level, attrs: f.attrs,
-        hp: f.hp, maxHp: f.maxHp, mana: f.mana, maxMana: f.maxMana, effects: f.effects, team: f.team,
+        hp: f.hp, maxHp: f.maxHp, mana: f.mana, maxMana: f.maxMana, effects: f.effects, team: f.team, color: Number(f.classColor || 0xc9a227), frameColor: '#' + Math.max(0, Number(f.classColor || 0xc9a227)).toString(16).padStart(6, '0'),
         actives: (f.actives || []).map((a) => ({
             id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd,
             currentCd: f.cds?.[a.id] || 0, desc: a.desc
         })),
         passives: (f.passives || []).map((a) => ({ id: a.id, name: a.name, emoji: a.emoji, desc: a.desc })),
         unique: (f.unique || []).map((a) => ({ id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd, currentCd: f.cds?.[a.id] || 0, desc: a.desc, oncePerBattle: !!a.oncePerBattle })),
-        basicAttack: f.basicAttack
+        basicAttack: f.basicAttack,\n        passiveActivations: (f.passives || []).map((p) => ({ id: p.id, name: p.name, emoji: p.emoji }))
     };
 }
 
@@ -105,7 +105,7 @@ function createMatch({ mode = '1v1', teamA = [], teamB = [], bet = 0, fun = fals
         fighters, teamA: aIds, teamB: bIds, turnOrder, turnIndex: 0, currentId: turnOrder[0],
         turnEndsAt: Date.now() + TURN_MS,
         log: [{ t: Date.now(), text: `Arena aberta.${hasBet ? ` Aposta: **${bet}** ✨.` : ''}` }],
-        status: 'active', winnerTeam: null, bet: Number(bet) || 0, lastEffect: null,
+        status: 'active', winnerTeam: null, bet: Number(bet) || 0, lastEffect: { type: 'passive', id: Date.now(), fighterId: turnOrder[0], name: fighters[turnOrder[0]]?.passives?.[0]?.name || 'Passivas ativadas' },
         createdAt: Date.now(), rewards: null, chat: []
     };
     arenas.set(id, match);
@@ -251,7 +251,7 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
         return { ok: true, match: publicState(match, playerId) };
     }
 
-    attacker.mana -= skill.mana || 0;
+    const manaBefore = attacker.mana;\n    attacker.mana -= skill.mana || 0;\n    match.lastEffect = { type: 'skill', id: Date.now(), fighterId: attacker.id, name: skill.name, emoji: skill.emoji || '✨', manaSpent: manaBefore - attacker.mana };
     if (skill.cd) attacker.cds[skill.id] = skill.cd;
     if (skill.unique && skill.oncePerBattle) {
         if (!Array.isArray(attacker.usedUniques)) attacker.usedUniques = [];
@@ -285,7 +285,7 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
                 match.log.push({ t: Date.now(), kind: 'attack', text: `🌀 ${defender.name} esquivou de **${skill.name}**!` });
                 continue;
             }
-            defender.hp = Math.max(0, defender.hp - result.dmg);
+            const hpBefore = defender.hp;\n            defender.hp = Math.max(0, defender.hp - result.dmg);\n            match.lastEffect = { type: 'damage', id: Date.now(), fighterId: defender.id, attackerId: attacker.id, amount: result.dmg, crit: !!result.crit };
             match.log.push({
                 t: Date.now(),
                 text: `⚔️ ${attacker.name} **${skill.name}** → **${result.dmg}**${result.crit ? ' CRIT' : ''} em ${defender.name}.`
