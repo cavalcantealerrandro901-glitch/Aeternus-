@@ -402,6 +402,64 @@ function canClaim(classId, userId, playersMap) {
     }
     return { ok: true };
 }
+function saveCustom(data) {
+    store.save('custom_classes.json', data);
+    return data;
+}
+
+function slugifyClassId(name) {
+    return String(name || 'classe')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+        .slice(0, 48) || 'classe';
+}
+
+function createClass(definition) {
+    const custom = loadCustom();
+    let id = slugifyClassId(definition.name);
+    let n = 2;
+    while (allClasses()[id] || custom[id]) id = slugifyClassId(definition.name) + '_' + n++;
+
+    const rarity = String(definition.rarity || 'comum').toLowerCase();
+    const rarityNames = {
+        comum: 'Comum', incomum: 'Incomum', rara: 'Rara', epica: 'Épica',
+        lendaria: 'Lendária', unica: 'Única', mitica: 'Mítica'
+    };
+    const cls = {
+        id,
+        name: String(definition.name || id),
+        emoji: String(definition.emoji || '✨'),
+        type: String(definition.type || 'melee').toLowerCase(),
+        rarity,
+        rarityName: rarityNames[rarity] || rarity,
+        selectionPool: rarity === 'comum' ? 'common' : rarity,
+        desc: String(definition.desc || ''),
+        uniqueAbilities: Array.isArray(definition.uniqueAbilities) ? definition.uniqueAbilities : [],
+        activeAbilities: Array.isArray(definition.activeAbilities) ? definition.activeAbilities : [],
+        powers: Array.isArray(definition.activeAbilities) ? definition.activeAbilities.map((x) => x.name || x) : [],
+        uniquePassives: Array.isArray(definition.uniquePassives) ? definition.uniquePassives : [],
+        passives: Array.isArray(definition.passives) ? definition.passives : [],
+        disadvantages: Array.isArray(definition.disadvantages) ? definition.disadvantages : [],
+        bonus: definition.bonus && typeof definition.bonus === 'object' ? definition.bonus : {},
+        attributes: definition.attributes && typeof definition.attributes === 'object' ? definition.attributes : {},
+        manaMult: Number(definition.manaMult) > 0 ? Number(definition.manaMult) : 1,
+        color: Number.isFinite(Number(definition.color)) ? Number(definition.color) : 0xc9a227,
+        classBonuses: definition.classBonuses || {},
+        uniqueAbilityBonuses: definition.uniqueAbilityBonuses || {},
+        exclusiveItems: Array.isArray(definition.exclusiveItems) ? definition.exclusiveItems : [],
+        classGear: definition.classGear || null,
+        basicAttack: definition.basicAttack || {
+            id: id + '_ataque_basico', name: 'Ataque Básico', emoji: String(definition.emoji || '✨'),
+            type: String(definition.type || 'melee'), power: 1, mana: 0
+        },
+        custom: true,
+        createdAt: new Date().toISOString()
+    };
+    custom[id] = cls;
+    saveCustom(custom);
+    return cls;
+}
+
 function listSelectableClasses() {
     return Object.values(allClasses()).filter((c) => c && c.id && c.selectionPool === 'common' && !(c.exclusive || c.maxHolders === 1));
 }
@@ -425,5 +483,5 @@ function enforceExclusiveOwners(playersMap) {
 
 module.exports = {
     BASE_CLASSES, COMMON_CLASSES, allClasses, getClass, resolveClassId, canClaim,
-    listSelectableClasses, listClassesForUser, enforceExclusiveOwners, loadCustom
+    createClass, listSelectableClasses, listClassesForUser, enforceExclusiveOwners, loadCustom
 };
