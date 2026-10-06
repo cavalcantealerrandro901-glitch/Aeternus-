@@ -43,28 +43,41 @@ function classEmbed(cls) {
     const aa = (cls.activeAbilities || cls.powers || []).filter((x) => x && x !== '—');
     const up = (cls.uniquePassives || []).filter((x) => x && x !== '—');
     const pa = (cls.passives || []).filter((x) => x && x !== '—');
-    if (ua.length)
+    const details = cls.abilityDetails || {};
+    const detailField = (list, detailList) => {
+        const source = Array.isArray(detailList) && detailList.length ? detailList : list.map((name) => ({ name }));
+        return truncField(source.map((x, i) => {
+            const attrs = x.attributes && typeof x.attributes === 'object'
+                ? Object.entries(x.attributes).map(([k, v]) => k + ' ' + (v >= 0 ? '+' : '') + v).join(' · ')
+                : '';
+            return '**' + (i + 1) + '. ' + (x.name || list[i]) + '**\n' + (x.description || '_Sem descrição_') + (attrs ? '\n↳ 📊 ' + attrs : '');
+        }).join('\n\n'));
+    };
+    if (ua.length) emb.addFields({ name: '👁️ Habilidades únicas (3)', value: detailField(ua, details.unique) });
+    if (aa.length) emb.addFields({ name: '⚔️ Ativas (4)', value: detailField(aa, details.active) });
+    if (up.length) emb.addFields({ name: '🔮 Passivas únicas (3)', value: detailField(up, details.uniquePassives) });
+    if (pa.length) emb.addFields({ name: '🧠 Passivas (5)', value: detailField(pa, details.passives) });
+
+    if (cls.attributes && Object.keys(cls.attributes).length) {
         emb.addFields({
-            name: '👁️ Habilidades únicas (3)',
-            value: truncField(ua.map((x, i) => `${i + 1}. ${x}`).join('\n'))
+            name: '📊 Atributos da classe',
+            value: truncField(Object.entries(cls.attributes).map(([k, v]) => '**' + k + '**: ' + v).join(' · '))
         });
-    if (aa.length)
-        emb.addFields({
-            name: '⚔️ Ativas (4)',
-            value: truncField(aa.map((x, i) => `${i + 1}. ${x}`).join('\n'))
-        });
-    if (up.length)
-        emb.addFields({
-            name: '🔮 Passivas únicas (3)',
-            value: truncField(up.map((x, i) => `${i + 1}. ${x}`).join('\n'))
-        });
-    if (pa.length)
-        emb.addFields({
-            name: '🧠 Passivas (5)',
-            value: truncField(pa.map((x, i) => `${i + 1}. ${x}`).join('\n'))
-        });
+    }
     if (cls.disadvantages?.length) {
         emb.addFields({ name: '⚠️ Desvantagens', value: truncField(cls.disadvantages.join(' · ')) });
+    }
+    if (Array.isArray(cls.exclusiveItems) && cls.exclusiveItems.length) {
+        const customItemDefs = cls.exclusiveItems.map((id) => items.getItemDef(id)).filter(Boolean);
+        if (customItemDefs.length) {
+            emb.addFields({
+                name: '🎒 Itens exclusivos da classe',
+                value: truncField(customItemDefs.map((it) => {
+                    const effects = Object.entries(it.effects || {}).map(([k, v]) => k + ' ' + (v >= 0 ? '+' : '') + v).join(' · ');
+                    return (it.emoji || '🎒') + ' **' + it.name + '** · ' + it.category + '\n' + (it.desc || '_Sem descrição_') + (effects ? '\n↳ 📊 ' + effects : '');
+                }).join('\n\n'), 1020)
+            });
+        }
     }
     if (cls.classGear) {
         const g = cls.classGear;
