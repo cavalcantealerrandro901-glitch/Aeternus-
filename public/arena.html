@@ -35,8 +35,9 @@
       <div class="barbox"><div class="barline"><span>❤️ Vida</span><b id="hpTextA">0 / 0</b></div><div class="bar hp"><i id="hpBarA"></i></div></div>
       <div class="barbox"><div class="barline"><span>🔵 Mana</span><b id="manaTextA">0 / 0</b></div><div class="bar mana"><i id="manaBarA"></i></div></div>
       <div class="section"><h3>📊 Atributos</h3><div class="attrs" id="attrsA"></div></div>
-      <div class="section"><h3>🔮 Passivas</h3><div class="info-list" id="passivesA"></div></div>
+      <div class="section"><h3>⚔️ Habilidades ativas</h3><div class="info-list" id="activesA"></div></div>
       <div class="section"><h3>✨ Habilidades únicas</h3><div class="info-list" id="uniqueA"></div></div>
+      <div class="section"><h3>🔮 Passivas</h3><div class="info-list" id="passivesA"></div></div>
     </article>
     <div class="vs"><div class="vsmark">VS</div><div class="effect" id="fxText"></div><div class="turn" id="turnDetail">—</div></div>
     <article class="card enemy" id="cardB">
@@ -44,8 +45,9 @@
       <div class="barbox"><div class="barline"><span>❤️ Vida</span><b id="hpTextB">0 / 0</b></div><div class="bar hp"><i id="hpBarB"></i></div></div>
       <div class="barbox"><div class="barline"><span>🔵 Mana</span><b id="manaTextB">0 / 0</b></div><div class="bar mana"><i id="manaBarB"></i></div></div>
       <div class="section"><h3>📊 Atributos</h3><div class="attrs" id="attrsB"></div></div>
-      <div class="section"><h3>🔮 Passivas</h3><div class="info-list" id="passivesB"></div></div>
+      <div class="section"><h3>⚔️ Habilidades ativas</h3><div class="info-list" id="activesB"></div></div>
       <div class="section"><h3>✨ Habilidades únicas</h3><div class="info-list" id="uniqueB"></div></div>
+      <div class="section"><h3>🔮 Passivas</h3><div class="info-list" id="passivesB"></div></div>
     </article>
   </section>
   <section class="actions">
@@ -63,7 +65,7 @@
 <script>
 (function(){
   const $=id=>document.getElementById(id);
-  const params=new URLSearchParams(location.search); let matchId=params.get('id')||'', asUser=''; let state=null, pollTimer=null, tickTimer=null, acting=false;
+  const params=new URLSearchParams(location.search); let matchId=params.get('id')||'', asUser=''; let state=null, pollTimer=null, tickTimer=null, acting=false, previousEffect=null;
   const attrLabels={forca:'Força',defesa:'Defesa',agilidade:'Agilidade',vida:'Vida',inteligencia:'Int.',sorte:'Sorte',precisao:'Precisão',resistencia:'Res.'};
   function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
   function scale(id,cur,max){$(id).style.transform='scaleX('+(max>0?Math.max(0,Math.min(1,cur/max)):0)+')';}
@@ -72,12 +74,21 @@
   function avatar(side,f){const el=$('avatar'+side);el.innerHTML='';if(f?.battleAvatar?.url){const im=document.createElement('img');im.src=f.battleAvatar.url;im.alt='Avatar de '+(f.name||'jogador');el.appendChild(im)}else if(f?.photo){const im=document.createElement('img');im.src=f.photo;im.alt='Avatar de '+(f.name||'jogador');el.appendChild(im)}else el.textContent=f?.emoji||'⚔️';}
   function infoList(id,list,empty){$(id).innerHTML=(list?.length?list:[]).map(x=>'<div class="info"><span class="ico">'+esc(x.emoji||'✦')+'</span><div><strong>'+esc(x.name||'Habilidade')+'</strong><small>'+esc(x.desc||'')+'</small></div></div>').join('')||'<div class="info"><span class="ico">—</span><div><small>'+empty+'</small></div></div>';}
   function fill(side,f){
-    if(!f)return;$('name'+side).textContent=f.name||'Jogador';$('class'+side).innerHTML=esc(f.emoji||'')+' <b>'+esc(f.className||f.classId||'Sem classe')+'</b> · Nv. '+esc(f.level||0)+' · '+esc(f.type||'melee');avatar(side,f);
+    if(!f)return;
+    $('name'+side).textContent=f.name||'Jogador';
+    $('class'+side).innerHTML=esc(f.emoji||'')+' <b>'+esc(f.className||f.classId||'Sem classe')+'</b> · Nv. '+esc(f.level||0)+' · '+esc(f.type||'melee');
+    avatar(side,f);
     $('badges'+side).innerHTML=(f.effects||[]).map(e=>'<span class="badge">'+esc(e.type||'Efeito')+(e.turns?' · '+e.turns+'t':'')+'</span>').join('')||'<span class="badge">Sem efeitos</span>';
-    $('hpText'+side).textContent=(f.hp||0)+' / '+(f.maxHp||0);$('manaText'+side).textContent=(f.mana||0)+' / '+(f.maxMana||0);scale('hpBar'+side,f.hp||0,f.maxHp||1);scale('manaBar'+side,f.mana||0,f.maxMana||1);
+    $('hpText'+side).textContent=(f.hp||0)+' / '+(f.maxHp||0);
+    $('manaText'+side).textContent=(f.mana||0)+' / '+(f.maxMana||0);
+    scale('hpBar'+side,f.hp||0,f.maxHp||1);scale('manaBar'+side,f.mana||0,f.maxMana||1);
     const a=f.attrs||{};$('attrs'+side).innerHTML=Object.keys(attrLabels).map(k=>'<div class="attr"><span>'+attrLabels[k]+'</span><b>'+Number(a[k]||0)+'</b></div>').join('');
-    infoList('passives'+side,f.passives,'Nenhuma passiva equipada.');infoList('unique'+side,f.unique,'Nenhuma habilidade única equipada.');
+    infoList('actives'+side,f.actives,'Nenhuma habilidade ativa equipada.');
+    infoList('unique'+side,f.unique,'Nenhuma habilidade única equipada.');
+    infoList('passives'+side,f.passives,'Nenhuma passiva equipada.');
+    const card=$('card'+side);if(card)card.style.setProperty('--frame',f.frameColor||'#c9a227');
   }
+  function pulse(side,type){const el=$('card'+side);if(!el)return;el.classList.remove(type);void el.offsetWidth;el.classList.add(type);setTimeout(()=>el.classList.remove(type),900);}
   function skills(s,me){
     const box=$('skills');box.innerHTML='';const myTurn=!!s.yourTurn&&s.status==='active';
     const list=[];if(me?.basicAttack)list.push({...me.basicAttack,id:me.basicAttack.id||'basic',mana:0,desc:me.basicAttack.desc||'Ataque básico da classe'});
@@ -86,10 +97,10 @@
     $('actionHint').textContent=s.status!=='active'?'Batalha encerrada':myTurn?'Seu turno — escolha uma habilidade':'Aguardando o turno do adversário…';
   }
   function render(s){
-    state=s;if(s.viewerId)asUser=String(s.viewerId);const [me,enemy]=sides(s);fill('A',me);fill('B',enemy);skills(s,me);if(s.lastEffect?.id!==previousEffect&&s.lastEffect?.type==='passive'){const owner=String(s.lastEffect.fighterId)===String(me?.id)?'A':'B';pulse(owner,'passive')}
+    state=s;if(s.viewerId)asUser=String(s.viewerId);const [me,enemy]=sides(s);fill('A',me);fill('B',enemy);skills(s,me);
+    const effectId=s.lastEffect?.id;if(effectId!==previousEffect&&s.lastEffect){const f=s.lastEffect;const owner=String(f.fighterId)===String(me?.id)?'A':'B';const other=owner==='A'?'B':'A';if(f.type==='damage'){pulse(other,'hit');$('fxText').textContent=(f.crit?'💥 CRÍTICO · ':'⚔️ ')+(f.amount||0)+' dano'}else if(f.type==='skill'){pulse(owner,'skill');pulse(owner,'mana');$('fxText').textContent=(f.emoji||'✨')+' '+(f.name||'Habilidade')}else if(f.type==='passive'){pulse(owner,'passive');$('fxText').textContent='🔮 '+(f.name||'Passiva')+' ativada'}else if(f.type==='heal'){$('fxText').textContent='💚 Cura ativada'}}previousEffect=effectId||previousEffect;
     const cur=[...(s.teamA||[]),...(s.teamB||[])].find(x=>String(x.id)===String(s.currentId));const mine=String(s.currentId)===asUser;
     $('turnText').innerHTML=s.status==='finished'?'🏆 Batalha encerrada':(mine?'<strong>SEU TURNO</strong>':'Turno de <strong>'+esc(cur?.name||'adversário')+'</strong>');$('turnDetail').textContent=s.status==='finished'?'':(mine?'Escolha seu ataque':'Aguarde o adversário');
-    if(s.lastEffect){const f=s.lastEffect;const [me,enemy]=sides(s);const owner=String(f.fighterId)===String(me?.id)?'A':'B';const other=owner==='A'?'B':'A';if(f.type==='damage'){pulse(other,'hit');$('fxText').textContent=(f.crit?'💥 CRÍTICO · ':'⚔️ ')+(f.amount||0)+' dano'}else if(f.type==='skill'){pulse(owner,'skill');pulse(owner,'mana');$('fxText').textContent=(f.emoji||'✨')+' '+(f.name||'Habilidade')}else if(f.type==='passive'){pulse(owner,'passive');$('fxText').textContent='🔮 '+(f.name||'Passiva')+' ativada'}else if(f.type==='heal'){$('fxText').textContent='💚 Cura ativada'}}
     $('log').innerHTML=(s.log||[]).slice(-40).map(x=>'<div class="line">'+esc(x.text||'')+'</div>').join('');$('log').scrollTop=$('log').scrollHeight;
     $('chatBody').innerHTML=(s.chat||[]).map(x=>'<div class="chat-msg"><b>'+esc(String(x.playerId)===asUser?'Você':x.name||'Jogador')+':</b> '+esc(x.text||'')+'</div>').join('');$('chatBody').scrollTop=$('chatBody').scrollHeight;
     $('forfeitBtn').disabled=s.status!=='active';
