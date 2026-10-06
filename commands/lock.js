@@ -35,6 +35,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
         const reason = i.options.getString('motivo') || 'Sem motivo';
         try {
             await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, { SendMessages: false });
