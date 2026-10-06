@@ -54,27 +54,39 @@ async function handleMuteProcess(context, moderator, targetMember, durationMs, r
     const collector = sentMsg.createMessageComponentCollector({ filter, time: 6 * 60 * 1000, max: 1 });
 
     collector.on('collect', async i => {
-        if (!targetMember.moderatable) {
-            return i.update({ content: '❌ Não consigo silenciar este membro (cargo mais alto).', components: [] });
-        }
-        
         try {
+            // Responde imediatamente à Interaction para evitar DiscordAPIError[10062].
+            await i.deferUpdate();
+
+            if (!targetMember.moderatable) {
+                return await sentMsg.edit({
+                    content: '❌ Não consigo silenciar este membro (cargo mais alto).',
+                    components: []
+                });
+            }
+
             await targetMember.timeout(durationMs, `${reason} · por ${moderator.tag}`);
-            
+
             const isSilent = i.customId === silentBtnId;
             const successText = isSilent
                 ? `---------- 🤫 O usuário <@${targetMember.id}> foi silenciado silenciosamente, mas quem manda quebrar las regras né!!`
-                : `---------- 🔇 O usuário <@${targetMember.id}> foi silenciado com sucesso, mas quem manda quebrar as regras né!!`;
-            
-            await i.update({
+                : `---------- 🔇 O usuário <@${targetMember.id}> foi silenciado com sucesso, mas quem manda quebrar las regras né!!`;
+
+            await sentMsg.edit({
                 content: successText,
                 components: []
             });
         } catch (e) {
-            await i.update({ content: '❌ Não consegui silenciar o usuário.', components: [] });
+            try {
+                await sentMsg.edit({
+                    content: '❌ Não consegui silenciar o usuário.',
+                    components: []
+                });
+            } catch (_) {}
+
+            console.error('[mute] Erro ao processar confirmação:', e);
         }
     });
-
     collector.on('end', async (collected, reasonCollected) => {
         if (reasonCollected === 'time') {
             try {
