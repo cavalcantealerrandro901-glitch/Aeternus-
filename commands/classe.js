@@ -11,6 +11,7 @@ const classes = require('../utils/classes');
 const player = require('../utils/player');
 const store = require('../utils/store');
 const items = require('../utils/items');
+const { generateClass } = require('../utils/classCreator');
 
 function truncField(s, max = 1020) {
     const t = String(s || '');
@@ -171,15 +172,57 @@ module.exports = {
         }
 
         if (sub === 'criar') {
-            if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
-                return message.reply('❌ Apenas administradores podem criar classes.');
+            const rawDescription = args.slice(1).join(' ').trim();
+            if (!rawDescription) return message.reply('❌ Informe a descrição completa da classe. Use: O.classe criar "descrição completa da classe"');
+
+            let isOwner = false;
+            const configuredOwner = process.env.OWNER_ID || process.env.BOT_OWNER_ID;
+            if (configuredOwner) {
+                isOwner = String(configuredOwner) === String(message.author.id);
+            } else {
+                try {
+                    const application = await message.client.application?.fetch();
+                    const owner = application?.owner;
+                    isOwner = String(owner?.user?.id || owner?.id || '') === String(message.author.id);
+                    if (!isOwner && owner?.members?.has) isOwner = owner.members.has(message.author.id);
+                } catch (_) {}
             }
+            if (!isOwner) return message.reply('❌ Apenas o criador do Aeternus pode usar O.classe criar.');
 
-            const raw = args.slice(1).join(' ').trim();
-            const parts = parseQuotedArgs(raw);
-
-            if (parts.length < 8) {
-                return message.reply([
+            await message.reply('🧠 Interpretando a descrição e montando a classe completa...');
+            try {
+                const generated = await generateClass(rawDescription);
+                const abilityDetails = { unique: generated.uniqueAbilities, active: generated.activeAbilities, uniquePassives: generated.uniquePassives, passives: generated.passives };
+                const classBonuses = {
+                    abilities: Object.fromEntries(generated.activeAbilities.map((x) => [x.name, x.attributes || {}])),
+                    passives: Object.fromEntries(generated.passives.map((x) => [x.name, x.attributes || {}])),
+                    unique: Object.fromEntries(generated.uniqueAbilities.map((x) => [x.name, x.attributes || {}])),
+                    uniquePassives: Object.fromEntries(generated.uniquePassives.map((x) => [x.name, x.attributes || {}]))
+                };
+                const disadvantageDetails = Object.fromEntries(generated.disadvantages.map((x) => [x.name, x]));
+                const cls = classes.createClass({
+                    name: generated.name, desc: generated.description, rarity: generated.rarity, type: generated.type, emoji: generated.emoji,
+                    attributes: generated.attributes, bonus: generated.attributes, uniqueAbilities: generated.uniqueAbilities, activeAbilities: generated.activeAbilities,
+                    uniquePassives: generated.uniquePassives, passives: generated.passives, disadvantages: generated.disadvantages, abilityDetails, disadvantageDetails, classBonuses
+                });
+                const createdItems = items.createCustomItems(generated.items, cls.id);
+                if (createdItems.length !== 3) return message.reply('❌ A classe foi gerada, mas os 3 itens exclusivos não puderam ser registrados.');
+                const updated = classes.updateCustomClass(cls.id, {
+                    exclusiveItems: createdItems.map((item) => item.id),
+                    classGear: { armor: createdItems.find((x) => x.category === 'armadura')?.id || null, accessory: createdItems.find((x) => x.category === 'acessorio')?.id || null }
+                }) || cls;
+                const itemLines = createdItems.map((item) => item.emoji + ' **' + item.name + '** · ' + item.category).join('\n');
+                const attrLines = Object.entries(generated.attributes).map(([key, value]) => key + ': **' + value + '**').join(' · ');
+                return message.reply({
+                    content: ['# ✦ NOVA CLASSE GERADA', '', updated.emoji + ' **' + updated.name + '**', '⭐ Raridade: **' + updated.rarityName + '**', '⚔️ Tipo: **' + updated.type + '**', '', '📊 **Atributos:** ' + attrLines, '', '🎒 **Itens exclusivos:**', itemLines].join('\n'),
+                    embeds: [classEmbed(updated)]
+                });
+            } catch (e) {
+                console.error('[classe criar]', e);
+                return message.reply('❌ Não foi possível criar a classe: ' + (e.message || e));
+            }
+        }
+        return message.reply([
                     '❌ Formato incorreto.',
                     '',
                     'Use: O.classe criar "Nome" "Descrição" raridade tipo "únicas|..." "ativas|..." "passivas únicas|..." "passivas|..." emoji "desvantagens|..."',
