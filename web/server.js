@@ -150,7 +150,7 @@ function startWeb(client) {
         const match = arenaEngine.getMatch(req.params.id);
         if (!match) return res.status(404).json({ error: 'Arena não encontrada' });
         const userId = String(req.auth.user.id);
-        const isParticipant = [...(match.teamA || []), ...(match.teamB || [])].some((p) => String(p.id) === userId);
+        const isParticipant = [...(match.teamA || []), ...(match.teamB || [])].some((p) => String(p?.id || p) === userId);
         if (!isParticipant) return res.status(403).json({ error: 'Você não participa desta batalha.' });
         return res.json(arenaEngine.publicState(match, userId));
     });
@@ -176,8 +176,8 @@ function startWeb(client) {
             mode: body.mode,
             teamA,
             teamB,
-            bet: undefined,
-            fun: body.fun
+            bet: 0,
+            fun: true
         });
         if (!result.ok) return res.status(400).json(result);
         return res.json({
