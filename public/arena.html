@@ -49,7 +49,7 @@
     </article>
   </section>
   <section class="actions">
-    <div class="actions-head"><h2>⚔️ SEUS ATAQUES</h2><span class="hint" id="actionHint">Aguardando seu turno…</span></div>
+    <div class="actions-head"><h2>⚔️ HABILIDADES EQUIPADAS</h2><span class="hint" id="actionHint">Aguardando seu turno…</span></div>
     <div class="skills" id="skills"></div>
   </section>
   <section class="bottom">
@@ -82,8 +82,8 @@
     const box=$('skills');box.innerHTML='';const myTurn=!!s.yourTurn&&s.status==='active';
     const list=[];if(me?.basicAttack)list.push({...me.basicAttack,id:me.basicAttack.id||'basic',mana:0,desc:me.basicAttack.desc||'Ataque básico da classe'});
     (me?.actives||[]).forEach(x=>list.push(x));(me?.unique||[]).forEach(x=>list.push({...x,unique:true}));
-    list.forEach(sk=>{const b=document.createElement('button');b.type='button';b.className='skill'+(sk.unique?' unique':'');const cd=Number(sk.currentCd||0),mana=Number(sk.mana||0);b.disabled=!myTurn||acting||cd>0||(me?.mana||0)<mana||(me?.hp||0)<=0;b.innerHTML='<div class="sn">'+esc(sk.emoji||'⚔️')+' '+esc(sk.name||sk.id)+'</div><div class="sd">'+esc(sk.desc||'Ataque da classe')+'</div><div class="sm">MP '+mana+(sk.unique?' · ÚNICA':'')+(cd>0?' · CD '+cd:'')+'</div>';b.onclick=()=>move(sk.id);box.appendChild(b)});
-    $('actionHint').textContent=s.status!=='active'?'Batalha encerrada':myTurn?'Seu turno — escolha um ataque':'Aguardando o turno do adversário…';
+    list.forEach(sk=>{const b=document.createElement('button');b.type='button';b.className='skill'+(sk.unique?' unique':'');const cd=Number(sk.currentCd||0),mana=Number(sk.mana||0);b.disabled=!myTurn||acting||cd>0||(me?.mana||0)<mana||(me?.hp||0)<=0;b.innerHTML='<div class="sn">'+esc(sk.emoji||'⚔️')+' '+esc(sk.name||sk.id)+'</div><div class="sd">'+esc(sk.desc||'')+'</div><div class="sm">'+esc(sk.category||'Habilidade')+' · MP '+mana+(sk.unique?' · ÚNICA':'')+(cd>0?' · CD '+cd:'')+'</div>';b.onclick=()=>move(sk.id);box.appendChild(b)});
+    $('actionHint').textContent=s.status!=='active'?'Batalha encerrada':myTurn?'Seu turno — escolha uma habilidade':'Aguardando o turno do adversário…';
   }
   function render(s){
     state=s;if(s.viewerId)asUser=String(s.viewerId);const [me,enemy]=sides(s);fill('A',me);fill('B',enemy);skills(s,me);
