@@ -1,11 +1,13 @@
 const { PermissionFlagsBits } = require('discord.js');
 const msgStats = require('../utils/msgStats');
+const store = require('../utils/store');
 
 const ACTIVE_ROLE = 'Ativo';
 const MASTER_ROLE = 'Ativo Master';
 const TIME_ZONE = process.env.DAILY_ACTIVITY_TIMEZONE || 'America/Sao_Paulo';
 
-let lastResetDay = getDayKey();
+const STATE_KEY = 'dailyActivityRoles.json';
+let lastResetDay = String(store.load(STATE_KEY, {}).day || '');
 
 function getDayKey(date = new Date()) {
     return new Intl.DateTimeFormat('en-CA', {
@@ -114,6 +116,7 @@ async function resetAllGuilds(client) {
     const today = getDayKey();
     if (today === lastResetDay) return;
     lastResetDay = today;
+    store.save(STATE_KEY, { day: today });
 
     for (const guild of client.guilds.cache.values()) {
         await resetGuild(guild);
@@ -138,8 +141,14 @@ function setup(client) {
         });
     }, 30 * 1000);
 
-    // Garante reset também após um restart que atravesse a meia-noite.
-    resetAllGuilds(client).catch(() => {});
+    // Se o bot ficou offline durante a virada, garante o reset ao voltar.
+    const today = getDayKey();
+    if (lastResetDay && lastResetDay !== today) {
+        resetAllGuilds(client).catch(() => {});
+    } else if (!lastResetDay) {
+        lastResetDay = today;
+        store.save(STATE_KEY, { day: today });
+    }
 
     global.__aeternusDailyActivityTimer = check;
 }
