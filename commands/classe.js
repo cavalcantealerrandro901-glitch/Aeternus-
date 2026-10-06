@@ -163,20 +163,7 @@ module.exports = {
         const sub = String(args[0] || 'listar').toLowerCase();
 
         if (sub === 'listar' || sub === 'lista' || sub === 'list') {
-            const list = classes.listSelectableClasses();
-            const lines = list
-                .map((c) => String(c.emoji || '✨') + ' **' + c.name + '** · ' + (c.rarityName || c.rarity || 'Comum') + ' · ' + c.id + (c.custom ? ' · custom' : ''))
-                .join('\n')
-                .slice(0, 3900);
-            return message.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xc9a227)
-                        .setTitle('📜 Classes Aeternus')
-                        .setDescription(lines || '_Nenhuma classe disponível._')
-                        .setFooter({ text: 'Use O.classe escolher para fazer sua escolha permanente' })
-                ]
-            });
+            return message.reply(classListPayload('comum', 0, 'prefix'));
         }
 
         if (sub === 'escolher' || sub === 'escolha') {
@@ -266,20 +253,7 @@ module.exports = {
     async executeSlash(interaction) {
         const sub = interaction.options.getSubcommand();
         if (sub === 'listar') {
-            const list = classes.listSelectableClasses();
-            const lines = list
-                .map((c) => String(c.emoji || '✨') + ' **' + c.name + '** · ' + (c.rarityName || c.rarity || 'Comum') + ' · ' + c.id)
-                .join('\n')
-                .slice(0, 3900);
-            return interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0xc9a227)
-                        .setTitle('📜 Classes Aeternus')
-                        .setDescription(lines || '_Nenhuma classe disponível._')
-                        .setFooter({ text: 'Use /classe escolher para fazer sua escolha' })
-                ]
-            });
+            return interaction.reply(classListPayload('comum', 0, 'slash'));
         }
         if (sub === 'escolher') return interaction.reply(chooseStartPayload());
     },
