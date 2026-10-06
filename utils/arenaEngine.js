@@ -56,7 +56,8 @@ function loadFighter(userId) {
         battleAvatar: player.getBattleAvatar?.(userId),
         level: stLevel || 0,
         attrs,
-        passMods,\n        classColor: Number(cls.color || 0xc9a227),
+        passMods,
+        classColor: Number(cls.color || 0xc9a227),
         actives: (equipped.active || []).filter(Boolean),
         passives: (equipped.passive || []).filter(Boolean),
         unique: (equipped.unique || []).filter(Boolean),
@@ -78,7 +79,8 @@ function publicFighter(f) {
         })),
         passives: (f.passives || []).map((a) => ({ id: a.id, name: a.name, emoji: a.emoji, desc: a.desc })),
         unique: (f.unique || []).map((a) => ({ id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd, currentCd: f.cds?.[a.id] || 0, desc: a.desc, oncePerBattle: !!a.oncePerBattle })),
-        basicAttack: f.basicAttack,\n        passiveActivations: (f.passives || []).map((p) => ({ id: p.id, name: p.name, emoji: p.emoji }))
+        basicAttack: f.basicAttack,
+        passiveActivations: (f.passives || []).map((p) => ({ id: p.id, name: p.name, emoji: p.emoji }))
     };
 }
 
@@ -251,7 +253,9 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
         return { ok: true, match: publicState(match, playerId) };
     }
 
-    const manaBefore = attacker.mana;\n    attacker.mana -= skill.mana || 0;\n    match.lastEffect = { type: 'skill', id: Date.now(), fighterId: attacker.id, name: skill.name, emoji: skill.emoji || '✨', manaSpent: manaBefore - attacker.mana };
+    const manaBefore = attacker.mana;
+    attacker.mana -= skill.mana || 0;
+    match.lastEffect = { type: 'skill', id: Date.now(), fighterId: attacker.id, name: skill.name, emoji: skill.emoji || '✨', manaSpent: manaBefore - attacker.mana };
     if (skill.cd) attacker.cds[skill.id] = skill.cd;
     if (skill.unique && skill.oncePerBattle) {
         if (!Array.isArray(attacker.usedUniques)) attacker.usedUniques = [];
@@ -285,7 +289,9 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
                 match.log.push({ t: Date.now(), kind: 'attack', text: `🌀 ${defender.name} esquivou de **${skill.name}**!` });
                 continue;
             }
-            const hpBefore = defender.hp;\n            defender.hp = Math.max(0, defender.hp - result.dmg);\n            match.lastEffect = { type: 'damage', id: Date.now(), fighterId: defender.id, attackerId: attacker.id, amount: result.dmg, crit: !!result.crit };
+            const hpBefore = defender.hp;
+            defender.hp = Math.max(0, defender.hp - result.dmg);
+            match.lastEffect = { type: 'damage', id: Date.now(), fighterId: defender.id, attackerId: attacker.id, amount: result.dmg, crit: !!result.crit };
             match.log.push({
                 t: Date.now(),
                 text: `⚔️ ${attacker.name} **${skill.name}** → **${result.dmg}**${result.crit ? ' CRIT' : ''} em ${defender.name}.`
@@ -301,7 +307,7 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
 function publicState(match, viewerId) {
     return {
         id: match.id, mode: match.mode, status: match.status, currentId: match.currentId,
-        turnEndsAt: match.turnEndsAt, winnerTeam: match.winnerTeam, bet: 0, fun: true, yourTurn: match.status === 'active' && String(match.currentId) === String(viewerId), youWon: match.status === 'finished' ? ((match.winnerTeam === match.fighters[viewerId]?.team) ? true : false) : null,
+        turnEndsAt: match.turnEndsAt, winnerTeam: match.winnerTeam, bet: 0, fun: true, lastEffect: match.lastEffect, yourTurn: match.status === 'active' && String(match.currentId) === String(viewerId), youWon: match.status === 'finished' ? ((match.winnerTeam === match.fighters[viewerId]?.team) ? true : false) : null,
         log: (match.log || []).filter((entry) => entry.kind === 'attack').slice(-40),
         teamA: match.teamA.map((id) => publicFighter(match.fighters[id])),
         teamB: match.teamB.map((id) => publicFighter(match.fighters[id])),
