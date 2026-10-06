@@ -63,7 +63,7 @@ function loadFighter(userId) {
         unique: (equipped.unique || []).filter(Boolean),
         basicAttack: cls.basicAttack || { id: 'basico', name: 'Ataque', emoji: '⚔️', type: 'physical', power: 1, mana: 0 },
         hp, maxHp: hp, mana, maxMana: mana,
-        effects: [], cds: {}, usedUniques: [], team: null
+        effects: [], cds: {}, usedUniques: [], team: null, equippedItems: (() => { try { const eq = player.getEquipped?.(userId) || {}; return ['arma','armadura','acessorio'].map(slot => eq[slot] ? { slot, id:eq[slot].id, name:eq[slot].name, emoji:eq[slot].emoji || '🎒', rarity:eq[slot].rarity || 'comum', desc:eq[slot].desc || '', effects:eq[slot].effects || {} } : null).filter(Boolean); } catch (_) { return []; } })()
     };
 }
 
@@ -80,6 +80,7 @@ function publicFighter(f) {
         passives: (f.passives || []).map((a) => ({ id: a.id, name: a.name, emoji: a.emoji, desc: a.desc })),
         unique: (f.unique || []).map((a) => ({ id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd, currentCd: f.cds?.[a.id] || 0, desc: a.desc, oncePerBattle: !!a.oncePerBattle })),
         basicAttack: f.basicAttack,
+        items: (f.equippedItems || []).map((it) => ({ slot: it.slot, id: it.id, name: it.name, emoji: it.emoji, rarity: it.rarity, desc: it.desc })),
         passiveActivations: (f.passives || []).map((p) => ({ id: p.id, name: p.name, emoji: p.emoji }))
     };
 }
