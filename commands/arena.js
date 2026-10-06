@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const player = require('../utils/player');
 const arenaEngine = require('../utils/arenaEngine');
 
@@ -26,6 +26,9 @@ module.exports = {
         const embed = new EmbedBuilder().setColor(0xc9a227).setTitle('⚔️ ARENA PvP • DESAFIO CRIADO')
             .setDescription(['**' + message.author.username + '** ⚔️ **' + opponent.username + '**','', 'A batalha foi criada. Cada jogador deve abrir o painel pelo botão abaixo.','', '⏱️ Turnos de **90 segundos**','⚔️ Ataques definidos pela classe','💬 Chat disponível somente durante a batalha','🏆 Vitória concede as recompensas normais do PvP.','', '🔗 [ABRIR ARENA](' + fightLink(result.match.id) + ')'].join('\n'))
             .setFooter({ text: 'Arena ' + result.match.id }).setTimestamp();
-        return message.reply({ embeds: [embed] });
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setLabel('⚔️ Abrir Arena').setStyle(ButtonStyle.Link).setURL(fightLink(result.match.id))
+        );
+        return message.reply({ embeds: [embed], components: [row] });
     }
 };
