@@ -204,9 +204,8 @@ module.exports = {
         } catch (_) {}
 
         try {
-            if (message.content && message.content.length >= 1) {
-                msgStats.add(message.guild.id, message.author.id, 1);
-            }
+            // Toda mensagem de membro conta, inclusive mensagens com apenas anexos.
+            msgStats.add(message.guild.id, message.author.id, 1);
         } catch (_) {}
 
         try {
