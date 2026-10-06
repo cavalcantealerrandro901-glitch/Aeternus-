@@ -180,8 +180,42 @@ for (const item of COMMON_CLASS_ITEMS) ITEMS[item.id] = item;
 const RECIPES = {};
 const TRADE_SHOP = [];
 
+function loadCustomItems() {
+    try { return store.load('custom_items.json', {}) || {}; } catch (_) { return {}; }
+}
+function saveCustomItems(data) {
+    store.save('custom_items.json', data);
+    return data;
+}
+function createCustomItems(list, classId) {
+    const custom = loadCustomItems();
+    const created = [];
+    for (const raw of Array.isArray(list) ? list : []) {
+        const id = String(raw.id || '').trim().toLowerCase();
+        if (!id || custom[id]) continue;
+        const category = String(raw.category || '').toLowerCase();
+        const item = {
+            id,
+            name: String(raw.name || id),
+            emoji: String(raw.emoji || '🎒'),
+            category: ['armadura', 'acessorio', 'consumivel'].includes(category) ? category : 'acessorio',
+            rarity: String(raw.rarity || 'comum').toLowerCase(),
+            classId: classId || null,
+            exclusive: true,
+            effects: raw.effects && typeof raw.effects === 'object' ? raw.effects : {},
+            desc: String(raw.description || raw.desc || ''),
+            uniqueAbility: raw.uniqueAbility && typeof raw.uniqueAbility === 'object' ? raw.uniqueAbility : null
+        };
+        custom[id] = item;
+        created.push(item);
+    }
+    if (created.length) saveCustomItems(custom);
+    return created;
+}
+
 function getItemDef(id) {
-    return ITEMS[id] || ITEMS[String(id || '').toLowerCase()] || null;
+    const key = String(id || '').trim().toLowerCase();
+    return ITEMS[id] || ITEMS[key] || loadCustomItems()[key] || null;
 }
 
 function instantiateItem(id, overrides = {}) {
@@ -221,5 +255,7 @@ module.exports = {
     TRADE_SHOP,
     getItemDef,
     listItems,
-    instantiateItem
+    instantiateItem,
+    loadCustomItems,
+    createCustomItems
 };
