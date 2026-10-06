@@ -36,6 +36,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.memberPermissions?.has(PermissionFlagsBits.BanMembers)) return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
         const id = String(i.options.getString('id', true)).replace(/\D/g, '');
         const reason = i.options.getString('motivo') || 'Sem motivo';
         try {
