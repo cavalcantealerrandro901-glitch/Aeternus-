@@ -592,7 +592,9 @@ function publicDungeon(match, asUserId) {
                                 hp: enemy.hp,
                                 maxHp: enemy.maxHp,
                                 level: enemy.level,
-                                isBoss: !!enemy.isBoss
+                                isBoss: !!enemy.isBoss,
+                                attrs: enemy.attrs || {},
+                                className: enemy.className || (enemy.isBoss ? 'Boss' : 'Monstro')
                             }
                           : null,
                       currentId: match.currentId,
