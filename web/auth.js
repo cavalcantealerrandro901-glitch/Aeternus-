@@ -178,6 +178,16 @@ async function requireGuildManager(req, res, next) {
 function setupAuth(app, client) {
     app.get('/login', (req, res) => {
         const cfg = getConfig();
+        const returnTo = String(req.query.returnTo || '').trim();
+        if (returnTo.startsWith('/') && !returnTo.startsWith('//')) {
+            res.cookie('aeternus_return_to', returnTo, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL,
+                sameSite: 'lax',
+                path: '/',
+                maxAge: 10 * 60 * 1000
+            });
+        }
         if (!cfg.clientId || !cfg.clientSecret || !cfg.redirect) {
             return res.status(500).send('OAuth Discord não configurado');
         }
@@ -241,7 +251,9 @@ function setupAuth(app, client) {
 
             const sessionId = createSession(token);
             res.cookie('aeternus_session', sessionId, cookieOptions());
-            res.redirect('/dashboard');
+            const returnTo = String(req.cookies?.aeternus_return_to || '').trim();
+            res.clearCookie('aeternus_return_to', { path: '/' });
+            res.redirect(returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/dashboard');
         } catch (e) {
             console.error('[auth] callback:', e.message);
             res.status(500).send('Falha na autenticação');
