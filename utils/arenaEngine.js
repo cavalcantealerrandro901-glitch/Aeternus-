@@ -282,7 +282,7 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
         for (const defender of targets) {
             const result = calcDamage(attacker, defender, skill);
             if (result.dodged) {
-                match.log.push({ t: Date.now(), text: `🌀 ${defender.name} esquivou de **${skill.name}**!` });
+                match.log.push({ t: Date.now(), kind: 'attack', text: `🌀 ${defender.name} esquivou de **${skill.name}**!` });
                 continue;
             }
             defender.hp = Math.max(0, defender.hp - result.dmg);
@@ -301,8 +301,8 @@ function applyMove(matchId, playerId, { moveId, targetId } = {}) {
 function publicState(match, viewerId) {
     return {
         id: match.id, mode: match.mode, status: match.status, currentId: match.currentId,
-        turnEndsAt: match.turnEndsAt, winnerTeam: match.winnerTeam, bet: match.bet, fun: match.fun,
-        log: (match.log || []).slice(-40),
+        turnEndsAt: match.turnEndsAt, winnerTeam: match.winnerTeam, bet: 0, fun: true, yourTurn: match.status === 'active' && String(match.currentId) === String(viewerId), youWon: match.status === 'finished' ? ((match.winnerTeam === match.fighters[viewerId]?.team) ? true : false) : null,
+        log: (match.log || []).filter((entry) => entry.kind === 'attack').slice(-40),
         teamA: match.teamA.map((id) => publicFighter(match.fighters[id])),
         teamB: match.teamB.map((id) => publicFighter(match.fighters[id])),
         rewards: match.rewards, chat: (match.chat || []).slice(-40), viewerId
