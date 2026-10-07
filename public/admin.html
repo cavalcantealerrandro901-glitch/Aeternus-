@@ -8,29 +8,115 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-<header class="header"><nav class="navbar">
-<div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
-<div class="admin-nav"><span id="admin-user" class="admin-user">Carregando...</span><a href="/servidores" class="btn btn-secondary">Trocar servidor</a></div>
-</nav></header>
+<header class="header">
+  <nav class="navbar">
+    <div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
+    <div class="admin-nav">
+      <span id="admin-user" class="admin-user">Carregando...</span>
+      <a href="/servidores" class="btn btn-secondary">Trocar servidor</a>
+    </div>
+  </nav>
+</header>
+
 <main class="admin-container">
-<section class="admin-hero admin-hero-left">
-<span class="admin-badge">ETAPA 02 • ADMINISTRAÇÃO</span>
-<h1 id="selected-server-name">Carregando servidor...</h1>
-<p id="selected-server-description">Carregando configurações...</p>
-</section>
-<section id="loading-state" class="admin-card"><div class="loader"></div><p>Carregando configurações...</p></section>
-<section id="admin-content" class="hidden">
-<div class="admin-settings-grid">
-<article class="admin-card admin-setting-card"><div class="admin-icon">🎁</div><h2>Daily</h2><p>Defina a faixa de éter entregue pelo comando diário.</p>
-<div class="setting-row"><label for="daily-min">Mínimo</label><input id="daily-min" type="number" min="0" step="1"></div>
-<div class="setting-row"><label for="daily-max">Máximo</label><input id="daily-max" type="number" min="0" step="1"></div>
-<button id="save-daily" class="btn btn-primary">Salvar alterações</button><span id="daily-status" class="setting-status"></span></article>
-<article class="admin-card admin-setting-card"><div class="admin-icon">🛒</div><h2>Loja</h2><p>Controle o estado da loja deste servidor.</p>
-<div class="shop-summary"><strong id="shop-status">Carregando...</strong><span id="shop-vips">0 VIPs</span></div>
-<div class="shop-actions"><button id="toggle-shop" class="btn btn-secondary">Alterar loja</button><a id="open-shop-panel" href="/itens" class="btn btn-primary">🛒 Abrir loja</a></div><span id="shop-feedback" class="setting-status"></span></article>
-</div>
-</section>
-<section id="error-state" class="admin-card hidden"><div class="admin-icon">⚠️</div><h2>Acesso não disponível</h2><p id="error-message">Não foi possível carregar este servidor.</p><a href="/servidores" class="btn btn-primary">Escolher outro servidor</a></section>
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-title">ADMINISTRAÇÃO</div>
+    <nav class="admin-category-menu" aria-label="Categorias de administração">
+      <a class="active" href="#visao-geral">⌂ <span>Visão geral</span></a>
+      <a href="#geral">⚙️ <span>Geral</span></a>
+      <a href="#economia">🎁 <span>Economia</span></a>
+      <a href="#atividade">🏅 <span>Atividade</span></a>
+      <a href="#loja">🛒 <span>Loja</span></a>
+      <a href="#moderacao">🛡️ <span>Moderação</span></a>
+      <a href="#seguranca">🔐 <span>Segurança</span></a>
+      <a href="#configuracoes">📋 <span>Configurações</span></a>
+    </nav>
+  </aside>
+
+  <section class="admin-main">
+    <section id="visao-geral" class="admin-hero admin-hero-left">
+      <div class="server-heading">
+        <img id="server-icon" class="server-large-icon hidden" alt="Ícone do servidor">
+        <div>
+          <span class="admin-badge">ADMINISTRAÇÃO • SERVIDOR SELECIONADO</span>
+          <h1 id="selected-server-name">Carregando servidor...</h1>
+          <p id="selected-server-description">Carregando informações...</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="loading-state" class="admin-card">
+      <div class="loader"></div><p>Carregando informações do servidor...</p>
+    </section>
+
+    <section id="admin-content" class="hidden">
+      <div class="server-info-grid">
+        <article class="admin-card server-info-card"><span>👥</span><small>Membros</small><strong id="server-members">—</strong></article>
+        <article class="admin-card server-info-card"><span>💬</span><small>Canais</small><strong id="server-channels">—</strong></article>
+        <article class="admin-card server-info-card"><span>🎭</span><small>Cargos</small><strong id="server-roles">—</strong></article>
+        <article class="admin-card server-info-card"><span>🚀</span><small>Nível de impulsos</small><strong id="server-boost">—</strong></article>
+      </div>
+
+      <section id="geral" class="admin-section">
+        <div class="section-heading"><span>⚙️</span><div><h2>Geral</h2><p>Informações principais do servidor selecionado.</p></div></div>
+        <div class="server-details-grid">
+          <div><small>Nome</small><strong id="detail-name">—</strong></div>
+          <div><small>ID do servidor</small><strong id="detail-id">—</strong></div>
+          <div><small>Proprietário</small><strong id="detail-owner">—</strong></div>
+          <div><small>Criado em</small><strong id="detail-created">—</strong></div>
+          <div><small>Prefixo</small><strong id="detail-prefix">O.</strong></div>
+          <div><small>Idioma do servidor</small><strong id="detail-locale">—</strong></div>
+        </div>
+      </section>
+
+      <section id="economia" class="admin-section">
+        <div class="section-heading"><span>🎁</span><div><h2>Economia</h2><p>Configure a recompensa diária de éter.</p></div></div>
+        <div class="admin-settings-grid">
+          <article class="admin-card admin-setting-card">
+            <div class="setting-row"><label for="daily-min">Mínimo</label><input id="daily-min" type="number" min="0" step="1"></div>
+            <div class="setting-row"><label for="daily-max">Máximo</label><input id="daily-max" type="number" min="0" step="1"></div>
+            <button id="save-daily" class="btn btn-primary">Salvar alterações</button>
+            <span id="daily-status" class="setting-status"></span>
+          </article>
+        </div>
+      </section>
+
+      <section id="atividade" class="admin-section">
+        <div class="section-heading"><span>🏅</span><div><h2>Atividade</h2><p>Categoria reservada para os sistemas de atividade do Aeternus.</p></div></div>
+        <article class="admin-card placeholder-card"><strong>Cargos por mensagens</strong><span>Configure metas, cargos e notificações de atividade.</span><em>Em configuração</em></article>
+      </section>
+
+      <section id="loja" class="admin-section">
+        <div class="section-heading"><span>🛒</span><div><h2>Loja</h2><p>Controle a disponibilidade da loja deste servidor.</p></div></div>
+        <article class="admin-card admin-setting-card">
+          <div class="shop-summary"><strong id="shop-status">Carregando...</strong><span id="shop-vips">0 VIP(s) cadastrados</span></div>
+          <div class="shop-actions"><button id="toggle-shop" class="btn btn-secondary">Alterar loja</button><a id="open-shop-panel" href="/itens" class="btn btn-primary">🛒 Abrir loja</a></div>
+          <span id="shop-feedback" class="setting-status"></span>
+        </article>
+      </section>
+
+      <section id="moderacao" class="admin-section">
+        <div class="section-heading"><span>🛡️</span><div><h2>Moderação</h2><p>Categoria reservada para as ferramentas de moderação.</p></div></div>
+        <article class="admin-card placeholder-card"><strong>Moderação do servidor</strong><span>Banimentos, expulsões, silenciamento, avisos e controle de canais.</span><em>Em configuração</em></article>
+      </section>
+
+      <section id="seguranca" class="admin-section">
+        <div class="section-heading"><span>🔐</span><div><h2>Segurança</h2><p>Categoria reservada para proteção e permissões.</p></div></div>
+        <article class="admin-card placeholder-card"><strong>Proteção do servidor</strong><span>Recursos de segurança e controle de acesso.</span><em>Em configuração</em></article>
+      </section>
+
+      <section id="configuracoes" class="admin-section">
+        <div class="section-heading"><span>📋</span><div><h2>Configurações</h2><p>Dados gerais usados pelo Aeternus neste servidor.</p></div></div>
+        <article class="admin-card placeholder-card"><strong>Configurações avançadas</strong><span>Mais opções administrativas serão adicionadas aqui.</span><em>Em configuração</em></article>
+      </section>
+    </section>
+
+    <section id="error-state" class="admin-card hidden">
+      <div class="admin-icon">⚠️</div><h2>Acesso não disponível</h2>
+      <p id="error-message">Não foi possível carregar este servidor.</p>
+      <a href="/servidores" class="btn btn-primary">Escolher outro servidor</a>
+    </section>
+  </section>
 </main>
 <script src="admin-panel.js"></script>
 </body>
