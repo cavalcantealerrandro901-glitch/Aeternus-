@@ -18,25 +18,12 @@ const MANAGE_PERMISSIONS =
 
 module.exports = {
   name: 'painel',
-
   aliases: [
-    'config',
-    'configuracao',
-    'configurações',
-    'configurar',
-    'admin',
-    'administracao',
-    'dashboard',
-    'dash',
-    'settings',
-    'setup',
-    'paineladmin',
-    'gerenciar',
-    'gerenciamento'
+    'config', 'configuracao', 'configurações', 'configurar', 'admin',
+    'administracao', 'dashboard', 'dash', 'settings', 'setup',
+    'paineladmin', 'gerenciar', 'gerenciamento'
   ],
-
   description: 'Acessa o painel de administração do servidor',
-
   data: new SlashCommandBuilder()
     .setName('painel')
     .setDescription('Acessa o painel de administração do servidor')
@@ -44,35 +31,19 @@ module.exports = {
 
   async executeSlash(interaction) {
     if (!interaction.inGuild()) {
-      return interaction.reply({
-        content: '❌ O painel só pode ser acessado dentro de um servidor.',
-        ephemeral: true
-      });
+      return interaction.reply({ content: '❌ O painel só pode ser acessado dentro de um servidor.', ephemeral: true });
     }
-
     if (!interaction.memberPermissions?.has(MANAGE_PERMISSIONS)) {
-      return interaction.reply({
-        content: '❌ Você precisa ter **Administrador** ou **Gerenciar Servidor** para acessar o painel.',
-        ephemeral: true
-      });
+      return interaction.reply({ content: '❌ Você precisa ter **Administrador** ou **Gerenciar Servidor** para acessar o painel.', ephemeral: true });
     }
-
     return enviarPainel(interaction, true);
   },
 
   async executePrefix(message) {
-    if (!message.guild) {
-      return message.reply(
-        '❌ O painel só pode ser acessado dentro de um servidor.'
-      );
-    }
-
+    if (!message.guild) return message.reply('❌ O painel só pode ser acessado dentro de um servidor.');
     if (!message.member?.permissions?.has(MANAGE_PERMISSIONS)) {
-      return message.reply(
-        '❌ Você precisa ter **Administrador** ou **Gerenciar Servidor** para acessar o painel.'
-      );
+      return message.reply('❌ Você precisa ter **Administrador** ou **Gerenciar Servidor** para acessar o painel.');
     }
-
     return enviarPainel(message, false);
   },
 
@@ -84,32 +55,33 @@ module.exports = {
 async function enviarPainel(context, isSlash) {
   const guild = context.guild;
   const usuario = context.user || context.author;
-
   const baseUrl = PANEL_URL.replace(/\/$/, '');
-  const painelUrl =
-    `${baseUrl}/admin/${encodeURIComponent(guild.id)}`;
+  const painelUrl = `${baseUrl}/admin/${encodeURIComponent(guild.id)}`;
 
   const embed = new EmbedBuilder()
-    .setColor('#6D28D9')
-    .setAuthor({
-      name: 'AETERNUS • Central de Administração',
-      iconURL: guild.client.user.displayAvatarURL()
-    })
-    .setTitle('⚙️ Painel do servidor')
+    .setColor('#8B3DFF')
+    .setAuthor({ name: 'AETERNUS • Central de Administração', iconURL: guild.client.user.displayAvatarURL() })
+    .setTitle('⚙️ Administração do servidor')
     .setDescription([
-      `Gerencie **${guild.name}** de forma rápida e centralizada.`,
+      `Gerencie **${guild.name}** pelo painel oficial do Aeternus.`,
       '',
-      'O painel permite configurar os principais recursos do Aeternus, com alterações específicas para este servidor.',
+      '**Informações atuais**',
+      `› 👥 Membros: **${guild.memberCount ?? '—'}**`,
+      `› 💬 Canais: **${guild.channels?.cache?.size ?? '—'}**`,
+      `› 🎭 Cargos: **${guild.roles?.cache?.size ?? '—'}**`,
+      `› 🆔 ID: \`${guild.id}\``,
       '',
-      '**Módulos disponíveis**',
-      '› 🎁 Economia e Daily',
-      '› 🏅 Cargos por atividade',
+      '**Categorias administrativas**',
+      '› ⚙️ Geral',
+      '› 🎁 Economia',
+      '› 🏅 Atividade',
       '› 🛒 Loja',
       '› 🛡️ Moderação',
-      '› 📋 Configurações do servidor',
+      '› 🔐 Segurança',
+      '› 📋 Configurações',
       '',
       '🔐 **Acesso protegido**',
-      'Somente membros com **Administrador** ou **Gerenciar Servidor** podem administrar o servidor.'
+      'O painel só pode ser administrado por membros com **Administrador** ou **Gerenciar Servidor**.'
     ].join('\n'))
     .setThumbnail(guild.iconURL({ size: 256 }) || guild.client.user.displayAvatarURL())
     .setFooter({
@@ -120,14 +92,11 @@ async function enviarPainel(context, isSlash) {
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setLabel('Abrir painel')
+      .setLabel('Abrir administração')
       .setEmoji('⚙️')
       .setStyle(ButtonStyle.Link)
       .setURL(painelUrl)
   );
 
-  return context.reply({
-    embeds: [embed],
-    components: [row]
-  });
+  return context.reply({ embeds: [embed], components: [row] });
 }
