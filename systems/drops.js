@@ -53,27 +53,47 @@ async function finishDrop(client, dropId, { isReroll = false } = {}) {
         drop.endedAt = Date.now();
         drops.createDrop(drop);
 
+        const conf = drops.guildDropConf(drop.guildId) || {};
+        const configuredColor = /^#[0-9a-fA-F]{6}$/.test(String(drop.embedColor || conf.embedColor || ''))
+            ? String(drop.embedColor || conf.embedColor)
+            : (isReroll ? '#FBBF24' : '#34D399');
+        const winnerMentions = winners.map((w) => `<@${w.id}>`).join(' ');
+        const winnerNames = winners.map((w) => `<@${w.id}>`).join(', ');
+        const replace = (text) => String(text || '').replace(/\\{(\\w+)\\}/g, (_, key) => ({
+            winners: winnerNames,
+            winners_count: winners.length,
+            prize: drop.prize?.label || '—',
+            participants: totalP,
+            tickets: drops.totalTickets(drop),
+            reroll: rerollId
+        }[key] ?? ''));
+
+        const victoryMessage = replace(
+            drop.winnerMessage ||
+            conf.winnerMessage ||
+            '🏆 Parabéns {winners}! Você venceu o drop de **{prize}**.'
+        );
+
         const embed = new EmbedBuilder()
-            .setColor(isReroll ? 0xfbbf24 : 0x34d399)
-            .setTitle(isReroll ? '🔁 Reroll finalizado' : '🎁 Drop finalizado')
-            .setDescription(
-                [
-                    `**Prêmio:** ${drop.prize.label}`,
-                    `**Participantes:** ${totalP}`,
-                    `**Tickets:** ${drops.totalTickets(drop)}`,
-                    drop.autopix ? '**Pagamento:** autopix' : '**Pagamento:** manual (staff)',
-                    '',
-                    '**Vencedor(es)**',
-                    ...lines,
-                    '',
-                    `🔁 Para re-sortear, envie no chat:`,
-                    `\`reroll ${rerollId}\``
-                ].join('\n')
-            )
-            .setFooter({ text: `Host: ${drop.hostTag || drop.hostId} · ID ${rerollId}` })
+            .setColor(configuredColor)
+            .setTitle(isReroll ? '🔁 Reroll finalizado' : '🎉 Resultado do drop')
+            .setDescription([
+                victoryMessage,
+                '',
+                `**Prêmio:** ${drop.prize.label}`,
+                `**Participantes:** ${totalP}`,
+                `**Tickets:** ${drops.totalTickets(drop)}`,
+                drop.autopix ? '**Pagamento:** automático' : '**Pagamento:** manual (staff)',
+                '',
+                '**Vencedor(es)**',
+                ...lines,
+                '',
+                `🔁 Reroll: \`${rerollId}\``
+            ].join('\\n'))
+            .setFooter({ text: 'Aeternus • Resultado do drop' })
             .setTimestamp();
 
-        const mentions = winners.map((w) => `<@${w.id}>`).join(' ');
+        const mentions = winnerMentions;
 
         if (msg) {
             await msg.edit({ embeds: [embed], components: [] }).catch(() => {});
@@ -82,6 +102,24 @@ async function finishDrop(client, dropId, { isReroll = false } = {}) {
             });
         } else {
             await channel.send({ content: mentions, embeds: [embed] }).catch(() => {});
+        }
+
+        if ((drop.winnerDm ?? conf.winnerDm) !== false) {
+            const dmEmbed = new EmbedBuilder()
+                .setColor(configuredColor)
+                .setTitle(isReroll ? '🔁 Você venceu o reroll!' : '🏆 Você venceu o drop!')
+                .setDescription(replace(
+                    drop.winnerMessage ||
+                    conf.winnerMessage ||
+                    'Parabéns {winners}! Você venceu o drop de **{prize}**.'
+                ))
+                .setFooter({ text: 'Aeternus • Resultado do drop' })
+                .setTimestamp();
+
+            for (const winner of winners) {
+                const user = await client.users.fetch(winner.id).catch(() => null);
+                if (user) await user.send({ embeds: [dmEmbed] }).catch(() => {});
+            }
         }
     } catch (e) {
         console.error('[drops] finish:', e.message);
