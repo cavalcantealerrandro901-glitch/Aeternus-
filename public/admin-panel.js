@@ -217,8 +217,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderExtraEntries(d.extraEntries || []);
     renderTemplates(d.templates || []);
     $('drop-template').value = d.templateId || 'default';
+    $('drop-winner-title').value = d.winnerTitle || '';
+    $('drop-winner-result-color').value = /^#[0-9a-fA-F]{6}$/.test(d.winnerResultColor || '') ? d.winnerResultColor : (d.embedColor || '#8B5CF6');
+    $('drop-winner-image').value = d.winnerImage || '';
+    $('drop-winner-banner').value = d.winnerBanner || '';
     $('drop-winner-message').value = d.winnerMessage || '';
+    $('drop-winner-mention').checked = d.winnerMention !== false;
     $('drop-winner-dm').checked = d.winnerDm !== false;
+    $('drop-result-separate').checked = d.resultSeparate !== false;
+    $('drop-reroll-enabled').checked = d.rerollEnabled !== false;
+    $('drop-max-rerolls').value = Number.isFinite(Number(d.maxRerolls)) ? Math.max(0, Number(d.maxRerolls)) : 3;
+    $('drop-delivery-failure').value = d.deliveryFailureMessage || '';
   }
 
   $('add-drop-entry').addEventListener('click', () => {
@@ -255,8 +264,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         embedColor: $('drop-color').value,
         templateId: $('drop-template').value,
         templates,
+        winnerTitle: $('drop-winner-title').value,
+        winnerResultColor: $('drop-winner-result-color').value,
+        winnerImage: $('drop-winner-image').value.trim(),
+        winnerBanner: $('drop-winner-banner').value.trim(),
         winnerMessage: $('drop-winner-message').value,
+        winnerMention: $('drop-winner-mention').checked,
         winnerDm: $('drop-winner-dm').checked,
+        resultSeparate: $('drop-result-separate').checked,
+        rerollEnabled: $('drop-reroll-enabled').checked,
+        maxRerolls: Number($('drop-max-rerolls').value) || 0,
+        deliveryFailureMessage: $('drop-delivery-failure').value,
         requirements: {
           minMessagesDay: Number($('drop-min-day').value) || 0,
           minMessagesWeek: Number($('drop-min-week').value) || 0,
