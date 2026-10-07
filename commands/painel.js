@@ -12,12 +12,12 @@ const GITHUB_PANEL_URL = process.env.GITHUB_URL || 'https://github.com/';
 
 module.exports = {
   name: 'painel',
-  aliases: ['suport', 'suporte', 'suport painel', 'painel suport'],
-  description: 'Acessa o gerenciador do servidor e o Painel GitHub',
+  aliases: [\n    'config',\n    'configuracao',\n    'configurações',\n    'configurar',\n    'configurarservidor',\n    'gerenciar',\n    'gerenciamento',\n    'admin',\n    'administracao',\n    'dashboard',\n    'dash',\n    'settings',\n    'setup',\n    'paineladmin',\n    'painel servidor',\n    'suporte',\n    'suport',\n    'painel suporte',\n    'suport painel'\n  ],
+  description: 'Abre o painel de administração do servidor',
 
   data: new SlashCommandBuilder()
     .setName('painel')
-    .setDescription('Acessa o gerenciador do servidor e o Painel GitHub')
+    .setDescription('Abre o painel de administração do servidor')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async executeSlash(interaction) {
