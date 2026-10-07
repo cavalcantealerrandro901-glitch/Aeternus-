@@ -554,7 +554,17 @@ async function createDropMsg(ctx, opts) {
             templateId: conf.templateId || 'default',
             template: getActiveTemplate(conf) || null,
             winnerMessage: conf.winnerMessage || '',
+            winnerTitle: conf.winnerTitle || '',
+            winnerResultColor: conf.winnerResultColor || conf.embedColor || '#8B5CF6',
+            winnerImage: conf.winnerImage || '',
+            winnerBanner: conf.winnerBanner || '',
+            winnerMention: conf.winnerMention !== false,
             winnerDm: conf.winnerDm !== false,
+            resultSeparate: conf.resultSeparate !== false,
+            rerollEnabled: conf.rerollEnabled !== false,
+            maxRerolls: Number(conf.maxRerolls) || 0,
+            deliveryFailureMessage: conf.deliveryFailureMessage || '',
+            rerollCount: 0,
             embedColor: conf.embedColor || '#8B5CF6'
         });
 
