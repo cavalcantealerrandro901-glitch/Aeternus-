@@ -24,6 +24,7 @@
 @media(max-width:900px){.arena{grid-template-columns:1fr 70px 1fr}.skills{grid-template-columns:repeat(2,1fr)}.attrs{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){#battle{padding:12px 9px}.top{align-items:flex-start}.arena{grid-template-columns:1fr;gap:9px}.vs{order:0;flex-direction:row;padding:3px}.vsmark{font-size:20px}.turn{display:flex;gap:7px;align-items:center}.effect{min-height:0}.card{padding:13px}.bottom{grid-template-columns:1fr}.skills{grid-template-columns:1fr 1fr}.avatar{width:54px;height:54px;flex-basis:54px}}
 </style>
+    <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
 <div id="lobby" style="max-width:440px;margin:80px auto;padding:24px;text-align:center;color:#9299aa">Carregando arena…</div>
@@ -104,5 +105,6 @@
   if(matchId){$('lobby').classList.add('hidden');$('battle').classList.remove('hidden');poll();pollTimer=setInterval(poll,1500);tickTimer=setInterval(tick,250)}else $('lobby').textContent='Abra a arena pelo botão enviado pelo Aeternus.';
 })();
 </script>
+    <script src="dashboard-app.js"></script>
 </body>
 </html>

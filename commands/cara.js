@@ -3,7 +3,7 @@ const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
 const MIN_BET = 1_000;
-const MAX_BET = 20_000_000;
+const MAX_BET = 35_000_000;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
