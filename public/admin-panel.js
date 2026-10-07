@@ -207,6 +207,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('drop-min-week').value = r.minMessagesWeek || 0;
     $('drop-min-month').value = r.minMessagesMonth || 0;
     $('drop-min-level').value = r.minLevel || 0;
+    $('drop-account-age').value = r.accountAgeDays || 0;
     $('drop-min-invites').value = r.minInvites || 0;
     $('drop-min-flocos').value = r.minFlocos || 0;
     $('drop-min-cristais').value = r.minCristais || 0;
@@ -261,6 +262,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           minMessagesWeek: Number($('drop-min-week').value) || 0,
           minMessagesMonth: Number($('drop-min-month').value) || 0,
           minLevel: Number($('drop-min-level').value) || 0,
+          accountAgeDays: Number($('drop-account-age').value) || 0,
           minInvites: Number($('drop-min-invites').value) || 0,
           minFlocos: Number($('drop-min-flocos').value) || 0,
           minCristais: Number($('drop-min-cristais').value) || 0,
