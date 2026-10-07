@@ -1,18 +1,37 @@
-const { 
-  SlashCommandBuilder, 
-  EmbedBuilder, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  PermissionFlagsBits 
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  PermissionFlagsBits
 } = require('discord.js');
 
-// URL do Painel hospedado no GitHub
-const GITHUB_PANEL_URL = process.env.GITHUB_URL || 'https://github.com/';
+const PANEL_URL =
+  process.env.PANEL_URL ||
+  process.env.PUBLIC_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  'https://aeternus-qsrc.onrender.com';
 
 module.exports = {
   name: 'painel',
-  aliases: [\n    'config',\n    'configuracao',\n    'configurações',\n    'configurar',\n    'configurarservidor',\n    'gerenciar',\n    'gerenciamento',\n    'admin',\n    'administracao',\n    'dashboard',\n    'dash',\n    'settings',\n    'setup',\n    'paineladmin',\n    'painel servidor',\n    'suporte',\n    'suport',\n    'painel suporte',\n    'suport painel'\n  ],
+  aliases: [
+    'config',
+    'configuracao',
+    'configurações',
+    'configurar',
+    'admin',
+    'administracao',
+    'dashboard',
+    'dash',
+    'settings',
+    'setup',
+    'paineladmin',
+    'gerenciar',
+    'gerenciamento',
+    'suporte',
+    'suport'
+  ],
   description: 'Abre o painel de administração do servidor',
 
   data: new SlashCommandBuilder()
@@ -21,123 +40,81 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async executeSlash(interaction) {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({ 
-        content: '❌ Apenas administradores podem acessar o gerenciador.', 
-        ephemeral: true 
+    if (!interaction.inGuild()) {
+      return interaction.reply({
+        content: '❌ Este comando só pode ser usado em um servidor.',
+        ephemeral: true
       });
     }
-    await renderHome(interaction, true);
+
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({
+        content: '❌ Apenas administradores podem acessar o painel.',
+        ephemeral: true
+      });
+    }
+
+    return enviarPainel(interaction);
   },
 
   async executePrefix(message) {
-    if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return message.reply('❌ Apenas administradores podem acessar o gerenciador.');
+    if (!message.guild) {
+      return message.reply('❌ Este comando só pode ser usado em um servidor.');
     }
-    await renderHome(message, false);
+
+    if (!message.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+      return message.reply('❌ Apenas administradores podem acessar o painel.');
+    }
+
+    return enviarPainel(message);
   },
 
-  async execute(message, args) {
+  async execute(message) {
     return this.executePrefix(message);
   }
 };
 
-async function renderHome(context, isSlash) {
+async function enviarPainel(context) {
   const guild = context.guild;
-  const author = isSlash ? context.user : context.author;
+  const usuario = context.user || context.author;
+  const baseUrl = PANEL_URL.replace(/\/$/, '');
+  const painelUrl = `${baseUrl}/admin/${encodeURIComponent(guild.id)}`;
 
-  const textoDescricao = [
-    '👑 **Central de Suporte e Controle do Servidor**',
-    'Seja bem-vindo ao sistema principal de gerenciamento do Aeternus.',
-    'Este painel permite ajustar módulos, preferências e permissões locais.',
-    'Todas as alterações efetuadas por este painel impactam o bot em tempo real.',
-    'Utilize os controles abaixo para avançar na configuração da sua guilda.',
-    'Garantimos salvamento automático de dados diretamente no banco MongoDB.',
-    '⚠️ *Atenção: Apenas membros com cargo de Administrador possuem acesso.*'
-  ].join('\n');
-
-  const homeEmbed = new EmbedBuilder()
-    .setTitle(`Gerenciador do servidor ${guild.name}`)
-    .setDescription(textoDescricao)
+  const embed = new EmbedBuilder()
+    .setTitle('✦ AETERNUS • PAINEL')
+    .setDescription([
+      `Servidor: **${guild.name}**`,
+      '',
+      '⚙️ **Central de administração**',
+      '',
+      'Configure os módulos do Aeternus para este servidor.',
+      '',
+      '• 🎁 Daily',
+      '• 🏅 Cargos por mensagens',
+      '• 🛒 Loja',
+      '• 🛡️ Moderação',
+      '• 📋 Outros módulos',
+      '',
+      'Clique no botão abaixo para abrir o painel web.'
+    ].join('\n'))
     .setColor('#7c3aed')
     .setThumbnail(guild.iconURL({ dynamic: true }) || null)
-    .setFooter({ text: `Solicitado por ${author.tag}`, iconURL: author.displayAvatarURL() })
+    .setFooter({
+      text: `Solicitado por ${usuario.tag}`,
+      iconURL: usuario.displayAvatarURL()
+    })
     .setTimestamp();
 
-  const rowButton = new ActionRowBuilder().addComponents(
+  const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId('go_to_confirm')
-      .setLabel('Ir para Confirmação')
-      .setEmoji('➡️')
-      .setStyle(ButtonStyle.Primary)
+      .setLabel('Abrir painel web')
+      .setEmoji('⚙️')
+      .setStyle(ButtonStyle.Link)
+      .setURL(painelUrl)
   );
 
-  const payload = { embeds: [homeEmbed], components: [rowButton] };
-  const response = isSlash 
-    ? await context.reply({ ...payload, fetchReply: true }) 
-    : await context.reply(payload);
-
-  const collector = response.createMessageComponentCollector({ time: 300000 });
-
-  collector.on('collect', async (i) => {
-    if (i.user.id !== author.id) {
-      return i.reply({ content: '❌ Apenas quem abriu o gerenciador pode interagir.', ephemeral: true });
-    }
-
-    if (i.customId === 'go_to_confirm') {
-      const confirmEmbed = new EmbedBuilder()
-        .setTitle('⚠️ Confirmação do Gerenciador')
-        .setDescription(
-          `Você está prestes a entrar no modo de edição do servidor **${guild.name}**.\n\n` +
-          'Deseja confirmar o acesso e abrir o painel?'
-        )
-        .setColor('#eab308')
-        .setTimestamp();
-
-      const confirmRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('confirm_yes')
-          .setLabel('Confirmar e Abrir')
-          .setEmoji('✅')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId('confirm_no')
-          .setLabel('Cancelar')
-          .setEmoji('✖️')
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await i.update({ embeds: [confirmEmbed], components: [confirmRow] });
-
-    } else if (i.customId === 'confirm_yes') {
-      const welcomeEmbed = new EmbedBuilder()
-        .setTitle('✨ Sistema de Confirmações & Painel GitHub')
-        .setDescription(
-          `Seja muito bem-vindo ao nosso sistema no servidor **${guild.name}**!\n\n` +
-          'Clique no botão abaixo para acessar o **Painel no GitHub**.'
-        )
-        .setColor('#22c55e')
-        .setFooter({ text: 'Aeternus • Redirecionamento', iconURL: guild.iconURL({ dynamic: true }) || null })
-        .setTimestamp();
-
-      const gitButtonRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setLabel('Acessar Painel GitHub')
-          .setEmoji('🐙')
-          .setStyle(ButtonStyle.Link)
-          .setURL(GITHUB_PANEL_URL)
-      );
-
-      await i.update({ embeds: [welcomeEmbed], components: [gitButtonRow] });
-      collector.stop();
-
-    } else if (i.customId === 'confirm_no') {
-      await i.update({ 
-        content: '❌ **Ação cancelada.**', 
-        embeds: [], 
-        components: [] 
-      });
-      collector.stop();
-    }
+  return context.reply({
+    embeds: [embed],
+    components: [row]
   });
 }
