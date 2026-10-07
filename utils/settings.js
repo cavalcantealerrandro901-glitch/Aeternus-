@@ -47,6 +47,21 @@ const DEFAULT = {
     drops: {
         enabled: true,
         channelId: null,
+        activationPrefix: 'O.',
+        embedColor: '#8B5CF6',
+        winnerMessage: '🏆 Parabéns {winners}! Você venceu o drop de **{prize}**.',
+        winnerDm: true,
+        templateId: 'default',
+        templates: [
+            {
+                id: 'default',
+                name: 'Modelo padrão',
+                title: '🎁 DROP EM ANDAMENTO',
+                description: '**Prêmio:** {prize}\n**Vencedores:** {winners_count}\n**Termina:** {ends}\n\nClique em **Participar** para entrar ou **Sair** para desistir.',
+                footer: 'Por {host} · {participants} participante(s)',
+                color: '#8B5CF6'
+            }
+        ],
         requirements: {
             minMessagesDay: 0,
             minMessagesWeek: 0,
@@ -124,7 +139,10 @@ function getSettings(guildId) {
         },
         extraEntries: Array.isArray(g.drops?.extraEntries)
             ? g.drops.extraEntries
-            : DEFAULT.drops.extraEntries
+            : DEFAULT.drops.extraEntries,
+        templates: Array.isArray(g.drops?.templates) && g.drops.templates.length
+            ? g.drops.templates
+            : DEFAULT.drops.templates
     };
     out.shop = {
         ...DEFAULT.shop,
