@@ -94,6 +94,106 @@ function startWeb(client) {
         });
     });
 
+    app.get('/api/dashboard/guild/:id/drops', requireGuildManager, (req, res) => {
+        const g = client.guilds.cache.get(req.params.id);
+        if (!g) return res.status(404).json({ ok: false, error: 'Servidor não encontrado.' });
+        const settings = getSettings(req.params.id);
+        const d = settings.drops || {};
+        return res.json({
+            ok: true,
+            enabled: d.enabled !== false,
+            channelId: d.channelId || null,
+            activationPrefix: d.activationPrefix || settings.prefix || 'O.',
+            embedColor: d.embedColor || '#8B5CF6',
+            winnerMessage: d.winnerMessage || '',
+            winnerDm: d.winnerDm !== false,
+            templateId: d.templateId || 'default',
+            templates: Array.isArray(d.templates) ? d.templates : [],
+            requirements: d.requirements || {},
+            extraEntries: Array.isArray(d.extraEntries) ? d.extraEntries : [],
+            channels: g.channels.cache
+                .filter(ch => ch.isTextBased?.())
+                .map(ch => ({ id: ch.id, name: ch.name }))
+                .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+            roles: g.roles.cache
+                .filter(r => r.id !== g.id)
+                .map(r => ({ id: r.id, name: r.name, position: r.position, color: r.hexColor }))
+                .sort((a, b) => b.position - a.position)
+        });
+    });
+
+    app.post('/api/dashboard/guild/:id/drops', requireGuildManager, (req, res) => {
+        const g = client.guilds.cache.get(req.params.id);
+        if (!g) return res.status(404).json({ ok: false, error: 'Servidor não encontrado.' });
+
+        const body = req.body || {};
+        const settings = getSettings(req.params.id);
+        const current = settings.drops || {};
+        const validHex = /^#[0-9a-fA-F]{6}$/;
+        const activationPrefix = String(body.activationPrefix || settings.prefix || 'O.').trim().replace(/\s+/g, '').slice(0, 5) || 'O.';
+        const embedColor = validHex.test(String(body.embedColor || '')) ? String(body.embedColor).toUpperCase() : '#8B5CF6';
+
+        const templates = Array.isArray(body.templates) ? body.templates.slice(0, 20).map((t, i) => ({
+            id: String(t.id || ('template-' + (i + 1))).slice(0, 40),
+            name: String(t.name || 'Modelo ' + (i + 1)).slice(0, 60),
+            title: String(t.title || '🎁 DROP EM ANDAMENTO').slice(0, 256),
+            description: String(t.description || '').slice(0, 4000),
+            footer: String(t.footer || '').slice(0, 2048),
+            color: validHex.test(String(t.color || '')) ? String(t.color).toUpperCase() : embedColor
+        })) : (Array.isArray(current.templates) ? current.templates : []);
+
+        const ids = new Set();
+        for (const t of templates) {
+            let base = t.id || 'template';
+            let id = base;
+            let n = 2;
+            while (ids.has(id)) id = base + '-' + n++;
+            t.id = id;
+            ids.add(id);
+        }
+
+        const templateId = ids.has(String(body.templateId)) ? String(body.templateId) : (templates[0]?.id || 'default');
+        const requiredRoleIds = Array.isArray(body.requirements?.requiredRoleIds) ? body.requirements.requiredRoleIds.map(String).filter(id => g.roles.cache.has(id)).slice(0, 20) : [];
+        const blockedRoleIds = Array.isArray(body.requirements?.blockedRoleIds) ? body.requirements.blockedRoleIds.map(String).filter(id => g.roles.cache.has(id)).slice(0, 20) : [];
+        const bypassRoleIds = Array.isArray(body.requirements?.bypassRoleIds) ? body.requirements.bypassRoleIds.map(String).filter(id => g.roles.cache.has(id)).slice(0, 20) : [];
+        const extraEntries = Array.isArray(body.extraEntries) ? body.extraEntries.slice(0, 30).map(rule => ({
+            roleId: String(rule.roleId || ''),
+            entries: Math.min(100, Math.max(0, Math.floor(Number(rule.entries) || 0))),
+            label: String(rule.label || '').slice(0, 60)
+        })).filter(rule => g.roles.cache.has(rule.roleId) && rule.entries > 0) : [];
+
+        const requirements = {
+            minMessagesDay: Math.max(0, Math.floor(Number(body.requirements?.minMessagesDay) || 0)),
+            minMessagesWeek: Math.max(0, Math.floor(Number(body.requirements?.minMessagesWeek) || 0)),
+            minMessagesMonth: Math.max(0, Math.floor(Number(body.requirements?.minMessagesMonth) || 0)),
+            minLevel: Math.max(0, Math.floor(Number(body.requirements?.minLevel) || 0)),
+            minInvites: Math.max(0, Math.floor(Number(body.requirements?.minInvites) || 0)),
+            minFlocos: Math.max(0, Math.floor(Number(body.requirements?.minFlocos) || 0)),
+            minCristais: Math.max(0, Math.floor(Number(body.requirements?.minCristais) || 0)),
+            requiredRoleIds,
+            blockedRoleIds,
+            bypassRoleIds
+        };
+
+        const patch = {
+            drops: {
+                enabled: body.enabled !== false,
+                channelId: g.channels.cache.has(String(body.channelId || '')) ? String(body.channelId) : null,
+                activationPrefix,
+                embedColor,
+                winnerMessage: String(body.winnerMessage || '').slice(0, 1000),
+                winnerDm: body.winnerDm !== false,
+                templateId,
+                templates,
+                requirements,
+                extraEntries
+            },
+            prefix: activationPrefix
+        };
+        const saved = setSettings(req.params.id, patch);
+        return res.json({ ok: true, drops: saved.drops, prefix: saved.prefix });
+    });
+
     app.get('/servidores', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'servidores.html')));
     app.get('/admin/:id', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')));
 
