@@ -49,6 +49,36 @@ const CATEGORIES = {
         name: 'Tecnologia',
         emoji: '💻',
         aliases: ['tech', 'tecnologia', 'ti', 'informatica', 'informática']
+    },
+    portugues: {
+        name: 'Português',
+        emoji: '📚',
+        aliases: ['portugues', 'português', 'gramatica', 'gramática', 'lingua', 'língua']
+    },
+    literatura: {
+        name: 'Literatura',
+        emoji: '✒️',
+        aliases: ['literatura', 'livros', 'literatura brasileira']
+    },
+    musica: {
+        name: 'Música',
+        emoji: '🎵',
+        aliases: ['musica', 'música', 'music']
+    },
+    cinema: {
+        name: 'Cinema & Séries',
+        emoji: '🎬',
+        aliases: ['cinema', 'filmes', 'filme', 'series', 'séries', 'tv']
+    },
+    natureza: {
+        name: 'Natureza & Animais',
+        emoji: '🌿',
+        aliases: ['natureza', 'animais', 'animal', 'fauna', 'flora']
+    },
+    logica: {
+        name: 'Lógica',
+        emoji: '🧩',
+        aliases: ['logica', 'lógica', 'raciocinio', 'raciocínio', 'enigmas']
     }
 };
 
@@ -160,6 +190,155 @@ const BANK = {
     ]
 };
 
+// Geradores de perguntas: além do banco fixo, estas categorias criam
+// variações novas a cada rodada, evitando um quiz com fim prático.
+const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+function generatedQuestion(catId) {
+    switch (catId) {
+        case 'matematica': {
+            const type = randInt(1, 6);
+            if (type === 1) {
+                const a = randInt(2, 99), b = randInt(2, 99);
+                return { q: `Quanto é ${a} × ${b}?`, a: [String(a * b)] };
+            }
+            if (type === 2) {
+                const b = randInt(2, 30), result = randInt(2, 40), a = b * result;
+                return { q: `Quanto é ${a} ÷ ${b}?`, a: [String(result)] };
+            }
+            if (type === 3) {
+                const n = randInt(2, 30);
+                return { q: `Quanto é ${n}² (${n} ao quadrado)?`, a: [String(n * n)] };
+            }
+            if (type === 4) {
+                const p = randInt(5, 95), n = randInt(20, 500);
+                const base = Math.floor((n * p) / 100);
+                return { q: `Quanto é ${p}% de ${n}?`, a: [String(base)] };
+            }
+            if (type === 5) {
+                const a = randInt(1, 40), b = randInt(1, 40), c = randInt(1, 40);
+                return { q: `Quanto é ${a} + ${b} + ${c}?`, a: [String(a + b + c)] };
+            }
+            const n = randInt(2, 20);
+            return { q: `Quanto é ${n}³ (${n} ao cubo)?`, a: [String(n ** 3)] };
+        }
+        case 'geral': {
+            const facts = [
+                ['Qual é a capital do Chile?', ['santiago']],
+                ['Qual é a capital do Canadá?', ['ottawa']],
+                ['Qual é a capital da Austrália?', ['canberra']],
+                ['Qual é a capital da Alemanha?', ['berlim', 'berlin']],
+                ['Qual é a capital da Itália?', ['roma', 'rome']],
+                ['Qual é a capital da Espanha?', ['madrid']],
+                ['Qual é a capital do México?', ['cidade do mexico', 'cidade do méxico']],
+                ['Qual é a capital da Colômbia?', ['bogota', 'bogotá']],
+                ['Qual é a capital do Peru?', ['lima']],
+                ['Qual é a capital do Uruguai?', ['montevideu', 'montevideo']],
+                ['Qual é a capital do Paraguai?', ['assuncao', 'assunção']],
+                ['Qual é a capital da Coreia do Sul?', ['seul', 'seoul']],
+                ['Qual é a capital da China?', ['pequim', 'beijing']],
+                ['Qual é a capital da Índia?', ['nova delhi', 'new delhi']],
+                ['Qual é a capital da Noruega?', ['oslo']],
+                ['Qual é a capital da Suécia?', ['estocolmo', 'stockholm']],
+                ['Qual é a capital da Grécia?', ['atenas', 'athens']],
+                ['Qual é a capital da Turquia?', ['ancara', 'ankara']]
+            ];
+            const [q, a] = facts[randInt(0, facts.length - 1)];
+            return { q, a };
+        }
+        case 'portugues': {
+            const items = [
+                ['Qual é o plural de “cidadão”?', ['cidadaos', 'cidadãos']],
+                ['Qual é o antônimo de “generoso”?', ['egoista', 'egoísta']],
+                ['Qual é o sinônimo de “rápido”?', ['veloz']],
+                ['Qual é o aumentativo de “casa”?', ['casarão', 'casarao']],
+                ['Qual é o diminutivo de “flor”?', ['florzinha']],
+                ['Qual é a classe gramatical de “feliz” em “ela está feliz”?', ['adjetivo']],
+                ['Qual é a classe gramatical de “rapidamente”?', ['adverbio', 'advérbio']],
+                ['Qual é o plural de “papel”?', ['papeis', 'papéis']],
+                ['Qual é o plural de “animal”?', ['animais']],
+                ['Qual é o contrário de “aceitar”?', ['recusar']],
+                ['Qual é o feminino de “ator”?', ['atriz']],
+                ['Qual é o coletivo de “peixes”?', ['cardume']]
+            ];
+            const [q, a] = items[randInt(0, items.length - 1)];
+            return { q, a };
+        }
+        case 'literatura': {
+            const items = [
+                ['Quem escreveu “Dom Casmurro”?', ['machado de assis', 'machado']],
+                ['Quem escreveu “O Cortiço”?', ['aluísio azevedo', 'aluisio azevedo']],
+                ['Quem escreveu “Vidas Secas”?', ['graciliano ramos']],
+                ['Quem escreveu “Iracema”?', ['jose de alencar', 'josé de alencar']],
+                ['Quem escreveu “O Alienista”?', ['machado de assis', 'machado']],
+                ['Quem escreveu “Grande Sertão: Veredas”?', ['guimaraes rosa', 'guimarães rosa']],
+                ['Quem escreveu “A Hora da Estrela”?', ['clarice lispector']],
+                ['Quem escreveu “Capitães da Areia”?', ['jorge amado']]
+            ];
+            return items[randInt(0, items.length - 1)].slice().map((x) => x);
+        }
+        case 'musica': {
+            const items = [
+                ['Qual instrumento possui cordas e é tocado com arco?', ['violino']],
+                ['Quantas cordas tem um violão tradicional?', ['6', 'seis']],
+                ['Qual instrumento é conhecido por ter teclas e pedais?', ['piano']],
+                ['Como se chama a pessoa que rege uma orquestra?', ['maestro', 'maestrina']],
+                ['Qual é o nome da velocidade de uma música?', ['andamento', 'tempo']],
+                ['Como se chama o conjunto de cinco linhas da escrita musical?', ['pentagrama']],
+                ['Qual instrumento de sopro é feito tradicionalmente de metal e tem bocal?', ['trompete']],
+                ['Qual é o nome da pessoa que compõe músicas?', ['compositor', 'compositora']]
+            ];
+            return items[randInt(0, items.length - 1)].slice().map((x) => x);
+        }
+        case 'cinema': {
+            const items = [
+                ['Qual personagem vive em Gotham City e combate o crime?', ['batman']],
+                ['Qual filme apresenta o personagem Jack Sparrow?', ['piratas do caribe', 'piratas do caribe']],
+                ['Qual é o nome do ogro protagonista de uma famosa animação da DreamWorks?', ['shrek']],
+                ['Qual saga apresenta a escola Hogwarts?', ['harry potter']],
+                ['Qual personagem é conhecido por usar um escudo com uma estrela?', ['capitao america', 'capitão américa']],
+                ['Qual é o nome do brinquedo cowboy de Toy Story?', ['woody']],
+                ['Qual personagem da Pixar é um robô que compacta lixo?', ['wall-e', 'wall e']],
+                ['Em qual cidade fictícia vive o Superman?', ['metropolis', 'metrópolis']]
+            ];
+            return items[randInt(0, items.length - 1)].slice().map((x) => x);
+        }
+        case 'natureza': {
+            const items = [
+                ['Qual é o maior animal terrestre?', ['elefante africano', 'elefante']],
+                ['Qual é o maior animal conhecido do planeta?', ['baleia azul']],
+                ['Qual mamífero é famoso por botar ovos?', ['ornitorrinco']],
+                ['Qual é o processo pelo qual plantas produzem alimento usando luz?', ['fotossintese', 'fotossíntese']],
+                ['Qual é o animal terrestre mais rápido?', ['guepardo', 'chita']],
+                ['Qual é o maior felino do mundo?', ['tigre']],
+                ['Qual ave é conhecida por não voar e viver na Antártida?', ['pinguim']],
+                ['Como se chama a transformação de lagarta em borboleta?', ['metamorfose']]
+            ];
+            return items[randInt(0, items.length - 1)].slice().map((x) => x);
+        }
+        case 'logica': {
+            const type = randInt(1, 4);
+            if (type === 1) {
+                const start = randInt(1, 20), step = randInt(2, 10);
+                const answer = start + step * 3;
+                return { q: `Complete a sequência: ${start}, ${start + step}, ${start + step * 2}, ?`, a: [String(answer)] };
+            }
+            if (type === 2) {
+                const n = randInt(2, 12);
+                return { q: `Se há ${n} caixas com 2 objetos em cada uma, quantos objetos há ao todo?`, a: [String(n * 2)] };
+            }
+            if (type === 3) {
+                const a = randInt(3, 12), b = randInt(3, 12);
+                return { q: `Um número somado a ${a} resulta em ${a + b}. Qual é o número?`, a: [String(b)] };
+            }
+            const a = randInt(2, 9), b = randInt(2, 9);
+            return { q: `Se A = ${a} e B = ${b}, quanto vale A × B + A?`, a: [String(a * b + a)] };
+        }
+        default:
+            return null;
+    }
+}
+
 const WIN_PHRASES = [
     '🔥 **{user}** mandou bem!',
     '⚡ Resposta relâmpago de **{user}**!',
@@ -196,8 +375,23 @@ function resolveCategory(input) {
 
 function pickQuestion(catId, used) {
     const pool = BANK[catId] || BANK.geral;
+
+    // Categorias com geração dinâmica têm um número praticamente ilimitado
+    // de combinações. O texto da pergunta é usado para evitar repetições.
+    if (typeof generatedQuestion === 'function') {
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+            const generated = generatedQuestion(catId);
+            if (generated && generated.q && generated.a?.length) {
+                const key = `${catId}:generated:${generated.q}`;
+                if (!used.has(key)) {
+                    used.add(key);
+                    return generated;
+                }
+            }
+        }
+    }
+
     const available = pool.filter((_, i) => !used.has(`${catId}:${i}`));
-    // se acabou o banco, reinicia o ciclo de perguntas usadas
     const list = available.length ? available : pool;
     if (!available.length) used.clear();
     const item = list[Math.floor(Math.random() * list.length)];
