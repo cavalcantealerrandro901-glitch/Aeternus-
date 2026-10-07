@@ -94,7 +94,8 @@ function startWeb(client) {
         });
     });
 
-    app.get('/admin/:id', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html')));
+    app.get('/servidores', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'servidores.html')));
+    app.get('/admin/:id', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')));
 
     app.get('/api/guild/:id', requireGuildManager, (req, res) => {
         const g = client.guilds.cache.get(req.params.id);
@@ -297,8 +298,8 @@ function startWeb(client) {
         }
     });
 
-    app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html')));
-    app.get('/', (req, res) => res.redirect('/dashboard'));
+    app.get('/dashboard', (req, res) => res.redirect('/servidores'));
+    app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 
     app.get('/health', (req, res) => {
         const mongo = (() => {
