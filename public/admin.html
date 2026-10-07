@@ -128,9 +128,26 @@
         </article>
 
         <article class="admin-card drop-config-card">
-          <div class="config-header"><div><strong>Resultado e vencedores</strong><p>Personalize a mensagem final e a entrega de resultados.</p></div></div>
-          <label>Mensagem de vitória<textarea id="drop-winner-message" rows="4" maxlength="1000" placeholder="🏆 Parabéns {winners}! Você venceu o drop de **{prize}**."></textarea><small>Variáveis: <code>{winners}</code>, <code>{prize}</code>, <code>{participants}</code>, <code>{tickets}</code>, <code>{reroll}</code>.</small></label>
-          <label class="switch-line"><input id="drop-winner-dm" type="checkbox"><span>Enviar resultado por DM para cada vencedor</span></label>
+          <div class="config-header"><div><strong>Resultado e vencedores</strong><p>Personalize a mensagem final, a entrega aos vencedores e o reroll.</p></div></div>
+          <div class="form-grid">
+            <label>Título do resultado<input id="drop-winner-title" maxlength="256" placeholder="🎉 Resultado do drop"></label>
+            <label>Cor do resultado<input id="drop-winner-result-color" type="color" value="#8B5CF6"><small>Usa a cor principal se não for alterada.</small></label>
+            <label>Imagem do resultado<input id="drop-winner-image" maxlength="1000" placeholder="https://..."><small>URL opcional da imagem.</small></label>
+            <label>Banner do resultado<input id="drop-winner-banner" maxlength="1000" placeholder="https://..."><small>URL opcional do banner.</small></label>
+          </div>
+          <label>Mensagem de vitória<textarea id="drop-winner-message" rows="4" maxlength="1000" placeholder="🏆 Parabéns {winners}! Você venceu o drop de **{prize}**."></textarea><small>Variáveis: <code>{winners}</code>, <code>{winners_count}</code>, <code>{prize}</code>, <code>{participants}</code>, <code>{tickets}</code>, <code>{reroll}</code>.</small></label>
+          <div class="role-config-grid">
+            <label class="switch-line"><input id="drop-winner-mention" type="checkbox"><span>Marcar vencedor(es) na mensagem</span></label>
+            <label class="switch-line"><input id="drop-winner-dm" type="checkbox"><span>Enviar resultado por DM para cada vencedor</span></label>
+          </div>
+          <div class="role-config-grid">
+            <label class="switch-line"><input id="drop-result-separate" type="checkbox"><span>Enviar resultado em uma mensagem separada</span></label>
+            <label class="switch-line"><input id="drop-reroll-enabled" type="checkbox"><span>Permitir reroll</span></label>
+          </div>
+          <div class="form-grid">
+            <label>Máximo de rerolls<input id="drop-max-rerolls" type="number" min="0" max="20" value="3"><small>0 desativa novas rodadas.</small></label>
+            <label>Falha na entrega<textarea id="drop-delivery-failure" rows="2" maxlength="1000" placeholder="⚠️ Não foi possível entregar automaticamente o prêmio."></textarea></label>
+          </div>
         </article>
 
         <div class="drop-save-bar"><span id="drop-status" class="setting-status"></span><button id="save-drops" class="btn btn-primary">Salvar configurações de Drops</button></div>
