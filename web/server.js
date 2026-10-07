@@ -97,12 +97,37 @@ function startWeb(client) {
     app.get('/servidores', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'servidores.html')));
     app.get('/admin/:id', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')));
 
-    app.get('/api/guild/:id', requireGuildManager, (req, res) => {
+    app.get('/api/guild/:id', requireGuildManager, async (req, res) => {
         const g = client.guilds.cache.get(req.params.id);
         if (!g) return res.status(404).json({ error: 'guild' });
-        res.json({
+
+        let ownerTag = null;
+        try {
+            const owner = await g.fetchOwner();
+            ownerTag = owner.user?.tag || owner.user?.username || null;
+        } catch (_) {}
+
+        const premiumLabels = { 0: 'Nenhum', 1: 'Nível 1', 2: 'Nível 2', 3: 'Nível 3' };
+
+        return res.json({
             id: g.id,
             name: g.name,
+            description: g.description || null,
+            icon: g.iconURL({ size: 256, extension: 'png' }) || null,
+            ownerId: g.ownerId || null,
+            ownerTag,
+            memberCount: g.memberCount ?? null,
+            channelCount: g.channels?.cache?.size ?? 0,
+            roleCount: g.roles?.cache?.size ?? 0,
+            emojiCount: g.emojis?.cache?.size ?? 0,
+            stickerCount: g.stickers?.cache?.size ?? 0,
+            premiumTier: Number(g.premiumTier || 0),
+            premiumTierLabel: premiumLabels[Number(g.premiumTier || 0)] || 'Desconhecido',
+            premiumSubscriptionCount: g.premiumSubscriptionCount ?? 0,
+            verificationLevel: String(g.verificationLevel ?? 'unknown'),
+            preferredLocale: g.preferredLocale || null,
+            createdAt: g.createdAt || null,
+            features: Array.isArray(g.features) ? g.features : [],
             prefix: getPrefix(req.params.id),
             settings: getSettings(req.params.id)
         });
