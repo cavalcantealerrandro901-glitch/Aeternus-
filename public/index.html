@@ -11,7 +11,16 @@
 <header class="header">
 <nav class="navbar">
 <div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
-<a href="/servidores" class="btn btn-primary nav-cta">Acessar painel</a>
+<div class="reception-menu">
+<button class="reception-menu-btn" id="reception-menu-btn" type="button" aria-expanded="false" aria-controls="reception-menu-list">☰ <span>Menu</span></button>
+<div class="reception-menu-list" id="reception-menu-list">
+<a href="/">⌂ Início</a>
+<a href="/servidores">⚙️ Painel</a>
+<a href="/login?returnTo=/servidores">🔐 Entrar com Discord</a>
+<div class="reception-menu-divider"></div>
+<a href="https://discord.com" target="_blank" rel="noopener noreferrer">💬 Comunidade</a>
+</div>
+</div>
 </nav>
 </header>
 <main class="reception">
@@ -32,5 +41,5 @@
 </section>
 </main>
 <footer><p>© 2026 <strong>Aeternus</strong> • Central de Administração</p></footer>
-</body>
+<script>const b=document.getElementById("reception-menu-btn"),m=document.getElementById("reception-menu-list");b.addEventListener("click",()=>{const o=b.getAttribute("aria-expanded")==="true";b.setAttribute("aria-expanded",String(!o));m.classList.toggle("open",!o)});document.addEventListener("click",e=>{if(!e.target.closest(".reception-menu")){b.setAttribute("aria-expanded","false");m.classList.remove("open")}});</script></body>
 </html>
