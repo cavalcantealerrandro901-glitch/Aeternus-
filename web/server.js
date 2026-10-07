@@ -171,6 +171,7 @@ function startWeb(client) {
             minInvites: Math.max(0, Math.floor(Number(body.requirements?.minInvites) || 0)),
             minFlocos: Math.max(0, Math.floor(Number(body.requirements?.minFlocos) || 0)),
             minCristais: Math.max(0, Math.floor(Number(body.requirements?.minCristais) || 0)),
+            minEter: Math.max(0, Math.floor(Number(body.requirements?.minEter) || 0)),
             accountAgeDays: Math.max(0, Math.floor(Number(body.requirements?.accountAgeDays) || 0)),
             requiredRoleIds,
             blockedRoleIds,
