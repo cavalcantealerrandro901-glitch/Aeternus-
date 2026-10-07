@@ -25,6 +25,7 @@
       <a class="active" href="#visao-geral">⌂ <span>Visão geral</span></a>
       <a href="#geral">⚙️ <span>Geral</span></a>
       <a href="#economia">🎁 <span>Economia</span></a>
+      <a href="#drops">🎉 <span>Drops & Sorteios</span></a>
       <a href="#atividade">🏅 <span>Atividade</span></a>
       <a href="#loja">🛒 <span>Loja</span></a>
       <a href="#moderacao">🛡️ <span>Moderação</span></a>
@@ -79,6 +80,58 @@
             <span id="daily-status" class="setting-status"></span>
           </article>
         </div>
+      </section>
+
+      <section id="drops" class="admin-section">
+        <div class="section-heading"><span>🎉</span><div><h2>Drops & Sorteios</h2><p>Controle completo dos drops, participantes, modelos e resultados do servidor.</p></div></div>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Ativação e publicação</strong><p>Defina como o sistema de drops será utilizado neste servidor.</p></div><label class="switch-line"><input id="drop-enabled" type="checkbox"><span>Ativado</span></label></div>
+          <div class="form-grid">
+            <label>Prefixo de ativação<input id="drop-prefix" maxlength="5" placeholder="O."><small>Este é o prefixo usado para ativar comandos por mensagem, como <b>O.drop</b>.</small></label>
+            <label>Canal padrão<select id="drop-channel"><option value="">Usar o canal onde o comando foi executado</option></select><small>O Aeternus tentará publicar os drops neste canal primeiro.</small></label>
+            <label>Cor principal<input id="drop-color" type="color" value="#8B5CF6"><small>Cor dos embeds do sistema.</small></label>
+            <label>Modelo ativo<select id="drop-template"></select><small>Escolha o modelo utilizado nos novos drops.</small></label>
+          </div>
+        </article>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Requisitos de participação</strong><p>Você pode combinar requisitos. Cargos de bypass ignoram estes requisitos.</p></div></div>
+          <div class="form-grid four">
+            <label>Mensagens no dia<input id="drop-min-day" type="number" min="0"></label>
+            <label>Mensagens na semana<input id="drop-min-week" type="number" min="0"></label>
+            <label>Mensagens no mês<input id="drop-min-month" type="number" min="0"></label>
+            <label>Nível mínimo<input id="drop-min-level" type="number" min="0"></label>
+            <label>Convites mínimos<input id="drop-min-invites" type="number" min="0"></label>
+            <label>Flocos mínimos<input id="drop-min-flocos" type="number" min="0"></label>
+            <label>Cristais mínimos<input id="drop-min-cristais" type="number" min="0"></label>
+          </div>
+          <div class="role-config-grid">
+            <label>Cargos exigidos<select id="drop-required-roles" multiple></select><small>O participante precisa ter pelo menos um deles.</small></label>
+            <label>Cargos que ignoram requisitos<select id="drop-bypass-roles" multiple></select><small>Estes cargos passam pelos requisitos automaticamente.</small></label>
+            <label>Cargos que não podem participar<select id="drop-blocked-roles" multiple></select><small>Bloqueio tem prioridade sobre bypass.</small></label>
+          </div>
+        </article>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Entradas extras por cargo</strong><p>Aumente a chance de determinados cargos com entradas adicionais.</p></div><button id="add-drop-entry" type="button" class="btn btn-secondary">+ Adicionar cargo</button></div>
+          <div id="drop-extra-entries" class="repeat-list"></div>
+          <div id="drop-entry-empty" class="empty-config">Nenhuma entrada extra configurada.</div>
+        </article>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Modelos de drop</strong><p>Crie modelos reutilizáveis para padronizar os embeds.</p></div><button id="add-drop-template" type="button" class="btn btn-secondary">+ Novo modelo</button></div>
+          <div id="drop-templates" class="template-list"></div>
+          <div class="template-help">Variáveis disponíveis: <code>{prize}</code> <code>{winners_count}</code> <code>{ends}</code> <code>{host}</code> <code>{participants}</code></div>
+        </article>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Resultado e vencedores</strong><p>Personalize a mensagem final e a entrega de resultados.</p></div></div>
+          <label>Mensagem de vitória<textarea id="drop-winner-message" rows="4" maxlength="1000" placeholder="🏆 Parabéns {winners}! Você venceu o drop de **{prize}**."></textarea><small>Variáveis: <code>{winners}</code>, <code>{prize}</code>, <code>{participants}</code>, <code>{tickets}</code>, <code>{reroll}</code>.</small></label>
+          <label class="switch-line"><input id="drop-winner-dm" type="checkbox"><span>Enviar resultado por DM para cada vencedor</span></label>
+        </article>
+
+        <div class="drop-save-bar"><span id="drop-status" class="setting-status"></span><button id="save-drops" class="btn btn-primary">Salvar configurações de Drops</button></div>
       </section>
 
       <section id="atividade" class="admin-section">
