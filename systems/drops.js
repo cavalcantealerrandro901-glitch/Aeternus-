@@ -157,7 +157,8 @@ async function rerollDrop(client, dropIdOrRerollId) {
     const conf = drops.guildDropConf(drop.guildId) || {};
     if ((drop.rerollEnabled ?? conf.rerollEnabled) === false) return { ok: false, error: 'O reroll está desativado para este servidor.' };
     const maxRerolls = Math.max(0, Math.min(20, Number(drop.maxRerolls ?? conf.maxRerolls) || 0));
-    if (maxRerolls > 0 && Number(drop.rerollCount || 0) >= maxRerolls) return { ok: false, error: `Limite de ${maxRerolls} reroll(s) atingido.` };
+    if (maxRerolls <= 0) return { ok: false, error: 'O reroll está desativado para este servidor.' };
+    if (Number(drop.rerollCount || 0) >= maxRerolls) return { ok: false, error: `Limite de ${maxRerolls} reroll(s) atingido.` };
     if (!Object.keys(drop.participants || {}).length)
         return { ok: false, error: 'Sem participantes para re-sortear.' };
 
