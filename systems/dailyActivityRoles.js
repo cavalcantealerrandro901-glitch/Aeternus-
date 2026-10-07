@@ -1,4 +1,4 @@
-const { PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const msgStats = require('../utils/msgStats');
 const store = require('../utils/store');
 
@@ -70,6 +70,21 @@ async function removeRole(member, role) {
     await member.roles.remove(role, 'Aeternus · fim do ciclo diário').catch(() => {});
 }
 
+async function notifyAward(message, role, count) {
+    if (!message.channel?.send || !role) return;
+    const isMaster = role.name === MASTER_ROLE;
+    const embed = new EmbedBuilder()
+        .setColor(isMaster ? 0xf59e0b : 0x22c55e)
+        .setTitle(isMaster ? '🏆 Cargo por mensagens alcançado!' : '🏅 Cargo por mensagens alcançado!')
+        .setDescription(
+            '<@' + message.author.id + '> atingiu **' + count + ' mensagens hoje** e recebeu o cargo ' + role + '.\n\n' +
+            (isMaster ? 'Você alcançou a meta máxima de atividade diária.' : 'Continue ativo para alcançar **Ativo Master** aos 500 envios.')
+        )
+        .setFooter({ text: 'Aeternus • Atividade diária' })
+        .setTimestamp();
+    await message.channel.send({ embeds: [embed] }).catch(() => {});
+}
+
 async function applyMilestone(message) {
     const guild = message.guild;
     if (!guild || message.author.bot) return;
@@ -85,10 +100,16 @@ async function applyMilestone(message) {
     const master = await getOrCreateRole(guild, MASTER_ROLE);
 
     if (count >= 500) {
+        const already = member.roles.cache.has(master.id);
         const added = await giveRole(member, master);
-        if (added) await removeRole(member, active);
+        if (added && !already) {
+            await removeRole(member, active);
+            await notifyAward(message, master, count);
+        }
     } else {
-        await giveRole(member, active);
+        const already = member.roles.cache.has(active.id);
+        const added = await giveRole(member, active);
+        if (added && !already) await notifyAward(message, active, count);
     }
 }
 

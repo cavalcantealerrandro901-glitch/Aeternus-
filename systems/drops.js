@@ -53,35 +53,85 @@ async function finishDrop(client, dropId, { isReroll = false } = {}) {
         drop.endedAt = Date.now();
         drops.createDrop(drop);
 
+        const conf = drops.guildDropConf(drop.guildId) || {};
+        const configuredColor = /^#[0-9a-fA-F]{6}$/.test(String(drop.winnerResultColor || conf.winnerResultColor || drop.embedColor || conf.embedColor || ''))
+            ? String(drop.winnerResultColor || conf.winnerResultColor || drop.embedColor || conf.embedColor)
+            : (isReroll ? '#FBBF24' : '#34D399');
+        const winnerMentions = winners.map((w) => `<@${w.id}>`).join(' ');
+        const winnerNames = winners.map((w) => `<@${w.id}>`).join(', ');
+        const replace = (text) => String(text || '').replace(/\\{(\\w+)\\}/g, (_, key) => ({
+            winners: winnerNames,
+            winners_count: winners.length,
+            prize: drop.prize?.label || '—',
+            participants: totalP,
+            tickets: drops.totalTickets(drop),
+            reroll: rerollId
+        }[key] ?? ''));
+
+        const victoryMessage = replace(
+            drop.winnerMessage ||
+            conf.winnerMessage ||
+            '🏆 Parabéns {winners}! Você venceu o drop de **{prize}**.'
+        );
+
         const embed = new EmbedBuilder()
-            .setColor(isReroll ? 0xfbbf24 : 0x34d399)
-            .setTitle(isReroll ? '🔁 Reroll finalizado' : '🎁 Drop finalizado')
-            .setDescription(
-                [
-                    `**Prêmio:** ${drop.prize.label}`,
-                    `**Participantes:** ${totalP}`,
-                    `**Tickets:** ${drops.totalTickets(drop)}`,
-                    drop.autopix ? '**Pagamento:** autopix' : '**Pagamento:** manual (staff)',
-                    '',
-                    '**Vencedor(es)**',
-                    ...lines,
-                    '',
-                    `🔁 Para re-sortear, envie no chat:`,
-                    `\`reroll ${rerollId}\``
-                ].join('\n')
-            )
-            .setFooter({ text: `Host: ${drop.hostTag || drop.hostId} · ID ${rerollId}` })
+            .setColor(configuredColor)
+            .setTitle(replace(drop.winnerTitle || conf.winnerTitle || (isReroll ? '🔁 Reroll finalizado' : '🎉 Resultado do drop')))
+            .setDescription([
+                victoryMessage,
+                '',
+                `**Prêmio:** ${drop.prize.label}`,
+                `**Participantes:** ${totalP}`,
+                `**Tickets:** ${drops.totalTickets(drop)}`,
+                drop.autopix ? '**Pagamento:** automático' : '**Pagamento:** manual (staff)',
+                '',
+                '**Vencedor(es)**',
+                ...lines,
+                '',
+                `🔁 Reroll: \`${rerollId}\``
+            ].join('\\n'))
+            .setFooter({ text: 'Aeternus • Resultado do drop' })
             .setTimestamp();
 
-        const mentions = winners.map((w) => `<@${w.id}>`).join(' ');
+        const mentions = (drop.winnerMention ?? conf.winnerMention) !== false ? winnerMentions : '';
+        if (drop.winnerImage || conf.winnerImage) embed.setThumbnail(drop.winnerImage || conf.winnerImage);
+        if (drop.winnerBanner || conf.winnerBanner) embed.setImage(drop.winnerBanner || conf.winnerBanner);
 
         if (msg) {
             await msg.edit({ embeds: [embed], components: [] }).catch(() => {});
-            await msg.reply({ content: mentions, embeds: [embed] }).catch(() => {
-                channel.send({ content: mentions, embeds: [embed] }).catch(() => {});
-            });
+            if ((drop.resultSeparate ?? conf.resultSeparate) !== false) {
+                await msg.reply({ content: mentions || undefined, embeds: [embed] }).catch(() => {
+                    channel.send({ content: mentions || undefined, embeds: [embed] }).catch(() => {});
+                });
+            }
         } else {
-            await channel.send({ content: mentions, embeds: [embed] }).catch(() => {});
+            await channel.send({ content: mentions || undefined, embeds: [embed] }).catch(() => {});
+        }
+
+        if ((drop.winnerDm ?? conf.winnerDm) !== false) {
+            const dmEmbed = new EmbedBuilder()
+                .setColor(configuredColor)
+                .setTitle(isReroll ? '🔁 Você venceu o reroll!' : '🏆 Você venceu o drop!')
+                .setDescription(replace(
+                    drop.winnerMessage ||
+                    conf.winnerMessage ||
+                    'Parabéns {winners}! Você venceu o drop de **{prize}**.'
+                ))
+                .setFooter({ text: 'Aeternus • Resultado do drop' })
+                .setTimestamp();
+
+            const dmFailures = [];
+            for (const winner of winners) {
+                const user = await client.users.fetch(winner.id).catch(() => null);
+                if (!user) { dmFailures.push(winner.id); continue; }
+                const sent = await user.send({ embeds: [dmEmbed] }).then(() => true).catch(() => false);
+                if (!sent) dmFailures.push(winner.id);
+            }
+            if (dmFailures.length && (drop.deliveryFailureMessage || conf.deliveryFailureMessage)) {
+                const failureText = replace(drop.deliveryFailureMessage || conf.deliveryFailureMessage)
+                    .replace(/\{failed_winners\}/g, dmFailures.map((id) => `<@${id}>`).join(', '));
+                await channel.send({ content: failureText }).catch(() => {});
+            }
         }
     } catch (e) {
         console.error('[drops] finish:', e.message);
@@ -104,9 +154,16 @@ async function rerollDrop(client, dropIdOrRerollId) {
         drops.findByMessageId(dropIdOrRerollId);
     if (!drop) return { ok: false, error: 'Drop não encontrado com esse ID.' };
     if (!drop.ended) return { ok: false, error: 'Esse drop ainda está em andamento.' };
+    const conf = drops.guildDropConf(drop.guildId) || {};
+    if ((drop.rerollEnabled ?? conf.rerollEnabled) === false) return { ok: false, error: 'O reroll está desativado para este servidor.' };
+    const maxRerolls = Math.max(0, Math.min(20, Number(drop.maxRerolls ?? conf.maxRerolls) || 0));
+    if (maxRerolls <= 0) return { ok: false, error: 'O reroll está desativado para este servidor.' };
+    if (Number(drop.rerollCount || 0) >= maxRerolls) return { ok: false, error: `Limite de ${maxRerolls} reroll(s) atingido.` };
     if (!Object.keys(drop.participants || {}).length)
         return { ok: false, error: 'Sem participantes para re-sortear.' };
 
+    drop.rerollCount = Number(drop.rerollCount || 0) + 1;
+    drops.createDrop(drop);
     await finishDrop(client, drop.id, { isReroll: true });
     return { ok: true, drop };
 }

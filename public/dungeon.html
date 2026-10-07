@@ -6,150 +6,35 @@
 <title>✦ Masmorra — Aeternus</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:wght@400;600&display=swap');
-:root{
-  --bg:#070605; --panel:#14100c; --gold:#c9a227; --gold-dim:#7a5c12;
-  --ink:#f5e6c8; --muted:#a89f91; --card:#1a1510; --danger:#7f1d1d;
-}
+:root{--bg:#080916;--panel:#0e1118;--card:#151925;--gold:#c9a227;--muted:#9ca3af;--line:#ffffff10;--blue:#3b82f6;--green:#22c55e;--danger:#7f1d1d}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{
-  min-height:100vh;color:var(--ink);font-family:'Crimson Text',Georgia,serif;
-  background:radial-gradient(ellipse 80% 50% at 50% 0%,#2a1810 0%,transparent 55%),var(--bg);
-  display:flex;flex-direction:column;
-}
-.hidden{display:none!important}
-button{font-family:inherit;cursor:pointer}
-.header{
-  text-align:center;padding:.75rem 1rem .4rem;border-bottom:1px solid #c9a22733;
-  background:linear-gradient(180deg,#1a120c 0%,transparent 100%);
-}
-.header h1{
-  font-family:Cinzel,serif;font-size:1.15rem;letter-spacing:.18em;
-  color:var(--gold);text-shadow:0 0 18px #c9a22755;
-}
-.turn-line{margin-top:.35rem;font-size:.95rem;color:var(--muted)}
-.turn-line strong{color:var(--gold);font-family:Cinzel,serif}
-.timer{display:inline-block;min-width:3.2rem;color:#fde68a;font-weight:600;font-variant-numeric:tabular-nums}
-.field{
-  display:grid;grid-template-columns:1fr auto 1fr;gap:.75rem;align-items:center;
-  padding:1rem .75rem .5rem;max-width:1100px;margin:0 auto;width:100%;
-}
-.fighter{
-  background:linear-gradient(160deg,#1c1510 0%,#0e0b09 100%);
-  border:1px solid var(--gold-dim);border-radius:12px;padding:.85rem 1rem;
-  box-shadow:0 8px 28px #000a;min-width:0;
-}
-.fighter.you{border-color:#c9a22788}
-.fighter.enemy{border-color:#7f1d1d88}
-.fighter .name{font-family:Cinzel,serif;font-size:1.05rem;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fighter .meta{font-size:.82rem;color:var(--muted);margin:.15rem 0 .5rem}
-.bar-row{margin:.28rem 0}
-.bar-label{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted);margin-bottom:.12rem}
-.bar{height:10px;border-radius:6px;background:#0a0806;overflow:hidden;border:1px solid #ffffff12}
-.bar>i{display:block;height:100%;width:100%;transform-origin:left center;transition:transform .35s ease}
-.bar.hp>i{background:linear-gradient(90deg,#16a34a,#4ade80)}
-.bar.mana>i{background:linear-gradient(90deg,#2563eb,#60a5fa)}
-.stats-mini{display:flex;gap:.75rem;margin-top:.45rem;font-size:.8rem;color:var(--muted)}
-.stats-mini span strong{color:var(--ink)}
-.vs-col{text-align:center;padding:0 .35rem}
-.vs-col .vs{font-family:Cinzel,serif;font-size:1.4rem;color:var(--gold);text-shadow:0 0 20px #c9a22766}
-.vs-col .fx{min-height:1.6rem;margin-top:.4rem;font-size:.9rem;color:#fca5a5}
-.bottom{
-  display:grid;grid-template-columns:1.1fr 1fr;gap:.75rem;
-  max-width:1100px;width:100%;margin:0 auto;padding:.5rem .75rem 0;
-}
-@media(max-width:720px){
-  .field{grid-template-columns:1fr;gap:.5rem}
-  .vs-col{order:-1}
-  .bottom{grid-template-columns:1fr}
-}
-.panel{
-  background:var(--panel);border:1px solid #c9a22728;border-radius:12px;
-  padding:.65rem .75rem;min-height:140px;max-height:240px;display:flex;flex-direction:column;
-}
-.panel h3{font-family:Cinzel,serif;font-size:.78rem;letter-spacing:.12em;color:var(--gold);margin-bottom:.45rem}
-.skills{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.45rem;overflow-y:auto;flex:1}
-.skill{
-  background:var(--card);border:1px solid #c9a22733;border-radius:8px;padding:.45rem .5rem;
-  text-align:left;color:var(--ink);
-}
-.skill:hover:not(:disabled){border-color:var(--gold)}
-.skill:disabled{opacity:.4;cursor:not-allowed}
-.skill .sn{font-family:Cinzel,serif;font-size:.78rem;color:var(--gold)}
-.skill .sd{font-size:.72rem;color:var(--muted);margin:.15rem 0;line-height:1.25;min-height:2.1em}
-.skill .sm{font-size:.72rem;color:#93c5fd}
-.skill .scd{font-size:.7rem;color:#fbbf24}
-.log{overflow-y:auto;flex:1;font-size:.82rem;line-height:1.4}
-.log .line{padding:.2rem 0;border-bottom:1px solid #ffffff08;color:var(--muted)}
-.log .line:last-child{color:var(--ink)}
-.map-section{max-width:1100px;width:100%;margin:0 auto;padding:.5rem .75rem}
-.map-hint{font-size:.82rem;color:var(--muted);text-align:center;margin-bottom:.4rem}
-.map{
-  display:grid;gap:2px;background:#0a0806;padding:8px;border-radius:12px;
-  border:1px solid #c9a22733;margin:0 auto;width:fit-content;touch-action:manipulation;
-}
-.cell{
-  width:26px;height:26px;border-radius:3px;display:flex;align-items:center;justify-content:center;
-  font-size:13px;cursor:pointer;background:#1a1510;
-}
-.cell.wall{background:#2a241c;cursor:not-allowed;opacity:.9}
-.cell.floor:hover{outline:1px solid #c9a22766}
-.cell.exit{background:#3a2a12;box-shadow:inset 0 0 6px #c9a227}
-.cell.trap{background:#3f1a1a}
-.cell.player{background:#1e3a5f;box-shadow:0 0 0 2px #60a5fa}
-.cell.mob{background:#3f1515}
-.cell.boss{background:#4a1d1d;box-shadow:0 0 0 2px #fbbf24}
-.chat-wrap{max-width:1100px;width:100%;margin:0 auto;padding:.55rem .75rem 0}
-.chat{background:var(--panel);border:1px solid #c9a22728;border-radius:12px;padding:.55rem .7rem}
-.chat h3{font-family:Cinzel,serif;font-size:.75rem;letter-spacing:.1em;color:var(--gold);margin-bottom:.35rem}
-.chat-body{max-height:90px;overflow-y:auto;font-size:.85rem;margin-bottom:.4rem}
-.chat-msg{margin:.15rem 0;color:var(--muted)}
-.chat-msg .who{color:var(--gold);font-weight:600}
-.chat-row{display:flex;gap:.4rem}
-.chat-row input{
-  flex:1;background:#0a0806;border:1px solid #c9a22733;border-radius:8px;color:var(--ink);padding:.45rem .6rem;font:inherit;
-}
-.chat-row button{
-  background:linear-gradient(180deg,#3a2a12,#1a1208);border:1px solid var(--gold-dim);
-  color:var(--gold);border-radius:8px;padding:.45rem .85rem;font-family:Cinzel,serif;font-size:.75rem;
-}
-.footer-actions{
-  max-width:1100px;width:100%;margin:0 auto;padding:.65rem .75rem 1rem;
-  display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center;
-}
-.footer-actions button{
-  border-radius:10px;padding:.55rem 1rem;font-family:Cinzel,serif;font-size:.78rem;
-  letter-spacing:.06em;border:1px solid var(--gold-dim);
-  background:linear-gradient(180deg,#2a1e10,#120e08);color:var(--gold);
-}
-.footer-actions button.danger{border-color:var(--danger);color:#fca5a5;background:linear-gradient(180deg,#2a1210,#120808)}
-.lobby{
-  max-width:420px;margin:3rem auto;padding:1.25rem;background:var(--panel);
-  border:1px solid var(--gold-dim);border-radius:14px;
-}
-.lobby h2{font-family:Cinzel,serif;color:var(--gold);text-align:center;margin-bottom:1rem}
-.lobby label{display:block;font-size:.85rem;color:var(--muted);margin:.5rem 0 .2rem}
-.lobby input{
-  width:100%;padding:.5rem .65rem;border-radius:8px;border:1px solid #c9a22733;background:#0a0806;color:var(--ink);font:inherit;
-}
-.lobby button{
-  width:100%;margin-top:1rem;padding:.65rem;border-radius:10px;font-family:Cinzel,serif;
-  border:1px solid var(--gold);background:#1a140c;color:var(--gold);
-}
-.overlay{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;z-index:100}
-.overlay .box{
-  background:var(--panel);border:1px solid var(--gold);border-radius:14px;padding:1.25rem 1.5rem;max-width:360px;text-align:center;
-}
-.overlay .box h2{font-family:Cinzel,serif;color:var(--gold);margin-bottom:.5rem}
-.overlay .box p{color:var(--muted);margin-bottom:1rem}
-.overlay .box button{
-  margin:.25rem;padding:.5rem 1rem;border-radius:8px;border:1px solid var(--gold-dim);background:#1a140c;color:var(--gold);font-family:Cinzel,serif;
-}
-.prog-bar{
-  max-width:1100px;width:100%;margin:0 auto;padding:.35rem .75rem 0;
-  font-size:.85rem;color:var(--muted);text-align:center;
-}
-.prog-bar strong{color:#fbbf24}
+html,body{min-height:100%;background:var(--bg)}
+body{color:#f3f4f6;font-family:'Crimson Text',Georgia,serif;background:radial-gradient(ellipse 80% 45% at 50% 0%,#111735 0%,transparent 60%),var(--bg)}
+.hidden{display:none!important}button{font-family:inherit;cursor:pointer}
+.header{max-width:1200px;margin:0 auto;padding:14px 10px 7px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-family:Cinzel,serif;font-size:15px;letter-spacing:.16em;color:var(--gold)}
+.turn-line{font-size:11px;color:var(--muted)}.turn-line strong{color:var(--gold)}.timer{color:#fde68a;font-weight:700}
+.prog-bar{max-width:1200px;margin:0 auto;padding:0 10px 7px;text-align:center;font-size:11px;color:var(--muted)}.prog-bar strong{color:#fbbf24}
+.field{display:grid;grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr);gap:8px;align-items:start;max-width:1200px;margin:0 auto;padding:4px 10px}
+.fighter{background:linear-gradient(160deg,#171b27,#0e1118);border:1px solid #c9a22755;border-radius:11px;padding:8px;min-width:0}
+.fighter.enemy{border-color:#9b303055}
+.identity{display:flex;align-items:center;gap:8px;margin-bottom:7px}.avatar{width:44px;height:44px;flex:0 0 44px;border-radius:10px;background:#090c13;border:1px solid #ffffff10;display:flex;align-items:center;justify-content:center;font-size:25px}
+.fighter .name{font-family:Cinzel,serif;font-size:13px;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fighter .meta{font-size:9px;color:var(--muted);margin-top:2px}
+.bar-row{margin:5px 0}.bar-label{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px}.bar{height:7px;border-radius:6px;background:#080b10;overflow:hidden}.bar>i{display:block;height:100%;width:100%;transform-origin:left center}.bar.hp>i{background:linear-gradient(90deg,#16a34a,#4ade80)}.bar.mana>i{background:linear-gradient(90deg,#2563eb,#60a5fa)}
+.section{border-top:1px solid var(--line);margin-top:5px;padding-top:6px}.section h3{font-family:Cinzel,serif;font-size:8px;letter-spacing:.1em;color:var(--gold);margin-bottom:5px}
+.attrs{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:2px}.attr{background:#090c13;border:1px solid #ffffff09;border-radius:5px;padding:3px 1px;text-align:center;font-size:7px;color:var(--muted)}.attr b{display:block;color:#f3f4f6;font-size:9px;margin-top:1px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px}.info-list{display:grid;gap:3px}.info{background:#090c13;border:1px solid #ffffff08;border-radius:6px;padding:3px;display:flex;gap:3px;min-width:0}.info .ico{width:13px;flex:0 0 13px}.info strong{font-size:8px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.info small{font-size:7px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs-col{text-align:center;padding-top:16px}.vs{font-family:Cinzel,serif;font-size:17px;color:var(--gold)}.fx{min-height:18px;margin-top:4px;font-size:9px;color:#fca5a5}
+.actions{max-width:1200px;margin:5px auto 0;padding:0 10px}.panel{background:var(--panel);border:1px solid #c9a22720;border-radius:12px;padding:9px}.panel h3{font-family:Cinzel,serif;font-size:10px;letter-spacing:.1em;color:var(--gold);margin-bottom:7px}.skills{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.skill{background:var(--card);border:1px solid #c9a22735;border-radius:8px;padding:7px;text-align:left;color:#f3f4f6;min-height:74px}.skill:disabled{opacity:.4;cursor:not-allowed}.skill .sn{font-family:Cinzel,serif;font-size:9px;color:var(--gold)}.skill .sd{font-size:8px;color:var(--muted);margin:3px 0;line-height:1.2}.skill .sm,.skill .scd{font-size:8px;color:#93c5fd}.skill .scd{color:#fbbf24}
+.combat-log{max-width:1200px;margin:5px auto 0;padding:0 10px}.log-panel{min-height:72px;max-height:150px}.log{overflow:auto;font-size:9px;line-height:1.4}.log .line{padding:2px 0;border-bottom:1px solid #ffffff08;color:var(--muted)}.log .line:last-child{color:#f3f4f6}
+.map-section{max-width:1200px;width:100%;margin:0 auto;padding:8px 10px}.map-hint{text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px}.map{display:grid;gap:2px;background:#090c13;padding:7px;border-radius:12px;border:1px solid #c9a22730;margin:auto;width:fit-content}.cell{width:26px;height:26px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:13px;background:#151925;cursor:pointer}.cell.wall{background:#242735;cursor:not-allowed}.cell.exit{background:#3a2a12}.cell.trap{background:#3f1a1a}.cell.player{background:#1e3a5f;box-shadow:0 0 0 2px #60a5fa}.cell.mob{background:#3f1515}.cell.boss{background:#4a1d1d;box-shadow:0 0 0 2px #fbbf24}
+.explore-panel{max-width:1200px;margin:6px auto 0;padding:0 10px}.explore-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.panel-text{font-size:10px;color:var(--muted);line-height:1.5}
+.footer-actions{max-width:1200px;margin:6px auto;padding:0 10px 14px;display:flex;justify-content:center;gap:7px}.footer-actions button{border-radius:9px;padding:7px 12px;font-family:Cinzel,serif;font-size:9px;border:1px solid #7a5c12;background:#151925;color:var(--gold)}.footer-actions button.danger{border-color:var(--danger);color:#fca5a5}
+.lobby{max-width:420px;margin:3rem auto;padding:1.25rem;background:var(--panel);border:1px solid #7a5c12;border-radius:14px}.lobby h2{font-family:Cinzel,serif;color:var(--gold);text-align:center;margin-bottom:1rem}.lobby label{display:block;font-size:.85rem;color:var(--muted);margin:.5rem 0 .2rem}.lobby input{width:100%;padding:.5rem .65rem;border-radius:8px;border:1px solid #c9a22733;background:#090c13;color:#f3f4f6;font:inherit}.lobby button{width:100%;margin-top:1rem;padding:.65rem;border-radius:10px;border:1px solid var(--gold);background:#151925;color:var(--gold)}
+.overlay{position:fixed;inset:0;background:#000b;display:flex;align-items:center;justify-content:center;z-index:100}.overlay .box{background:var(--panel);border:1px solid var(--gold);border-radius:14px;padding:1.25rem 1.5rem;max-width:360px;text-align:center}.overlay .box h2{font-family:Cinzel,serif;color:var(--gold);margin-bottom:.5rem}.overlay .box p{color:var(--muted);margin-bottom:1rem}.overlay .box button{margin:.25rem;padding:.5rem 1rem;border-radius:8px;border:1px solid #7a5c12;background:#151925;color:var(--gold)}
+@media(max-width:900px){.field{grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:4px}.skills{grid-template-columns:repeat(2,1fr)}.attrs{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:650px){.header{padding:8px 5px 5px}.header h1{font-size:11px}.field{grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:2px;padding:3px 5px}.fighter{padding:5px}.avatar{width:32px;height:32px;flex-basis:32px;font-size:19px}.identity{gap:4px}.fighter .name{font-size:11px}.fighter .meta{font-size:8px}.bar-label{font-size:9px}.bar{height:6px}.section h3{font-size:7px}.attrs{grid-template-columns:repeat(4,1fr)}.info-grid{grid-template-columns:1fr 1fr 1fr;gap:2px}.info strong{font-size:7px}.info small{font-size:6px}.info .ico{width:11px;flex-basis:11px}.vs{font-size:14px}.fx{font-size:8px}.actions,.combat-log,.explore-panel{padding-left:5px;padding-right:5px}.skills{grid-template-columns:1fr 1fr}.skill{min-height:68px;padding:6px}.skill .sn{font-size:8px}.skill .sd,.skill .sm,.skill .scd{font-size:7px}.explore-grid{grid-template-columns:1fr}.map-section{padding-left:5px;padding-right:5px}}
 </style>
     <link rel="stylesheet" href="dashboard.css">
 </head>
@@ -177,46 +62,31 @@ button{font-family:inherit;cursor:pointer}
   <div id="combatView" class="hidden">
     <section class="field">
       <div class="fighter you">
-        <div class="name" id="nameA">—</div>
-        <div class="meta" id="metaA">—</div>
-        <div class="bar-row">
-          <div class="bar-label"><span>❤️ HP</span><span id="hpTextA">0 / 0</span></div>
-          <div class="bar hp"><i id="hpBarA" style="transform:scaleX(1)"></i></div>
+        <div class="identity"><div class="avatar" id="avatarA">⚔️</div><div><div class="name" id="nameA">—</div><div class="meta" id="metaA">—</div></div></div>
+        <div class="bar-row"><div class="bar-label"><span>❤️ Vida</span><span id="hpTextA">0 / 0</span></div><div class="bar hp"><i id="hpBarA"></i></div></div>
+        <div class="bar-row"><div class="bar-label"><span>🔵 Mana</span><span id="manaTextA">0 / 0</span></div><div class="bar mana"><i id="manaBarA"></i></div></div>
+        <div class="section"><h3>📊 ATRIBUTOS</h3><div class="attrs" id="attrsA"></div></div>
+        <div class="info-grid">
+          <div class="section"><h3>✨ ÚNICAS</h3><div class="info-list" id="uniqueA"></div></div>
+          <div class="section"><h3>🔮 PASSIVAS</h3><div class="info-list" id="passivesA"></div></div>
+          <div class="section"><h3>🎒 ITENS</h3><div class="info-list" id="itemsA"></div></div>
         </div>
-        <div class="bar-row">
-          <div class="bar-label"><span>🔵 Mana</span><span id="manaTextA">0 / 0</span></div>
-          <div class="bar mana"><i id="manaBarA" style="transform:scaleX(1)"></i></div>
-        </div>
-        <div class="stats-mini" id="statsA"></div>
       </div>
-      <div class="vs-col">
-        <div class="vs">VS</div>
-        <div class="fx" id="fxText"></div>
-      </div>
+      <div class="vs-col"><div class="vs">VS</div><div class="fx" id="fxText"></div></div>
       <div class="fighter enemy">
-        <div class="name" id="nameB">—</div>
-        <div class="meta" id="metaB">—</div>
-        <div class="bar-row">
-          <div class="bar-label"><span>❤️ HP</span><span id="hpTextB">0 / 0</span></div>
-          <div class="bar hp"><i id="hpBarB" style="transform:scaleX(1)"></i></div>
+        <div class="identity"><div class="avatar" id="avatarB">👹</div><div><div class="name" id="nameB">—</div><div class="meta" id="metaB">—</div></div></div>
+        <div class="bar-row"><div class="bar-label"><span>❤️ Vida</span><span id="hpTextB">0 / 0</span></div><div class="bar hp"><i id="hpBarB"></i></div></div>
+        <div class="bar-row"><div class="bar-label"><span>🔵 Mana</span><span id="manaTextB">—</span></div><div class="bar mana"><i id="manaBarB"></i></div></div>
+        <div class="section"><h3>📊 ATRIBUTOS</h3><div class="attrs" id="attrsB"></div></div>
+        <div class="info-grid">
+          <div class="section"><h3>👹 MONSTRO</h3><div class="info-list" id="monsterInfo"></div></div>
+          <div class="section"><h3>⚔️ ATAQUE</h3><div class="info-list" id="monsterAttack"></div></div>
+          <div class="section"><h3>👑 CHEFE</h3><div class="info-list" id="monsterBoss"></div></div>
         </div>
-        <div class="bar-row">
-          <div class="bar-label"><span>🔵 Mana</span><span id="manaTextB">—</span></div>
-          <div class="bar mana"><i id="manaBarB" style="transform:scaleX(0)"></i></div>
-        </div>
-        <div class="stats-mini" id="statsB"></div>
       </div>
     </section>
-    <section class="bottom">
-      <div class="panel">
-        <h3>⚔️ HABILIDADES</h3>
-        <div class="skills" id="skills"></div>
-      </div>
-      <div class="panel">
-        <h3>📜 LOG</h3>
-        <div class="log" id="logCombat"></div>
-      </div>
-    </section>
+    <section class="actions"><div class="panel"><h3>⚔️ HABILIDADES DE ATAQUE</h3><div class="skills" id="skills"></div></div></section>
+    <section class="combat-log"><div class="panel log-panel"><h3>⚔️ LOG DE ATAQUES</h3><div class="log" id="logCombat"></div></div></section>
   </div>
   <div id="exploreView">
     <div class="map-section">
@@ -234,16 +104,6 @@ button{font-family:inherit;cursor:pointer}
       </div>
     </section>
   </div>
-  <section class="chat-wrap">
-    <div class="chat">
-      <h3>💬 CHAT</h3>
-      <div class="chat-body" id="chatBody"></div>
-      <div class="chat-row">
-        <input id="chatInput" maxlength="300" placeholder="Digite sua mensagem…" autocomplete="off" />
-        <button type="button" id="chatSendBtn">ENVIAR</button>
-      </div>
-    </div>
-  </section>
   <div class="footer-actions">
     <button type="button" id="advanceBtn" class="hidden">🔓 PRÓXIMO PISO</button>
     <button type="button" id="leaveBtn" class="danger">🚪 SAIR DA MASMORRA</button>
@@ -287,27 +147,38 @@ button{font-family:inherit;cursor:pointer}
     return (m > 0 ? m + ':' : '0:') + String(r).padStart(2, '0');
   }
 
+  function renderInfoList(id, list, empty='—') {
+    const box = $(id);
+    if (!box) return;
+    box.innerHTML = (list && list.length ? list : [{name:empty,emoji:'•',desc:''}]).map((x) =>
+      '<div class="info"><span class="ico">'+(x.emoji||'•')+'</span><div><strong>'+((x.name||'—'))+'</strong>'+(x.desc?'<small>'+x.desc+'</small>':'')+'</div></div>'
+    ).join('');
+  }
+
+  function renderAttrs(id, attrs) {
+    const names=[['forca','FOR'],['defesa','DEF'],['agilidade','AGI'],['vida','VID'],['inteligencia','INT'],['sorte','SOR'],['precisao','PRE'],['resistencia','RES']];
+    const box=$(id); if(!box) return;
+    box.innerHTML=names.map(([k,n])=>'<div class="attr">'+n+'<b>'+(attrs?.[k]||0)+'</b></div>').join('');
+  }
+
   function fillSide(side, f, isMob) {
     if (!f) return;
-    $('name' + side).textContent = (f.emoji ? f.emoji + ' ' : '') + (f.name || '—');
-    $('meta' + side).textContent =
-      (f.className || (isMob ? (f.isBoss ? 'Boss' : 'Monstro') : '—')) +
-      ' · Nv. ' + (f.level || 0);
-    $('hpText' + side).textContent = (f.hp || 0) + ' / ' + (f.maxHp || 0);
-    scale($('hpBar' + side), f.hp || 0, f.maxHp || 1);
-    if (!isMob) {
-      $('manaText' + side).textContent = (f.mana || 0) + ' / ' + (f.maxMana || 0);
-      scale($('manaBar' + side), f.mana || 0, f.maxMana || 1);
-      const at = f.attrs || {};
-      $('stats' + side).innerHTML =
-        '<span>⚔️ Atq <strong>' + (at.forca || 0) + '</strong></span>' +
-        '<span>🛡️ Def <strong>' + (at.defesa || 0) + '</strong></span>';
-    } else {
-      $('manaText' + side).textContent = '—';
-      scale($('manaBar' + side), 0, 1);
-      $('stats' + side).innerHTML = f.isBoss
-        ? '<span><strong>👑 BOSS</strong></span>'
-        : '<span>Inimigo</span>';
+    $('avatar'+side).textContent=f.emoji || (isMob?'👹':'⚔️');
+    $('name'+side).textContent=f.name||'—';
+    $('meta'+side).textContent=(f.className || (isMob?(f.isBoss?'Boss':'Monstro'):'—'))+' · Nv. '+(f.level||0);
+    $('hpText'+side).textContent=(f.hp||0)+' / '+(f.maxHp||0);
+    scale($('hpBar'+side),f.hp||0,f.maxHp||1);
+    $('manaText'+side).textContent=isMob?'—':((f.mana||0)+' / '+(f.maxMana||0));
+    scale($('manaBar'+side),isMob?0:(f.mana||0),isMob?1:(f.maxMana||1));
+    renderAttrs('attrs'+side,f.attrs||{});
+    if(!isMob){
+      renderInfoList('unique'+side,f.unique,'Nenhuma');
+      renderInfoList('passives'+side,f.passives,'Nenhuma');
+      renderInfoList('items'+side,f.items,'Nenhum');
+    }else{
+      renderInfoList('monsterInfo',[{name:f.isBoss?'Boss':'Monstro',emoji:f.isBoss?'👑':'👹',desc:f.isBoss?'Inimigo principal do piso':'Inimigo da masmorra'}]);
+      renderInfoList('monsterAttack',[{name:'Ataque básico',emoji:'⚔️',desc:f.isBoss?'Fúria do Boss':'Garra'}]);
+      renderInfoList('monsterBoss',[{name:f.isBoss?'BOSS ATIVO':'Não é chefe',emoji:f.isBoss?'👑':'—',desc:f.isBoss?'Derrote para concluir o piso':''}]);
     }
   }
 
@@ -428,17 +299,6 @@ button{font-family:inherit;cursor:pointer}
     }
 
     renderLog(s);
-    $('chatBody').innerHTML = (s.chat || [])
-      .map((m) => {
-        const mine = String(m.from) === String(asUser);
-        return (
-          '<div class="chat-msg"><span class="who">' +
-          (mine ? 'Você' : m.name || 'Jogador') +
-          ':</span> ' + (m.text || '') + '</div>'
-        );
-      })
-      .join('');
-
     if (s.status === 'finished' && !$('endOverlay').dataset.shown) {
       $('endOverlay').dataset.shown = '1';
       $('endOverlay').classList.remove('hidden');
@@ -523,30 +383,6 @@ button{font-family:inherit;cursor:pointer}
     $('leaveConfirm').classList.add('hidden');
   }
 
-  async function sendChat() {
-    const text = $('chatInput').value.trim();
-    if (!text) return;
-    $('chatInput').value = '';
-    const r = await fetch('/api/dungeon/' + encodeURIComponent(matchId) + '/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: asUser, text })
-    });
-    const d = await r.json();
-    if (d.chat) {
-      $('chatBody').innerHTML = d.chat
-        .map((m) => {
-          const mine = String(m.from) === String(asUser);
-          return (
-            '<div class="chat-msg"><span class="who">' +
-            (mine ? 'Você' : m.name || '') +
-            ':</span> ' + m.text + '</div>'
-          );
-        })
-        .join('');
-    }
-  }
-
   function enter() {
     matchId = $('idInput').value.trim() || matchId;
     asUser = $('asInput').value.trim() || asUser;
@@ -568,11 +404,6 @@ button{font-family:inherit;cursor:pointer}
   $('leaveBtn').onclick = () => $('leaveConfirm').classList.remove('hidden');
   $('leaveYes').onclick = leave;
   $('leaveNo').onclick = () => $('leaveConfirm').classList.add('hidden');
-  $('chatSendBtn').onclick = sendChat;
-  $('chatInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendChat();
-  });
-
   if (matchId && asUser) {
     $('idInput').value = matchId;
     $('asInput').value = asUser;

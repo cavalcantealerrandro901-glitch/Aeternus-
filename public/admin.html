@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administração — Aeternus</title>
+<link rel="stylesheet" href="dashboard.css">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="header">
+  <nav class="navbar">
+    <div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
+    <div class="admin-nav">
+      <span id="admin-user" class="admin-user">Carregando...</span>
+      <a href="/servidores" class="btn btn-secondary">Trocar servidor</a>
+    </div>
+  </nav>
+</header>
+
+<main class="admin-container">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-title">ADMINISTRAÇÃO</div>
+    <nav class="admin-category-menu" aria-label="Categorias de administração">
+      <a class="active" href="#visao-geral">⌂ <span>Visão geral</span></a>
+      <a href="#geral">⚙️ <span>Geral</span></a>
+      <a href="#economia">🎁 <span>Economia</span></a>
+      <a href="#drops">🎉 <span>Drops & Sorteios</span></a>
+      <a href="#atividade">🏅 <span>Atividade</span></a>
+      <a href="#loja">🛒 <span>Loja</span></a>
+      <a href="#moderacao">🛡️ <span>Moderação</span></a>
+      <a href="#seguranca">🔐 <span>Segurança</span></a>
+      <a href="#configuracoes">📋 <span>Configurações</span></a>
+    </nav>
+  </aside>
+
+  <section class="admin-main">
+    <section id="visao-geral" class="admin-hero admin-hero-left">
+      <div class="server-heading">
+        <img id="server-icon" class="server-large-icon hidden" alt="Ícone do servidor">
+        <div>
+          <span class="admin-badge">ADMINISTRAÇÃO • SERVIDOR SELECIONADO</span>
+          <h1 id="selected-server-name">Carregando servidor...</h1>
+          <p id="selected-server-description">Carregando informações...</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="loading-state" class="admin-card">
+      <div class="loader"></div><p>Carregando informações do servidor...</p>
+    </section>
+
+    <section id="admin-content" class="hidden">
+      <div class="server-info-grid">
+        <article class="admin-card server-info-card"><span>👥</span><small>Membros</small><strong id="server-members">—</strong></article>
+        <article class="admin-card server-info-card"><span>💬</span><small>Canais</small><strong id="server-channels">—</strong></article>
+        <article class="admin-card server-info-card"><span>🎭</span><small>Cargos</small><strong id="server-roles">—</strong></article>
+        <article class="admin-card server-info-card"><span>🚀</span><small>Nível de impulsos</small><strong id="server-boost">—</strong></article>
+      </div>
+
+      <section id="geral" class="admin-section">
+        <div class="section-heading"><span>⚙️</span><div><h2>Geral</h2><p>Informações principais do servidor selecionado.</p></div></div>
+        <div class="server-details-grid">
+          <div><small>Nome</small><strong id="detail-name">—</strong></div>
+          <div><small>ID do servidor</small><strong id="detail-id">—</strong></div>
+          <div><small>Proprietário</small><strong id="detail-owner">—</strong></div>
+          <div><small>Criado em</small><strong id="detail-created">—</strong></div>
+          <div><small>Prefixo</small><strong id="detail-prefix">O.</strong></div>
+          <div><small>Idioma do servidor</small><strong id="detail-locale">—</strong></div>
+        </div>
+      </section>
+
+      <section id="economia" class="admin-section">
+        <div class="section-heading"><span>🎁</span><div><h2>Economia</h2><p>Configure a recompensa diária de éter.</p></div></div>
+        <div class="admin-settings-grid">
+          <article class="admin-card admin-setting-card">
+            <div class="setting-row"><label for="daily-min">Mínimo</label><input id="daily-min" type="number" min="0" step="1"></div>
+            <div class="setting-row"><label for="daily-max">Máximo</label><input id="daily-max" type="number" min="0" step="1"></div>
+            <button id="save-daily" class="btn btn-primary">Salvar alterações</button>
+            <span id="daily-status" class="setting-status"></span>
+          </article>
+        </div>
+      </section>
+
+      <section id="drops" class="admin-section">
+        <div class="section-heading"><span>🎉</span><div><h2>Drops & Sorteios</h2><p>Controle completo dos drops, participantes, modelos e resultados do servidor.</p></div></div>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Ativação e publicação</strong><p>Defina como o sistema de drops será utilizado neste servidor.</p></div><label class="switch-line"><input id="drop-enabled" type="checkbox"><span>Ativado</span></label></div>
+          <div class="form-grid">
+            <label>Prefixo de ativação<input id="drop-prefix" maxlength="5" placeholder="O."><small>Este é o prefixo usado para ativar comandos por mensagem, como <b>O.drop</b>.</small></label>
+            <label>Canal padrão<select id="drop-channel"><option value="">Usar o canal onde o comando foi executado</option></select><small>O Aeternus tentará publicar os drops neste canal primeiro.</small></label>
+            <label>Cor principal<input id="drop-color" type="color" value="#8B5CF6"><small>Cor dos embeds do sistema.</small></label>
+            <label>Modelo ativo<select id="drop-template"></select><small>Escolha o modelo utilizado nos novos drops.</small></label>
+          </div>
+        </article>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Requisitos de participação</strong><p>Você pode combinar requisitos. Cargos de bypass ignoram estes requisitos.</p></div></div>
+          <div class="form-grid four">
+            <label>Mensagens no dia<input id="drop-min-day" type="number" min="0"></label>
+            <label>Mensagens na semana<input id="drop-min-week" type="number" min="0"></label>
+            <label>Mensagens no mês<input id="drop-min-month" type="number" min="0"></label>
+            <label>Nível mínimo<input id="drop-min-level" type="number" min="0"></label>
+            <label>Idade mínima da conta (dias)<input id="drop-account-age" type="number" min="0"></label>
+            <label>Convites mínimos<input id="drop-min-invites" type="number" min="0"></label>
+            <label>Flocos mínimos<input id="drop-min-flocos" type="number" min="0"></label>
+            <label>Cristais mínimos<input id="drop-min-cristais" type="number" min="0"></label>
+            <label>Saldo mínimo de éter<input id="drop-min-eter" type="number" min="0"></label>
+          </div>
+          <div class="role-config-grid">
+            <label>Cargos exigidos<select id="drop-required-roles" multiple></select><small>O participante precisa ter pelo menos um deles.</small></label>
+            <label>Cargos que ignoram requisitos<select id="drop-bypass-roles" multiple></select><small>Estes cargos passam pelos requisitos automaticamente.</small></label>
+            <label>Cargos que não podem participar<select id="drop-blocked-roles" multiple></select><small>Bloqueio tem prioridade sobre bypass.</small></label>
+          </div>
+        </article>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Entradas extras por cargo</strong><p>Aumente a chance de determinados cargos com entradas adicionais.</p></div><button id="add-drop-entry" type="button" class="btn btn-secondary">+ Adicionar cargo</button></div>
+          <div id="drop-extra-entries" class="repeat-list"></div>
+          <div id="drop-entry-empty" class="empty-config">Nenhuma entrada extra configurada.</div>
+        </article>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Modelos de drop</strong><p>Crie modelos reutilizáveis para padronizar os embeds.</p></div><button id="add-drop-template" type="button" class="btn btn-secondary">+ Novo modelo</button></div>
+          <div id="drop-templates" class="template-list"></div>
+          <div class="template-help">Variáveis disponíveis: <code>{prize}</code> <code>{winners_count}</code> <code>{ends}</code> <code>{host}</code> <code>{participants}</code></div>
+        </article>
+
+        <article class="admin-card drop-config-card">
+          <div class="config-header"><div><strong>Resultado e vencedores</strong><p>Personalize a mensagem final, a entrega aos vencedores e o reroll.</p></div></div>
+          <div class="form-grid">
+            <label>Título do resultado<input id="drop-winner-title" maxlength="256" placeholder="🎉 Resultado do drop"></label>
+            <label>Cor do resultado<input id="drop-winner-result-color" type="color" value="#8B5CF6"><small>Usa a cor principal se não for alterada.</small></label>
+            <label>Imagem do resultado<input id="drop-winner-image" maxlength="1000" placeholder="https://..."><small>URL opcional da imagem.</small></label>
+            <label>Banner do resultado<input id="drop-winner-banner" maxlength="1000" placeholder="https://..."><small>URL opcional do banner.</small></label>
+          </div>
+          <label>Mensagem de vitória<textarea id="drop-winner-message" rows="4" maxlength="1000" placeholder="🏆 Parabéns {winners}! Você venceu o drop de **{prize}**."></textarea><small>Variáveis: <code>{winners}</code>, <code>{winners_count}</code>, <code>{prize}</code>, <code>{participants}</code>, <code>{tickets}</code>, <code>{reroll}</code>.</small></label>
+          <div class="role-config-grid">
+            <label class="switch-line"><input id="drop-winner-mention" type="checkbox"><span>Marcar vencedor(es) na mensagem</span></label>
+            <label class="switch-line"><input id="drop-winner-dm" type="checkbox"><span>Enviar resultado por DM para cada vencedor</span></label>
+          </div>
+          <div class="role-config-grid">
+            <label class="switch-line"><input id="drop-result-separate" type="checkbox"><span>Enviar resultado em uma mensagem separada</span></label>
+            <label class="switch-line"><input id="drop-reroll-enabled" type="checkbox"><span>Permitir reroll</span></label>
+          </div>
+          <div class="form-grid">
+            <label>Máximo de rerolls<input id="drop-max-rerolls" type="number" min="0" max="20" value="3"><small>0 desativa novas rodadas.</small></label>
+            <label>Falha na entrega<textarea id="drop-delivery-failure" rows="2" maxlength="1000" placeholder="⚠️ Não foi possível entregar automaticamente o prêmio."></textarea></label>
+          </div>
+        </article>
+
+        <div class="drop-save-bar"><span id="drop-status" class="setting-status"></span><button id="save-drops" class="btn btn-primary">Salvar configurações de Drops</button></div>
+      </section>
+
+      <section id="atividade" class="admin-section">
+        <div class="section-heading"><span>🏅</span><div><h2>Atividade</h2><p>Categoria reservada para os sistemas de atividade do Aeternus.</p></div></div>
+        <article class="admin-card placeholder-card"><strong>Cargos por mensagens</strong><span>Configure metas, cargos e notificações de atividade.</span><em>Em configuração</em></article>
+      </section>
+
+      <section id="loja" class="admin-section">
+        <div class="section-heading"><span>🛒</span><div><h2>Loja</h2><p>Controle a disponibilidade da loja deste servidor.</p></div></div>
+        <article class="admin-card admin-setting-card">
+          <div class="shop-summary"><strong id="shop-status">Carregando...</strong><span id="shop-vips">0 VIP(s) cadastrados</span></div>
+          <div class="shop-actions"><button id="toggle-shop" class="btn btn-secondary">Alterar loja</button><a id="open-shop-panel" href="/itens" class="btn btn-primary">🛒 Abrir loja</a></div>
+          <span id="shop-feedback" class="setting-status"></span>
+        </article>
+      </section>
+
+      <section id="moderacao" class="admin-section">
+        <div class="section-heading"><span>🛡️</span><div><h2>Moderação</h2><p>Categoria reservada para as ferramentas de moderação.</p></div></div>
+        <article class="admin-card placeholder-card"><strong>Moderação do servidor</strong><span>Banimentos, expulsões, silenciamento, avisos e controle de canais.</span><em>Em configuração</em></article>
+      </section>
+
+      <section id="seguranca" class="admin-section">
+        <div class="section-heading"><span>🔐</span><div><h2>Segurança</h2><p>Categoria reservada para proteção e permissões.</p></div></div>
+        <article class="admin-card placeholder-card"><strong>Proteção do servidor</strong><span>Recursos de segurança e controle de acesso.</span><em>Em configuração</em></article>
+      </section>
+
+      <section id="configuracoes" class="admin-section">
+        <div class="section-heading"><span>📋</span><div><h2>Configurações</h2><p>Dados gerais usados pelo Aeternus neste servidor.</p></div></div>
+        <article class="admin-card placeholder-card"><strong>Configurações avançadas</strong><span>Mais opções administrativas serão adicionadas aqui.</span><em>Em configuração</em></article>
+      </section>
+    </section>
+
+    <section id="error-state" class="admin-card hidden">
+      <div class="admin-icon">⚠️</div><h2>Acesso não disponível</h2>
+      <p id="error-message">Não foi possível carregar este servidor.</p>
+      <a href="/servidores" class="btn btn-primary">Escolher outro servidor</a>
+    </section>
+  </section>
+</main>
+<script src="admin-panel.js"></script>
+</body>
+</html>

@@ -578,6 +578,17 @@ function publicDungeon(match, asUserId) {
                       cd: a.cd,
                       currentCd: me.cds?.[a.id] || 0,
                       desc: a.desc
+                  })),
+                  unique: (me.unique || []).map((a) => ({
+                      id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd,
+                      currentCd: me.cds?.[a.id] || 0, desc: a.desc
+                  })),
+                  passives: (me.passives || []).map((a) => ({
+                      id: a.id, name: a.name, emoji: a.emoji, desc: a.desc
+                  })),
+                  items: (me.equippedItems || []).map((it) => ({
+                      slot: it.slot, id: it.id, name: it.name, emoji: it.emoji,
+                      rarity: it.rarity, desc: it.desc
                   }))
               }
             : null,
@@ -592,7 +603,9 @@ function publicDungeon(match, asUserId) {
                                 hp: enemy.hp,
                                 maxHp: enemy.maxHp,
                                 level: enemy.level,
-                                isBoss: !!enemy.isBoss
+                                isBoss: !!enemy.isBoss,
+                                attrs: enemy.attrs || {},
+                                className: enemy.className || (enemy.isBoss ? 'Boss' : 'Monstro')
                             }
                           : null,
                       currentId: match.currentId,

@@ -54,27 +54,41 @@ async function handleMuteProcess(context, moderator, targetMember, durationMs, r
     const collector = sentMsg.createMessageComponentCollector({ filter, time: 6 * 60 * 1000, max: 1 });
 
     collector.on('collect', async i => {
-        if (!targetMember.moderatable) {
-            return i.update({ content: '❌ Não consigo silenciar este membro (cargo mais alto).', components: [] });
-        }
-        
+        const originalMessage = i.message || sentMsg;
+
         try {
-            await targetMember.timeout(durationMs, `${reason} · por ${moderator.tag}`);
-            
+            // Confirma imediatamente o botão e edita a mensagem original.
+            if (!i.deferred && !i.replied) {
+                await i.deferUpdate().catch(() => null);
+            }
+
+            if (!targetMember.moderatable) {
+                await originalMessage.edit({
+                    content: '❌ Não consigo silenciar este membro (cargo mais alto).',
+                    components: []
+                }).catch(() => null);
+                return;
+            }
+
+            await targetMember.timeout(durationMs, reason + ' · por ' + moderator.tag);
+
             const isSilent = i.customId === silentBtnId;
             const successText = isSilent
-                ? `---------- 🤫 O usuário <@${targetMember.id}> foi silenciado silenciosamente, mas quem manda quebrar las regras né!!`
-                : `---------- 🔇 O usuário <@${targetMember.id}> foi silenciado com sucesso, mas quem manda quebrar as regras né!!`;
-            
-            await i.update({
+                ? '---------- 🤫 O usuário <@' + targetMember.id + '> foi silenciado silenciosamente, mas quem manda quebrar las regras né!!'
+                : '---------- 🔇 O usuário <@' + targetMember.id + '> foi silenciado com sucesso, mas quem manda quebrar las regras né!!';
+
+            await originalMessage.edit({
                 content: successText,
                 components: []
-            });
+            }).catch(() => null);
         } catch (e) {
-            await i.update({ content: '❌ Não consegui silenciar o usuário.', components: [] });
+            console.error('[mute] Erro ao processar confirmação:', e);
+            await originalMessage.edit({
+                content: '❌ Não consegui silenciar o usuário.',
+                components: []
+            }).catch(() => null);
         }
     });
-
     collector.on('end', async (collected, reasonCollected) => {
         if (reasonCollected === 'time') {
             try {

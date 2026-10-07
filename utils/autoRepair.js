@@ -63,7 +63,7 @@ function isIgnorableNoise(text, { fromCommand = false } = {}) {
     }
     if (/connect ETIMEDOUT|getaddrinfo|EHOSTUNREACH/i.test(t)) return true;
     if (fromCommand) return false;
-    if (/InteractionAlreadyReplied|already been sent or deferred/i.test(t)) return true;
+    if (/InteractionAlreadyReplied|already been sent or deferred|Unknown interaction|DiscordAPIError\[10062\]|code[=: ]+10062/i.test(t)) return true;
     return false;
 }
 

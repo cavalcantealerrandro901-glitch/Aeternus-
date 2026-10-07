@@ -1,6 +1,8 @@
 const store = require('./store');
 const eter = require('./eter');
 const xp = require('./xp');
+const msgStats = require('./msgStats');
+const invites = require('./invites');
 const { getSettings } = require('./settings');
 
 const KEY = 'drops.json';
@@ -193,6 +195,7 @@ function getRequirements(guildIdOrDrop, maybeDrop) {
         minInvites: Number(over.minInvites ?? base.minInvites ?? 0) || 0,
         minFlocos: Number(over.minFlocos ?? base.minFlocos ?? 0) || 0,
         minCristais: Number(over.minCristais ?? base.minCristais ?? 0) || 0,
+        minEter: Number(over.minEter ?? base.minEter ?? 0) || 0,
         accountAgeDays: Number(over.accountAgeDays ?? base.accountAgeDays ?? 0) || 0,
         requiredRoleIds: Array.isArray(requiredRoleIds) ? requiredRoleIds.map(String) : [],
         blockedRoleIds: Array.isArray(blockedRoleIds) ? blockedRoleIds.map(String) : [],
@@ -220,6 +223,26 @@ function checkRequirements(member, drop) {
 
     const level = xp.get(member.id).level || 0;
     if (level < (req.minLevel || 0)) fails.push(`nível XP: ${level}/${req.minLevel}`);
+
+    const stats = msgStats.getUser(guildId, member.id);
+    if (stats.today < (req.minMessagesDay || 0)) fails.push(`mensagens hoje: ${stats.today}/${req.minMessagesDay}`);
+    if (stats.week < (req.minMessagesWeek || 0)) fails.push(`mensagens na semana: ${stats.week}/${req.minMessagesWeek}`);
+    if (stats.month < (req.minMessagesMonth || 0)) fails.push(`mensagens no mês: ${stats.month}/${req.minMessagesMonth}`);
+
+    if (req.minInvites > 0) {
+        const inviteStats = invites.getStats(guildId, member.id);
+        if ((inviteStats.active || 0) < req.minInvites) fails.push(`convites: ${inviteStats.active || 0}/${req.minInvites}`);
+    }
+
+    if (req.minEter > 0 && eter.get(member.id) < req.minEter) {
+        fails.push(`éter: ${eter.formatPlain(eter.get(member.id))}/${eter.formatPlain(req.minEter)}`);
+    }
+
+    if (req.accountAgeDays > 0) {
+        const age = (Date.now() - member.user.createdTimestamp) / (24 * 60 * 60 * 1000);
+        if (age < req.accountAgeDays) fails.push(`conta com ${Math.floor(age)}d / ${req.accountAgeDays}d`);
+    }
+
     if (req.requiredRoleIds?.length) {
         const has = req.requiredRoleIds.some((rid) => member.roles.cache.has(String(rid)));
         if (!has) fails.push('cargo exigido');

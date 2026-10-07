@@ -44,6 +44,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
         const user = i.options.getUser('usuario', true);
         const reason = i.options.getString('motivo') || 'Sem motivo';
         const member = await i.guild.members.fetch(user.id).catch(() => null);

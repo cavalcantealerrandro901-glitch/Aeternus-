@@ -9,7 +9,7 @@ module.exports = {
         const msgId = args[0];
         if (!msgId) return message.reply('Uso: O.reroll <id da mensagem do drop>');
         try {
-            const result = await rerollDrop(message, msgId);
+            const result = await rerollDrop(message.client, msgId);
             if (result?.error) return message.reply(`❌ ${result.error}`);
             await message.reply(result?.text || '✅ Reroll feito.');
         } catch (e) {

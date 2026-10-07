@@ -239,6 +239,20 @@ function instantiateItem(id, overrides = {}) {
     };
 }
 
+function getRecipe(id) {
+    const key = String(id || '').trim().toLowerCase();
+    return RECIPES[key] || null;
+}
+
+function listRecipesFor(level = 0, classId = null) {
+    const n = Number(level) || 0;
+    return Object.values(RECIPES).filter((recipe) => {
+        if (n < (recipe.minLevel || 1)) return false;
+        if (recipe.needClass && recipe.needClass !== classId) return false;
+        return true;
+    });
+}
+
 function listItems(filter) {
     return Object.values(ITEMS).filter((it) => {
         if (!filter) return true;
@@ -254,6 +268,8 @@ module.exports = {
     RECIPES,
     TRADE_SHOP,
     getItemDef,
+    getRecipe,
+    listRecipesFor,
     listItems,
     instantiateItem,
     loadCustomItems,

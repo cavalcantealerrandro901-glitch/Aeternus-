@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Servidores — Aeternus</title>
+<link rel="stylesheet" href="dashboard.css">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="header"><nav class="navbar">
+<div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
+<div class="admin-nav"><a href="/" class="nav-link">Início</a><a href="/logout" class="btn btn-secondary">Sair</a></div>
+</nav></header>
+<main class="admin-container">
+<section class="admin-hero">
+<span class="admin-badge">ETAPA 01 • SELEÇÃO</span>
+<h1>Escolha um servidor</h1>
+<p>Selecione um servidor onde o Aeternus está instalado e onde você possui permissão para gerenciá-lo.</p>
+</section>
+<section id="login-state" class="admin-card hidden">
+<div class="admin-icon">🔐</div><h2>Entre para continuar</h2>
+<p>Conecte sua conta Discord para visualizar os servidores disponíveis.</p>
+<a href="/login?returnTo=/servidores" class="btn btn-primary">Entrar com Discord</a>
+</section>
+<section id="loading-state" class="admin-card"><div class="loader"></div><p>Verificando seus servidores...</p></section>
+<section id="server-state" class="hidden">
+<div class="section-heading"><div><h2>Servidores disponíveis</h2><p>Apenas servidores administráveis pelo seu usuário aparecem aqui.</p></div><button id="refresh-servers" class="btn btn-secondary">↻ Atualizar</button></div>
+<div id="server-grid" class="server-grid"></div>
+<div id="empty-state" class="admin-card hidden"><div class="admin-icon">🛡️</div><h2>Nenhum servidor disponível</h2><p>O Aeternus precisa estar instalado e você precisa ter Administrador ou Gerenciar Servidor.</p></div>
+</section>
+<section id="error-state" class="admin-card hidden"><div class="admin-icon">⚠️</div><h2>Não foi possível carregar</h2><p id="error-message">Tente novamente.</p><button id="retry" class="btn btn-primary">Tentar novamente</button></section>
+</main>
+<script src="server-selection.js"></script>
+</body>
+</html>

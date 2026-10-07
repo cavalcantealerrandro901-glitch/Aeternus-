@@ -94,14 +94,161 @@ function startWeb(client) {
         });
     });
 
-    app.get('/admin/:id', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html')));
+    app.get('/api/dashboard/guild/:id/drops', requireGuildManager, (req, res) => {
+        const g = client.guilds.cache.get(req.params.id);
+        if (!g) return res.status(404).json({ ok: false, error: 'Servidor não encontrado.' });
+        const settings = getSettings(req.params.id);
+        const d = settings.drops || {};
+        return res.json({
+            ok: true,
+            enabled: d.enabled !== false,
+            channelId: d.channelId || null,
+            activationPrefix: d.activationPrefix || settings.prefix || 'O.',
+            embedColor: d.embedColor || '#8B5CF6',
+            winnerMessage: d.winnerMessage || '',
+            winnerTitle: d.winnerTitle || '',
+            winnerResultColor: d.winnerResultColor || d.embedColor || '#8B5CF6',
+            winnerImage: d.winnerImage || '',
+            winnerBanner: d.winnerBanner || '',
+            winnerMention: d.winnerMention !== false,
+            winnerDm: d.winnerDm !== false,
+            resultSeparate: d.resultSeparate !== false,
+            rerollEnabled: d.rerollEnabled !== false,
+            maxRerolls: Number.isFinite(Number(d.maxRerolls)) ? Math.max(0, Math.min(20, Math.floor(Number(d.maxRerolls)))) : 3,
+            deliveryFailureMessage: d.deliveryFailureMessage || '',
+            templateId: d.templateId || 'default',
+            templates: Array.isArray(d.templates) ? d.templates : [],
+            requirements: d.requirements || {},
+            extraEntries: Array.isArray(d.extraEntries) ? d.extraEntries : [],
+            channels: g.channels.cache
+                .filter(ch => ch.isTextBased?.())
+                .map(ch => ({ id: ch.id, name: ch.name }))
+                .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+            roles: g.roles.cache
+                .filter(r => r.id !== g.id)
+                .map(r => ({ id: r.id, name: r.name, position: r.position, color: r.hexColor }))
+                .sort((a, b) => b.position - a.position)
+        });
+    });
 
-    app.get('/api/guild/:id', requireGuildManager, (req, res) => {
+    app.post('/api/dashboard/guild/:id/drops', requireGuildManager, (req, res) => {
+        const g = client.guilds.cache.get(req.params.id);
+        if (!g) return res.status(404).json({ ok: false, error: 'Servidor não encontrado.' });
+
+        const body = req.body || {};
+        const settings = getSettings(req.params.id);
+        const current = settings.drops || {};
+        const validHex = /^#[0-9a-fA-F]{6}$/;
+        const activationPrefix = String(body.activationPrefix || settings.prefix || 'O.').trim().replace(/\s+/g, '').slice(0, 5) || 'O.';
+        const embedColor = validHex.test(String(body.embedColor || '')) ? String(body.embedColor).toUpperCase() : '#8B5CF6';
+
+        const templates = Array.isArray(body.templates) ? body.templates.slice(0, 20).map((t, i) => ({
+            id: String(t.id || ('template-' + (i + 1))).slice(0, 40),
+            name: String(t.name || 'Modelo ' + (i + 1)).slice(0, 60),
+            title: String(t.title || '🎁 DROP EM ANDAMENTO').slice(0, 256),
+            description: String(t.description || '').slice(0, 4000),
+            footer: String(t.footer || '').slice(0, 2048),
+            color: validHex.test(String(t.color || '')) ? String(t.color).toUpperCase() : embedColor
+        })) : (Array.isArray(current.templates) ? current.templates : []);
+
+        const ids = new Set();
+        for (const t of templates) {
+            let base = t.id || 'template';
+            let id = base;
+            let n = 2;
+            while (ids.has(id)) id = base + '-' + n++;
+            t.id = id;
+            ids.add(id);
+        }
+
+        const templateId = ids.has(String(body.templateId)) ? String(body.templateId) : (templates[0]?.id || 'default');
+        const requiredRoleIds = Array.isArray(body.requirements?.requiredRoleIds) ? body.requirements.requiredRoleIds.map(String).filter(id => g.roles.cache.has(id)).slice(0, 20) : [];
+        const blockedRoleIds = Array.isArray(body.requirements?.blockedRoleIds) ? body.requirements.blockedRoleIds.map(String).filter(id => g.roles.cache.has(id)).slice(0, 20) : [];
+        const bypassRoleIds = Array.isArray(body.requirements?.bypassRoleIds) ? body.requirements.bypassRoleIds.map(String).filter(id => g.roles.cache.has(id)).slice(0, 20) : [];
+        const extraEntries = Array.isArray(body.extraEntries) ? body.extraEntries.slice(0, 30).map(rule => ({
+            roleId: String(rule.roleId || ''),
+            entries: Math.min(100, Math.max(0, Math.floor(Number(rule.entries) || 0))),
+            label: String(rule.label || '').slice(0, 60)
+        })).filter(rule => g.roles.cache.has(rule.roleId) && rule.entries > 0) : [];
+
+        const requirements = {
+            minMessagesDay: Math.max(0, Math.floor(Number(body.requirements?.minMessagesDay) || 0)),
+            minMessagesWeek: Math.max(0, Math.floor(Number(body.requirements?.minMessagesWeek) || 0)),
+            minMessagesMonth: Math.max(0, Math.floor(Number(body.requirements?.minMessagesMonth) || 0)),
+            minLevel: Math.max(0, Math.floor(Number(body.requirements?.minLevel) || 0)),
+            accountAgeDays: Math.max(0, Math.floor(Number(body.requirements?.accountAgeDays) || 0)),
+            minInvites: Math.max(0, Math.floor(Number(body.requirements?.minInvites) || 0)),
+            minFlocos: Math.max(0, Math.floor(Number(body.requirements?.minFlocos) || 0)),
+            minCristais: Math.max(0, Math.floor(Number(body.requirements?.minCristais) || 0)),
+            minEter: Math.max(0, Math.floor(Number(body.requirements?.minEter) || 0)),
+            accountAgeDays: Math.max(0, Math.floor(Number(body.requirements?.accountAgeDays) || 0)),
+            requiredRoleIds,
+            blockedRoleIds,
+            bypassRoleIds
+        };
+
+        const patch = {
+            drops: {
+                enabled: body.enabled !== false,
+                channelId: g.channels.cache.has(String(body.channelId || '')) ? String(body.channelId) : null,
+                activationPrefix,
+                embedColor,
+                winnerMessage: String(body.winnerMessage || '').slice(0, 1000),
+                winnerTitle: String(body.winnerTitle || '').slice(0, 256),
+                winnerResultColor: validHex.test(String(body.winnerResultColor || '')) ? String(body.winnerResultColor).toUpperCase() : embedColor,
+                winnerImage: String(body.winnerImage || '').trim().slice(0, 1000),
+                winnerBanner: String(body.winnerBanner || '').trim().slice(0, 1000),
+                winnerMention: body.winnerMention !== false,
+                winnerDm: body.winnerDm !== false,
+                resultSeparate: body.resultSeparate !== false,
+                rerollEnabled: body.rerollEnabled !== false,
+                maxRerolls: Math.max(0, Math.min(20, Math.floor(Number(body.maxRerolls) || 0))),
+                deliveryFailureMessage: String(body.deliveryFailureMessage || '').slice(0, 1000),
+                templateId,
+                templates,
+                requirements,
+                extraEntries
+            },
+            prefix: activationPrefix
+        };
+        const saved = setSettings(req.params.id, patch);
+        return res.json({ ok: true, drops: saved.drops, prefix: saved.prefix });
+    });
+
+    app.get('/servidores', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'servidores.html')));
+    app.get('/admin/:id', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')));
+
+    app.get('/api/guild/:id', requireGuildManager, async (req, res) => {
         const g = client.guilds.cache.get(req.params.id);
         if (!g) return res.status(404).json({ error: 'guild' });
-        res.json({
+
+        let ownerTag = null;
+        try {
+            const owner = await g.fetchOwner();
+            ownerTag = owner.user?.tag || owner.user?.username || null;
+        } catch (_) {}
+
+        const premiumLabels = { 0: 'Nenhum', 1: 'Nível 1', 2: 'Nível 2', 3: 'Nível 3' };
+
+        return res.json({
             id: g.id,
             name: g.name,
+            description: g.description || null,
+            icon: g.iconURL({ size: 256, extension: 'png' }) || null,
+            ownerId: g.ownerId || null,
+            ownerTag,
+            memberCount: g.memberCount ?? null,
+            channelCount: g.channels?.cache?.size ?? 0,
+            roleCount: g.roles?.cache?.size ?? 0,
+            emojiCount: g.emojis?.cache?.size ?? 0,
+            stickerCount: g.stickers?.cache?.size ?? 0,
+            premiumTier: Number(g.premiumTier || 0),
+            premiumTierLabel: premiumLabels[Number(g.premiumTier || 0)] || 'Desconhecido',
+            premiumSubscriptionCount: g.premiumSubscriptionCount ?? 0,
+            verificationLevel: String(g.verificationLevel ?? 'unknown'),
+            preferredLocale: g.preferredLocale || null,
+            createdAt: g.createdAt || null,
+            features: Array.isArray(g.features) ? g.features : [],
             prefix: getPrefix(req.params.id),
             settings: getSettings(req.params.id)
         });
@@ -297,8 +444,8 @@ function startWeb(client) {
         }
     });
 
-    app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html')));
-    app.get('/', (req, res) => res.redirect('/dashboard'));
+    app.get('/dashboard', (req, res) => res.redirect('/servidores'));
+    app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 
     app.get('/health', (req, res) => {
         const mongo = (() => {

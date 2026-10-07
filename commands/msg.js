@@ -23,7 +23,12 @@ module.exports = {
                             `Hoje: **${s.today ?? s.day ?? 0}**`,
                             `Semana: **${s.week ?? 0}**`,
                             `Mês: **${s.month ?? 0}**`,
-                            `Total: **${s.total ?? 0}**`
+                            `Total: **${s.total ?? 0}**`,
+                            ``,
+                            `🏅 **Cargos por mensagens hoje**`,
+                            `• 100 mensagens → **Ativo**`,
+                            `• 500 mensagens → **Ativo Master**`,
+                            `• Progresso: **${Math.min(Number(s.today ?? s.day ?? 0), 500)}/500**`
                         ].join('\n')
                     )
             ]

@@ -44,15 +44,17 @@ async function handleBanProcess(context, moderator, targetMember, reason, isSlas
     const collector = sentMsg.createMessageComponentCollector({ filter, time: 6 * 60 * 1000, max: 1 });
 
     collector.on('collect', async i => {
+        const originalMessage = i.message || sentMsg;
+        try { await i.deferUpdate(); } catch (_) { return; }
         if (!targetMember.bannable) {
-            return i.update({ content: '❌ Não consigo banir este membro (cargo mais alto).', components: [] });
+            return originalMessage.edit({ content: '❌ Não consigo banir este membro (cargo mais alto).', components: [] });
         }
         try {
             await targetMember.ban({ reason: `${reason} · por ${moderator.tag}` });
             
             const successText = `---------- 🔨 O usuário <@${targetMember.id}> foi expulso do servidor para sempre, mas quem manda quebrar as regras né!!`;
             
-            await i.update({
+            await originalMessage.edit({
                 content: successText,
                 components: []
             });

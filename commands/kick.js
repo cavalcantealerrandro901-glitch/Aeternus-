@@ -44,15 +44,17 @@ async function handleKickProcess(context, moderator, targetMember, reason, isSla
     const collector = sentMsg.createMessageComponentCollector({ filter, time: 6 * 60 * 1000, max: 1 });
 
     collector.on('collect', async i => {
+        const originalMessage = i.message || sentMsg;
+        try { await i.deferUpdate(); } catch (_) { return; }
         if (!targetMember.kickable) {
-            return i.update({ content: '❌ Não consigo expulsar este membro (cargo mais alto).', components: [] });
+            return originalMessage.edit({ content: '❌ Não consigo expulsar este membro (cargo mais alto).', components: [] });
         }
         try {
             await targetMember.kick(`${reason} · por ${moderator.tag}`);
             
             const successText = `---------- 👢 O usuário <@${targetMember.id}> foi expulso do servidor, mas quem manda quebrar as regras né!!`;
             
-            await i.update({
+            await originalMessage.edit({
                 content: successText,
                 components: []
             });

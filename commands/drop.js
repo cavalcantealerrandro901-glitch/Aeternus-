@@ -92,53 +92,63 @@ function buildListPayload(drop, page) {
     };
 }
 
+function replaceTemplate(text, values) {
+    return String(text || '').replace(/\\{(\\w+)\\}/g, (_, key) =>
+        values[key] == null ? '' : String(values[key])
+    );
+}
+
+function getActiveTemplate(conf) {
+    const templates = Array.isArray(conf?.templates) ? conf.templates : [];
+    return templates.find((t) => t.id === conf.templateId) || templates[0] || null;
+}
+
 function buildEmbed(drop, guild, authorTag) {
     const endsUnix = Math.floor((drop.endsAt || Date.now()) / 1000);
     const total = drops.participantCount(drop);
     const req = drops.getRequirements(guild.id, drop);
     const reqLines = [];
     if (req.minLevel > 0) reqLines.push('• Nível mínimo: **' + req.minLevel + '**');
-    if (req.requiredRoleIds && req.requiredRoleIds.length) {
-        const names = req.requiredRoleIds
-            .map((id) => guild.roles.cache.get(id))
-            .filter(Boolean)
-            .map((r) => String(r));
+    if (req.minMessagesDay > 0) reqLines.push('• Mensagens no dia: **' + req.minMessagesDay + '**');
+    if (req.minMessagesWeek > 0) reqLines.push('• Mensagens na semana: **' + req.minMessagesWeek + '**');
+    if (req.minMessagesMonth > 0) reqLines.push('• Mensagens no mês: **' + req.minMessagesMonth + '**');
+    if (req.minInvites > 0) reqLines.push('• Convites: **' + req.minInvites + '**');
+    if (req.minFlocos > 0) reqLines.push('• Flocos: **' + req.minFlocos + '**');
+    if (req.minCristais > 0) reqLines.push('• Cristais: **' + req.minCristais + '**');
+    if (req.requiredRoleIds?.length) {
+        const names = req.requiredRoleIds.map((id) => guild.roles.cache.get(id)).filter(Boolean).map((r) => String(r));
         if (names.length) reqLines.push('• Cargo exigido: ' + names.join(', '));
     }
 
     const panelInfo = drops.formatDropPanelInfo(guild, guild.id);
-    const vipBlock = panelInfo.vipLines.length
-        ? '\n**VIP · entradas extras**\n' + panelInfo.vipLines.join('\n')
-        : '';
-    const blockedBlock = panelInfo.blocked.length
-        ? '\n**Não pode participar**\n' +
-          panelInfo.blocked.map((b) => '• ' + b).join('\n')
-        : '';
-    const bypassBlock = (panelInfo.bypass || []).length
-        ? '\n**Ignora requisitos**\n' +
-          panelInfo.bypass.map((b) => '• ' + b).join('\n')
-        : '';
+    const vipBlock = panelInfo.vipLines.length ? '\n**Entradas extras**\n' + panelInfo.vipLines.join('\n') : '';
+    const blockedBlock = panelInfo.blocked.length ? '\n**Não pode participar**\n' + panelInfo.blocked.map((b) => '• ' + b).join('\n') : '';
+    const bypassBlock = (panelInfo.bypass || []).length ? '\n**Ignora requisitos**\n' + panelInfo.bypass.map((b) => '• ' + b).join('\n') : '';
 
-    return new EmbedBuilder()
-        .setColor(0xa78bfa)
-        .setTitle('🎁 DROP EM ANDAMENTO')
-        .setDescription(
-            [
-                '**Prêmio:** ' + (drop.prize && drop.prize.label ? drop.prize.label : '—'),
-                '**Vencedores:** ' + (drop.winners || 1),
-                '**Termina:** <t:' + endsUnix + ':R> (<t:' + endsUnix + ':f>)',
-                '',
-                'Clique em **Participar** para entrar ou **Sair** para desistir.',
-                reqLines.length ? '\n**Requisitos**\n' + reqLines.join('\n') : '',
-                vipBlock,
-                bypassBlock,
-                blockedBlock
-            ]
-                .filter((x) => x != null && x !== '')
-                .join('\n')
-        )
-        .setFooter({ text: 'Por ' + (authorTag || 'staff') + ' · ' + total + ' participante(s)' })
+    const conf = getSettings(guild.id).drops || {};
+    const template = getActiveTemplate(conf);
+    const values = {
+        prize: drop.prize?.label || '—',
+        winners_count: drop.winners || 1,
+        ends: '<t:' + endsUnix + ':R> (<t:' + endsUnix + ':f>)',
+        host: authorTag || 'staff',
+        participants: total
+    };
+
+    const embed = new EmbedBuilder()
+        .setColor(template?.color || conf.embedColor || '#8B5CF6')
+        .setTitle(replaceTemplate(template?.title || '🎁 DROP EM ANDAMENTO', values))
+        .setDescription([
+            replaceTemplate(template?.description || '', values),
+            reqLines.length ? '\n**Requisitos**\n' + reqLines.join('\n') : '',
+            vipBlock,
+            bypassBlock,
+            blockedBlock
+        ].filter(Boolean).join('\n'))
+        .setFooter({ text: replaceTemplate(template?.footer || 'Por {host} · {participants} participante(s)', values) })
         .setTimestamp(drop.endsAt);
+
+    return embed;
 }
 
 async function refreshDropMessage(interaction, drop) {
@@ -504,7 +514,8 @@ async function createDropMsg(ctx, opts) {
                 endsAt: endsAt,
                 participants: {},
                 requirements: conf.requirements || {},
-                guildId: guild.id
+                guildId: guild.id,
+                templateId: conf.templateId || 'default'
             },
             guild,
             author.tag
@@ -539,7 +550,22 @@ async function createDropMsg(ctx, opts) {
             participants: {},
             createdBy: author.id,
             createdByTag: author.tag,
-            requirements: conf.requirements || {}
+            requirements: conf.requirements || {},
+            templateId: conf.templateId || 'default',
+            template: getActiveTemplate(conf) || null,
+            winnerMessage: conf.winnerMessage || '',
+            winnerTitle: conf.winnerTitle || '',
+            winnerResultColor: conf.winnerResultColor || conf.embedColor || '#8B5CF6',
+            winnerImage: conf.winnerImage || '',
+            winnerBanner: conf.winnerBanner || '',
+            winnerMention: conf.winnerMention !== false,
+            winnerDm: conf.winnerDm !== false,
+            resultSeparate: conf.resultSeparate !== false,
+            rerollEnabled: conf.rerollEnabled !== false,
+            maxRerolls: Number(conf.maxRerolls) || 0,
+            deliveryFailureMessage: conf.deliveryFailureMessage || '',
+            rerollCount: 0,
+            embedColor: conf.embedColor || '#8B5CF6'
         });
 
         await msg.edit({ components: [joinRow(drop.id, 0)] }).catch(() => {});
