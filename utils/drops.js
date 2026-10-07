@@ -1,6 +1,7 @@
 const store = require('./store');
 const eter = require('./eter');
 const xp = require('./xp');
+const msgStats = require('./msgStats');
 const { getSettings } = require('./settings');
 
 const KEY = 'drops.json';
@@ -220,6 +221,17 @@ function checkRequirements(member, drop) {
 
     const level = xp.get(member.id).level || 0;
     if (level < (req.minLevel || 0)) fails.push(`nível XP: ${level}/${req.minLevel}`);
+
+    const stats = msgStats.getUser(guildId, member.id);
+    if (stats.today < (req.minMessagesDay || 0)) fails.push(`mensagens hoje: ${stats.today}/${req.minMessagesDay}`);
+    if (stats.week < (req.minMessagesWeek || 0)) fails.push(`mensagens na semana: ${stats.week}/${req.minMessagesWeek}`);
+    if (stats.month < (req.minMessagesMonth || 0)) fails.push(`mensagens no mês: ${stats.month}/${req.minMessagesMonth}`);
+
+    if (req.accountAgeDays > 0) {
+        const age = (Date.now() - member.user.createdTimestamp) / (24 * 60 * 60 * 1000);
+        if (age < req.accountAgeDays) fails.push(`conta com ${Math.floor(age)}d / ${req.accountAgeDays}d`);
+    }
+
     if (req.requiredRoleIds?.length) {
         const has = req.requiredRoleIds.some((rid) => member.roles.cache.has(String(rid)));
         if (!has) fails.push('cargo exigido');
