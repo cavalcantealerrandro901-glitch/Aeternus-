@@ -51,6 +51,15 @@ async function ensureRoles(guild) {
         if (me.roles.highest.comparePositionTo(role) <= 0) return { ok: false, error: `O cargo **${role.name}** precisa ficar abaixo do cargo mais alto do Aeternus.` };
         roleIds[r.key] = role.id;
     }
+    // Organiza os cargos da hierarquia abaixo do cargo mais alto do bot.
+    const botTop = me.roles.highest.position;
+    const ordered = RANKS.map((r) => roleIds[r.key]).filter(Boolean);
+    for (let i = 0; i < ordered.length; i++) {
+        const role = guild.roles.cache.get(ordered[i]);
+        if (!role) continue;
+        const targetPosition = Math.max(1, botTop - 1 - i);
+        await role.setPosition(targetPosition, 'Organizar Hierarquia Aeternus').catch(() => {});
+    }
     saveConfig(guild.id, { enabled: true, roleIds });
     const owner = await guild.members.fetch(guild.ownerId).catch(() => null);
     if (owner) {
