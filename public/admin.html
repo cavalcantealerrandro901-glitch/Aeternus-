@@ -10,6 +10,23 @@
 <body>
 <header class="header">
   <nav class="navbar">
+    <div class="admin-top-menu">
+      <button id="admin-menu-btn" class="admin-menu-btn" type="button" aria-expanded="false" aria-controls="admin-menu-panel">☰ <span>Menu</span></button>
+      <div id="admin-menu-panel" class="admin-menu-panel" aria-hidden="true">
+        <div class="admin-menu-title">ADMINISTRAÇÃO</div>
+        <nav class="admin-category-menu" aria-label="Categorias de administração">
+          <a class="active" href="#visao-geral">⌂ <span>Visão geral</span></a>
+          <a href="#geral">⚙️ <span>Geral</span></a>
+          <a href="#economia">🎁 <span>Economia</span></a>
+          <a href="#drops">🎉 <span>Drops & Sorteios</span></a>
+          <a href="#atividade">🏅 <span>Atividade</span></a>
+          <a href="#loja">🛒 <span>Loja</span></a>
+          <a href="#moderacao">🛡️ <span>Moderação</span></a>
+          <a href="#seguranca">🔐 <span>Segurança</span></a>
+          <a href="#configuracoes">📋 <span>Configurações</span></a>
+        </nav>
+      </div>
+    </div>
     <div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
     <div class="admin-nav">
       <span id="admin-user" class="admin-user">Carregando...</span>
@@ -19,21 +36,6 @@
 </header>
 
 <main class="admin-container">
-  <aside class="admin-sidebar">
-    <div class="admin-sidebar-title">ADMINISTRAÇÃO</div>
-    <nav class="admin-category-menu" aria-label="Categorias de administração">
-      <a class="active" href="#visao-geral">⌂ <span>Visão geral</span></a>
-      <a href="#geral">⚙️ <span>Geral</span></a>
-      <a href="#economia">🎁 <span>Economia</span></a>
-      <a href="#drops">🎉 <span>Drops & Sorteios</span></a>
-      <a href="#atividade">🏅 <span>Atividade</span></a>
-      <a href="#loja">🛒 <span>Loja</span></a>
-      <a href="#moderacao">🛡️ <span>Moderação</span></a>
-      <a href="#seguranca">🔐 <span>Segurança</span></a>
-      <a href="#configuracoes">📋 <span>Configurações</span></a>
-    </nav>
-  </aside>
-
   <section class="admin-main">
     <section id="visao-geral" class="admin-hero admin-hero-left">
       <div class="server-heading">
@@ -190,6 +192,13 @@
     </section>
   </section>
 </main>
+<script>
+const adminMenuBtn=document.getElementById('admin-menu-btn');
+const adminMenuPanel=document.getElementById('admin-menu-panel');
+adminMenuBtn.addEventListener('click',()=>{const open=adminMenuBtn.getAttribute('aria-expanded')==='true';adminMenuBtn.setAttribute('aria-expanded',String(!open));adminMenuPanel.classList.toggle('open',!open);adminMenuPanel.setAttribute('aria-hidden',String(open));});
+document.addEventListener('click',e=>{if(!e.target.closest('.admin-top-menu')){adminMenuBtn.setAttribute('aria-expanded','false');adminMenuPanel.classList.remove('open');adminMenuPanel.setAttribute('aria-hidden','true');}});
+document.querySelectorAll('.admin-category-menu a').forEach(link=>link.addEventListener('click',()=>{document.querySelectorAll('.admin-category-menu a').forEach(i=>i.classList.remove('active'));link.classList.add('active');adminMenuBtn.setAttribute('aria-expanded','false');adminMenuPanel.classList.remove('open');adminMenuPanel.setAttribute('aria-hidden','true');}));
+</script>
 <script src="admin-panel.js"></script>
 </body>
 </html>
