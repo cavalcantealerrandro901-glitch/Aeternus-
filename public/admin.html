@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administração — Aeternus</title>
+<link rel="stylesheet" href="dashboard.css">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<header class="header"><nav class="navbar">
+<div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
+<div class="admin-nav"><span id="admin-user" class="admin-user">Carregando...</span><a href="/servidores" class="btn btn-secondary">Trocar servidor</a></div>
+</nav></header>
+<main class="admin-container">
+<section class="admin-hero admin-hero-left">
+<span class="admin-badge">ETAPA 02 • ADMINISTRAÇÃO</span>
+<h1 id="selected-server-name">Carregando servidor...</h1>
+<p id="selected-server-description">Carregando configurações...</p>
+</section>
+<section id="loading-state" class="admin-card"><div class="loader"></div><p>Carregando configurações...</p></section>
+<section id="admin-content" class="hidden">
+<div class="admin-settings-grid">
+<article class="admin-card admin-setting-card"><div class="admin-icon">🎁</div><h2>Daily</h2><p>Defina a faixa de éter entregue pelo comando diário.</p>
+<div class="setting-row"><label for="daily-min">Mínimo</label><input id="daily-min" type="number" min="0" step="1"></div>
+<div class="setting-row"><label for="daily-max">Máximo</label><input id="daily-max" type="number" min="0" step="1"></div>
+<button id="save-daily" class="btn btn-primary">Salvar alterações</button><span id="daily-status" class="setting-status"></span></article>
+<article class="admin-card admin-setting-card"><div class="admin-icon">🛒</div><h2>Loja</h2><p>Controle o estado da loja deste servidor.</p>
+<div class="shop-summary"><strong id="shop-status">Carregando...</strong><span id="shop-vips">0 VIPs</span></div>
+<div class="shop-actions"><button id="toggle-shop" class="btn btn-secondary">Alterar loja</button><a id="open-shop-panel" href="/itens" class="btn btn-primary">🛒 Abrir loja</a></div><span id="shop-feedback" class="setting-status"></span></article>
+</div>
+</section>
+<section id="error-state" class="admin-card hidden"><div class="admin-icon">⚠️</div><h2>Acesso não disponível</h2><p id="error-message">Não foi possível carregar este servidor.</p><a href="/servidores" class="btn btn-primary">Escolher outro servidor</a></section>
+</main>
+<script src="admin-panel.js"></script>
+</body>
+</html>
