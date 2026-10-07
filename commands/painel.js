@@ -56,7 +56,7 @@ async function enviarPainel(context, isSlash) {
   const guild = context.guild;
   const usuario = context.user || context.author;
   const baseUrl = PANEL_URL.replace(/\/$/, '');
-  const painelUrl = `${baseUrl}/admin/${encodeURIComponent(guild.id)}`;
+  // Abre diretamente o painel administrativo deste servidor, na visão geral.\n  // O ID do servidor vem da própria interação, evitando abrir o painel de outro servidor.\n  const painelUrl = `${baseUrl}/admin/${encodeURIComponent(guild.id)}#visao-geral`;
 
   const embed = new EmbedBuilder()
     .setColor('#8B3DFF')
