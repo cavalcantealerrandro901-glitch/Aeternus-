@@ -76,7 +76,7 @@ async function finishDrop(client, dropId, { isReroll = false } = {}) {
 
         const embed = new EmbedBuilder()
             .setColor(configuredColor)
-            .setTitle(replace(drop.winnerTitle || conf.winnerTitle || (isReroll ? '🔁 Reroll finalizado' : '🎉 Resultado do drop'))
+            .setTitle(replace(drop.winnerTitle || conf.winnerTitle || (isReroll ? '🔁 Reroll finalizado' : '🎉 Resultado do drop')))
             .setDescription([
                 victoryMessage,
                 '',
