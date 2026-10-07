@@ -167,6 +167,7 @@ function startWeb(client) {
             minMessagesWeek: Math.max(0, Math.floor(Number(body.requirements?.minMessagesWeek) || 0)),
             minMessagesMonth: Math.max(0, Math.floor(Number(body.requirements?.minMessagesMonth) || 0)),
             minLevel: Math.max(0, Math.floor(Number(body.requirements?.minLevel) || 0)),
+            accountAgeDays: Math.max(0, Math.floor(Number(body.requirements?.accountAgeDays) || 0)),
             minInvites: Math.max(0, Math.floor(Number(body.requirements?.minInvites) || 0)),
             minFlocos: Math.max(0, Math.floor(Number(body.requirements?.minFlocos) || 0)),
             minCristais: Math.max(0, Math.floor(Number(body.requirements?.minCristais) || 0)),
