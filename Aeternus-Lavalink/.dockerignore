@@ -1,0 +1,6 @@
+logs/
+plugins/
+*.log
+.git/
+.github/
+README.md
