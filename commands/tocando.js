@@ -1,11 +1,9 @@
-const { SlashCommandBuilder } = require('discord.js');
 const musicManager = require('../utils/musicManager');
 
 module.exports = {
     name: 'tocando',
     aliases: ['np', 'nowplaying', 'agora'],
     description: 'Mostra a música atual',
-    data: new SlashCommandBuilder().setName('tocando').setDescription('Música tocando agora'),
 
     async execute(message) {
         const q = musicManager.getQueue(message.guild.id);
