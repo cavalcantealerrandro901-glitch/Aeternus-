@@ -634,9 +634,10 @@ function bindPlayerEvents(client, player, guildId) {
                 `[music] EXCEPTION guild=${guildId} src=${src} severity=${ex.severity || '?'} ` +
                 `cause=${String(ex.cause || '?').slice(0, 100)} message=${String(msg).slice(0, 140)}`
             );
-            handlePlayFailure(client, guildId, q.current, msg).catch((failureError) => {
-                console.warn('[music] exception recovery:', failureError?.message || failureError);
-            });
+            // Lavalink normalmente emite END(loadFailed) para a mesma falha.
+            // Recuperar também aqui causa duas recuperações concorrentes e pode
+            // consumir várias alternativas sem sequer iniciar a próxima faixa.
+            console.warn('[music] aguardando END(loadFailed) para recuperar a faixa');
         } catch (e) {
             console.warn('[music] exception handler:', e?.message || e);
         }
