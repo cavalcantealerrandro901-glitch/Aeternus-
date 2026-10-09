@@ -33,6 +33,8 @@ class GuildQueue {
         this.panelMessageId = null;
         this.voiceChannelId = null;
         this.lastAdvance = 0;
+        this.position = 0;
+        this.lastPanelProgressUpdate = 0;
     }
 }
 
@@ -110,8 +112,8 @@ function trackEmbed(track, q, title = 'Tocando agora') {
         .setDescription(
             `**${uri ? `[${safeTitle}](${uri})` : safeTitle}**\n` +
             `${String(info.author || 'Artista não informado').slice(0, 100)}\n\n` +
-            `\`${progressBar(0, info.length || 1, 18)}\`\n` +
-            `⏱️ ${info.isStream ? 'Ao vivo' : `0:00 / ${duration}`}`
+            `\`${progressBar(q?.position || 0, info.length || 1, 18)}\`\n` +
+            `⏱️ ${info.isStream ? 'Ao vivo' : `${formatMs(q?.position || 0)} / ${duration}`}`
         )
         .addFields(
             { name: 'Solicitado por', value: track.requester ? `<@${track.requester}>` : '—', inline: true },
@@ -454,6 +456,8 @@ async function playNext(client, guildId) {
         }
 
         q.current = next;
+        q.position = 0;
+        q.lastPanelProgressUpdate = 0;
         q.playing = true;
         q.paused = false;
 
@@ -577,6 +581,17 @@ function bindPlayerEvents(client, player, guildId) {
     });
 
     player.on('update', (data) => {
+        const q = getQueue(guildId);
+        const reportedPosition = Number(data?.state?.position ?? data?.position);
+        if (Number.isFinite(reportedPosition) && reportedPosition >= 0) {
+            q.position = reportedPosition;
+            // Editar o painel no máximo a cada 10 segundos para evitar rate limits.
+            const now = Date.now();
+            if (q.current && q.playing && !q.paused && now - q.lastPanelProgressUpdate >= 10_000) {
+                q.lastPanelProgressUpdate = now;
+                sendOrUpdatePanel(client, guildId, q.current).catch(() => {});
+            }
+        }
         if (process.env.MUSIC_DEBUG !== '1') return;
         console.log(
             `[music:player] guild=${guildId} pos=${data?.state?.position ?? data?.position ?? '?'} paused=${player.paused} volume=${player.volume} track=${player.track ? 'yes' : 'no'}`
