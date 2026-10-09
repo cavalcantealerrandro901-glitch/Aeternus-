@@ -14,6 +14,10 @@ function yesterdayKey() {
     return d.toLocaleDateString('en-CA');
 }
 
+function isPartnerGuild(guildId) {
+    if (!guildId) return false;
+    return String(process.env.PARTNER_GUILD_IDS || '').split(',').map(id => id.trim()).filter(Boolean).includes(String(guildId));
+}
 function getInfo(userId) {
     const all = store.load('daily.json', {});
     return all[userId] || { last: null, streak: 0 };
@@ -62,7 +66,9 @@ function claim(userId, guildId) {
     const max = eco.dailyMax ?? 50000;
     const base = min + Math.floor(Math.random() * (Math.max(max, min) - min + 1));
     const mult = xp.dailyMultiplier(xp.get(userId).level);
-    const total = Math.floor(base * mult);
+    const partner = isPartnerGuild(guildId);
+    const totalMultiplier = mult * (partner ? 2 : 1);
+    const total = Math.floor(base * totalMultiplier);
 
     eter.add(userId, total, { reason: 'daily' });
     all[userId] = { last: today, streak };
