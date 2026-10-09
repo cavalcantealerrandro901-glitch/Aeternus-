@@ -25,6 +25,15 @@ module.exports = {
               console.warn('[avatarEmojiSync] Falha em ' + guild.id + '/' + name + ': ' + e.message);
             }
           }
+          const oldSticker = guild.stickers.cache.find(s => s.name === 'Aeternus Avatar');
+          if (oldSticker) {
+            try {
+              await oldSticker.delete('Atualização automática do avatar do Aeternus');
+              await guild.stickers.create({ file: await media.stickerPng(client), name: 'Aeternus Avatar', tags: '✨', description: 'Avatar atual do Aeternus' });
+            } catch (e) {
+              console.warn('[avatarEmojiSync] Falha ao atualizar figurinha em ' + guild.id + ': ' + e.message);
+            }
+          }
         }
       } finally { running = false; }
     }
