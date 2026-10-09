@@ -380,8 +380,7 @@ async function attemptPlay(player, track, volume) {
     if (!track?.encoded) throw new Error('track sem encoded');
     const target = Math.max(50, Math.min(100, Number(volume) || 100));
 
-    await player.playTrack({ track: { encoded: track.encoded } });
-
+    // Aplicar volume antes de iniciar reduz a chance de começar com estado antigo.
     try {
         if (typeof player.setGlobalVolume === 'function') {
             await player.setGlobalVolume(target);
@@ -389,12 +388,16 @@ async function attemptPlay(player, track, volume) {
             await player.setVolume(target);
         }
     } catch (e) {
-        console.warn('[music] volume', e?.message || e);
+        console.warn('[music] volume before play:', e?.message || e);
     }
+
+    await player.playTrack({ track: { encoded: track.encoded } });
 
     try {
         if (typeof player.setPaused === 'function') await player.setPaused(false);
-    } catch (_) {}
+    } catch (e) {
+        console.warn('[music] unpause:', e?.message || e);
+    }
 
     console.log(
         '[music] play OK vol=' +
@@ -569,9 +572,24 @@ function bindPlayerEvents(client, player, guildId) {
     if (!player || player.__aeternusBound) return;
     player.__aeternusBound = true;
 
+    player.on('start', (data) => {
+        const q = getQueue(guildId);
+        console.log(
+            `[music] START guild=${guildId} node=${player.node?.name || '?'} ping=${player.ping ?? '?'} title=${String(q.current?.info?.title || data?.track || 'unknown').slice(0, 70)}`
+        );
+    });
+
+    player.on('update', (data) => {
+        if (process.env.MUSIC_DEBUG !== '1') return;
+        console.log(
+            `[music:player] guild=${guildId} pos=${data?.state?.position ?? data?.position ?? '?'} paused=${player.paused} volume=${player.volume} track=${player.track ? 'yes' : 'no'}`
+        );
+    });
+
     player.on('end', (data) => {
         try {
             const reason = data?.reason || data;
+            console.log(`[music] END guild=${guildId} reason=${String(reason).slice(0, 80)}`);
             if (reason === 'replaced') return;
 
             const q = getQueue(guildId);
@@ -609,20 +627,24 @@ function bindPlayerEvents(client, player, guildId) {
     player.on('exception', (data) => {
         try {
             const q = getQueue(guildId);
-            const msg =
-                data?.exception?.message ||
-                data?.exception?.cause ||
-                data?.message ||
-                'exception';
+            const ex = data?.exception || {};
+            const msg = ex.message || ex.cause || data?.message || 'exception';
             const src = q.current?.info?.sourceName || '?';
             console.warn(
-                `[music] exception ${guildId} src=${src}: ${String(msg).slice(0, 140)}`
+                `[music] EXCEPTION guild=${guildId} src=${src} severity=${ex.severity || '?'} ` +
+                `cause=${String(ex.cause || '?').slice(0, 100)} message=${String(msg).slice(0, 140)}`
             );
-            handlePlayFailure(client, guildId, q.current, msg).catch(() => {});
-        } catch (_) {}
+            handlePlayFailure(client, guildId, q.current, msg).catch((failureError) => {
+                console.warn('[music] exception recovery:', failureError?.message || failureError);
+            });
+        } catch (e) {
+            console.warn('[music] exception handler:', e?.message || e);
+        }
     });
 
-    player.on('error', () => {});
+    player.on('resumed', () => {
+        console.log(`[music] PLAYER RESUMED guild=${guildId} node=${player.node?.name || '?'}`);
+    });
 }
 
 async function enqueue(client, { guild, voiceChannelId, textChannelId, query, requesterId }) {
