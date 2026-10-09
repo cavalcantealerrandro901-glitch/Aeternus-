@@ -1,11 +1,9 @@
-const { SlashCommandBuilder } = require('discord.js');
 const musicManager = require('../utils/musicManager');
 
 module.exports = {
     name: 'pular',
     aliases: ['skip', 'next', 'proxima'],
     description: 'Pula a música atual',
-    data: new SlashCommandBuilder().setName('pular').setDescription('Pula a música atual'),
 
     async execute(message) {
         return act(message);
