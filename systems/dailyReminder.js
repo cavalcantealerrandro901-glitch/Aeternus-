@@ -77,6 +77,20 @@ function buildEmbed(user, st) {
     const min = st.dailyMin ?? 5000;
     const max = st.dailyMax ?? 15000;
     const mult = Number(st.multiplier || 1);
+    const inactiveDays = daily.daysSince(st.last);
+    if (inactiveDays === 6) {
+        return new EmbedBuilder()
+            .setColor(0xf59e0b)
+            .setTitle('Aviso de sequência diária')
+            .setDescription(
+                `Olá, **${name}**! Faz 6 dias desde seu último resgate.\\n\\n` +
+                `Sua sequência atual é de **${Number(st.streak || 0)} dia(s)**.\\n` +
+                'Resgate o daily hoje para manter a sequência. Ao completar 7 dias sem resgatar, ela será reiniciada no próximo resgate.\\n\\n' +
+                'Use **O.daily** ou **/daily** em um servidor com o Aeternus.'
+            )
+            .setFooter({ text: 'Aeternus Economy • Aviso por mensagem privada' });
+    }
+
 
     let color = 0xa78bfa;
     let title = '✦ Daily disponível';
