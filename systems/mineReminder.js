@@ -1,7 +1,3 @@
-/**
- * Aviso por DM quando o cooldown do minerar (O.minerar) termina.
- * ENV: MINE_REMINDER=off → desliga
- */
 const { EmbedBuilder } = require('discord.js');
 const store = require('../utils/store');
 
@@ -143,7 +139,7 @@ function setup(client) {
         client.once('clientReady', onceReady);
     }
 
-    console.log('[mineReminder] ativo · avisa no PV quando o cooldown (5 min) acaba');
+    console.log('[mineReminder] ativo · avisa no PV quando o cooldown (30 min) acaba');
 }
 
 module.exports = { setup, tick, CD_MS };
