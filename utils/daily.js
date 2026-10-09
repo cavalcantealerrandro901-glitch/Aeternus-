@@ -17,6 +17,16 @@ function yesterdayKey() {
   const d = new Date(Date.UTC(year, month - 1, day - 1, 12));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
+function daysSince(last, today = todayKey()) {
+  if (!last || !/^\\d{4}-\\d{2}-\\d{2}$/.test(last)) return Infinity;
+  const lastDate = Date.parse(last + 'T12:00:00Z');
+  const todayDate = Date.parse(today + 'T12:00:00Z');
+  return Math.floor((todayDate - lastDate) / 86400000);
+}
+function keepsStreak(last, today = todayKey()) {
+  const days = daysSince(last, today);
+  return days >= 1 && days < 7;
+}
 function isPartnerGuild(guildId) {
   if (!guildId) return false;
   const partners = store.load('serverPartners.json', {});
@@ -37,7 +47,9 @@ function status(userId, guildId) {
   const partner = isPartnerGuild(guildId);
   return {
     ok: true, claimed, available: !claimed, last: info.last, streak: info.streak || 0,
-    nextStreak: claimed ? (info.streak || 0) : (info.last === yesterdayKey() ? (info.streak || 0) + 1 : 1),
+    nextStreak: claimed
+      ? (info.streak || 0)
+      : (keepsStreak(info.last, today) ? (info.streak || 0) + 1 : 1),
     dailyMin: eco.dailyMin ?? 5000, dailyMax: eco.dailyMax ?? 50000,
     multiplier: levelMultiplier * (partner ? 2 : 1), levelMultiplier, partner, level,
     balance: eter.get(userId), timezone: TIME_ZONE,
@@ -50,7 +62,7 @@ function claim(userId, guildId) {
   const info = all[userId] || { last: null, streak: 0 };
   if (info.last === today) return { ok: false, error: 'Daily já coletado hoje. Volte após meia-noite de Brasília.' };
 
-  const streak = info.last === yesterdayKey() ? (info.streak || 0) + 1 : 1;
+  const streak = keepsStreak(info.last, today) ? (info.streak || 0) + 1 : 1;
   const eco = guildId ? getSettings(guildId).economy : { dailyMin: 5000, dailyMax: 50000 };
   const min = eco.dailyMin ?? 5000;
   const max = Math.max(eco.dailyMax ?? 50000, min);
@@ -66,4 +78,4 @@ function claim(userId, guildId) {
     levelMultiplier, partner, streak, balance: eter.get(userId)
   };
 }
-module.exports = { todayKey, yesterdayKey, claim, status, getInfo };
+module.exports = { todayKey, yesterdayKey, claim, status, getInfo, daysSince, keepsStreak };
