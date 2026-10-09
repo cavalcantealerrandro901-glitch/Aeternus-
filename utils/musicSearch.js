@@ -1,6 +1,7 @@
 /**
  * Busca multi-fonte para Lavalink (Serenetia).
- * Ordem: SoundCloud → YouTube → Deezer (mais chances de stream válido).
+ * Ordem para buscas por texto: YouTube → SoundCloud → Deezer.
+ * URLs explícitas continuam sendo resolvidas diretamente.
  */
 
 function isUrl(q) {
@@ -70,14 +71,14 @@ function searchIdentifiers(raw) {
     const queries = expandQueries(q);
     const ids = [];
 
-    // SoundCloud
-    for (const query of queries.slice(0, 3)) {
-        ids.push(`scsearch:${query}`);
-    }
-    // YouTube (Serenetia tem source youtube)
+    // YouTube primeiro: evita escolher resultados do SoundCloud cujo stream pode retornar 404.
     for (const query of queries.slice(0, 2)) {
         ids.push(`ytsearch:${query}`);
         ids.push(`ytmsearch:${query}`);
+    }
+    // SoundCloud como alternativa
+    for (const query of queries.slice(0, 3)) {
+        ids.push(`scsearch:${query}`);
     }
     // Deezer
     for (const query of queries.slice(0, 2)) {
