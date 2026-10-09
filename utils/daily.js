@@ -18,7 +18,7 @@ function yesterdayKey() {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 function daysSince(last, today = todayKey()) {
-  if (!last || !/^\\d{4}-\\d{2}-\\d{2}$/.test(last)) return Infinity;
+  if (!last || !/^\d{4}-\d{2}-\d{2}$/.test(last)) return Infinity;
   const lastDate = Date.parse(last + 'T12:00:00Z');
   const todayDate = Date.parse(today + 'T12:00:00Z');
   return Math.floor((todayDate - lastDate) / 86400000);
