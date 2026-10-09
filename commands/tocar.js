@@ -33,13 +33,10 @@ module.exports = {
 
 async function run(message, query) {
     try {
-        const result = await play(message, query);
-        const sent = await message.reply({
-            ...result,
-            allowedMentions: { repliedUser: false }
-        });
-        setTimeout(() => sent.delete().catch(() => {}), 15_000);
-        return sent;
+        // O musicManager já cria/atualiza o painel principal com embed e botões.
+        // Evita enviar um segundo embed temporário para a mesma música.
+        await play(message, query);
+        return null;
     } catch (e) {
         const err = await message.reply(`❌ ${e.message || e}`);
         setTimeout(() => err.delete().catch(() => {}), 12_000);
