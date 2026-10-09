@@ -8,9 +8,6 @@ module.exports = {
     async execute(message) {
         return act(message);
     },
-    async executeSlash(i) {
-        return act(i, true);
-    }
 };
 
 async function act(ctx, slash) {
