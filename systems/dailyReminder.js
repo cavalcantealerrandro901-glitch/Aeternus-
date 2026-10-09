@@ -211,41 +211,48 @@ function buildEmbed(user, st) {
     return new EmbedBuilder().setColor(color).setTitle(title).setDescription(body);
 }
 
+let ticking = false;
+
 async function tick(client) {
-    if (!isEnabled()) return;
-    const { day, hour, minute } = nowBRT();
-    if (hour !== 0 || minute > 8) return;
-    if (lastRunDay === day) return;
-    lastRunDay = day;
+    if (!isEnabled() || ticking) return;
+    ticking = true;
+    try {
+        // Não depende de o bot estar online exatamente à meia-noite:
+        // avisa no primeiro ciclo disponível e tenta novamente se a DM falhar.
+        const { day } = nowBRT();
+        const data = reminders();
+        const ids = candidateIds();
+        let sent = 0;
 
-    const data = reminders();
-    const ids = candidateIds();
-    let sent = 0;
-
-    for (const id of ids) {
-        try {
+        for (const id of ids) {
             if (data[id] === day) continue;
-            let st = { nextStreak: 1, streak: 0, last: null, balance: 0, level: 0 };
-            try {
-                if (typeof daily.status === 'function') st = { ...st, ...daily.status(id) };
-            } catch (_) {}
-            try {
-                st.balance = typeof eter.get === 'function' ? eter.get(id) : 0;
-            } catch (_) {}
 
-            const user = await client.users.fetch(id).catch(() => null);
-            if (!user) continue;
-            const emb = buildEmbed(user, st);
-            await user.send({ embeds: [emb] }).catch(() => null);
-            data[id] = day;
-            sent += 1;
-            await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
-        } catch (e) {
-            console.warn('[dailyReminder]', id, e.message);
+            try {
+                const st = daily.status(id);
+                // Não avisa quem já resgatou o daily neste dia.
+                if (st.claimed) {
+                    data[id] = day;
+                    continue;
+                }
+
+                const user = await client.users.fetch(id).catch(() => null);
+                if (!user) continue;
+
+                await user.send({ embeds: [buildEmbed(user, st)] });
+                data[id] = day;
+                sent += 1;
+                await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+            } catch (error) {
+                // Não marca como enviado: uma próxima verificação poderá tentar de novo.
+                console.warn('[dailyReminder] Falha ao avisar', id, error?.message || error);
+            }
         }
+
+        saveReminders(data);
+        if (sent) console.log(`[dailyReminder] ${sent} DM(s) enviadas em ${day}`);
+    } finally {
+        ticking = false;
     }
-    saveReminders(data);
-    if (sent) console.log(`[dailyReminder] ${sent} DM(s) em ${day}`);
 }
 
 function setup(client) {
