@@ -1,7 +1,10 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const daily = require('../utils/daily');
 const eter = require('../utils/eter');
-const DAILY_IMAGE = 'https://images.weserv.nl/?url=raw.githubusercontent.com/cavalcantealerrandro901-glitch/Aeternus-/main/public/images/daily-reward.svg&output=png';
+
+const IMAGE_BASE = 'https://raw.githubusercontent.com/cavalcantealerrandro901-glitch/Aeternus-/main/public/images/';
+const PARTNER_THANKS_IMAGE = IMAGE_BASE + 'partner-thanks.svg';
+const STREAK_IMAGES = Array.from({ length: 7 }, (_, i) => IMAGE_BASE + `daily-streak-${i + 1}.svg`);
 
 function fmt(n) {
   if (typeof eter.formatPlain === 'function') return eter.formatPlain(n);
@@ -13,24 +16,43 @@ function row(disabled = false) {
       .setEmoji('🎁').setStyle(ButtonStyle.Primary).setDisabled(disabled)
   );
 }
-function render(user, st, result = null, already = false) {
-  const streak = result?.streak ?? (st?.claimed ? st.streak : st?.nextStreak ?? st?.streak ?? 0);
+function buildEmbed(user, st, result = null, already = false) {
+  const streak = Math.max(1, result?.streak ?? (st?.claimed ? st.streak : st?.nextStreak ?? st?.streak ?? 1));
   const balance = result?.balance ?? st?.balance ?? eter.get(user.id);
-  const lines = [
-    DAILY_IMAGE, '',
-    '✦ **AETERNUS • RECOMPENSA DIÁRIA**',
-    result ? `🎉 Você recebeu **✨ ${fmt(result.amount)} éter**!`
-      : already ? '⏳ Você já resgatou sua recompensa de hoje.'
-      : '🎁 Clique no botão abaixo para resgatar sua recompensa diária.',
-    `🔥 **Sequência:** ${streak} dia(s)`,
-    `✨ **Saldo:** ${fmt(balance)} éter`
-  ];
+  const embed = new EmbedBuilder()
+    .setColor(result ? 0x36d9ff : 0x2878ff)
+    .setAuthor({ name: 'AETERNUS • ECONOMY', iconURL: 'https://cdn.discordapp.com/embed/avatars/5.png' })
+    .setTitle('🎁 Recompensa diária')
+    .setDescription(result
+      ? `Parabéns, <@${user.id}>! Sua recompensa diária foi creditada.`
+      : already
+        ? `Olá, <@${user.id}>! Você já resgatou sua recompensa de hoje.`
+        : `Olá, <@${user.id}>! Resgate seu daily e continue sua sequência.`)
+    .addFields(
+      { name: '✨ Éter ganho', value: result ? `**+${fmt(result.amount)} éter**` : 'Resgate para revelar sua recompensa.', inline: true },
+      { name: '🔥 Sequência', value: `**${streak} dia(s)**`, inline: true },
+      { name: '💰 Saldo atual', value: `**${fmt(balance)} éter**`, inline: true }
+    )
+    .setImage(PARTNER_THANKS_IMAGE)
+    .setThumbnail(STREAK_IMAGES[Math.min(streak, 7) - 1])
+    .setFooter({ text: 'Obrigado aos servidores parceiros por fortalecerem a comunidade Aeternus.' })
+    .setTimestamp();
+
   if (result?.levelMultiplier && result.levelMultiplier !== 1)
-    lines.push(`⭐ Bônus de nível: ×${Number(result.levelMultiplier).toFixed(2)}`);
-  if (result?.partner) lines.push('🤝 Bônus de servidor parceiro ×2 aplicado!');
-  else if (!result && st?.partner && !already) lines.push('🤝 Este servidor oferece bônus de parceria ×2.');
-  lines.push('', 'Resgate novamente amanhã, após a meia-noite de Brasília, para manter a sequência.');
-  return { content: lines.join('\n'), components: [row(Boolean(already || result))] };
+    embed.addFields({ name: '⭐ Bônus de nível', value: `×${Number(result.levelMultiplier).toFixed(2)}`, inline: true });
+  if (result?.partner)
+    embed.addFields({ name: '🤝 Bônus de parceria', value: '**×2 aplicado nesta recompensa!**', inline: true });
+  else if (!result && st?.partner && !already)
+    embed.addFields({ name: '🤝 Servidor parceiro', value: 'O bônus ×2 será aplicado à recompensa.', inline: true });
+
+  embed.addFields({
+    name: '📅 Próximo resgate',
+    value: already ? 'Volte após a meia-noite de Brasília.' : 'Resgate uma vez por dia para manter sua sequência.'
+  });
+  return embed;
+}
+function render(user, st, result = null, already = false) {
+  return { embeds: [buildEmbed(user, st, result, already)], components: [row(Boolean(already || result))] };
 }
 async function run(user, guildId) {
   const st = daily.status(user.id, guildId);
