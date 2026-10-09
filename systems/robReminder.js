@@ -144,7 +144,6 @@ function setup(client) {
     else {
         const onceReady = () => setTimeout(start, 24_000);
         client.once('clientReady', onceReady);
-        client.once('ready', onceReady);
     }
 
     console.log('[robReminder] ativo · avisa no PV quando o cooldown (15 min) acaba');
