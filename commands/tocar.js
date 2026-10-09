@@ -152,11 +152,16 @@ async function play(ctx, query) {
         return {
             embeds: [
                 new EmbedBuilder()
-                    .setColor(0x7c3aed)
-                    .setTitle('📑 Playlist na fila')
-                    .setDescription(
-                        `**${res.playlistName}**\n+**${res.added}** faixa(s)\nTotal: **${res.queueSize}**`
+                    .setColor(0x2b2d31)
+                    .setAuthor({ name: 'AETERNUS  /  MÚSICA' })
+                    .setTitle('Playlist adicionada à fila')
+                    .setDescription(`**${res.playlistName}**`)
+                    .addFields(
+                        { name: 'Faixas adicionadas', value: `\`${res.added}\``, inline: true },
+                        { name: 'Total na fila', value: `\`${res.queueSize}\``, inline: true }
                     )
+                    .setFooter({ text: 'Aeternus Music' })
+                    .setTimestamp()
             ]
         };
     }
@@ -171,16 +176,18 @@ async function play(ctx, query) {
     return {
         embeds: [
             new EmbedBuilder()
-                .setColor(0x7c3aed)
-                .setTitle(res.queueSize <= 1 ? '✅ Tocando' : '➕ Na fila')
-                .setDescription(`**[${info.title || 'Música'}](${info.uri || '#'})**${note}`)
+                .setColor(0x2b2d31)
+                .setAuthor({ name: 'AETERNUS  /  MÚSICA' })
+                .setTitle(res.queueSize <= 1 ? 'Adicionado à reprodução' : 'Adicionado à fila')
+                .setDescription(`**[${String(info.title || 'Música').slice(0, 180)}](${info.uri || '#'})**${note}`)
                 .addFields(
-                    { name: 'Fonte', value: `\`${fonte}\``, inline: true },
-                    { name: 'Node', value: `\`${node.name}\``, inline: true },
-                    { name: 'Fila', value: `\`${res.queueSize}\``, inline: true }
+                    { name: 'Solicitado por', value: userId ? `<@${userId}>` : 'Usuário', inline: true },
+                    { name: 'Origem', value: `\`${fonte}\``, inline: true },
+                    { name: 'Faixas na fila', value: `\`${res.queueSize}\``, inline: true }
                 )
-                .setThumbnail(info.artworkUrl || null)
-                .setFooter({ text: 'Aeternus Music · Serenetia' })
+                .setThumbnail(/^https?:\/\//i.test(String(info.artworkUrl || '')) ? info.artworkUrl : null)
+                .setFooter({ text: 'Use os controles do painel para gerenciar a reprodução.' })
+                .setTimestamp()
         ]
     };
 }
