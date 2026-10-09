@@ -28,6 +28,7 @@ const DEFAULT = {
     suggestions: { enabled: false, channelId: null, upvoteEmoji: '👍', downvoteEmoji: '👎' },
     reports: { enabled: false, channelId: null, anon: true },
     levels: { announceChannelId: null, enabled: true },
+    hierarchy: { enabled: false, roleIds: {} },
     starboard: { enabled: false, channelId: null, minStars: 3, emoji: '⭐' },
     autorole: { enabled: false, roleId: null, delaySec: 0 },
     verification: {
@@ -120,7 +121,7 @@ const MERGE_KEYS = [
     'logs', 'welcome', 'leave', 'automod', 'tickets', 'economy', 'xp',
     'suggestions', 'reports', 'levels', 'starboard', 'autorole', 'verification',
     'antinuke', 'shop', 'birthday', 'counting', 'sticky', 'autoPublish',
-    'memberCounter', 'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub', 'drops', 'partnership'
+    'memberCounter', 'autoReact', 'autoThread', 'dmWelcome', 'mentionGuard', 'voiceHub', 'hierarchy', 'drops', 'partnership'
 ];
 
 function getSettings(guildId) {

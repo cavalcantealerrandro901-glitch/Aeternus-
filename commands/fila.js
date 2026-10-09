@@ -1,18 +1,14 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const musicManager = require('../utils/musicManager');
 
 module.exports = {
     name: 'fila',
     aliases: ['queue', 'q'],
     description: 'Mostra a fila de músicas',
-    data: new SlashCommandBuilder().setName('fila').setDescription('Mostra a fila de músicas'),
 
     async execute(message) {
         return message.reply({ embeds: [build(message.guild.id)] });
     },
-    async executeSlash(i) {
-        return i.reply({ embeds: [build(i.guild.id)] });
-    }
 };
 
 function build(guildId) {

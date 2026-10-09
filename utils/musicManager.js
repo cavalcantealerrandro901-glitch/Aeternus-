@@ -33,6 +33,8 @@ class GuildQueue {
         this.panelMessageId = null;
         this.voiceChannelId = null;
         this.lastAdvance = 0;
+        this.position = 0;
+        this.lastPanelProgressUpdate = 0;
     }
 }
 
@@ -94,37 +96,34 @@ function controlRow(guildId, paused = false) {
 
 function trackEmbed(track, q, title = 'Tocando agora') {
     const info = track?.info || {};
-    const source = String(info.sourceName || '—').slice(0, 32);
-    const loopLabel = q?.loop === 1 ? 'Faixa' : q?.loop === 2 ? 'Fila' : 'Off';
+    const source = String(info.sourceName || 'Desconhecida').slice(0, 32);
+    const loopLabel = q?.loop === 1 ? 'Faixa atual' : q?.loop === 2 ? 'Fila completa' : 'Desativado';
     const queueN = (q?.tracks?.length || 0) + (q?.current ? 1 : 0);
-    const safeTitle = String(info.title || 'Desconhecido').slice(0, 200);
-    const uri = info.uri || info.url || '#';
+    const safeTitle = String(info.title || 'Faixa desconhecida').slice(0, 180);
+    const candidateUrl = String(info.uri || info.url || '');
+    const uri = /^https?:\/\//i.test(candidateUrl) ? candidateUrl : null;
+    const duration = info.isStream ? 'AO VIVO' : formatMs(info.length);
+    const art = info.artworkUrl || info.thumbnail;
 
     const embed = new EmbedBuilder()
-        .setColor(0x7c3aed)
-        .setAuthor({ name: 'Aeternus Music' })
-        .setTitle(`🎵  ${title}`)
+        .setColor(0x2b2d31)
+        .setAuthor({ name: 'AETERNUS  /  MUSIC' })
+        .setTitle(title)
         .setDescription(
-            `### [${safeTitle}](${uri})\n` +
-                `👤 **${String(info.author || 'Artista').slice(0, 80)}**\n\n` +
-                `\`${progressBar(0, info.length || 1)}\`\n` +
-                `⏱️ \`${info.isStream ? 'AO VIVO' : '0:00'} / ${info.isStream ? '∞' : formatMs(info.length)}\``
+            `**${uri ? `[${safeTitle}](${uri})` : safeTitle}**\n` +
+            `${String(info.author || 'Artista não informado').slice(0, 100)}\n\n` +
+            `\`${progressBar(q?.position || 0, info.length || 1, 18)}\`\n` +
+            `⏱️ ${info.isStream ? 'Ao vivo' : `${formatMs(q?.position || 0)} / ${duration}`}`
         )
         .addFields(
-            { name: 'Fonte', value: `\`${source}\``, inline: true },
-            { name: 'Volume', value: `\`${q?.volume ?? 100}%\``, inline: true },
-            { name: 'Loop', value: `\`${loopLabel}\``, inline: true },
-            { name: 'Fila', value: `\`${queueN}\` faixa(s)`, inline: true },
-            {
-                name: 'Pedido por',
-                value: track.requester ? `<@${track.requester}>` : '—',
-                inline: true
-            }
+            { name: 'Solicitado por', value: track.requester ? `<@${track.requester}>` : '—', inline: true },
+            { name: 'Fila', value: `${queueN} faixa(s)`, inline: true },
+            { name: 'Volume', value: `${q?.volume ?? 100}%`, inline: true },
+            { name: 'Repetição', value: loopLabel, inline: true },
+            { name: 'Fonte', value: source, inline: true }
         )
-        .setFooter({ text: 'Multi-fonte · Serenetia Lavalink' })
-        .setTimestamp();
+        .setFooter({ text: 'Aeternus Music  •  Use os botões para controlar a reprodução' })
 
-    const art = info.artworkUrl || info.thumbnail;
     if (art && /^https?:\/\//i.test(art)) embed.setThumbnail(art);
     return embed;
 }
@@ -380,8 +379,7 @@ async function attemptPlay(player, track, volume) {
     if (!track?.encoded) throw new Error('track sem encoded');
     const target = Math.max(50, Math.min(100, Number(volume) || 100));
 
-    await player.playTrack({ track: { encoded: track.encoded } });
-
+    // Aplicar volume antes de iniciar reduz a chance de começar com estado antigo.
     try {
         if (typeof player.setGlobalVolume === 'function') {
             await player.setGlobalVolume(target);
@@ -389,12 +387,16 @@ async function attemptPlay(player, track, volume) {
             await player.setVolume(target);
         }
     } catch (e) {
-        console.warn('[music] volume', e?.message || e);
+        console.warn('[music] volume before play:', e?.message || e);
     }
+
+    await player.playTrack({ track: { encoded: track.encoded } });
 
     try {
         if (typeof player.setPaused === 'function') await player.setPaused(false);
-    } catch (_) {}
+    } catch (e) {
+        console.warn('[music] unpause:', e?.message || e);
+    }
 
     console.log(
         '[music] play OK vol=' +
@@ -454,6 +456,8 @@ async function playNext(client, guildId) {
         }
 
         q.current = next;
+        q.position = 0;
+        q.lastPanelProgressUpdate = 0;
         q.playing = true;
         q.paused = false;
 
@@ -463,7 +467,14 @@ async function playNext(client, guildId) {
             await sendOrUpdatePanel(client, guildId, next);
         } catch (e) {
             console.warn('[music] playTrack', e?.message || e);
-            await handlePlayFailure(client, guildId, next, e?.message || 'erro');
+            // Não chamar handlePlayFailure enquanto playLocks está ativo:
+            // os retries chamariam playNext e seriam descartados pelo lock.
+            const reason = e?.message || 'erro';
+            setTimeout(() => {
+                handlePlayFailure(client, guildId, next, reason).catch((failureError) => {
+                    console.warn('[music] recovery failure:', failureError?.message || failureError);
+                });
+            }, 0);
         }
     } finally {
         playLocks.set(guildId, false);
@@ -562,9 +573,35 @@ function bindPlayerEvents(client, player, guildId) {
     if (!player || player.__aeternusBound) return;
     player.__aeternusBound = true;
 
+    player.on('start', (data) => {
+        const q = getQueue(guildId);
+        console.log(
+            `[music] START guild=${guildId} node=${player.node?.name || '?'} ping=${player.ping ?? '?'} title=${String(q.current?.info?.title || data?.track || 'unknown').slice(0, 70)}`
+        );
+    });
+
+    player.on('update', (data) => {
+        const q = getQueue(guildId);
+        const reportedPosition = Number(data?.state?.position ?? data?.position);
+        if (Number.isFinite(reportedPosition) && reportedPosition >= 0) {
+            q.position = reportedPosition;
+            // Atualiza o tempo e a barra a cada segundo enquanto a faixa toca.
+            const now = Date.now();
+            if (q.current && q.playing && !q.paused && now - q.lastPanelProgressUpdate >= 1_000) {
+                q.lastPanelProgressUpdate = now;
+                sendOrUpdatePanel(client, guildId, q.current).catch(() => {});
+            }
+        }
+        if (process.env.MUSIC_DEBUG !== '1') return;
+        console.log(
+            `[music:player] guild=${guildId} pos=${data?.state?.position ?? data?.position ?? '?'} paused=${player.paused} volume=${player.volume} track=${player.track ? 'yes' : 'no'}`
+        );
+    });
+
     player.on('end', (data) => {
         try {
             const reason = data?.reason || data;
+            console.log(`[music] END guild=${guildId} reason=${String(reason).slice(0, 80)}`);
             if (reason === 'replaced') return;
 
             const q = getQueue(guildId);
@@ -602,20 +639,25 @@ function bindPlayerEvents(client, player, guildId) {
     player.on('exception', (data) => {
         try {
             const q = getQueue(guildId);
-            const msg =
-                data?.exception?.message ||
-                data?.exception?.cause ||
-                data?.message ||
-                'exception';
+            const ex = data?.exception || {};
+            const msg = ex.message || ex.cause || data?.message || 'exception';
             const src = q.current?.info?.sourceName || '?';
             console.warn(
-                `[music] exception ${guildId} src=${src}: ${String(msg).slice(0, 140)}`
+                `[music] EXCEPTION guild=${guildId} src=${src} severity=${ex.severity || '?'} ` +
+                `cause=${String(ex.cause || '?').slice(0, 100)} message=${String(msg).slice(0, 140)}`
             );
-            handlePlayFailure(client, guildId, q.current, msg).catch(() => {});
-        } catch (_) {}
+            // Lavalink normalmente emite END(loadFailed) para a mesma falha.
+            // Recuperar também aqui causa duas recuperações concorrentes e pode
+            // consumir várias alternativas sem sequer iniciar a próxima faixa.
+            console.warn('[music] aguardando END(loadFailed) para recuperar a faixa');
+        } catch (e) {
+            console.warn('[music] exception handler:', e?.message || e);
+        }
     });
 
-    player.on('error', () => {});
+    player.on('resumed', () => {
+        console.log(`[music] PLAYER RESUMED guild=${guildId} node=${player.node?.name || '?'}`);
+    });
 }
 
 async function enqueue(client, { guild, voiceChannelId, textChannelId, query, requesterId }) {

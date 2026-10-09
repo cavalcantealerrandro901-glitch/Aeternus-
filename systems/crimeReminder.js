@@ -140,7 +140,6 @@ function setup(client) {
     else {
         const onceReady = () => setTimeout(start, 22_000);
         client.once('clientReady', onceReady);
-        client.once('ready', onceReady);
     }
 
     console.log('[crimeReminder] ativo · avisa no PV quando o cooldown (20 min) acaba');

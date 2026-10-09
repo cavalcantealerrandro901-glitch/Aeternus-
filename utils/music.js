@@ -123,10 +123,6 @@ function setup(client) {
         const n = currentNode();
         if (n && !n.ready) connectNode(activeIdx);
     });
-    client.once('ready', () => {
-        const n = currentNode();
-        if (n && !n.ready) connectNode(activeIdx);
-    });
 }
 
 function connectNode(idx) {

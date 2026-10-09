@@ -74,8 +74,20 @@ function createConnector(client) {
                 }
             };
             this.client.once('clientReady', start);
-            this.client.once('ready', start);
-            this.client.on('raw', (packet) => this.raw(packet));
+            this.client.on('raw', (packet) => {
+                // Diagnóstico seguro: registra apenas presença dos campos de voz,
+                // nunca imprime token, sessionId ou endpoint completo.
+                if (process.env.MUSIC_DEBUG === '1' &&
+                    (packet?.t === 'VOICE_STATE_UPDATE' || packet?.t === 'VOICE_SERVER_UPDATE')) {
+                    const d = packet.d || {};
+                    console.log(
+                        `[music:voice-gateway] type=${packet.t} guild=${d.guild_id || '?'} ` +
+                        `channel=${d.channel_id ? 'yes' : 'no'} session=${d.session_id ? 'yes' : 'no'} ` +
+                        `token=${d.token ? 'yes' : 'no'} endpoint=${d.endpoint ? 'yes' : 'no'}`
+                    );
+                }
+                this.raw(packet);
+            });
 
             // bot já online (hot-reload)
             if (this.client.user?.id || this.client.isReady?.()) {
@@ -129,7 +141,24 @@ function setup(client) {
             `🎵 [lavalink] ONLINE: ${name}${reconnected ? ' (reconectado)' : ''}`
         );
         const node = shoukaku.nodes.get(name);
-        if (node) youtubeOauth.applyYoutubeOauthToNode(node).catch(() => {});
+        if (node) {
+            // Descobre a versão real do node externo sem depender do painel web.
+            const restUrl = String(node.rest?.url || '').replace(/\/v\d+\/?$/, '');
+            const auth = node.rest?.auth || node.options?.auth;
+            if (restUrl && auth) {
+                fetch(`${restUrl}/version`, {
+                    headers: { Authorization: auth, 'User-Agent': 'Aeternus/2.2 (Shoukaku)' }
+                }).then(async (res) => {
+                    const version = (await res.text()).trim().slice(0, 100);
+                    console.log(`[music:lavalink-version] node=${name} http=${res.status} version=${res.ok ? version : 'indisponível'}`);
+                }).catch((e) => {
+                    console.warn(`[music:lavalink-version] node=${name} erro=${String(e?.message || e).slice(0, 100)}`);
+                });
+            } else {
+                console.warn(`[music:lavalink-version] não foi possível consultar versão do node=${name}`);
+            }
+            youtubeOauth.applyYoutubeOauthToNode(node).catch(() => {});
+        }
     });
 
     shoukaku.on('error', (name, error) => {
@@ -151,9 +180,6 @@ function setup(client) {
         });
     });
 
-    if (process.env.MUSIC_DEBUG === '1') {
-        shoukaku.on('debug', (name, info) => console.log(`[music:debug] ${name}`, info));
-    }
 
     const status = () => {
         try {
@@ -169,9 +195,14 @@ function setup(client) {
         }
     };
 
-    client.once('clientReady', () => setTimeout(status, 2000));
-    client.once('ready', () => setTimeout(status, 2000));
-    setTimeout(status, 8000);
+    let statusPrinted = false;
+    const printStatusOnce = () => {
+        if (statusPrinted) return;
+        statusPrinted = true;
+        setTimeout(status, 2000);
+    };
+    client.once('clientReady', printStatusOnce);
+    if (client.user?.id || client.isReady?.()) setTimeout(printStatusOnce, 300);
 
     console.log(`[music] Shoukaku preparado · ${nodes.length} node(s) (aguardando Discord ready)`);
     for (const n of nodes) {

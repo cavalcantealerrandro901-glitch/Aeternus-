@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administração — Aeternus</title>
-<link rel="stylesheet" href="dashboard.css">
+<link rel="stylesheet" href="/dashboard.css">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -199,7 +199,11 @@ adminMenuBtn.addEventListener('click',()=>{const open=adminMenuBtn.getAttribute(
 document.addEventListener('click',e=>{if(!e.target.closest('.admin-top-menu')){adminMenuBtn.setAttribute('aria-expanded','false');adminMenuPanel.classList.remove('open');adminMenuPanel.setAttribute('aria-hidden','true');}});
 document.querySelectorAll('.admin-category-menu a').forEach(link=>link.addEventListener('click',()=>{document.querySelectorAll('.admin-category-menu a').forEach(i=>i.classList.remove('active'));link.classList.add('active');adminMenuBtn.setAttribute('aria-expanded','false');adminMenuPanel.classList.remove('open');adminMenuPanel.setAttribute('aria-hidden','true');}));
 </script>
+<<<<<<< HEAD
 <script src="admin-panel.js"></script>
     <script src="dashboard-app.js"></script>
+=======
+<script src="/admin-panel.js"></script>
+>>>>>>> 8eec11c4c99aa5d6974be110d09140c9631b9d48
 </body>
 </html>
