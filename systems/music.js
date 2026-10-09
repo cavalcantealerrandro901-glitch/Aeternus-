@@ -144,7 +144,7 @@ function setup(client) {
         const node = shoukaku.nodes.get(name);
         if (node) {
             // Descobre a versão real do node externo sem depender do painel web.
-            const restUrl = String(node.rest?.url || '').replace(/\\/v\\d+\\/?$/, '');
+            const restUrl = String(node.rest?.url || '').replace(/\/v\d+\/?$/, '');
             const auth = node.rest?.auth || node.options?.auth;
             if (restUrl && auth) {
                 fetch(`${restUrl}/version`, {
