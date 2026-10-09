@@ -94,38 +94,36 @@ function controlRow(guildId, paused = false) {
 
 function trackEmbed(track, q, title = 'Tocando agora') {
     const info = track?.info || {};
-    const source = String(info.sourceName || '—').slice(0, 32);
-    const loopLabel = q?.loop === 1 ? 'Faixa' : q?.loop === 2 ? 'Fila' : 'Off';
+    const source = String(info.sourceName || 'Desconhecida').slice(0, 32);
+    const loopLabel = q?.loop === 1 ? 'Faixa atual' : q?.loop === 2 ? 'Fila completa' : 'Desativado';
     const queueN = (q?.tracks?.length || 0) + (q?.current ? 1 : 0);
-    const safeTitle = String(info.title || 'Desconhecido').slice(0, 200);
-    const uri = info.uri || info.url || '#';
+    const safeTitle = String(info.title || 'Faixa desconhecida').slice(0, 180);
+    const uri = /^https?:\\/\\//i.test(String(info.uri || info.url || ''))
+        ? (info.uri || info.url)
+        : null;
+    const duration = info.isStream ? 'AO VIVO' : formatMs(info.length);
+    const art = info.artworkUrl || info.thumbnail;
 
     const embed = new EmbedBuilder()
-        .setColor(0x7c3aed)
-        .setAuthor({ name: 'Aeternus Music' })
-        .setTitle(`🎵  ${title}`)
+        .setColor(0x2b2d31)
+        .setAuthor({ name: 'AETERNUS  /  MUSIC' })
+        .setTitle(title)
         .setDescription(
-            `### [${safeTitle}](${uri})\n` +
-                `👤 **${String(info.author || 'Artista').slice(0, 80)}**\n\n` +
-                `\`${progressBar(0, info.length || 1)}\`\n` +
-                `⏱️ \`${info.isStream ? 'AO VIVO' : '0:00'} / ${info.isStream ? '∞' : formatMs(info.length)}\``
+            `**${uri ? `[${safeTitle}](${uri})` : safeTitle}**\\n` +
+            `${String(info.author || 'Artista não informado').slice(0, 100)}\\n\\n` +
+            `\\`${progressBar(0, info.length || 1, 18)}\\`\\n` +
+            `\\⏱️ ${info.isStream ? 'Ao vivo' : `0:00 / ${duration}`}`
         )
         .addFields(
-            { name: 'Fonte', value: `\`${source}\``, inline: true },
-            { name: 'Volume', value: `\`${q?.volume ?? 100}%\``, inline: true },
-            { name: 'Loop', value: `\`${loopLabel}\``, inline: true },
-            { name: 'Fila', value: `\`${queueN}\` faixa(s)`, inline: true },
-            {
-                name: 'Pedido por',
-                value: track.requester ? `<@${track.requester}>` : '—',
-                inline: true
-            }
+            { name: 'Solicitado por', value: track.requester ? `<@${track.requester}>` : '—', inline: true },
+            { name: 'Fila', value: ` ${queueN} faixa(s)`, inline: true },
+            { name: 'Volume', value: `${q?.volume ?? 100}%`, inline: true },
+            { name: 'Repetição', value: loopLabel, inline: true },
+            { name: 'Fonte', value: source, inline: true }
         )
-        .setFooter({ text: 'Multi-fonte · Serenetia Lavalink' })
-        .setTimestamp();
+        .setFooter({ text: 'Aeternus Music  •  Use os botões para controlar a reprodução' });
 
-    const art = info.artworkUrl || info.thumbnail;
-    if (art && /^https?:\/\//i.test(art)) embed.setThumbnail(art);
+    if (art && /^https?:\\/\\//i.test(art)) embed.setThumbnail(art);
     return embed;
 }
 
