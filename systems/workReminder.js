@@ -152,7 +152,6 @@ function setup(client) {
     else {
         const onceReady = () => setTimeout(start, 20_000);
         client.once('clientReady', onceReady);
-        client.once('ready', onceReady);
     }
 
     const mins = Math.round((workUtil.COOLDOWN_MS || 45 * 60 * 1000) / 60000);
