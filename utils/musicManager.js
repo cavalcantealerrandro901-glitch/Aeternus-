@@ -118,16 +118,9 @@ function trackEmbed(track, q, title = 'Tocando agora') {
             { name: 'Fila', value: `${queueN} faixa(s)`, inline: true },
             { name: 'Volume', value: `${q?.volume ?? 100}%`, inline: true },
             { name: 'Repetição', value: loopLabel, inline: true },
-            { name: 'Fonte', value: source, inline: true },
-            {
-                name: '🎛️  CONTROLES',
-                value:
-                    '`〔 ⏸️ PAUSAR 〕`  `〔 ⏭️ PULAR 〕`  `〔 ⏹️ PARAR 〕`\\n' +
-                    '`〔 📜 FILA 〕`  `〔 🔁 LOOP 〕`',
-                inline: false
-            }
+            { name: 'Fonte', value: source, inline: true }
         )
-        .setFooter({ text: 'Aeternus Music  •  Selecione os botões logo abaixo do painel' });
+        .setFooter({ text: 'Aeternus Music  •  Use os botões para controlar a reprodução' })
 
     if (art && /^https?:\/\//i.test(art)) embed.setThumbnail(art);
     return embed;
