@@ -1,8 +1,6 @@
 const { REST, Routes } = require('discord.js');
 const { getToken, getClientId, getGuildId } = require('./env');
 
-// O Discord não aceita espaços no nome individual. A estrutura grupo + subcomando
-// faz os comandos aparecerem como "/economia saldo", "/moderacao banir" etc.
 const CATEGORY = {
     addmoney: 'economia', removemoney: 'economia', saldo: 'economia', banco: 'economia',
     depositar: 'economia', sacar: 'economia', beg: 'economia', rob: 'economia', pay: 'economia',
@@ -37,6 +35,17 @@ const LABELS = {
     stop: 'parar', queue: 'fila', volume: 'volume', nowplaying: 'tocando', loop: 'repetir'
 };
 
+const GROUP_DESCRIPTIONS = {
+    economia: 'Saldo, banco e economia do Aeternus',
+    moderacao: 'Ferramentas de moderação do servidor',
+    servidor: 'Configurações e ferramentas do servidor',
+    utilidades: 'Comandos úteis do Aeternus',
+    diversao: 'Jogos e diversão',
+    rpg: 'Aventura, classes e progressão',
+    musica: 'Reprodução e controle de música',
+    geral: 'Outros comandos'
+};
+
 function safeName(value) {
     return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-z0-9]/g, '').slice(0, 32) || 'comando';
@@ -45,6 +54,7 @@ function safeName(value) {
 function collectSlashBody(client) {
     const groups = new Map();
     const routes = new Map();
+    const rootRoutes = new Map();
     const sources = client.slash ? [...client.slash.values()] : [];
 
     for (const cmd of sources) {
@@ -52,31 +62,44 @@ function collectSlashBody(client) {
         try {
             const json = typeof cmd.data.toJSON === 'function' ? cmd.data.toJSON() : { ...cmd.data };
             if (!json?.name) continue;
+
+            const originalOptions = Array.isArray(json.options)
+                ? json.options.filter(o => o && o.name !== 'args')
+                : [];
+            const hasNested = originalOptions.some(o => o.type === 1 || o.type === 2);
+
+            // Comandos que já possuem subcomandos próprios continuam sendo comandos raiz.
+            // Apenas normalizamos o nome para remover hífens; suas opções são preservadas.
+            if (hasNested) {
+                const rootName = safeName(json.name);
+                if (rootRoutes.has(rootName)) {
+                    console.warn('[slash] nome raiz duplicado após normalização:', rootName, '—', cmd.name);
+                    continue;
+                }
+                const rootJson = { ...json, name: rootName, options: originalOptions };
+                if (rootJson.description) rootJson.description = String(rootJson.description).slice(0, 100);
+                rootRoutes.set(rootName, cmd);
+                routes.set('__root:' + rootName, cmd);
+                if (!groups.has('__root_commands__')) groups.set('__root_commands__', []);
+                groups.get('__root_commands__').push({ __root: true, json: rootJson });
+                continue;
+            }
+
             const group = CATEGORY[cmd.name] || 'geral';
             let sub = safeName(LABELS[cmd.name] || cmd.name);
-            const routeKey = group + ' ' + sub;
-            if (routes.has(routeKey)) {
-                sub = safeName(cmd.name);
-            }
+            if (routes.has(group + ' ' + sub)) sub = safeName(cmd.name);
             const finalKey = group + ' ' + sub;
             if (routes.has(finalKey)) {
                 console.warn('[slash] subcomando duplicado ignorado:', finalKey);
                 continue;
             }
-            const options = Array.isArray(json.options)
-                ? json.options.filter(o => o && o.name !== 'args')
-                : [];
-            // Slash commands are exposed as subcommands. Existing options and handlers remain.
-            if (options.some(o => o.type === 1 || o.type === 2)) {
-                console.warn('[slash] comando com subcomandos aninhados não agrupado:', cmd.name);
-                continue;
-            }
+
             if (!groups.has(group)) groups.set(group, []);
             groups.get(group).push({
                 type: 1,
                 name: sub,
                 description: String(json.description || cmd.description || cmd.name || sub).slice(0, 100),
-                ...(options.length ? { options } : {})
+                ...(originalOptions.length ? { options: originalOptions } : {})
             });
             routes.set(finalKey, cmd);
         } catch (e) {
@@ -85,35 +108,24 @@ function collectSlashBody(client) {
     }
 
     const body = [];
-    for (const [group, subs] of groups) {
-        // Discord permite no máximo 25 subcomandos em cada grupo.
-        for (let i = 0; i < subs.length; i += 25) {
-            const chunk = subs.slice(i, i + 25);
+    for (const [group, entries] of groups) {
+        if (group === '__root_commands__') {
+            for (const entry of entries) body.push(entry.json);
+            continue;
+        }
+        for (let i = 0; i < entries.length; i += 25) {
+            const chunk = entries.slice(i, i + 25);
             const name = i === 0 ? group : safeName(group + (i / 25 + 1));
-            body.push({
-                name,
-                description: ({
-                    economia: 'Saldo, banco e economia do Aeternus',
-                    moderacao: 'Ferramentas de moderação do servidor',
-                    servidor: 'Configurações e ferramentas do servidor',
-                    utilidades: 'Comandos úteis do Aeternus',
-                    diversao: 'Jogos e diversão',
-                    rpg: 'Aventura, classes e progressão',
-                    musica: 'Reprodução e controle de música',
-                    geral: 'Outros comandos'
-                })[group] || 'Comandos do Aeternus',
-                options: chunk
-            });
-            // Rotas dos grupos adicionais também apontam para os comandos originais.
+            body.push({ name, description: GROUP_DESCRIPTIONS[group] || 'Comandos do Aeternus', options: chunk });
             if (i > 0) {
-                const original = subs.slice(i, i + 25);
-                for (const sub of original) {
-                    const cmd = [...routes.entries()].find(([k]) => k.endsWith(' ' + sub.name))?.[1];
-                    if (cmd) routes.set(name + ' ' + sub.name, cmd);
+                for (const sub of chunk) {
+                    const original = [...routes.entries()].find(([k]) => k === group + ' ' + sub.name)?.[1];
+                    if (original) routes.set(name + ' ' + sub.name, original);
                 }
             }
         }
     }
+
     client.slashRoutes = routes;
     body.sort((a, b) => a.name.localeCompare(b.name));
     return body;
@@ -127,7 +139,7 @@ async function registerSlash(client, opts = {}) {
 
     const rest = new REST({ version: '10' }).setToken(token);
     const body = opts.wipeOnly ? [] : collectSlashBody(client);
-    console.log('⏳ [slash] Sincronizando ' + body.length + ' grupos (subcomandos agrupados)…');
+    console.log('⏳ [slash] Sincronizando ' + body.length + ' comandos/grupos…');
 
     try {
         await rest.put(Routes.applicationCommands(clientId), { body });
