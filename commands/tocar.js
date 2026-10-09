@@ -1,6 +1,6 @@
 const {
     EmbedBuilder,
-    SlashCommandBuilder,
+
     ChannelType,
     MessageFlags
 } = require('discord.js');
@@ -10,15 +10,6 @@ module.exports = {
     name: 'tocar',
     aliases: ['play', 'p', 'toca'],
     description: 'Toca música (SoundCloud / Lavalink)',
-    data: new SlashCommandBuilder()
-        .setName('tocar')
-        .setDescription('Toca música')
-        .addStringOption((o) =>
-            o
-                .setName('busca')
-                .setDescription('Nome da música ou link (SoundCloud / YouTube)')
-                .setRequired(true)
-        ),
 
     async execute(message, args) {
         const query = args.join(' ').trim();
@@ -31,17 +22,6 @@ module.exports = {
             );
         }
         return run(message, query);
-    },
-
-    async executeSlash(i) {
-        const query = i.options.getString('busca', true);
-        await i.deferReply();
-        try {
-            const result = await play(i, query);
-            return i.editReply(result);
-        } catch (e) {
-            return i.editReply({ content: `❌ ${e.message || e}` });
-        }
     },
 
     async handleComponent(interaction, client) {
