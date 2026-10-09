@@ -40,7 +40,26 @@ module.exports = {
             const guild = client.guilds.cache.get(id);
             partners[id] = { guildId: id, name: guild?.name || 'Servidor parceiro', addedBy: message.author.id, addedAt: new Date().toISOString() };
             savePartners(partners);
-            return message.reply({ embeds: [makeEmbed('Parceria cadastrada', `✅ **${guild?.name || 'Servidor'}** foi cadastrado como parceiro.\nID: \`${id}\`\n\nO bônus ×2 do daily será aplicado neste servidor.`, 0x22c55e)] });
+
+            // Avisa por DM o proprietário do servidor recém-cadastrado.
+            let dmStatus = '⚠️ Não foi possível enviar a DM ao dono do servidor (as mensagens privadas podem estar fechadas).';
+            if (guild) {
+                try {
+                    const guildOwner = await guild.fetchOwner();
+                    await guildOwner.send({
+                        embeds: [makeEmbed(
+                            'Seu servidor agora é parceiro!',
+                            `Olá! O servidor **${guild.name}** foi cadastrado como parceiro do **Aeternus**.\\n\\n✨ Enquanto a parceria estiver ativa, os membros deste servidor recebem o bônus ×2 no daily.\\n\\nObrigado por fazer parte da comunidade!`,
+                            0x22c55e
+                        )]
+                    });
+                    dmStatus = `📩 Aviso enviado por DM para o dono do servidor (${guildOwner.user.tag || guildOwner.id}).`;
+                } catch (error) {
+                    console.warn('[serverparceiro] Falha ao avisar dono por DM:', error?.message || error);
+                }
+            }
+
+            return message.reply({ embeds: [makeEmbed('Parceria cadastrada', `✅ **${guild?.name || 'Servidor'}** foi cadastrado como parceiro.\\nID: \`${id}\`\\n\\nO bônus ×2 do daily será aplicado neste servidor.\\n\\n${dmStatus}`, 0x22c55e)] });
         }
 
         if (['remover', 'remove', 'excluir', 'retirar'].includes(action)) {
