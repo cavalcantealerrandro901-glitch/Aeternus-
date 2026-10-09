@@ -141,7 +141,6 @@ function setup(client) {
     else {
         const onceReady = () => setTimeout(start, 26_000);
         client.once('clientReady', onceReady);
-        client.once('ready', onceReady);
     }
 
     console.log('[mineReminder] ativo · avisa no PV quando o cooldown (5 min) acaba');
