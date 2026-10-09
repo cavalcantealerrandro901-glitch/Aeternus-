@@ -98,9 +98,8 @@ function trackEmbed(track, q, title = 'Tocando agora') {
     const loopLabel = q?.loop === 1 ? 'Faixa atual' : q?.loop === 2 ? 'Fila completa' : 'Desativado';
     const queueN = (q?.tracks?.length || 0) + (q?.current ? 1 : 0);
     const safeTitle = String(info.title || 'Faixa desconhecida').slice(0, 180);
-    const uri = /^https?:\\/\\//i.test(String(info.uri || info.url || ''))
-        ? (info.uri || info.url)
-        : null;
+    const candidateUrl = String(info.uri || info.url || '');
+    const uri = /^https?:\/\//i.test(candidateUrl) ? candidateUrl : null;
     const duration = info.isStream ? 'AO VIVO' : formatMs(info.length);
     const art = info.artworkUrl || info.thumbnail;
 
@@ -109,21 +108,21 @@ function trackEmbed(track, q, title = 'Tocando agora') {
         .setAuthor({ name: 'AETERNUS  /  MUSIC' })
         .setTitle(title)
         .setDescription(
-            `**${uri ? `[${safeTitle}](${uri})` : safeTitle}**\\n` +
-            `${String(info.author || 'Artista não informado').slice(0, 100)}\\n\\n` +
-            `\\`${progressBar(0, info.length || 1, 18)}\\`\\n` +
-            `\\⏱️ ${info.isStream ? 'Ao vivo' : `0:00 / ${duration}`}`
+            `**${uri ? `[${safeTitle}](${uri})` : safeTitle}**\n` +
+            `${String(info.author || 'Artista não informado').slice(0, 100)}\n\n` +
+            `\`${progressBar(0, info.length || 1, 18)}\`\n` +
+            `⏱️ ${info.isStream ? 'Ao vivo' : `0:00 / ${duration}`}`
         )
         .addFields(
             { name: 'Solicitado por', value: track.requester ? `<@${track.requester}>` : '—', inline: true },
-            { name: 'Fila', value: ` ${queueN} faixa(s)`, inline: true },
+            { name: 'Fila', value: `${queueN} faixa(s)`, inline: true },
             { name: 'Volume', value: `${q?.volume ?? 100}%`, inline: true },
             { name: 'Repetição', value: loopLabel, inline: true },
             { name: 'Fonte', value: source, inline: true }
         )
         .setFooter({ text: 'Aeternus Music  •  Use os botões para controlar a reprodução' });
 
-    if (art && /^https?:\\/\\//i.test(art)) embed.setThumbnail(art);
+    if (art && /^https?:\/\//i.test(art)) embed.setThumbnail(art);
     return embed;
 }
 
