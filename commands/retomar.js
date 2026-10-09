@@ -1,11 +1,9 @@
-const { SlashCommandBuilder } = require('discord.js');
 const musicManager = require('../utils/musicManager');
 
 module.exports = {
     name: 'retomar',
     aliases: ['resume', 'unpause', 'despausar'],
     description: 'Retoma a música pausada',
-    data: new SlashCommandBuilder().setName('retomar').setDescription('Retoma a música'),
 
     async execute(message) {
         return act(message);
