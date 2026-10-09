@@ -10,10 +10,6 @@ module.exports = {
         if (Number.isNaN(n)) return message.reply('Use: `O.volume <0-100>`');
         return setVol(message, n);
     },
-    async executeSlash(i) {
-        const n = i.options.getInteger('nivel', true);
-        return setVol(i, n, true);
-    }
 };
 
 async function setVol(ctx, n, slash) {
