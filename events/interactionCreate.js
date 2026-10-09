@@ -65,29 +65,42 @@ module.exports = {
             }
 
             if (interaction.isChatInputCommand()) {
-                const name = interaction.commandName;
-                const cmd = client.slash.get(name) || client.commands.get(name);
+                const group = interaction.commandName;
+                let name = group;
+                let cmd = null;
 
-                if (!cmd) {
-                    return interaction
-                        .reply({
-                            content: '❌ Este slash não existe mais. Aguarde a sincronização.',
-                            ephemeral: true
-                        })
-                        .catch(() => {});
+                // Novos slash agrupados: /economia saldo, /moderacao banir etc.
+                if (interaction.options?.getSubcommand) {
+                    const sub = interaction.options.getSubcommand(false);
+                    if (sub) {
+                        name = group + ' ' + sub;
+                        cmd = client.slashRoutes?.get(name) || null;
+                    }
                 }
 
-                // executeSlash gerencia o próprio defer/reply (ex.: /parceria)
+                // Compatibilidade com comandos antigos enquanto o Discord sincroniza.
+                if (!cmd) cmd = client.slash.get(group) || client.commands.get(group);
+
+                if (!cmd) {
+                    return interaction.reply({
+                        content: '❌ Não encontrei esse comando. Aguarde a sincronização dos slash.',
+                        ephemeral: true
+                    }).catch(() => {});
+                }
+
                 if (typeof cmd.executeSlash === 'function') {
                     try {
                         await cmd.executeSlash(interaction, client);
-                        try { const notice = classAdvancement.notifyCommand(interaction.user.id); if (notice && interaction.channel) await interaction.channel.send(notice); } catch (_) {}
+                        try {
+                            const notice = classAdvancement.notifyCommand(interaction.user.id);
+                            if (notice && interaction.channel) await interaction.channel.send(notice);
+                        } catch (_) {}
                     } catch (err) {
                         if (err && (err.code === 10062 || err.code === 40060)) return;
                         await autoRepair.handleCommandError({
                             cmdName: name,
                             error: err,
-                            context: `slash /${name} · ${interaction.guild?.name || 'DM'} · user ${interaction.user?.id}`,
+                            context: 'slash /' + name + ' · ' + (interaction.guild?.name || 'DM') + ' · user ' + interaction.user?.id,
                             interaction
                         });
                     }
@@ -101,22 +114,23 @@ module.exports = {
                 if (typeof cmd.execute === 'function') {
                     try {
                         await bridgeSlashToPrefix(interaction, cmd, client);
-                        try { const notice = classAdvancement.notifyCommand(interaction.user.id); if (notice && interaction.channel) await interaction.channel.send(notice); } catch (_) {}
+                        try {
+                            const notice = classAdvancement.notifyCommand(interaction.user.id);
+                            if (notice && interaction.channel) await interaction.channel.send(notice);
+                        } catch (_) {}
                     } catch (err) {
                         if (err && (err.code === 10062 || err.code === 40060)) return;
                         await autoRepair.handleCommandError({
                             cmdName: name,
                             error: err,
-                            context: `slash-bridge /${name} · ${interaction.guild?.name || 'DM'}`,
+                            context: 'slash-bridge /' + name + ' · ' + (interaction.guild?.name || 'DM'),
                             interaction
                         });
                     }
                     return;
                 }
 
-                return interaction
-                    .reply({ content: 'Indisponível.', ephemeral: true })
-                    .catch(() => {});
+                return interaction.reply({ content: 'Indisponível.', ephemeral: true }).catch(() => {});
             }
 
             if (interaction.isButton() || interaction.isStringSelectMenu()) {
@@ -135,9 +149,7 @@ module.exports = {
                 if (!cmd && parts[0] === 'habilidades') cmd = client.commands.get('habilidades');
                 if (!cmd && parts[0] === 'passivas') cmd = client.commands.get('passivas');
                 if (!cmd && parts[0] === 'classe') cmd = client.commands.get('classe');
-                if (parts[0] === 'act' && parts[1] === 'devolver' && parts[2]) {
-                    cmd = client.commands.get(parts[2]);
-                }
+                if (parts[0] === 'act' && parts[1] === 'devolver' && parts[2]) cmd = client.commands.get(parts[2]);
 
                 if (cmd?.handleComponent) {
                     try {
@@ -152,11 +164,10 @@ module.exports = {
         } catch (e) {
             if (e && (e.code === 10062 || e.code === 40060)) return;
             const id = interaction.customId || interaction.commandName || '?';
-            const cmdHint = String(id).split(':')[0];
             await autoRepair.handleCommandError({
-                cmdName: cmdHint,
+                cmdName: String(id).split(':')[0],
                 error: e,
-                context: `interaction · ${interaction.guild?.name || 'DM'} · ${interaction.type}`,
+                context: 'interaction · ' + (interaction.guild?.name || 'DM') + ' · ' + interaction.type,
                 interaction
             });
         }
