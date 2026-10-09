@@ -181,9 +181,6 @@ function setup(client) {
         });
     });
 
-    if (process.env.MUSIC_DEBUG === '1') {
-        shoukaku.on('debug', (name, info) => console.log(`[music:debug] ${name}`, info));
-    }
 
     const status = () => {
         try {
@@ -199,9 +196,15 @@ function setup(client) {
         }
     };
 
-    client.once('clientReady', () => setTimeout(status, 2000));
-    client.once('ready', () => setTimeout(status, 2000));
-    setTimeout(status, 8000);
+    let statusPrinted = false;
+    const printStatusOnce = () => {
+        if (statusPrinted) return;
+        statusPrinted = true;
+        setTimeout(status, 2000);
+    };
+    client.once('clientReady', printStatusOnce);
+    client.once('ready', printStatusOnce);
+    if (client.user?.id || client.isReady?.()) setTimeout(printStatusOnce, 300);
 
     console.log(`[music] Shoukaku preparado · ${nodes.length} node(s) (aguardando Discord ready)`);
     for (const n of nodes) {
