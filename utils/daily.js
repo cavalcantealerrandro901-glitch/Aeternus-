@@ -16,6 +16,9 @@ function yesterdayKey() {
 
 function isPartnerGuild(guildId) {
     if (!guildId) return false;
+    const partners = store.load('serverPartners.json', {});
+    if (partners && typeof partners === 'object' && partners[String(guildId)]) return true;
+    // Compatibilidade opcional com IDs já configurados no ambiente.
     return String(process.env.PARTNER_GUILD_IDS || '').split(',').map(id => id.trim()).filter(Boolean).includes(String(guildId));
 }
 function getInfo(userId) {

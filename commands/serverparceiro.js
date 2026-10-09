@@ -35,7 +35,7 @@ module.exports = {
         const partners = getPartners();
 
         if (['adicionar', 'add', 'registrar'].includes(action)) {
-            const id = parseId(args[1] || message.mentions.guilds?.first()?.id);
+            const id = parseId(args[1] || message.mentions.guilds?.first()?.id) || message.guild?.id;
             if (!id) return message.reply({ embeds: [makeEmbed('Como adicionar', 'Use: `O.serverparceiro adicionar ID_DO_SERVIDOR`\nVocê também pode executar o comando dentro do servidor que deseja cadastrar, sem informar o ID.')] });
             const guild = client.guilds.cache.get(id);
             partners[id] = { guildId: id, name: guild?.name || 'Servidor parceiro', addedBy: message.author.id, addedAt: new Date().toISOString() };
