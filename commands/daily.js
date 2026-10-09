@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const daily = require('../utils/daily');
 const eter = require('../utils/eter');
-const DAILY_IMAGE = 'https://raw.githubusercontent.com/cavalcantealerrandro901-glitch/Aeternus-/main/public/images/daily-reward.svg';
+const DAILY_IMAGE = 'https://images.weserv.nl/?url=raw.githubusercontent.com/cavalcantealerrandro901-glitch/Aeternus-/main/public/images/daily-reward.svg&output=png';
 
 function fmt(n) {
   if (typeof eter.formatPlain === 'function') return eter.formatPlain(n);
