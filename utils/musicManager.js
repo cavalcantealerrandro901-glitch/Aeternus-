@@ -585,9 +585,9 @@ function bindPlayerEvents(client, player, guildId) {
         const reportedPosition = Number(data?.state?.position ?? data?.position);
         if (Number.isFinite(reportedPosition) && reportedPosition >= 0) {
             q.position = reportedPosition;
-            // Editar o painel no máximo a cada 10 segundos para evitar rate limits.
+            // Atualiza o tempo e a barra a cada segundo enquanto a faixa toca.
             const now = Date.now();
-            if (q.current && q.playing && !q.paused && now - q.lastPanelProgressUpdate >= 10_000) {
+            if (q.current && q.playing && !q.paused && now - q.lastPanelProgressUpdate >= 1_000) {
                 q.lastPanelProgressUpdate = now;
                 sendOrUpdatePanel(client, guildId, q.current).catch(() => {});
             }
