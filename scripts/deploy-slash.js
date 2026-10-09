@@ -56,7 +56,6 @@ async function main() {
     await client.login(token);
     await new Promise((r) => {
         client.once('clientReady', r);
-        client.once('ready', r);
     });
 
     console.log(`🤖 ${client.user.tag}`);
