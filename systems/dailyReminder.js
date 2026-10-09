@@ -232,11 +232,13 @@ async function tick(client) {
     ticking = true;
     try {
         // Não depende de o bot estar online exatamente à meia-noite:
-        // avisa no primeiro ciclo disponível e tenta novamente se a DM falhar.
+        // avisa no primeiro ciclo disponível; falhas permanentes de DM são registradas no dia para evitar tentativas repetidas a cada minuto.
         const { day } = nowBRT();
         const data = reminders();
         const ids = candidateIds();
         let sent = 0;
+        let failedDM = 0;
+        let fetchFailed = 0;
 
         for (const id of ids) {
             if (data[id] === day) continue;
@@ -250,20 +252,40 @@ async function tick(client) {
                 }
 
                 const user = await client.users.fetch(id).catch(() => null);
-                if (!user) continue;
+                if (!user) {
+                    fetchFailed += 1;
+                    continue;
+                }
 
-                await user.send({ embeds: [buildEmbed(user, st)] });
-                data[id] = day;
-                sent += 1;
-                await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+                try {
+                    await user.send({ embeds: [buildEmbed(user, st)] });
+                    data[id] = day;
+                    sent += 1;
+                    await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+                } catch (error) {
+                    // Falhas comuns de DM (privacidade, bloqueio ou nenhum servidor em comum)
+                    // não precisam poluir os logs nem provocar novas tentativas a cada minuto.
+                    const code = Number(error?.code);
+                    const message = String(error?.message || '');
+                    const cannotDM = code === 50007 ||
+                        /Cannot send messages to this user|no mutual guilds/i.test(message);
+
+                    if (cannotDM) {
+                        data[id] = day;
+                        failedDM += 1;
+                    } else {
+                        console.warn('[dailyReminder] Erro inesperado ao enviar DM:', error?.message || error);
+                    }
+                }
             } catch (error) {
-                // Não marca como enviado: uma próxima verificação poderá tentar de novo.
-                console.warn('[dailyReminder] Falha ao avisar', id, error?.message || error);
+                console.warn('[dailyReminder] Falha ao processar lembrete:', error?.message || error);
             }
         }
 
         saveReminders(data);
-        if (sent) console.log(`[dailyReminder] ${sent} DM(s) enviadas em ${day}`);
+        if (sent || failedDM || fetchFailed) {
+            console.log(`[dailyReminder] ${day} · enviadas: ${sent} · DMs indisponíveis: ${failedDM} · usuários não encontrados: ${fetchFailed}`);
+        }
     } finally {
         ticking = false;
     }
