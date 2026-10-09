@@ -463,7 +463,14 @@ async function playNext(client, guildId) {
             await sendOrUpdatePanel(client, guildId, next);
         } catch (e) {
             console.warn('[music] playTrack', e?.message || e);
-            await handlePlayFailure(client, guildId, next, e?.message || 'erro');
+            // Não chamar handlePlayFailure enquanto playLocks está ativo:
+            // os retries chamariam playNext e seriam descartados pelo lock.
+            const reason = e?.message || 'erro';
+            setTimeout(() => {
+                handlePlayFailure(client, guildId, next, reason).catch((failureError) => {
+                    console.warn('[music] recovery failure:', failureError?.message || failureError);
+                });
+            }, 0);
         }
     } finally {
         playLocks.set(guildId, false);
