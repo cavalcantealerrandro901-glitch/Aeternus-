@@ -1,271 +1,71 @@
-const { 
-  SlashCommandBuilder, 
-  EmbedBuilder, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  ComponentType, 
-  AttachmentBuilder 
-} = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const media = require('../utils/avatarMedia');
 
-let AdmZip;
-try {
-  AdmZip = require('adm-zip');
-} catch (e) {
-  AdmZip = null;
-}
-
-function getZipFiles() {
-  const searchFolders = [
-    path.join(__dirname, '../data'),
-    path.join(__dirname, '..'),
-    path.join(process.cwd(), 'data'),
-    process.cwd()
-  ];
-
-  const foundFiles = [];
-
-  for (const folder of searchFolders) {
-    const estaticoPath = path.join(folder, 'emoji_estaticos.zip');
-    const animadoPath = path.join(folder, 'emoji_animados.zip');
-    const genericoPath = path.join(folder, 'emojis.zip');
-
-    if (fs.existsSync(estaticoPath) && !foundFiles.some(f => f.type === 'estatico')) {
-      foundFiles.push({ type: 'estatico', path: estaticoPath });
-    }
-    if (fs.existsSync(animadoPath) && !foundFiles.some(f => f.type === 'animado')) {
-      foundFiles.push({ type: 'animado', path: animadoPath });
-    }
-    if (fs.existsSync(genericoPath) && foundFiles.length === 0) {
-      foundFiles.push({ type: 'geral', path: genericoPath });
-    }
-  }
-
-  return foundFiles;
+function isOwner(user, client) {
+  const ids = String(process.env.OWNER_ID || process.env.EDITOR_OWNER_ID || '').split(',').map(x => x.trim()).filter(Boolean);
+  return ids.includes(user.id) || user.id === client.application?.owner?.id;
 }
 
 module.exports = {
-  name: 'emoji',
-  aliases: ['emojis', 'pegaremoji'],
-  description: 'Busca e envia emojis dos arquivos zip (estáticos e animados)',
-
-  data: new SlashCommandBuilder()
-    .setName('emoji')
-    .setNameLocalizations({
-      'pt-BR': 'emoji',
-      'en-US': 'emoji'
-    })
-    .setDescription('Busca e envia emojis dos arquivos zip (estáticos e animados)')
-    .setDescriptionLocalizations({
-      'pt-BR': 'Busca e envia emojis dos arquivos zip (estáticos e animados)',
-      'en-US': 'Fetches and sends emojis from zip files (static and animated)'
-    })
-    .addStringOption(option =>
-      option.setName('tipo')
-        .setNameLocalizations({ 'pt-BR': 'tipo', 'en-US': 'type' })
-        .setDescription('Filtro: estatico, animado, lista ou nome da categoria')
-        .setRequired(false)),
-
-  async executeSlash(interaction) {
-    const tipo = interaction.options.getString('tipo')?.trim() || null;
-    await processEmojiCommand(interaction, tipo, true);
-  },
-
-  async executePrefix(message, args) {
-    const tipo = args.length > 0 ? args.join(' ').trim() : null;
-    await processEmojiCommand(message, tipo, false);
-  },
-
-  async execute(message, args) {
-    return this.executePrefix(message, args);
-  }
+  name: 'emojis', aliases: ['emoji', 'figurinhas', 'stickers'],
+  description: 'Cria e sincroniza emojis, figurinhas e GIFs com a foto atual do Aeternus.',
+  data: new SlashCommandBuilder().setName('emoji').setDescription('Gerencia emojis e figurinhas do Aeternus')
+    .addStringOption(o => o.setName('acao').setDescription('Ação').setRequired(false).addChoices(
+      { name: 'ajuda', value: 'ajuda' }, { name: 'listar', value: 'listar' },
+      { name: 'criar', value: 'criar' }, { name: 'atualizar', value: 'atualizar' })),
+  async executeSlash(i) { await run(i, i.options.getString('acao') || 'ajuda', true); },
+  async executePrefix(m, args) { await run(m, args[0] || 'ajuda', false); },
+  async execute(m, args) { return this.executePrefix(m, args); }
 };
 
-async function processEmojiCommand(context, rawTipo, isSlash) {
-  const author = isSlash ? context.user : context.author;
-
-  if (!AdmZip) {
-    const noAdmZipMsg = '❌ A biblioteca `adm-zip` não está instalada no bot. Execute no Termux: `npm install adm-zip`';
-    return isSlash ? context.reply({ content: noAdmZipMsg, ephemeral: true }) : context.reply(noAdmZipMsg);
+async function run(ctx, action, slash) {
+  const client = ctx.client, user = slash ? ctx.user : ctx.author;
+  const reply = p => ctx.reply(p);
+  if (!isOwner(user, client)) return reply({ content: '🔒 Apenas o proprietário do Aeternus pode usar este sistema.', ephemeral: slash });
+  if (['ajuda', 'help'].includes(action)) {
+    const e = new EmbedBuilder().setColor(0x38bdf8).setTitle('✦ AETERNUS • CENTRAL DE EMOJIS')
+      .setDescription(['`O.emojis criar` — cria 3 emojis estáticos, 1 GIF animado e tenta criar uma figurinha.',
+        '`O.emojis listar` — lista os emojis gerados no servidor atual.',
+        '`O.emojis atualizar` — atualiza os emojis existentes com a foto atual do bot.', '',
+        'Ao detectar mudança de avatar, o sistema sincroniza os emojis gerados em servidores onde eles já existem.',
+        'Requer permissão **Gerenciar Expressões** e espaço disponível no servidor.'].join('\n'))
+      .setFooter({ text: 'Aeternus • Avatar Media System' });
+    return reply({ embeds: [e], ephemeral: slash });
   }
-
-  const zipFiles = getZipFiles();
-  if (zipFiles.length === 0) {
-    const noZipMsg = '❌ Nenhum arquivo ZIP encontrado!\n\n📌 **Coloque os arquivos no Termux:**\n• `emoji_estaticos.zip` e/ou `emoji_animados.zip` na pasta raiz do bot ou em `data/`.';
-    return isSlash ? context.reply({ content: noZipMsg, ephemeral: true }) : context.reply(noZipMsg);
-  }
-
-  const allEntries = [];
-
-  for (const zipInfo of zipFiles) {
-    try {
-      const zip = new AdmZip(zipInfo.path);
-      const entries = zip.getEntries().filter(e => {
-        if (e.isDirectory) return false;
-        const ext = path.extname(e.entryName).toLowerCase();
-        return ['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext);
-      });
-
-      entries.forEach(entry => {
-        allEntries.push({
-          entry,
-          zipType: zipInfo.type,
-          entryName: entry.entryName
-        });
-      });
-    } catch (err) {
-      console.error(`Erro ao abrir o ZIP ${zipInfo.path}:`, err);
+  if (!ctx.guild) return reply({ content: 'Use este comando dentro de um servidor.', ephemeral: slash });
+  if (!ctx.guild.members.me?.permissions.has(PermissionFlagsBits.ManageGuildExpressions))
+    return reply({ content: '❌ Preciso da permissão **Gerenciar Expressões**.', ephemeral: slash });
+  if (slash) await ctx.deferReply({ ephemeral: true });
+  const send = p => slash ? ctx.editReply(p) : ctx.channel.send(p);
+  try {
+    const guild = ctx.guild;
+    const owned = guild.emojis.cache.filter(e => /^aet_(avatar|glow|purple|pulse)$/.test(e.name));
+    if (['listar', 'lista'].includes(action)) {
+      const list = owned.size ? owned.map(e => (e.animated ? '🎞️ ' : '🖼️ ') + e.toString() + ' — `' + e.name + '`').join('\n') : '_Nenhum emoji criado. Use `O.emojis criar`._';
+      return send({ embeds: [new EmbedBuilder().setColor(0x38bdf8).setTitle('✦ Biblioteca Aeternus').setDescription(list)] });
     }
-  }
-
-  if (allEntries.length === 0) {
-    const emptyMsg = '❌ Os arquivos ZIP não contêm imagens válidas (.png, .jpg, .gif, .webp).';
-    return isSlash ? context.reply({ content: emptyMsg, ephemeral: true }) : context.reply(emptyMsg);
-  }
-
-  const inputTipo = rawTipo ? rawTipo.toLowerCase() : null;
-
-  if (inputTipo === 'lista' || inputTipo === 'listar' || inputTipo === 'categorias' || inputTipo === 'tipos') {
-    const estatCount = allEntries.filter(e => e.zipType === 'estatico' || path.extname(e.entryName).toLowerCase() !== '.gif').length;
-    const animCount = allEntries.filter(e => e.zipType === 'animado' || path.extname(e.entryName).toLowerCase() === '.gif').length;
-
-    const listEmbed = new EmbedBuilder()
-      .setTitle('🎨 Biblioteca de Emojis — Aeternus')
-      .setDescription(
-        [
-          `🖼️ **Estáticos:** ${estatCount} emoji(s)`,
-          `🎞️ **Animados:** ${animCount} emoji(s)`,
-          '',
-          '📌 **Como usar os comandos:**',
-          '• `O.emoji estatico` — Busca apenas emojis estáticos',
-          '• `O.emoji animado` — Busca apenas emojis animados/GIFs',
-          '• `O.emoji <nome>` — Busca por nome ou categoria específica'
-        ].join('\n')
-      )
-      .setColor('#a78bfa')
-      .setFooter({ text: `Total de emojis disponíveis: ${allEntries.length}` })
-      .setTimestamp();
-
-    return isSlash ? context.reply({ embeds: [listEmbed] }) : context.reply({ embeds: [listEmbed] });
-  }
-
-  let targetEntries = allEntries;
-  let labelTag = 'Aleatório';
-
-  if (inputTipo) {
-    if (['estatico', 'estaticos', 'static', 'imagem', 'foto'].includes(inputTipo)) {
-      targetEntries = allEntries.filter(e => e.zipType === 'estatico' || path.extname(e.entryName).toLowerCase() !== '.gif');
-      labelTag = 'Estático';
-    } else if (['animado', 'animados', 'animated', 'gif'].includes(inputTipo)) {
-      targetEntries = allEntries.filter(e => e.zipType === 'animado' || path.extname(e.entryName).toLowerCase() === '.gif');
-      labelTag = 'Animado';
-    } else {
-      targetEntries = allEntries.filter(e => e.entryName.toLowerCase().includes(inputTipo));
-      labelTag = rawTipo;
+    if (!['criar', 'atualizar', 'update'].includes(action)) return send({ content: 'Ação desconhecida. Use `O.emojis ajuda`.' });
+    const items = [
+      { name: 'aet_avatar', data: await media.staticEmoji(client, 'normal') },
+      { name: 'aet_glow', data: await media.staticEmoji(client, 'glow') },
+      { name: 'aet_purple', data: await media.staticEmoji(client, 'purple') },
+      { name: 'aet_pulse', data: await media.animatedEmoji(client) }
+    ];
+    const results = [];
+    for (const item of items) {
+      const old = guild.emojis.cache.find(e => e.name === item.name);
+      if (old) { await guild.emojis.edit(old.id, { name: item.name, image: item.data, reason: 'Sincronização do avatar do Aeternus' }); results.push('♻️ Atualizado :' + item.name + ':'); }
+      else { const created = await guild.emojis.create({ attachment: item.data, name: item.name, reason: 'Avatar Media System Aeternus' }); results.push('✅ Criado ' + created.toString()); }
     }
-
-    if (targetEntries.length === 0) {
-      const notFoundMsg = `❌ Nenhum emoji encontrado para **"${rawTipo}"**.\n\nUse \`O.emoji estatico\`, \`O.emoji animado\` ou \`O.emoji lista\`.`;
-      return isSlash ? context.reply({ content: notFoundMsg, ephemeral: true }) : context.reply(notFoundMsg);
-    }
+    let stickerNote = '';
+    if (!guild.stickers.cache.some(s => s.name === 'Aeternus Avatar')) {
+      try { await guild.stickers.create({ file: await media.stickerPng(client), name: 'Aeternus Avatar', tags: '✨', description: 'Avatar atual do Aeternus' }); stickerNote = '\n✅ Figurinha criada.'; }
+      catch (e) { stickerNote = '\n⚠️ Figurinha não criada: ' + String(e.message || e).slice(0, 160); }
+    } else stickerNote = '\nℹ️ A figurinha já existe. O Discord não permite trocar a imagem dela diretamente; remova e recrie para mudar a arte.';
+    return send({ embeds: [new EmbedBuilder().setColor(0x22c55e).setTitle('✦ AETERNUS • CONTEÚDOS SINCRONIZADOS')
+      .setDescription(results.join('\n') + stickerNote).setFooter({ text: 'Emojis vinculados ao avatar atual do bot.' }).setTimestamp()] });
+  } catch (e) {
+    console.error('[emojis]', e);
+    return send({ content: '❌ Não foi possível concluir: ' + String(e.message || e).slice(0, 220) });
   }
-
-  function getRandomEmojiPayload(tag, list) {
-    const item = list[Math.floor(Math.random() * list.length)];
-    const buffer = item.entry.getData();
-    const cleanFileName = path.basename(item.entryName);
-    const attachment = new AttachmentBuilder(buffer, { name: cleanFileName });
-
-    const isGif = path.extname(cleanFileName).toLowerCase() === '.gif' || item.zipType === 'animado';
-    const typeBadge = isGif ? '🎞️ ANIMADO' : '🖼️ ESTÁTICO';
-
-    const embed = new EmbedBuilder()
-      .setTitle(`✨ Emoji: ${tag.toUpperCase()} [${typeBadge}]`)
-      .setDescription(`**Arquivo:** \`${cleanFileName}\`\n**Solicitado por:** <@${author.id}>`)
-      .setImage(`attachment://${cleanFileName}`)
-      .setColor('#a78bfa')
-      .setTimestamp();
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('next_emoji')
-        .setLabel('Outro Emoji')
-        .setEmoji('🎲')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId('delete_emoji')
-        .setLabel('Deletar')
-        .setEmoji('🗑️')
-        .setStyle(ButtonStyle.Danger)
-    );
-
-    return { embed, attachment, row };
-  }
-
-  const payload = getRandomEmojiPayload(labelTag, targetEntries);
-
-  let response;
-  if (isSlash) {
-    response = await context.reply({
-      embeds: [payload.embed],
-      files: [payload.attachment],
-      components: [payload.row],
-      fetchReply: true
-    });
-  } else {
-    response = await context.reply({
-      embeds: [payload.embed],
-      files: [payload.attachment],
-      components: [payload.row]
-    });
-  }
-
-  const collector = response.createMessageComponentCollector({
-    componentType: ComponentType.Button,
-    time: 360000
-  });
-
-  collector.on('collect', async (i) => {
-    if (i.user.id !== author.id) {
-      return i.reply({ content: '❌ Apenas quem usou o comando pode interagir com esses botões.', ephemeral: true });
-    }
-
-    try {
-      if (i.customId === 'next_emoji') {
-        const newPayload = getRandomEmojiPayload(labelTag, targetEntries);
-        await i.update({
-          embeds: [newPayload.embed],
-          files: [newPayload.attachment],
-          components: [newPayload.row]
-        });
-      } else if (i.customId === 'delete_emoji') {
-        collector.stop('deleted');
-        await response.delete().catch(() => {});
-      }
-    } catch (err) {
-      console.error('Erro na interação do emoji:', err);
-    }
-  });
-
-  collector.on('end', (collected, reasonEnd) => {
-    if (reasonEnd !== 'deleted') {
-      const disabledRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('next_emoji_disabled')
-          .setLabel('Outro Emoji')
-          .setEmoji('🎲')
-          .setStyle(ButtonStyle.Primary)
-          .setDisabled(true),
-        new ButtonBuilder()
-          .setCustomId('delete_emoji_disabled')
-          .setLabel('Deletar')
-          .setEmoji('🗑️')
-          .setStyle(ButtonStyle.Danger)
-          .setDisabled(true)
-      );
-      response.edit({ components: [disabledRow] }).catch(() => {});
-    }
-  });
 }
