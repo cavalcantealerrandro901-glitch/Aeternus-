@@ -10,9 +10,4 @@ module.exports = {
         if (!q.current) return message.reply('Nada tocando.');
         return message.reply({ embeds: [musicManager.trackEmbed(q.current)] });
     },
-    async executeSlash(i) {
-        const q = musicManager.getQueue(i.guild.id);
-        if (!q.current) return i.reply({ content: 'Nada tocando.', flags: 64 });
-        return i.reply({ embeds: [musicManager.trackEmbed(q.current)] });
-    }
 };
