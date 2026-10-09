@@ -74,7 +74,6 @@ function createConnector(client) {
                 }
             };
             this.client.once('clientReady', start);
-            this.client.once('ready', start);
             this.client.on('raw', (packet) => {
                 // Diagnóstico seguro: registra apenas presença dos campos de voz,
                 // nunca imprime token, sessionId ou endpoint completo.
@@ -203,7 +202,6 @@ function setup(client) {
         setTimeout(status, 2000);
     };
     client.once('clientReady', printStatusOnce);
-    client.once('ready', printStatusOnce);
     if (client.user?.id || client.isReady?.()) setTimeout(printStatusOnce, 300);
 
     console.log(`[music] Shoukaku preparado · ${nodes.length} node(s) (aguardando Discord ready)`);
