@@ -217,7 +217,7 @@ const GUILD_HELP_PAGES = [
             '',
             'Use os botões abaixo para navegar pelas categorias de comandos.',
             '_Prefixo atual: `O.`_'
-        ].join('\\n')
+        ].join('\n')
     },
     {
         title: '🛡️ Membros e liderança',
@@ -230,7 +230,7 @@ const GUILD_HELP_PAGES = [
             '`O.guild promover @user` / `O.guild rebaixar @user` — ajustar oficial/membro',
             '`O.guild transferir @user` — transferir liderança',
             '`O.guild dissolver` — dissolver a guilda (confirmação obrigatória)'
-        ].join('\\n')
+        ].join('\n')
     },
     {
         title: '✏️ Personalização',
@@ -243,7 +243,7 @@ const GUILD_HELP_PAGES = [
             '`O.guild editar imagem` — alterar imagem/banner',
             '`O.guild editar tagimagem` — definir rótulo da imagem',
             '`O.guild sincronizar` — sincronizar cargos-tag do Discord'
-        ].join('\\n')
+        ].join('\n')
     },
     {
         title: '🏦 Banco e baú',
@@ -256,7 +256,7 @@ const GUILD_HELP_PAGES = [
             '`O.guild removeritem <nº>` — remover item do baú (permissões aplicáveis)',
             '',
             'Valores aceitam atalhos como `1k`; confira seu saldo antes de movimentar.'
-        ].join('\\n')
+        ].join('\n')
     }
 ];
 
