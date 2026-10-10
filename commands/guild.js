@@ -160,10 +160,11 @@ async function applyGuildBadge(discordGuild, userId, gameGuild) {
     }
 }
 
-function roleLabel(role) {
-    if (role === 'owner') return '👑 Líder';
-    if (role === 'officer') return '⭐ Oficial';
-    return '🛡️ Membro';
+function roleLabel(member) {
+    if (member?.rank) return guilds.rankLabel(guilds.rankOf(member));
+    if (member?.role === 'owner') return '👑 Mestre';
+    if (member?.role === 'officer') return '⭐ Oficial';
+    return '👤 Membro';
 }
 
 function guildEmbed(g) {
@@ -174,20 +175,20 @@ function guildEmbed(g) {
             const o = { owner: 0, officer: 1, member: 2 };
             return (o[a.role] ?? 3) - (o[b.role] ?? 3);
         });
-    const lines = members.slice(0, 15).map((m, i) => `${i + 1}. <@${m.id}> — ${roleLabel(m)}`);
+    const lines = members.slice(0, 15).map((m, i) => `${String(i + 1).padStart(2, '0')}. <@${m.id}> · ${roleLabel(m)}`);
     const need = guilds.guildLevelNeed(g.level);
     const emb = new EmbedBuilder()
         .setColor(0xa78bfa)
-        .setTitle(`[${g.tag}] ${g.name}`)
+        .setTitle(`🏰 [${g.tag}] ${g.name}`)
         .setDescription(
             [
                 g.description || '_Sem descrição._',
                 g.welcome ? `\n💬 **Boas-vindas:** ${g.welcome}` : '',
                 '',
-                `🎚️ Nível **${g.level}** · XP **${fmt(g.xp)}** / ${fmt(need)}`,
-                `👥 Membros **${members.length}** / **${guilds.maxMembers(g)}**`,
-                `🏦 Banco **✨ ${fmt(g.bank)}**`,
-                `👑 Líder <@${g.ownerId}>`,
+                `🎚️ **Nível ${g.level}** · XP **${fmt(g.xp)} / ${fmt(need)}**`,
+                `👥 **${members.length} / ${guilds.maxMembers(g)}** membros`,
+                `🏦 Banco da guilda: **✨ ${fmt(g.bank)}**`,
+                `👑 Mestre: <@${g.ownerId}>`,
                 g.imageTag ? `🏷️ Tag da imagem: \`${g.imageTag}\`` : '',
                 '',
                 '**Membros**',
@@ -196,35 +197,91 @@ function guildEmbed(g) {
                 .filter(Boolean)
                 .join('\n')
         )
-        .setFooter({ text: `ID ${g.id} · O.guild ajuda` })
+        .setFooter({ text: `Aeternus Guilds · ID ${g.id} · O.guild ajuda` })
         .setTimestamp();
     if (g.imageUrl) emb.setThumbnail(g.imageUrl).setImage(g.imageUrl);
     return emb;
 }
 
-function helpEmbed() {
-    return new EmbedBuilder()
+const GUILD_HELP_PAGES = [
+    {
+        title: '🏰 Central de Guildas · Visão geral',
+        description: [
+            `Criar uma guilda custa **✨ ${fmt(guilds.CREATE_COST)}** e o assistente é feito no privado.`,
+            '',
+            '**Comece por aqui**',
+            '`O.guild criar` — criar sua guilda',
+            '`O.guild info` — ver sua guilda e seus membros',
+            '`O.guild membros` — consultar os integrantes',
+            '`O.guild ranking` — melhores guildas',
+            '',
+            'Use os botões abaixo para navegar pelas categorias de comandos.',
+            '_Prefixo atual: `O.`_'
+        ].join('\\n')
+    },
+    {
+        title: '🛡️ Membros e liderança',
+        description: [
+            '`O.guild convidar @user` — enviar convite',
+            '`O.guild aceitar <tag>` — aceitar convite por comando',
+            '`O.guild sair` — sair da guilda',
+            '`O.guild expulsar @user` — remover integrante',
+            '`O.guild hierarquia` — gerenciar cargos e limites',
+            '`O.guild promover @user` / `O.guild rebaixar @user` — ajustar oficial/membro',
+            '`O.guild transferir @user` — transferir liderança',
+            '`O.guild dissolver` — dissolver a guilda (confirmação obrigatória)'
+        ].join('\\n')
+    },
+    {
+        title: '✏️ Personalização',
+        description: [
+            '`O.guild editar` — abrir o assistente no privado',
+            '`O.guild editar nome` — alterar nome',
+            '`O.guild editar tag` — alterar tag',
+            '`O.guild editar desc` — alterar descrição',
+            '`O.guild editar boasvindas` — alterar mensagem de boas-vindas',
+            '`O.guild editar imagem` — alterar imagem/banner',
+            '`O.guild editar tagimagem` — definir rótulo da imagem',
+            '`O.guild sincronizar` — sincronizar cargos-tag do Discord'
+        ].join('\\n')
+    },
+    {
+        title: '🏦 Banco e baú',
+        description: [
+            '`O.guild depositar <valor|all|half|1k>` — guardar éter',
+            '`O.guild sacar <valor|all|half>` — retirar do banco',
+            '`O.guild inventario` — consultar o baú compartilhado',
+            '`O.guild depositaritem <nº> [qtd]` — guardar itens',
+            '`O.guild retiraritem <nº>` — retirar item do baú',
+            '`O.guild removeritem <nº>` — remover item do baú (permissões aplicáveis)',
+            '',
+            'Valores aceitam atalhos como `1k`; confira seu saldo antes de movimentar.'
+        ].join('\\n')
+    }
+];
+
+function helpPanel(page = 0) {
+    const index = Math.max(0, Math.min(GUILD_HELP_PAGES.length - 1, Number(page) || 0));
+    const data = GUILD_HELP_PAGES[index];
+    const embed = new EmbedBuilder()
         .setColor(0x8b5cf6)
-        .setTitle('🏰 Sistema de Guildas')
-        .setDescription(
-            [
-                `Criar custa **✨ ${fmt(guilds.CREATE_COST)}** e é feito **no PV**.`,
-                '',
-                '**Comandos**',
-                '`O.guild criar` — criação no privado',
-                '`O.guild editar` — editar no PV (nome, tag, imagem…)',
-                '`O.guild editar <categoria>` — nome · tag · desc · boasvindas · imagem',
-                '`O.guild info [nome|tag]`',
-                '`O.guild convidar @user` — convite com botões',
-                '`O.guild sair` · `O.guild expulsar @user`',
-                '`O.guild hierarquia` — painel interativo de cargos (Mestre → Membro)',
-                '`O.guild promover / rebaixar @user`',
-                '`O.guild transferir @user`',
-                '`O.guild depositar / sacar <valor>`',
-                '`O.guild inventario` · depositar/retirar itens',
-                '`O.guild ranking` · `O.guild sincronizar` (cargos-tag) · `O.guild dissolver`'
-            ].join('\n')
-        );
+        .setTitle(data.title)
+        .setDescription(data.description)
+        .setFooter({ text: `Aeternus Guilds · Página ${index + 1}/${GUILD_HELP_PAGES.length} · O.guild ajuda` })
+        .setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('guild:help-prev')
+            .setLabel('◀ Anterior')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(index === 0),
+        new ButtonBuilder()
+            .setCustomId('guild:help-next')
+            .setLabel('Próxima ▶')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(index === GUILD_HELP_PAGES.length - 1)
+    );
+    return { embeds: [embed], components: [row] };
 }
 
 function hierarchyEmbed(g) {
@@ -762,7 +819,7 @@ module.exports = {
         const rest = args.slice(1);
 
         if (['ajuda', 'help', 'cmds'].includes(sub) || !args.length) {
-            return message.reply({ embeds: [helpEmbed()] });
+            return message.reply(helpPanel(0));
         }
 
         if (sub === 'criar' || sub === 'create') return startCreateDm(message);
@@ -1092,7 +1149,7 @@ module.exports = {
             });
         }
 
-        return message.reply({ embeds: [helpEmbed()] });
+        return message.reply(helpPanel(0));
     },
 
     async handleComponent(interaction) {
@@ -1142,6 +1199,12 @@ module.exports = {
                 content: `💥 Guilda dissolvida. ✨ **${fmt(r.refunded)}** devolvidos ao líder.${roleNote}`,
                 components: []
             });
+        }
+
+        if (action === 'help-prev' || action === 'help-next') {
+            const current = Number(interaction.message.embeds?.[0]?.footer?.text?.match(/Página (\\d+)\\//)?.[1] || 1) - 1;
+            const next = current + (action === 'help-next' ? 1 : -1);
+            return interaction.update(helpPanel(next));
         }
 
         if (action.startsWith('hierarchy-')) {
