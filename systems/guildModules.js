@@ -134,7 +134,7 @@ function setCountingNumber(guildId, n, opts) {
 
     const saved = getSettings(guildId).counting || {};
     const live = countRuntime.get(key);
-    const liveCurrent = live?.current ?? current;
+    const liveCurrent = live?.current ?? (next - 1);
 
     return {
         ok: true,
