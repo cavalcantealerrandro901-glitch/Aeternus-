@@ -8,7 +8,7 @@ function buildStatusEmbed(st) {
         .setDescription(
             [
                 st.channelId ? `**Canal:** <#${st.channelId}>` : '**Canal:** _não configurado_',
-                `**Atual (último válido):** \`${st.current ?? 0}\``,
+                `**Último válido:** \`${st.current ?? 0}\``,
                 `**Próximo esperado:** **${st.next ?? 1}**`,
                 st.enabled === false ? '\n⚠️ Contagem desativada no painel.' : '',
                 '',
@@ -26,7 +26,7 @@ function buildUpdateEmbed({ admin, before, current, next, channelId, wasDisabled
         .setDescription(
             [
                 `**Administrador:** ${admin}`,
-                `**Próximo número definido:** **${next}**`,
+                `**Próximo esperado:** **${next}**`,
                 
                 channelId ? `**Canal:** <#${channelId}>` : null,
                 wasDisabled ? '\n✅ Contagem **reativada** automaticamente.' : null,
@@ -66,7 +66,7 @@ function parseTarget(args) {
     if (!args?.length) return { mode: 'status' };
     const a0 = String(args[0]).toLowerCase();
     if (a0 === 'reset' || a0 === 'zerar') {
-        return { mode: 'set', value: 0 };
+        return { mode: 'set', value: 1 };
     }
     if (!/^(0|[1-9]\d*)$/.test(a0)) return { mode: 'invalid' };
     const n = Number(a0);
@@ -77,7 +77,7 @@ function parseTarget(args) {
 module.exports = {
     name: 'contagem',
     aliases: ['counting', 'setcount', 'contador'],
-    description: 'Ver ou definir o número atual da contagem',
+    description: 'Ver ou definir o próximo número esperado da contagem',
     data: new SlashCommandBuilder()
         .setName('alterar-contador')
         .setDescription('Ver ou alterar o número atual da contagem')
