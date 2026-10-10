@@ -71,158 +71,74 @@ function pick(arr) {
 
 function buildEmbed(user, st) {
     const name = user?.username || 'viajante';
-    const streak = Number(st.nextStreak || st.streak || 0);
-    const level = Number(st.level || 0);
-    const bal = Number(st.balance || 0);
+    const streak = Math.max(0, Number(st.nextStreak || st.streak || 0));
+    const level = Math.max(0, Number(st.level || 0));
+    const balance = Math.max(0, Number(st.balance || 0));
     const min = st.dailyMin ?? 5000;
     const max = st.dailyMax ?? 15000;
-    const mult = Number(st.multiplier || 1);
+    const multiplier = Number(st.multiplier || 1);
     const inactiveDays = daily.daysSince(st.last);
+    const embed = new EmbedBuilder()
+        .setFooter({ text: 'AETERNUS ECONOMY • Notificação diária' })
+        .setTimestamp();
+
     if (inactiveDays === 6) {
-        return new EmbedBuilder()
+        return embed
             .setColor(0xf59e0b)
-            .setTitle('Aviso de sequência diária')
-            .setDescription(
-                `Olá, **${name}**! Faz 6 dias desde seu último resgate.\\n\\n` +
-                `Sua sequência atual é de **${Number(st.streak || 0)} dia(s)**.\\n` +
-                'Resgate o daily hoje para manter a sequência. Ao completar 7 dias sem resgatar, ela será reiniciada no próximo resgate.\\n\\n' +
-                'Use **O.daily** ou **/daily** em um servidor com o Aeternus.'
-            )
-            .setFooter({ text: 'Aeternus Economy • Aviso por mensagem privada' });
+            .setTitle('⚠️ Sua sequência precisa de atenção')
+            .setDescription([
+                `Olá, **${name}**.`,
+                '',
+                'Faz **6 dias** desde seu último resgate diário.',
+                `Sua sequência anterior era de **${Number(st.streak || 0)} dia(s)**.`,
+                '',
+                'Resgate hoje para evitar que a sequência seja reiniciada no próximo resgate.',
+                '',
+                '**Como resgatar**',
+                'Use `O.daily` ou `/daily` em um servidor com o Aeternus.'
+            ].join('\n'));
     }
 
-
-    let color = 0xa78bfa;
-    let title = '✦ Daily disponível';
-    let body = '';
-
+    let title = '✨ Seu daily está disponível';
+    let color = 0x8b5cf6;
+    let intro = 'Uma nova recompensa diária está esperando por você.';
     if (streak >= 30) {
+        title = '👑 Sequência lendária';
         color = 0xfbbf24;
-        title = pick(['👑 Lenda da sequência', '✦ Trinta dias e além', '🌟 Constância rara']);
-        body = pick([
-            [
-                `**${name}**, sua marca é difícil de ignorar.`,
-                `Hoje a sequência pode chegar a **${streak} dias**.`,
-                '',
-                'O éter de hoje espera por quem não quebra o ritmo.',
-                `Faixa estimada: ✨ **${fmt(min)} – ${fmt(max)}**` +
-                    (mult > 1 ? ` · bônus ×${mult.toFixed(2)}` : '') +
-                    '.',
-                '',
-                'Resgate agora: **O.daily** ou **/diario**'
-            ].join('\n'),
-            [
-                `A madrugada reconhece **${name}**.`,
-                `**${streak} dias** de caminho — continue.`,
-                '',
-                'Um único resgate mantém tudo o que você construiu.',
-                '',
-                '→ **O.daily**  ·  **/diario**'
-            ].join('\n')
-        ]);
+        intro = `Sua constância já chegou a **${streak} dias**. Continue sua jornada.`;
     } else if (streak >= 7) {
+        title = '🔥 Sequência em andamento';
         color = 0x34d399;
-        title = pick(['🔥 Semana em chamas', '✦ Sequência firme', '💪 Ritmo conquistado']);
-        body = pick([
-            [
-                `**${name}**, você já segura **${Math.max(streak - 1, 1)}+ dias** seguidos.`,
-                `Hoje pode ser o dia **${streak}**.`,
-                '',
-                'Não deixe a meia-noite passar em branco.',
-                `Recompensa na faixa ✨ **${fmt(min)} – ${fmt(max)}**.`,
-                '',
-                '**O.daily** ou **/diario** — e a sequência segue.'
-            ].join('\n'),
-            [
-                `Bom recomeço de ciclo, **${name}**.`,
-                `Sua sequência está viva. O próximo passo é **${streak}**.`,
-                '',
-                'Resgate em segundos e siga o dia mais leve.',
-                '',
-                '→ **/diario**'
-            ].join('\n')
-        ]);
+        intro = `Você está construindo uma sequência de **${streak} dias**.`;
     } else if (streak <= 1 && !st.last) {
+        title = '🌟 Comece sua jornada diária';
         color = 0x60a5fa;
-        title = pick(['✨ Primeiro passo', '🌕 Novo no éter', '✦ Comece aqui']);
-        body = pick([
-            [
-                `Olá, **${name}**.`,
-                '',
-                'Todo dia o Aeternus libera uma recompensa só sua.',
-                `Hoje, algo entre ✨ **${fmt(min)}** e **${fmt(max)}** pode ser seu.`,
-                '',
-                'É rápido — e abre a sua sequência.',
-                '',
-                'Use **O.daily** ou **/diario** no servidor.'
-            ].join('\n'),
-            [
-                `**${name}**, bem-vindo ao ciclo diário.`,
-                '',
-                'Um resgate por dia. Sem mistério.',
-                'Depois, cada dia conta.',
-                '',
-                '→ **O.daily**'
-            ].join('\n')
-        ]);
+        intro = 'Faça seu primeiro resgate e comece a construir sua sequência.';
     } else if (streak <= 1) {
+        title = '🔄 Recomece sua sequência';
         color = 0xf472b6;
-        title = pick(['🔄 De volta ao ciclo', '✦ Recomeço', '🌓 Outra chance']);
-        body = pick([
-            [
-                `**${name}**, um novo dia limpa a contagem — e reabre o prêmio.`,
-                '',
-                'Resgatar hoje é recomeçar a sequência do zero, com éter na conta.',
-                `Faixa: ✨ **${fmt(min)} – ${fmt(max)}**.`,
-                '',
-                '**O.daily** · **/diario**'
-            ].join('\n'),
-            [
-                `A meia-noite não pergunta o que ficou para trás, **${name}**.`,
-                'Só oferece o que você faz agora.',
-                '',
-                'Colete o daily e comece de novo.',
-                '',
-                '→ **/diario**'
-            ].join('\n')
-        ]);
-    } else {
-        color = 0xa78bfa;
-        title = pick(['✦ Um novo ciclo começou', '🌑 Daily à espera', '✨ Éter da madrugada']);
-        body = pick([
-            [
-                `Olá, **${name}**.`,
-                '',
-                `Sua sequência está em **${Math.max(streak - 1, 1)} dia(s)**.`,
-                `Resgate hoje e avance para **${streak}**.`,
-                '',
-                `Estimativa: ✨ **${fmt(min)} – ${fmt(max)}**` +
-                    (mult > 1 ? ` (bônus ×${mult.toFixed(2)})` : '') +
-                    '.',
-                '',
-                '**O.daily** ou **/diario**'
-            ].join('\n'),
-            [
-                `**${name}**, a recompensa diária abriu com a meia-noite.`,
-                '',
-                level > 0
-                    ? `Nível **${level}** · saldo **✨ ${fmt(bal)}**.`
-                    : `Saldo atual: **✨ ${fmt(bal)}**.`,
-                'Um comando é o bastante para garantir o dia.',
-                '',
-                '→ **O.daily**  ·  **/diario**'
-            ].join('\n'),
-            [
-                `Madrugada quieta, **${name}** — e o daily já é seu se quiser.`,
-                '',
-                `Sequência à vista: **${streak}**. Não quebre o fio.`,
-                '',
-                'Resgate: **/diario**'
-            ].join('\n')
-        ]);
+        intro = 'Seu novo ciclo começou. Resgate a recompensa de hoje para continuar.';
     }
 
-    return new EmbedBuilder().setColor(color).setTitle(title).setDescription(body);
+    const description = [
+        `Olá, **${name}**!`,
+        '',
+        intro,
+        '',
+        '**📊 Seu resumo**',
+        `🔥 Próxima sequência: **${streak} dia(s)**`,
+        level > 0 ? `⭐ Nível: **${level}**` : null,
+        `✨ Saldo atual: **${fmt(balance)} éter**`,
+        '',
+        '**🎁 Recompensa estimada**',
+        `✨ ${fmt(min)} – ${fmt(max)} éter`,
+        multiplier > 1 ? `Multiplicador atual: **×${multiplier.toFixed(2)}**` : null,
+        '',
+        '**Resgate agora**',
+        'Use `O.daily` ou `/daily` em um servidor com o Aeternus.'
+    ].filter((line) => line !== null).join('\n');
+
+    return embed.setColor(color).setTitle(title).setDescription(description);
 }
 
 let ticking = false;
