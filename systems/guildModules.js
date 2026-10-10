@@ -107,8 +107,8 @@ function setCountingNumber(guildId, n, opts) {
     // se estava desligada, liga automaticamente ao alterar o número
     const wasDisabled = ct.enabled === false;
 
-    const current = Math.max(0, Math.floor(Number(n)));
-    if (!Number.isFinite(current) || current < 0) {
+    const current = Number(n);
+    if (!Number.isSafeInteger(current) || current < 0) {
         return { ok: false, error: 'Número inválido. Use um inteiro ≥ 0.' };
     }
     if (current > 1_000_000_000) {
@@ -116,9 +116,12 @@ function setCountingNumber(guildId, n, opts) {
     }
 
     const key = countKey(ct.channelId);
+    // Sobrescreve explicitamente o estado em memória: o número informado é
+    // o último válido, então a próxima mensagem deve ser current + 1.
+    const previousState = getCountState(key, current);
     const state = {
         current,
-        lastUser: resetLastUser ? null : getCountState(key, current)?.lastUser ?? null
+        lastUser: resetLastUser ? null : previousState?.lastUser ?? null
     };
     countRuntime.set(key, state);
 
