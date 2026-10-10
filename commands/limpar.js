@@ -1,12 +1,12 @@
 const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
-    name: 'limpar',
-    aliases: ['clear', 'purge'],
+    name: 'clear',
+    aliases: ['limpar', 'deletar', 'deleta', 'purge'],
     description: 'Apagar mensagens do canal',
     data: new SlashCommandBuilder()
         .setName('limpar-chat')
-        .setDescription('Limpar mensagens')
+        .setDescription('[🧹] Limpar mensagens')
         .addIntegerOption((o) =>
             o
                 .setName('quantidade')
@@ -19,7 +19,7 @@ module.exports = {
 
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            return message.reply('❌ Sem permissão.');
+            return message.reply('❌ Sem permissão. Vocé precisa de permisão de geren iar o servudor');
         }
         const n = Math.min(100, Math.max(1, parseInt(args[0], 10) || 0));
         if (!n) return message.reply('❌ Uso: `O.limpar <1-100>`');
