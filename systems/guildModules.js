@@ -230,7 +230,7 @@ async function failCounting(message, ct, state, expected, reason) {
                     .setColor(0xf87171)
                     .setTitle('🔢 Contagem errada')
                     .setDescription(
-                        `${message.author} errou.\n${reason || ''}\nEsperado: **${expected}**. A contagem voltou para **1**.`
+                        `${message.author} errou.\n${reason || ''}\nNúmero esperado antes do erro: **${expected}**. A sequência foi reiniciada.\n**Próximo número: 1**.`
                     )
             ]
         })

@@ -68,8 +68,9 @@ function parseTarget(args) {
     if (a0 === 'reset' || a0 === 'zerar') {
         return { mode: 'set', value: 0 };
     }
-    const n = parseInt(a0, 10);
-    if (Number.isNaN(n) || n < 0) return { mode: 'invalid' };
+    if (!/^(0|[1-9]\d*)$/.test(a0)) return { mode: 'invalid' };
+    const n = Number(a0);
+    if (!Number.isSafeInteger(n) || n > 1_000_000_000) return { mode: 'invalid' };
     return { mode: 'set', value: n };
 }
 
@@ -86,6 +87,10 @@ module.exports = {
                 .setDescription('Número ATUAL da contagem (ex: 100 → próximo será 101)')
                 .setRequired(false)
                 .setMinValue(0)
+                .setMaxValue(1_000_000_000)
+        )
+        .addBooleanOption((o) =>
+            o.setName('zerar').setDescription('Zerar a contagem; o próximo número será 1')
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
@@ -167,8 +172,13 @@ module.exports = {
 
         const st = getCountingStatus(i.guild.id);
         const n = i.options.getInteger('numero');
+        const reset = i.options.getBoolean('zerar') === true;
 
-        if (n == null) {
+        if (reset && n != null) {
+            return i.reply({ content: '❌ Use `numero` ou `zerar`, não os dois ao mesmo tempo.', ephemeral: true });
+        }
+
+        if (n == null && !reset) {
             if (!st.channelId) {
                 return i.reply({
                     content: 'Contagem sem canal. Configure no painel.',
@@ -178,8 +188,9 @@ module.exports = {
             return i.reply({ embeds: [buildStatusEmbed(st)], ephemeral: true });
         }
 
-        if (n < 0) {
-            return i.reply({ content: '❌ Número inválido. Use ≥ 0.', ephemeral: true });
+        const target = reset ? 0 : n;
+        if (!Number.isSafeInteger(target) || target < 0 || target > 1_000_000_000) {
+            return i.reply({ content: '❌ Número inválido. Use um inteiro entre 0 e 1.000.000.000.', ephemeral: true });
         }
 
         if (!st.channelId) {
@@ -190,7 +201,7 @@ module.exports = {
         }
 
         const before = Number(st.current ?? 0) || 0;
-        const res = setCountingNumber(i.guild.id, n);
+        const res = setCountingNumber(i.guild.id, target);
 
         if (!res?.ok) {
             return i.reply({
