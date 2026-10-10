@@ -2,7 +2,8 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    StringSelectMenuBuilder
 } = require('discord.js');
 const player = require('../utils/player');
 const guilds = require('../utils/guilds');
