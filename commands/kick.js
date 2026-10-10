@@ -47,26 +47,23 @@ async function handleKickProcess(context, moderator, targetMember, reason, isSla
         const originalMessage = i.message || sentMsg;
         try { await i.deferUpdate(); } catch (_) { return; }
         if (!targetMember.kickable) {
-            return originalMessage.edit({ content: '❌ Não consigo expulsar este membro (cargo mais alto).', components: [] });
+            return originalMessage.reply({ content: '❌ Não consigo expulsar este membro (cargo mais alto).', allowedMentions: { repliedUser: false } });
         }
         try {
             await targetMember.kick(`${reason} · por ${moderator.tag}`);
             
             const successText = `---------- 👢 O usuário <@${targetMember.id}> foi expulso do servidor, mas quem manda quebrar as regras né!!`;
             
-            await originalMessage.edit({
-                content: successText,
-                components: []
-            });
+            await originalMessage.reply({ content: successText, allowedMentions: { repliedUser: false } });
         } catch (e) {
-            await i.update({ content: '❌ Não consegui expulsar o usuário.', components: [] });
+            await originalMessage.reply({ content: '❌ Não consegui expulsar o usuário.', allowedMentions: { repliedUser: false } });
         }
     });
 
     collector.on('end', async (collected, reasonCollected) => {
         if (reasonCollected === 'time') {
             try {
-                await sentMsg.edit({ content: '⏳ Tempo esgotado para confirmar a expulsão.', components: [] });
+                await sentMsg.reply({ content: '⏳ Tempo esgotado para confirmar a expulsão.', allowedMentions: { repliedUser: false } });
             } catch (_) {}
         }
     });
