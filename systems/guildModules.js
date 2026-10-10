@@ -92,8 +92,8 @@ function persistCount(guildId, ct, state) {
 }
 
 /**
- * Define o PRÓXIMO número esperado da contagem.
- * Ex: setCountingNumber(guildId, 100) → atual=99, próximo=100
+ * Define o último número válido da contagem.
+ * Ex: setCountingNumber(guildId, 100) → atual=100, próximo=101
  */
 function setCountingNumber(guildId, n, opts) {
     const resetLastUser = !opts || opts.resetLastUser !== false;
@@ -107,18 +107,18 @@ function setCountingNumber(guildId, n, opts) {
     // se estava desligada, liga automaticamente ao alterar o número
     const wasDisabled = ct.enabled === false;
 
-    const next = Math.floor(Number(n));
-    if (!Number.isSafeInteger(next) || next < 1) {
-        return { ok: false, error: 'Número inválido. Use um inteiro entre 1 e 1.000.000.001.' };
+    const current = Number(n);
+    if (!Number.isSafeInteger(current) || current < 0) {
+        return { ok: false, error: 'Número inválido. Use um inteiro ≥ 0.' };
     }
-    if (next > 1_000_000_001) {
+    if (current > 1_000_000_000) {
         return { ok: false, error: 'Número muito grande.' };
     }
 
     const key = countKey(ct.channelId);
     const state = {
-        current: next - 1,
-        lastUser: resetLastUser ? null : getCountState(key, next - 1)?.lastUser ?? null
+        current,
+        lastUser: resetLastUser ? null : getCountState(key, current)?.lastUser ?? null
     };
     countRuntime.set(key, state);
 
