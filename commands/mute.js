@@ -57,16 +57,13 @@ async function handleMuteProcess(context, moderator, targetMember, durationMs, r
         const originalMessage = i.message || sentMsg;
 
         try {
-            // Confirma imediatamente o botão e edita a mensagem original.
+            // Confirma o botão sem editar a mensagem original; o resultado será enviado como resposta.
             if (!i.deferred && !i.replied) {
                 await i.deferUpdate().catch(() => null);
             }
 
             if (!targetMember.moderatable) {
-                await originalMessage.edit({
-                    content: '❌ Não consigo silenciar este membro (cargo mais alto).',
-                    components: []
-                }).catch(() => null);
+                await originalMessage.reply({ content: '❌ Não consigo silenciar este membro (cargo mais alto).', allowedMentions: { repliedUser: false } }).catch(() => null);
                 return;
             }
 
@@ -77,22 +74,16 @@ async function handleMuteProcess(context, moderator, targetMember, durationMs, r
                 ? '---------- 🤫 O usuário <@' + targetMember.id + '> foi silenciado silenciosamente, mas quem manda quebrar las regras né!!'
                 : '---------- 🔇 O usuário <@' + targetMember.id + '> foi silenciado com sucesso, mas quem manda quebrar las regras né!!';
 
-            await originalMessage.edit({
-                content: successText,
-                components: []
-            }).catch(() => null);
+            await originalMessage.reply({ content: successText, allowedMentions: { repliedUser: false } }).catch(() => null);
         } catch (e) {
             console.error('[mute] Erro ao processar confirmação:', e);
-            await originalMessage.edit({
-                content: '❌ Não consegui silenciar o usuário.',
-                components: []
-            }).catch(() => null);
+            await originalMessage.reply({ content: '❌ Não consegui silenciar o usuário.', allowedMentions: { repliedUser: false } }).catch(() => null);
         }
     });
     collector.on('end', async (collected, reasonCollected) => {
         if (reasonCollected === 'time') {
             try {
-                await sentMsg.edit({ content: '⏳ Tempo esgotado para confirmar o silenciamento.', components: [] });
+                await sentMsg.reply({ content: '⏳ Tempo esgotado para confirmar o silenciamento.', allowedMentions: { repliedUser: false } });
             } catch (_) {}
         }
     });
