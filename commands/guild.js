@@ -12,7 +12,7 @@ const eter = require('../utils/eter');
 /** userId -> draft (criar ou editar) */
 const drafts = new Map();
 /** inviteId -> pending invite meta */
-const pendingInvites = new Map();
+const pendingInvites = new Map();\n/** Seleções temporárias da interface de hierarquia; os cargos reais ficam salvos em guilds.json. */\nconst hierarchySelections = new Map();
 const INVITE_TTL_MS = 5 * 60 * 1000;
 
 function fmt(n) {
@@ -171,7 +171,7 @@ function guildEmbed(g) {
             const o = { owner: 0, officer: 1, member: 2 };
             return (o[a.role] ?? 3) - (o[b.role] ?? 3);
         });
-    const lines = members.slice(0, 15).map((m, i) => `${i + 1}. <@${m.id}> — ${roleLabel(m.role)}`);
+    const lines = members.slice(0, 15).map((m, i) => `${i + 1}. <@${m.id}> — ${roleLabel(m)}`);
     const need = guilds.guildLevelNeed(g.level);
     const emb = new EmbedBuilder()
         .setColor(0xa78bfa)
@@ -214,13 +214,84 @@ function helpEmbed() {
                 '`O.guild info [nome|tag]`',
                 '`O.guild convidar @user` — convite com botões',
                 '`O.guild sair` · `O.guild expulsar @user`',
-                '`O.guild promover / rebaixar @user`',
+                '`O.guild hierarquia` — painel interativo de cargos (Mestre → Membro)',\n                '`O.guild promover / rebaixar @user`',
                 '`O.guild transferir @user`',
                 '`O.guild depositar / sacar <valor>`',
                 '`O.guild inventario` · depositar/retirar itens',
                 '`O.guild ranking` · `O.guild sincronizar` (cargos-tag) · `O.guild dissolver`'
             ].join('\n')
         );
+}
+
+function hierarchyEmbed(g) {
+    const counts = guilds.rankCounts(g);
+    const lines = guilds.HIERARCHY.map((rank) => {
+        const amount = counts[rank.id] || 0;
+        const limit = Number.isFinite(rank.limit) ? rank.limit : '∞';
+        return `${rank.label}: **${amount}/${limit}**`;
+    });
+    return new EmbedBuilder()
+        .setColor(0x8b5cf6)
+        .setTitle(`🏰 Hierarquia · [${g.tag}] ${g.name}`)
+        .setDescription([
+            'Gerencie os cargos da sua guilda. **Somente o Mestre** pode alterar a hierarquia.',
+            '',
+            ...lines,
+            '',
+            '_As alterações são salvas automaticamente._'
+        ].join('\n'))
+        .setFooter({ text: 'Aeternus Guilds · Hierarquia persistente' })
+        .setTimestamp();
+}
+
+function hierarchyPanel(g, ownerId, page = 0, targetId = null, rankId = 'membro') {
+    const members = (Array.isArray(g.members) ? g.members : []).filter((m) => String(m.id) !== String(g.ownerId));
+    const pageSize = 25;
+    const pages = Math.max(1, Math.ceil(members.length / pageSize));
+    page = Math.max(0, Math.min(pages - 1, Number(page) || 0));
+    const visible = members.slice(page * pageSize, page * pageSize + pageSize);
+    const state = { guildId: g.id, ownerId, page, targetId, rankId };
+    hierarchySelections.set(ownerId, state);
+    const memberOptions = visible.map((m) => ({
+        label: String((g.members.find((x) => String(x.id) === String(m.id))?.nickname) || m.name || m.username || m.id).slice(0, 90),
+        description: guilds.rankLabel(guilds.rankOf(m)).slice(0, 100),
+        value: String(m.id),
+        default: targetId ? String(m.id) === String(targetId) : false
+    }));
+    const rankOptions = guilds.HIERARCHY.filter((r) => r.id !== 'mestre').map((r) => ({
+        label: r.label,
+        description: Number.isFinite(r.limit) ? `Limite: ${r.limit}` : 'Sem limite',
+        value: r.id,
+        default: r.id === rankId
+    }));
+    const rows = [];
+    if (memberOptions.length) {
+        rows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('guild:hierarchy-member')
+                .setPlaceholder('1. Escolha o membro')
+                .addOptions(memberOptions)
+        ));
+        rows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('guild:hierarchy-rank')
+                .setPlaceholder('2. Escolha o cargo')
+                .addOptions(rankOptions)
+        ));
+    }
+    const buttons = new ActionRowBuilder();
+    if (pages > 1) {
+        buttons.addComponents(
+            new ButtonBuilder().setCustomId('guild:hierarchy-prev').setLabel('◀ Anterior').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+            new ButtonBuilder().setCustomId('guild:hierarchy-next').setLabel('Próxima ▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= pages - 1)
+        );
+    }
+    buttons.addComponents(
+        new ButtonBuilder().setCustomId('guild:hierarchy-apply').setLabel('Salvar cargo').setStyle(ButtonStyle.Success).setDisabled(!memberOptions.length),
+        new ButtonBuilder().setCustomId('guild:hierarchy-refresh').setLabel('Atualizar').setStyle(ButtonStyle.Primary)
+    );
+    rows.push(buttons);
+    return { embeds: [hierarchyEmbed(g)], components: rows };
 }
 
 function pickImageFromMessage(message) {
@@ -704,6 +775,13 @@ module.exports = {
             return message.reply({ embeds: [guildEmbed(g)] });
         }
 
+        if (sub === 'hierarquia' || sub === 'hierarchy' || sub === 'cargos') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            if (!guilds.isOwner(g, message.author.id)) return message.reply('❌ Só o Mestre pode gerenciar a hierarquia.');
+            return message.reply(hierarchyPanel(g, message.author.id));
+        }
+
         if (sub === 'membros' || sub === 'members') {
             const g = guilds.findByMember(message.author.id);
             if (!g) return message.reply('Você não está em uma guilda.');
@@ -1060,6 +1138,39 @@ module.exports = {
                 content: `💥 Guilda dissolvida. ✨ **${fmt(r.refunded)}** devolvidos ao líder.${roleNote}`,
                 components: []
             });
+        }
+
+        if (action.startsWith('hierarchy-')) {
+            const state = hierarchySelections.get(interaction.user.id);
+            if (!state) return interaction.reply({ content: 'Painel expirado. Use `O.guild hierarquia` novamente.', ephemeral: true });
+            const g = guilds.get(state.guildId);
+            if (!g || !guilds.isOwner(g, interaction.user.id) || String(state.ownerId) !== String(interaction.user.id)) {
+                return interaction.reply({ content: '❌ Somente o Mestre pode usar este painel.', ephemeral: true });
+            }
+            if (action === 'hierarchy-member') {
+                state.targetId = interaction.values?.[0] || null;
+                return interaction.update(hierarchyPanel(g, interaction.user.id, state.page, state.targetId, state.rankId));
+            }
+            if (action === 'hierarchy-rank') {
+                state.rankId = interaction.values?.[0] || 'membro';
+                return interaction.update(hierarchyPanel(g, interaction.user.id, state.page, state.targetId, state.rankId));
+            }
+            if (action === 'hierarchy-prev' || action === 'hierarchy-next') {
+                const nextPage = state.page + (action === 'hierarchy-next' ? 1 : -1);
+                return interaction.update(hierarchyPanel(g, interaction.user.id, nextPage, null, state.rankId));
+            }
+            if (action === 'hierarchy-refresh') {
+                return interaction.update(hierarchyPanel(g, interaction.user.id, state.page, state.targetId, state.rankId));
+            }
+            if (action === 'hierarchy-apply') {
+                if (!state.targetId) return interaction.reply({ content: 'Escolha um membro primeiro.', ephemeral: true });
+                const result = guilds.setRole(g.id, interaction.user.id, state.targetId, state.rankId);
+                if (!result.ok) return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
+                return interaction.update({
+                    ...hierarchyPanel(result.guild, interaction.user.id, state.page, null, state.rankId),
+                    content: `✅ Cargo de <@${state.targetId}> atualizado para **${guilds.rankLabel(state.rankId)}**.`
+                });
+            }
         }
 
         // Inviter confirms the invite
