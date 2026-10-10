@@ -405,7 +405,50 @@ const CLASS_RARITIES = [
     { id: 'mitica', name: 'Mítica' }
 ];
 
-function listCatalogClasses(rarity) {\n    const all = typeof classes.allClasses === 'function' ? classes.allClasses() : {};\n    return Object.values(all).filter((c) => c && c.id &&\n        String(c.selectionPool || '').toLowerCase() === String(rarity).toLowerCase() &&\n        !(c.exclusive || c.maxHolders === 1));\n}\n\nfunction classListPayload(rarity = 'comum', page = 0, source = 'component') {\n    const rarityInfo = CLASS_RARITIES.find((r) => r.id === rarity) || CLASS_RARITIES[0];\n    const list = listCatalogClasses(rarityInfo.id);\n    const pageSize = 5;\n    const totalPages = Math.max(1, Math.ceil(list.length / pageSize));\n    const safePage = Math.min(Math.max(0, Number(page) || 0), totalPages - 1);\n    const visible = list.slice(safePage * pageSize, safePage * pageSize + pageSize);\n    const lines = [];\n    lines.push('**✦ Raridade: ' + rarityInfo.name + '**');\n    lines.push('*Escolha uma classe para conhecer seu caminho.*', '');\n    for (const c of visible) {\n        lines.push((c.emoji || '✨') + ' **' + c.name + '**');\n        lines.push(c.desc || 'Sem descrição disponível.', '');\n    }\n    const emb = new EmbedBuilder()\n        .setColor(0xc9a227)\n        .setTitle('📜 CLASSES • AETERNUS')\n        .setDescription(lines.join('\n').trim() || '_Nenhuma classe disponível nesta raridade._')\n        .setFooter({ text: 'Página ' + (safePage + 1) + '/' + totalPages + ' • ' + list.length + ' classes • ' + rarityInfo.name });\n    const prev = new ButtonBuilder()\n        .setCustomId('classe:list:' + rarityInfo.id + ':' + Math.max(0, safePage - 1))\n        .setLabel('Anterior').setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(safePage === 0);\n    const next = new ButtonBuilder()\n        .setCustomId('classe:list:' + rarityInfo.id + ':' + Math.min(totalPages - 1, safePage + 1))\n        .setLabel('Próxima').setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(safePage >= totalPages - 1);\n    const rarityIndex = CLASS_RARITIES.findIndex((r) => r.id === rarityInfo.id);\n    const nextRarity = CLASS_RARITIES[(rarityIndex + 1) % CLASS_RARITIES.length];\n    const rarityButton = new ButtonBuilder()\n        .setCustomId('classe:list:' + nextRarity.id + ':0')\n        .setLabel('Mudar raridade · ' + nextRarity.name).setStyle(ButtonStyle.Primary).setEmoji('🔄');\n    return { embeds: [emb], components: [\n        new ActionRowBuilder().addComponents(prev, next),\n        new ActionRowBuilder().addComponents(rarityButton)\n    ], ephemeral: source !== 'prefix' };\n}\n\nfunction parseQuotedArgs(input) {
+function listCatalogClasses(rarity) {
+    const all = typeof classes.allClasses === 'function' ? classes.allClasses() : {};
+    return Object.values(all).filter((c) => c && c.id &&
+        String(c.selectionPool || '').toLowerCase() === String(rarity).toLowerCase() &&
+        !(c.exclusive || c.maxHolders === 1));
+}
+
+function classListPayload(rarity = 'comum', page = 0, source = 'component') {
+    const rarityInfo = CLASS_RARITIES.find((r) => r.id === rarity) || CLASS_RARITIES[0];
+    const list = listCatalogClasses(rarityInfo.id);
+    const pageSize = 5;
+    const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+    const safePage = Math.min(Math.max(0, Number(page) || 0), totalPages - 1);
+    const visible = list.slice(safePage * pageSize, safePage * pageSize + pageSize);
+    const lines = [];
+    lines.push('**✦ Raridade: ' + rarityInfo.name + '**');
+    lines.push('*Escolha uma classe para conhecer seu caminho.*', '');
+    for (const c of visible) {
+        lines.push((c.emoji || '✨') + ' **' + c.name + '**');
+        lines.push(c.desc || 'Sem descrição disponível.', '');
+    }
+    const emb = new EmbedBuilder()
+        .setColor(0xc9a227)
+        .setTitle('📜 CLASSES • AETERNUS')
+        .setDescription(lines.join('\n').trim() || '_Nenhuma classe disponível nesta raridade._')
+        .setFooter({ text: 'Página ' + (safePage + 1) + '/' + totalPages + ' • ' + list.length + ' classes • ' + rarityInfo.name });
+    const prev = new ButtonBuilder()
+        .setCustomId('classe:list:' + rarityInfo.id + ':' + Math.max(0, safePage - 1))
+        .setLabel('Anterior').setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(safePage === 0);
+    const next = new ButtonBuilder()
+        .setCustomId('classe:list:' + rarityInfo.id + ':' + Math.min(totalPages - 1, safePage + 1))
+        .setLabel('Próxima').setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(safePage >= totalPages - 1);
+    const rarityIndex = CLASS_RARITIES.findIndex((r) => r.id === rarityInfo.id);
+    const nextRarity = CLASS_RARITIES[(rarityIndex + 1) % CLASS_RARITIES.length];
+    const rarityButton = new ButtonBuilder()
+        .setCustomId('classe:list:' + nextRarity.id + ':0')
+        .setLabel('Mudar raridade · ' + nextRarity.name).setStyle(ButtonStyle.Primary).setEmoji('🔄');
+    return { embeds: [emb], components: [
+        new ActionRowBuilder().addComponents(prev, next),
+        new ActionRowBuilder().addComponents(rarityButton)
+    ], ephemeral: source !== 'prefix' };
+}
+
+function parseQuotedArgs(input) {
     const out = [];
     const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
     let m;
