@@ -8,11 +8,11 @@ function buildStatusEmbed(st) {
         .setDescription(
             [
                 st.channelId ? `**Canal:** <#${st.channelId}>` : '**Canal:** _não configurado_',
-                `**Atual (último válido):** \`${st.current ?? 0}\``,
+                `**Último número válido:** \`${st.current ?? 0}\``,
                 `**Próximo esperado:** **${st.next ?? 1}**`,
                 st.enabled === false ? '\n⚠️ Contagem desativada no painel.' : '',
                 '',
-                '_Para alterar: `O.contagem <número>` — define o valor **atual**._'
+                '_`O.contagem 100` define o último número válido como **100**; o próximo esperado será **101**._'
             ]
                 .filter(Boolean)
                 .join('\n')
@@ -117,8 +117,8 @@ module.exports = {
         if (parsed.mode === 'invalid') {
             return message.reply(
                 '❌ Número inválido.\n' +
-                    'Use `O.contagem <número>` para definir o valor **atual** (ex: `O.contagem 100`).\n' +
-                    'Use `O.contagem reset` para zerar.'
+                    'Use `O.contagem <número>` para definir o último número válido (ex: `O.contagem 100` → próximo: `101`).\n' +
+                    'Use `O.contagem reset` para reiniciar em `0` (próximo: `1`).'
             );
         }
 
