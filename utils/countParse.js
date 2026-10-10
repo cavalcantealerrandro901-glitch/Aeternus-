@@ -38,7 +38,7 @@ function digitsToInt(str) {
 
 function parseRoman(str) {
     const s = String(str || '').trim().toLowerCase();
-    if (!s || !/^[mdclxvi]+$/i.test(s)) return null;
+    if (!s || !/^(?=.)M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/i.test(s)) return null;
     let total = 0;
     let prev = 0;
     for (let i = s.length - 1; i >= 0; i--) {
@@ -58,13 +58,17 @@ function parsePrefixed(raw) {
     const s = String(raw || '').trim().toLowerCase();
     const m = s.match(/^(0x|0b|0o)([0-9a-f]+)$/i);
     if (!m) return null;
+    const prefix = m[1].toLowerCase();
+    const digits = m[2];
+    if (prefix === '0b' && !/^[01]+$/.test(digits)) return null;
+    if (prefix === '0o' && !/^[0-7]+$/.test(digits)) return null;
     try {
         const n =
-            m[1] === '0x'
-                ? parseInt(m[2], 16)
-                : m[1] === '0b'
-                  ? parseInt(m[2], 2)
-                  : parseInt(m[2], 8);
+            prefix === '0x'
+                ? parseInt(digits, 16)
+                : prefix === '0b'
+                  ? parseInt(digits, 2)
+                  : parseInt(digits, 8);
         if (!Number.isSafeInteger(n) || n < 0) return null;
         return n;
     } catch (_) {
@@ -290,13 +294,12 @@ function parseCountMessage(content) {
     raw = stripLeadingEmojis(raw);
     if (!raw) return null;
 
-    const digMatch = raw.match(/^((?:[\d]|[_\s.])+)/u);
+    // Aceita apenas uma sequência contínua de algarismos no início.
+    // Evita transformar entradas ambíguas como "1.2" ou "1 2" em 12.
+    const digMatch = raw.match(/^([0-9０-９]+)/u);
     if (digMatch) {
-        const pure = digMatch[1].replace(/[\s_,.]/g, '');
-        if (pure && [...pure].every((ch) => DIGIT_MAP[ch] !== undefined)) {
-            const n = digitsToInt(pure);
-            if (n !== null) return n;
-        }
+        const n = digitsToInt(digMatch[1]);
+        if (n !== null) return n;
     }
 
     const firstTok = raw.split(/\s+/)[0] || '';
