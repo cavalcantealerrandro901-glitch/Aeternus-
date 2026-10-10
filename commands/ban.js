@@ -47,26 +47,23 @@ async function handleBanProcess(context, moderator, targetMember, reason, isSlas
         const originalMessage = i.message || sentMsg;
         try { await i.deferUpdate(); } catch (_) { return; }
         if (!targetMember.bannable) {
-            return originalMessage.edit({ content: '❌ Não consigo banir este membro (cargo mais alto).', components: [] });
+            return originalMessage.reply({ content: '❌ Não consigo banir este membro (cargo mais alto).', allowedMentions: { repliedUser: false } });
         }
         try {
             await targetMember.ban({ reason: `${reason} · por ${moderator.tag}` });
             
             const successText = `---------- 🔨 O usuário <@${targetMember.id}> foi expulso do servidor para sempre, mas quem manda quebrar as regras né!!`;
             
-            await originalMessage.edit({
-                content: successText,
-                components: []
-            });
+            await originalMessage.reply({ content: successText, allowedMentions: { repliedUser: false } });
         } catch (e) {
-            await i.update({ content: '❌ Não consegui banir o usuário.', components: [] });
+            await originalMessage.reply({ content: '❌ Não consegui banir o usuário.', allowedMentions: { repliedUser: false } });
         }
     });
 
     collector.on('end', async (collected, reasonCollected) => {
         if (reasonCollected === 'time') {
             try {
-                await sentMsg.edit({ content: '⏳ Tempo esgotado para confirmar o banimento.', components: [] });
+                await sentMsg.reply({ content: '⏳ Tempo esgotado para confirmar o banimento.', allowedMentions: { repliedUser: false } });
             } catch (_) {}
         }
     });

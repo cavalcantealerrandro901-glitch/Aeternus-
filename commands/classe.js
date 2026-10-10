@@ -236,77 +236,16 @@ module.exports = {
             }
         }
         return message.reply([
-                    '❌ Formato incorreto.',
-                    '',
-                    'Use: O.classe criar "Nome" "Descrição" raridade tipo "únicas|..." "ativas|..." "passivas únicas|..." "passivas|..." emoji "desvantagens|..."',
-                    '',
-                    'Exemplo: O.classe criar "Cavaleiro Arcano" "Um guerreiro que combina espada e magia." rara melee "Mestre da Lâmina|Último Bastião|Golpe do Campeão" "Investida|Corte Arcano|Barreira|Ruptura" "Vontade Arcana|Defesa Mística|Sentido Arcano" "Tenacidade|Foco|Resistência|Concentração|Disciplina" ⚔️ "Custo de mana"',
-                    '',
-                    'Use | para separar habilidades, passivas e desvantagens.'
-                ].join('\n'));
-            }
-
-            const [name, desc, rarity, type, uniqueAbilities, activeAbilities, uniquePassives, passives, emoji = '✨', disadvantages = ''] = parts;
-            const validRarities = ['comum', 'incomum', 'rara', 'epica', 'lendaria', 'unica', 'mitica'];
-            const validTypes = ['melee', 'magic', 'ranged', 'support', 'tank'];
-
-            if (!validRarities.includes(String(rarity).toLowerCase())) {
-                return message.reply('❌ Raridade inválida. Use: comum, incomum, rara, epica, lendaria, unica ou mitica.');
-            }
-            if (!validTypes.includes(String(type).toLowerCase())) {
-                return message.reply('❌ Tipo inválido. Use: melee, magic, ranged, support ou tank.');
-            }
-
-            try {
-                const cls = classes.createClass({
-                    name,
-                    desc,
-                    rarity: String(rarity).toLowerCase(),
-                    type: String(type).toLowerCase(),
-                    uniqueAbilities,
-                    activeAbilities,
-                    uniquePassives,
-                    passives,
-                    emoji: emoji || '✨',
-                    disadvantages
-                });
-
-                let dmInfo = '';
-                try {
-                    const r = await dmAllPlayers(message.client, cls);
-                    dmInfo = '\n📬 PV enviado: **' + r.ok + '** · falhou: **' + r.fail + '**';
-                } catch (e) {
-                    dmInfo = '\n⚠️ Não foi possível enviar os PVs: ' + e.message;
-                }
-
-                return message.reply({
-                    content: [
-                        '# ✦ NOVA CLASSE',
-                        '',
-                        '✅ **' + cls.emoji + ' ' + cls.name + '** criada com sucesso.',
-                        '🆔 ID: ' + cls.id,
-                        '⭐ Raridade: **' + (cls.rarityName || cls.rarity) + '**',
-                        dmInfo.trim()
-                    ].filter(Boolean).join('\n'),
-                    embeds: [classEmbed(cls)],
-                    components: [pickButtons(cls.id)]
-                });
-            } catch (e) {
-                return message.reply('❌ ' + e.message);
-            }
-        }
-
-        return message.reply([
             '❌ Subcomando de classe não reconhecido.',
             '',
             'Comandos disponíveis:',
             'O.classe escolher — escolher sua classe',
             'O.classe listar — listar as classes',
-            'O.classe criar ... — criar uma classe (administrador)'
-        ].join('\n'));
+            'O.classe criar <descrição completa> — criar uma classe com IA (criador do bot)'
+        ].join('\\n'));
     },
 
-    async executeSlash(interaction) {
+   async executeSlash(interaction) {
         const sub = interaction.options.getSubcommand();
         if (sub === 'listar') {
             return interaction.reply(classListPayload('comum', 0, 'slash'));
@@ -319,7 +258,14 @@ module.exports = {
         if (id.startsWith('classe:list:')) {
             const parts = id.split(':');
             const rarity = parts[2] || 'comum';
-            const page = Math.max(0, Number(parts[3]) || 0);
+            // Formato novo: classe:list:<raridade>:<prev|next|page>:<número>
+            // Mantém compatibilidade com botões antigos já enviados.
+            let page;
+            if (parts[3] === 'prev' || parts[3] === 'next' || parts[3] === 'page') {
+                page = Math.max(0, Number(parts[4]) || 0);
+            } else {
+                page = Math.max(0, Number(parts[3]) || 0);
+            }
             return interaction.update(classListPayload(rarity, page, 'component'));
         }
         if (id === 'classe:abrir') {
@@ -395,7 +341,60 @@ module.exports = {
     }
 };
 
-const CLASS_RARITIES = [\n    { id: 'comum', name: 'Comum' },\n    { id: 'incomum', name: 'Incomum' },\n    { id: 'rara', name: 'Rara' },\n    { id: 'epica', name: 'Épica' },\n    { id: 'lendaria', name: 'Lendária' },\n    { id: 'unica', name: 'Única' },\n    { id: 'mitica', name: 'Mítica' }\n];\n\nfunction listCatalogClasses(rarity) {\n    const all = typeof classes.allClasses === 'function' ? classes.allClasses() : {};\n    return Object.values(all).filter((c) => c && c.id &&\n        String(c.selectionPool || '').toLowerCase() === String(rarity).toLowerCase() &&\n        !(c.exclusive || c.maxHolders === 1));\n}\n\nfunction classListPayload(rarity = 'comum', page = 0, source = 'component') {\n    const rarityInfo = CLASS_RARITIES.find((r) => r.id === rarity) || CLASS_RARITIES[0];\n    const list = listCatalogClasses(rarityInfo.id);\n    const pageSize = 5;\n    const totalPages = Math.max(1, Math.ceil(list.length / pageSize));\n    const safePage = Math.min(Math.max(0, Number(page) || 0), totalPages - 1);\n    const visible = list.slice(safePage * pageSize, safePage * pageSize + pageSize);\n    const lines = [];\n    lines.push('**✦ Raridade: ' + rarityInfo.name + '**');\n    lines.push('*Escolha uma classe para conhecer seu caminho.*', '');\n    for (const c of visible) {\n        lines.push((c.emoji || '✨') + ' **' + c.name + '**');\n        lines.push(c.desc || 'Sem descrição disponível.', '');\n    }\n    const emb = new EmbedBuilder()\n        .setColor(0xc9a227)\n        .setTitle('📜 CLASSES • AETERNUS')\n        .setDescription(lines.join('\n').trim() || '_Nenhuma classe disponível nesta raridade._')\n        .setFooter({ text: 'Página ' + (safePage + 1) + '/' + totalPages + ' • ' + list.length + ' classes • ' + rarityInfo.name });\n    const prev = new ButtonBuilder()\n        .setCustomId('classe:list:' + rarityInfo.id + ':' + Math.max(0, safePage - 1))\n        .setLabel('Anterior').setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(safePage === 0);\n    const next = new ButtonBuilder()\n        .setCustomId('classe:list:' + rarityInfo.id + ':' + Math.min(totalPages - 1, safePage + 1))\n        .setLabel('Próxima').setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(safePage >= totalPages - 1);\n    const rarityIndex = CLASS_RARITIES.findIndex((r) => r.id === rarityInfo.id);\n    const nextRarity = CLASS_RARITIES[(rarityIndex + 1) % CLASS_RARITIES.length];\n    const rarityButton = new ButtonBuilder()\n        .setCustomId('classe:list:' + nextRarity.id + ':0')\n        .setLabel('Mudar raridade · ' + nextRarity.name).setStyle(ButtonStyle.Primary).setEmoji('🔄');\n    return { embeds: [emb], components: [\n        new ActionRowBuilder().addComponents(prev, next),\n        new ActionRowBuilder().addComponents(rarityButton)\n    ], ephemeral: source !== 'prefix' };\n}\n\nfunction parseQuotedArgs(input) {
+const CLASS_RARITIES = [
+    { id: 'comum', name: 'Comum' },
+    { id: 'incomum', name: 'Incomum' },
+    { id: 'rara', name: 'Rara' },
+    { id: 'epica', name: 'Épica' },
+    { id: 'lendaria', name: 'Lendária' },
+    { id: 'unica', name: 'Única' },
+    { id: 'mitica', name: 'Mítica' }
+];
+
+function listCatalogClasses(rarity) {
+    const all = typeof classes.allClasses === 'function' ? classes.allClasses() : {};
+    return Object.values(all).filter((c) => c && c.id &&
+        String(c.selectionPool || '').toLowerCase() === String(rarity).toLowerCase() &&
+        !(c.exclusive || c.maxHolders === 1));
+}
+
+function classListPayload(rarity = 'comum', page = 0, source = 'component') {
+    const rarityInfo = CLASS_RARITIES.find((r) => r.id === rarity) || CLASS_RARITIES[0];
+    const list = listCatalogClasses(rarityInfo.id);
+    const pageSize = 5;
+    const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+    const safePage = Math.min(Math.max(0, Number(page) || 0), totalPages - 1);
+    const visible = list.slice(safePage * pageSize, safePage * pageSize + pageSize);
+    const lines = [];
+    lines.push('**✦ Raridade: ' + rarityInfo.name + '**');
+    lines.push('*Escolha uma classe para conhecer seu caminho.*', '');
+    for (const c of visible) {
+        lines.push((c.emoji || '✨') + ' **' + c.name + '**');
+        lines.push(c.desc || 'Sem descrição disponível.', '');
+    }
+    const emb = new EmbedBuilder()
+        .setColor(0xc9a227)
+        .setTitle('📜 CLASSES • AETERNUS')
+        .setDescription(lines.join('\n').trim() || '_Nenhuma classe disponível nesta raridade._')
+        .setFooter({ text: 'Página ' + (safePage + 1) + '/' + totalPages + ' • ' + list.length + ' classes • ' + rarityInfo.name });
+    const prev = new ButtonBuilder()
+        .setCustomId('classe:list:' + rarityInfo.id + ':prev:' + Math.max(0, safePage - 1))
+        .setLabel('Anterior').setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(safePage === 0);
+    const next = new ButtonBuilder()
+        .setCustomId('classe:list:' + rarityInfo.id + ':next:' + Math.min(totalPages - 1, safePage + 1))
+        .setLabel('Próxima').setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(safePage >= totalPages - 1);
+    const rarityIndex = CLASS_RARITIES.findIndex((r) => r.id === rarityInfo.id);
+    const nextRarity = CLASS_RARITIES[(rarityIndex + 1) % CLASS_RARITIES.length];
+    const rarityButton = new ButtonBuilder()
+        .setCustomId('classe:list:' + nextRarity.id + ':0')
+        .setLabel('Mudar raridade · ' + nextRarity.name).setStyle(ButtonStyle.Primary).setEmoji('🔄');
+    return { embeds: [emb], components: [
+        new ActionRowBuilder().addComponents(prev, next),
+        new ActionRowBuilder().addComponents(rarityButton)
+    ], ephemeral: source !== 'prefix' };
+}
+
+function parseQuotedArgs(input) {
     const out = [];
     const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
     let m;

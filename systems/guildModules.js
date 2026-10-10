@@ -11,6 +11,11 @@ const stickyMsgId = new Map();
 const countRuntime = new Map();
 const antinukeHits = new Map();
 
+// Um único listener de contagem por cliente, inclusive após hot reload.
+if (!(global.__aeternusCountingMessageHandlers instanceof WeakMap)) {
+    global.__aeternusCountingMessageHandlers = new WeakMap();
+}
+
 function fmt(tpl, map) {
     let s = String(tpl || '');
     for (const [k, v] of Object.entries(map)) {
@@ -107,8 +112,8 @@ function setCountingNumber(guildId, n, opts) {
     // se estava desligada, liga automaticamente ao alterar o número
     const wasDisabled = ct.enabled === false;
 
-    const current = Math.max(0, Math.floor(Number(n)));
-    if (!Number.isFinite(current) || current < 0) {
+    const current = Number(n);
+    if (!Number.isSafeInteger(current) || current < 0) {
         return { ok: false, error: 'Número inválido. Use um inteiro ≥ 0.' };
     }
     if (current > 1_000_000_000) {
@@ -116,9 +121,12 @@ function setCountingNumber(guildId, n, opts) {
     }
 
     const key = countKey(ct.channelId);
+    // Sobrescreve explicitamente o estado em memória: o número informado é
+    // o último válido, então a próxima mensagem deve ser current + 1.
+    const previousState = getCountState(key, current);
     const state = {
         current,
-        lastUser: resetLastUser ? null : getCountState(key, current)?.lastUser ?? null
+        lastUser: resetLastUser ? null : previousState?.lastUser ?? null
     };
     countRuntime.set(key, state);
 
@@ -230,7 +238,7 @@ async function failCounting(message, ct, state, expected, reason) {
                     .setColor(0xf87171)
                     .setTitle('🔢 Contagem errada')
                     .setDescription(
-                        `${message.author} errou.\n${reason || ''}\nEsperado: **${expected}**. A contagem voltou para **1**.`
+                        `${message.author} errou.\n${reason || ''}\nNúmero esperado antes do erro: **${expected}**. A sequência foi reiniciada.\n**Próximo número: 1**.`
                     )
             ]
         })
@@ -238,6 +246,10 @@ async function failCounting(message, ct, state, expected, reason) {
 }
 
 function setup(client) {
+    // Remove o listener anterior de contagem antes de registrar o novo.
+    const previousCountingHandler = global.__aeternusCountingMessageHandlers.get(client);
+    if (previousCountingHandler) client.removeListener('messageCreate', previousCountingHandler);
+
     hydrateCountingRuntime(client);
 
     const onReady = () => hydrateCountingRuntime(client);
@@ -316,7 +328,7 @@ function setup(client) {
         await updateMemberCounter(member.guild);
     });
 
-    client.on('messageCreate', async (message) => {
+    const countingMessageHandler = async (message) => {
         if (!message.guild || message.author.bot) return;
         const s = getSettings(message.guild.id);
 
@@ -437,7 +449,10 @@ function setup(client) {
                 await message.crosspost().catch(() => {});
             }
         } catch (_) {}
-    });
+    };
+    global.__aeternusCountingMessageHandlers.set(client, countingMessageHandler);
+    client.on('messageCreate', countingMessageHandler);
+
 
     client.on('messageReactionAdd', async (reaction, user) => {
         try {

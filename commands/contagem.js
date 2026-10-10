@@ -8,11 +8,11 @@ function buildStatusEmbed(st) {
         .setDescription(
             [
                 st.channelId ? `**Canal:** <#${st.channelId}>` : '**Canal:** _não configurado_',
-                `**Atual (último válido):** \`${st.current ?? 0}\``,
+                `**Último número válido:** \`${st.current ?? 0}\``,
                 `**Próximo esperado:** **${st.next ?? 1}**`,
                 st.enabled === false ? '\n⚠️ Contagem desativada no painel.' : '',
                 '',
-                '_Para alterar: `O.contagem <número>` — define o valor **atual**._'
+                '_`O.contagem 100` define o último número válido como **100**; o próximo esperado será **101**._'
             ]
                 .filter(Boolean)
                 .join('\n')
@@ -39,28 +39,6 @@ function buildUpdateEmbed({ admin, before, current, next, channelId, wasDisabled
         .setTimestamp();
 }
 
-async function announceInCountChannel(guild, res, adminTag) {
-    if (!res?.channelId || !guild) return;
-    try {
-        const ch = await guild.channels.fetch(res.channelId).catch(() => null);
-        if (!ch?.isTextBased?.()) return;
-        await ch
-            .send({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0x38bdf8)
-                        .setTitle('🔢 Contador ajustado')
-                        .setDescription(
-                            `Um administrador definiu o contador em **${res.current}**.\n` +
-                                `Próximo número: **${res.next}**\n` +
-                                (adminTag ? `_por ${adminTag}_` : '')
-                        )
-                        .setTimestamp()
-                ]
-            })
-            .catch(() => {});
-    } catch (_) {}
-}
 
 function parseTarget(args) {
     if (!args?.length) return { mode: 'status' };
@@ -68,8 +46,9 @@ function parseTarget(args) {
     if (a0 === 'reset' || a0 === 'zerar') {
         return { mode: 'set', value: 0 };
     }
-    const n = parseInt(a0, 10);
-    if (Number.isNaN(n) || n < 0) return { mode: 'invalid' };
+    if (!/^(0|[1-9]\d*)$/.test(a0)) return { mode: 'invalid' };
+    const n = Number(a0);
+    if (!Number.isSafeInteger(n) || n > 1_000_000_000) return { mode: 'invalid' };
     return { mode: 'set', value: n };
 }
 
@@ -86,6 +65,10 @@ module.exports = {
                 .setDescription('Número ATUAL da contagem (ex: 100 → próximo será 101)')
                 .setRequired(false)
                 .setMinValue(0)
+                .setMaxValue(1_000_000_000)
+        )
+        .addBooleanOption((o) =>
+            o.setName('zerar').setDescription('Zerar a contagem; o próximo número será 1')
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
@@ -112,8 +95,8 @@ module.exports = {
         if (parsed.mode === 'invalid') {
             return message.reply(
                 '❌ Número inválido.\n' +
-                    'Use `O.contagem <número>` para definir o valor **atual** (ex: `O.contagem 100`).\n' +
-                    'Use `O.contagem reset` para zerar.'
+                    'Use `O.contagem <número>` para definir o último número válido (ex: `O.contagem 100` → próximo: `101`).\n' +
+                    'Use `O.contagem reset` para reiniciar em `0` (próximo: `1`).'
             );
         }
 
@@ -146,15 +129,6 @@ module.exports = {
             ]
         });
 
-        await announceInCountChannel(
-            message.guild,
-            {
-                channelId: res.channelId,
-                current: afterSt.current ?? res.current,
-                next: afterSt.next ?? res.next
-            },
-            String(message.author)
-        );
     },
 
     async executeSlash(i) {
@@ -167,8 +141,13 @@ module.exports = {
 
         const st = getCountingStatus(i.guild.id);
         const n = i.options.getInteger('numero');
+        const reset = i.options.getBoolean('zerar') === true;
 
-        if (n == null) {
+        if (reset && n != null) {
+            return i.reply({ content: '❌ Use `numero` ou `zerar`, não os dois ao mesmo tempo.', ephemeral: true });
+        }
+
+        if (n == null && !reset) {
             if (!st.channelId) {
                 return i.reply({
                     content: 'Contagem sem canal. Configure no painel.',
@@ -178,8 +157,9 @@ module.exports = {
             return i.reply({ embeds: [buildStatusEmbed(st)], ephemeral: true });
         }
 
-        if (n < 0) {
-            return i.reply({ content: '❌ Número inválido. Use ≥ 0.', ephemeral: true });
+        const target = reset ? 0 : n;
+        if (!Number.isSafeInteger(target) || target < 0 || target > 1_000_000_000) {
+            return i.reply({ content: '❌ Número inválido. Use um inteiro entre 0 e 1.000.000.000.', ephemeral: true });
         }
 
         if (!st.channelId) {
@@ -190,7 +170,7 @@ module.exports = {
         }
 
         const before = Number(st.current ?? 0) || 0;
-        const res = setCountingNumber(i.guild.id, n);
+        const res = setCountingNumber(i.guild.id, target);
 
         if (!res?.ok) {
             return i.reply({
@@ -215,14 +195,5 @@ module.exports = {
             ]
         });
 
-        await announceInCountChannel(
-            i.guild,
-            {
-                channelId: res.channelId,
-                current: afterSt.current ?? res.current,
-                next: afterSt.next ?? res.next
-            },
-            String(i.user)
-        );
     }
 };

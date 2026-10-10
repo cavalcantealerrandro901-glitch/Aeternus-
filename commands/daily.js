@@ -1,105 +1,79 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const daily = require('../utils/daily');
 const eter = require('../utils/eter');
 
+const IMAGE_BASE = 'https://raw.githubusercontent.com/cavalcantealerrandro901-glitch/Aeternus-/main/public/images/';
+const PARTNER_THANKS_IMAGE = IMAGE_BASE + 'partner-thanks.svg';
+const STREAK_IMAGES = Array.from({ length: 7 }, (_, i) => IMAGE_BASE + `daily-streak-${i + 1}.svg`);
+
 function fmt(n) {
-    if (typeof eter.formatPlain === 'function') return eter.formatPlain(n);
-    return Number(n || 0).toLocaleString('pt-BR');
+  if (typeof eter.formatPlain === 'function') return eter.formatPlain(n);
+  return Number(n || 0).toLocaleString('pt-BR');
 }
-
-function claimEmbed(user, result) {
-    const lines = [
-        `Você recebeu **✨ ${fmt(result.amount)}**.`,
-        result.multiplier && result.multiplier !== 1
-            ? `Base ✨ ${fmt(result.base)} · bônus ×${Number(result.multiplier).toFixed(2)}`
-            : null,
-        `**Sequência:** ${result.streak} dia(s)`,
-        `**Saldo:** ✨ ${fmt(result.balance)}`,
-        '',
-        'Volte amanhã após **meia-noite (Brasília)** para manter a sequência.'
-    ].filter(Boolean);
-
-    return new EmbedBuilder()
-        .setColor(0x22c55e)
-        .setAuthor({
-            name: user.username,
-            iconURL: user.displayAvatarURL({ size: 64 })
-        })
-        .setTitle('Daily resgatado')
-        .setDescription(lines.join('\n'));
+function row(disabled = false) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('daily:claim').setLabel('RESGATAR DAILY')
+      .setEmoji('🎁').setStyle(ButtonStyle.Primary).setDisabled(disabled)
+  );
 }
+function buildEmbed(user, st, result = null, already = false) {
+  const streak = Math.max(1, result?.streak ?? (st?.claimed ? st.streak : st?.nextStreak ?? st?.streak ?? 1));
+  const balance = result?.balance ?? st?.balance ?? eter.get(user.id);
+  const embed = new EmbedBuilder()
+    .setColor(result ? 0x36d9ff : 0x2878ff)
+    .setAuthor({ name: 'AETERNUS • ECONOMY', iconURL: 'https://cdn.discordapp.com/embed/avatars/5.png' })
+    .setTitle('🎁 Recompensa diária')
+    .setDescription(result
+      ? `Parabéns, <@${user.id}>! Sua recompensa diária foi creditada.`
+      : already
+        ? `Olá, <@${user.id}>! Você já resgatou sua recompensa de hoje.`
+        : `Olá, <@${user.id}>! Resgate seu daily e continue sua sequência.`)
+    .addFields(
+      { name: '✨ Éter ganho', value: result ? `**+${fmt(result.amount)} éter**` : 'Resgate para revelar sua recompensa.', inline: true },
+      { name: '🔥 Sequência', value: `**${streak} dia(s)**`, inline: true },
+      { name: '💰 Saldo atual', value: `**${fmt(balance)} éter**`, inline: true }
+    )
+    .setImage(PARTNER_THANKS_IMAGE)
+    .setThumbnail(STREAK_IMAGES[Math.min(streak, 7) - 1])
+    .setFooter({ text: 'Obrigado aos servidores parceiros por fortalecerem a comunidade Aeternus.' })
+    .setTimestamp();
 
-function alreadyEmbed(user, st) {
-    const lines = [
-        'Você **já resgatou** o daily de hoje.',
-        'A próxima recompensa libera após **meia-noite (Brasília)**.',
-        '',
-        `**Sequência:** ${st.streak || 0} dia(s)`,
-        `**Faixa:** ✨ ${fmt(st.dailyMin)} – ${fmt(st.dailyMax)}`,
-        st.multiplier && st.multiplier !== 1
-            ? `**Bônus de nível:** ×${Number(st.multiplier).toFixed(2)} (nível ${st.level || 0})`
-            : null,
-        `**Saldo:** ✨ ${fmt(st.balance)}`
-    ].filter(Boolean);
+  if (result?.levelMultiplier && result.levelMultiplier !== 1)
+    embed.addFields({ name: '⭐ Bônus de nível', value: `×${Number(result.levelMultiplier).toFixed(2)}`, inline: true });
+  if (result?.partner)
+    embed.addFields({ name: '🤝 Bônus de parceria', value: '**×2 aplicado nesta recompensa!**', inline: true });
+  else if (!result && st?.partner && !already)
+    embed.addFields({ name: '🤝 Servidor parceiro', value: 'O bônus ×2 será aplicado à recompensa.', inline: true });
 
-    return new EmbedBuilder()
-        .setColor(0xf59e0b)
-        .setAuthor({
-            name: user.username,
-            iconURL: user.displayAvatarURL({ size: 64 })
-        })
-        .setTitle('Daily já coletado')
-        .setDescription(lines.join('\n'));
+  embed.addFields({
+    name: '📅 Próximo resgate',
+    value: already ? 'Volte após a meia-noite de Brasília.' : 'Resgate uma vez por dia para manter sua sequência.'
+  });
+  return embed;
 }
-
-function failEmbed(msg) {
-    return new EmbedBuilder()
-        .setColor(0xef4444)
-        .setTitle('Daily')
-        .setDescription(String(msg || 'Não foi possível resgatar.').slice(0, 400));
+function render(user, st, result = null, already = false) {
+  return { embeds: [buildEmbed(user, st, result, already)], components: [row(Boolean(already || result))] };
 }
-
 async function run(user, guildId) {
-    const st = daily.status(user.id, guildId);
-
-    if (st.claimed) {
-        return { embeds: [alreadyEmbed(user, st)] };
-    }
-
-    if (typeof daily.claim !== 'function') {
-        return { embeds: [failEmbed('Sistema de daily indisponível.')] };
-    }
-
-    const result = daily.claim(user.id, guildId);
-
-    if (!result?.ok) {
-        // race: já coletado entre status e claim
-        if (result?.error) {
-            const again = daily.status(user.id, guildId);
-            if (again.claimed) return { embeds: [alreadyEmbed(user, again)] };
-            return { embeds: [failEmbed(result.error)] };
-        }
-        return { embeds: [failEmbed('Não foi possível resgatar o daily.')] };
-    }
-
-    return { embeds: [claimEmbed(user, result)] };
+  const st = daily.status(user.id, guildId);
+  return render(user, st, null, st.claimed);
 }
-
+async function handleComponent(interaction) {
+  if (interaction.customId !== 'daily:claim') return;
+  const guildId = interaction.guild?.id;
+  const st = daily.status(interaction.user.id, guildId);
+  if (st.claimed) return interaction.update(render(interaction.user, st, null, true));
+  const result = daily.claim(interaction.user.id, guildId);
+  if (!result?.ok) {
+    const again = daily.status(interaction.user.id, guildId);
+    return interaction.update(render(interaction.user, again, null, true));
+  }
+  return interaction.update(render(interaction.user, result, result, false));
+}
 module.exports = {
-    name: 'daily',
-    aliases: ['diario'],
-    description: 'Resgata a recompensa diária de éter',
-    data: new SlashCommandBuilder()
-        .setName('diario')
-        .setDescription('Resgata a recompensa diária de éter'),
-
-    async execute(message) {
-        const payload = await run(message.author, message.guild?.id);
-        return message.reply(payload);
-    },
-
-    async executeSlash(i) {
-        const payload = await run(i.user, i.guild?.id);
-        return i.reply(payload);
-    }
+  name: 'daily', aliases: ['diario'], description: 'Mostra e resgata a recompensa diária de éter',
+  data: new SlashCommandBuilder().setName('daily').setDescription('Mostra e resgata a recompensa diária de éter'),
+  async execute(message) { return message.reply(await run(message.author, message.guild?.id)); },
+  async executeSlash(interaction) { return interaction.reply(await run(interaction.user, interaction.guild?.id)); },
+  handleComponent
 };

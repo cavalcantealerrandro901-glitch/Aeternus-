@@ -2,7 +2,8 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    StringSelectMenuBuilder
 } = require('discord.js');
 const player = require('../utils/player');
 const guilds = require('../utils/guilds');
@@ -13,6 +14,8 @@ const eter = require('../utils/eter');
 const drafts = new Map();
 /** inviteId -> pending invite meta */
 const pendingInvites = new Map();
+/** Seleções temporárias da interface de hierarquia; os cargos reais ficam salvos em guilds.json. */
+const hierarchySelections = new Map();
 const INVITE_TTL_MS = 5 * 60 * 1000;
 
 function fmt(n) {
@@ -157,10 +160,11 @@ async function applyGuildBadge(discordGuild, userId, gameGuild) {
     }
 }
 
-function roleLabel(role) {
-    if (role === 'owner') return '👑 Líder';
-    if (role === 'officer') return '⭐ Oficial';
-    return '🛡️ Membro';
+function roleLabel(member) {
+    if (member?.rank) return guilds.rankLabel(guilds.rankOf(member));
+    if (member?.role === 'owner') return '👑 Mestre';
+    if (member?.role === 'officer') return '⭐ Oficial';
+    return '👤 Membro';
 }
 
 function guildEmbed(g) {
@@ -171,20 +175,20 @@ function guildEmbed(g) {
             const o = { owner: 0, officer: 1, member: 2 };
             return (o[a.role] ?? 3) - (o[b.role] ?? 3);
         });
-    const lines = members.slice(0, 15).map((m, i) => `${i + 1}. <@${m.id}> — ${roleLabel(m.role)}`);
+    const lines = members.slice(0, 15).map((m, i) => `${String(i + 1).padStart(2, '0')}. <@${m.id}> · ${roleLabel(m)}`);
     const need = guilds.guildLevelNeed(g.level);
     const emb = new EmbedBuilder()
         .setColor(0xa78bfa)
-        .setTitle(`[${g.tag}] ${g.name}`)
+        .setTitle(`🏰 [${g.tag}] ${g.name}`)
         .setDescription(
             [
                 g.description || '_Sem descrição._',
                 g.welcome ? `\n💬 **Boas-vindas:** ${g.welcome}` : '',
                 '',
-                `🎚️ Nível **${g.level}** · XP **${fmt(g.xp)}** / ${fmt(need)}`,
-                `👥 Membros **${members.length}** / **${guilds.maxMembers(g)}**`,
-                `🏦 Banco **✨ ${fmt(g.bank)}**`,
-                `👑 Líder <@${g.ownerId}>`,
+                `🎚️ **Nível ${g.level}** · XP **${fmt(g.xp)} / ${fmt(need)}**`,
+                `👥 **${members.length} / ${guilds.maxMembers(g)}** membros`,
+                `🏦 Banco da guilda: **✨ ${fmt(g.bank)}**`,
+                `👑 Mestre: <@${g.ownerId}>`,
                 g.imageTag ? `🏷️ Tag da imagem: \`${g.imageTag}\`` : '',
                 '',
                 '**Membros**',
@@ -193,34 +197,162 @@ function guildEmbed(g) {
                 .filter(Boolean)
                 .join('\n')
         )
-        .setFooter({ text: `ID ${g.id} · O.guild ajuda` })
+        .setFooter({ text: `Aeternus Guilds · ID ${g.id} · O.guild ajuda` })
         .setTimestamp();
     if (g.imageUrl) emb.setThumbnail(g.imageUrl).setImage(g.imageUrl);
     return emb;
 }
 
-function helpEmbed() {
+const GUILD_HELP_PAGES = [
+    {
+        title: '🏰 Central de Guildas · Visão geral',
+        description: [
+            `Criar uma guilda custa **✨ ${fmt(guilds.CREATE_COST)}** e o assistente é feito no privado.`,
+            '',
+            '**Comece por aqui**',
+            '`O.guild criar` — criar sua guilda',
+            '`O.guild info` — ver sua guilda e seus membros',
+            '`O.guild membros` — consultar os integrantes',
+            '`O.guild ranking` — melhores guildas',
+            '',
+            'Use os botões abaixo para navegar pelas categorias de comandos.',
+            '_Prefixo atual: `O.`_'
+        ].join('\n')
+    },
+    {
+        title: '🛡️ Membros e liderança',
+        description: [
+            '`O.guild convidar @user` — enviar convite',
+            '`O.guild aceitar <tag>` — aceitar convite por comando',
+            '`O.guild sair` — sair da guilda',
+            '`O.guild expulsar @user` — remover integrante',
+            '`O.guild hierarquia` — gerenciar cargos e limites',
+            '`O.guild promover @user` / `O.guild rebaixar @user` — ajustar oficial/membro',
+            '`O.guild transferir @user` — transferir liderança',
+            '`O.guild dissolver` — dissolver a guilda (confirmação obrigatória)'
+        ].join('\n')
+    },
+    {
+        title: '✏️ Personalização',
+        description: [
+            '`O.guild editar` — abrir o assistente no privado',
+            '`O.guild editar nome` — alterar nome',
+            '`O.guild editar tag` — alterar tag',
+            '`O.guild editar desc` — alterar descrição',
+            '`O.guild editar boasvindas` — alterar mensagem de boas-vindas',
+            '`O.guild editar imagem` — alterar imagem/banner',
+            '`O.guild editar tagimagem` — definir rótulo da imagem',
+            '`O.guild sincronizar` — sincronizar cargos-tag do Discord'
+        ].join('\n')
+    },
+    {
+        title: '🏦 Banco e baú',
+        description: [
+            '`O.guild depositar <valor|all|half|1k>` — guardar éter',
+            '`O.guild sacar <valor|all|half>` — retirar do banco',
+            '`O.guild inventario` — consultar o baú compartilhado',
+            '`O.guild depositaritem <nº> [qtd]` — guardar itens',
+            '`O.guild retiraritem <nº>` — retirar item do baú',
+            '`O.guild removeritem <nº>` — remover item do baú (permissões aplicáveis)',
+            '',
+            'Valores aceitam atalhos como `1k`; confira seu saldo antes de movimentar.'
+        ].join('\n')
+    }
+];
+
+function helpPanel(page = 0) {
+    const index = Math.max(0, Math.min(GUILD_HELP_PAGES.length - 1, Number(page) || 0));
+    const data = GUILD_HELP_PAGES[index];
+    const embed = new EmbedBuilder()
+        .setColor(0x8b5cf6)
+        .setTitle(data.title)
+        .setDescription(data.description)
+        .setFooter({ text: `Aeternus Guilds · Página ${index + 1}/${GUILD_HELP_PAGES.length} · O.guild ajuda` })
+        .setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('guild:help-prev')
+            .setLabel('◀ Anterior')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(index === 0),
+        new ButtonBuilder()
+            .setCustomId('guild:help-next')
+            .setLabel('Próxima ▶')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(index === GUILD_HELP_PAGES.length - 1)
+    );
+    return { embeds: [embed], components: [row] };
+}
+
+function hierarchyEmbed(g) {
+    const counts = guilds.rankCounts(g);
+    const lines = guilds.HIERARCHY.map((rank) => {
+        const amount = counts[rank.id] || 0;
+        const limit = Number.isFinite(rank.limit) ? rank.limit : '∞';
+        return `${rank.label}: **${amount}/${limit}**`;
+    });
     return new EmbedBuilder()
         .setColor(0x8b5cf6)
-        .setTitle('🏰 Sistema de Guildas')
-        .setDescription(
-            [
-                `Criar custa **✨ ${fmt(guilds.CREATE_COST)}** e é feito **no PV**.`,
-                '',
-                '**Comandos**',
-                '`O.guild criar` — criação no privado',
-                '`O.guild editar` — editar no PV (nome, tag, imagem…)',
-                '`O.guild editar <categoria>` — nome · tag · desc · boasvindas · imagem',
-                '`O.guild info [nome|tag]`',
-                '`O.guild convidar @user` — convite com botões',
-                '`O.guild sair` · `O.guild expulsar @user`',
-                '`O.guild promover / rebaixar @user`',
-                '`O.guild transferir @user`',
-                '`O.guild depositar / sacar <valor>`',
-                '`O.guild inventario` · depositar/retirar itens',
-                '`O.guild ranking` · `O.guild sincronizar` (cargos-tag) · `O.guild dissolver`'
-            ].join('\n')
+        .setTitle(`🏰 Hierarquia · [${g.tag}] ${g.name}`)
+        .setDescription([
+            'Gerencie os cargos da sua guilda. **Somente o Mestre** pode alterar a hierarquia.',
+            '',
+            ...lines,
+            '',
+            '_As alterações são salvas automaticamente._'
+        ].join('\n'))
+        .setFooter({ text: 'Aeternus Guilds · Hierarquia persistente' })
+        .setTimestamp();
+}
+
+function hierarchyPanel(g, ownerId, page = 0, targetId = null, rankId = 'membro') {
+    const members = (Array.isArray(g.members) ? g.members : []).filter((m) => String(m.id) !== String(g.ownerId));
+    const pageSize = 25;
+    const pages = Math.max(1, Math.ceil(members.length / pageSize));
+    page = Math.max(0, Math.min(pages - 1, Number(page) || 0));
+    const visible = members.slice(page * pageSize, page * pageSize + pageSize);
+    const state = { guildId: g.id, ownerId, page, targetId, rankId };
+    hierarchySelections.set(ownerId, state);
+    const memberOptions = visible.map((m) => ({
+        label: String((g.members.find((x) => String(x.id) === String(m.id))?.nickname) || m.name || m.username || m.id).slice(0, 90),
+        description: guilds.rankLabel(guilds.rankOf(m)).slice(0, 100),
+        value: String(m.id),
+        default: targetId ? String(m.id) === String(targetId) : false
+    }));
+    const rankOptions = guilds.HIERARCHY.filter((r) => r.id !== 'mestre').map((r) => ({
+        label: r.label,
+        description: Number.isFinite(r.limit) ? `Limite: ${r.limit}` : 'Sem limite',
+        value: r.id,
+        default: r.id === rankId
+    }));
+    const rows = [];
+    if (memberOptions.length) {
+        rows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('guild:hierarchy-member')
+                .setPlaceholder('1. Escolha o membro')
+                .addOptions(memberOptions)
+        ));
+        rows.push(new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('guild:hierarchy-rank')
+                .setPlaceholder('2. Escolha o cargo')
+                .addOptions(rankOptions)
+        ));
+    }
+    const buttons = new ActionRowBuilder();
+    if (pages > 1) {
+        buttons.addComponents(
+            new ButtonBuilder().setCustomId('guild:hierarchy-prev').setLabel('◀ Anterior').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+            new ButtonBuilder().setCustomId('guild:hierarchy-next').setLabel('Próxima ▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= pages - 1)
         );
+    }
+    buttons.addComponents(
+        new ButtonBuilder().setCustomId('guild:hierarchy-apply').setLabel('Salvar cargo').setStyle(ButtonStyle.Success).setDisabled(!memberOptions.length),
+        new ButtonBuilder().setCustomId('guild:hierarchy-refresh').setLabel('Atualizar').setStyle(ButtonStyle.Primary)
+    );
+    rows.push(buttons);
+    return { embeds: [hierarchyEmbed(g)], components: rows };
 }
 
 function pickImageFromMessage(message) {
@@ -687,7 +819,7 @@ module.exports = {
         const rest = args.slice(1);
 
         if (['ajuda', 'help', 'cmds'].includes(sub) || !args.length) {
-            return message.reply({ embeds: [helpEmbed()] });
+            return message.reply(helpPanel(0));
         }
 
         if (sub === 'criar' || sub === 'create') return startCreateDm(message);
@@ -702,6 +834,13 @@ module.exports = {
             if (!g) g = guilds.findByMember(message.author.id);
             if (!g) return message.reply('Guilda não encontrada.');
             return message.reply({ embeds: [guildEmbed(g)] });
+        }
+
+        if (sub === 'hierarquia' || sub === 'hierarchy' || sub === 'cargos') {
+            const g = guilds.findByMember(message.author.id);
+            if (!g) return message.reply('Você não está em uma guilda.');
+            if (!guilds.isOwner(g, message.author.id)) return message.reply('❌ Só o Mestre pode gerenciar a hierarquia.');
+            return message.reply(hierarchyPanel(g, message.author.id));
         }
 
         if (sub === 'membros' || sub === 'members') {
@@ -1010,7 +1149,7 @@ module.exports = {
             });
         }
 
-        return message.reply({ embeds: [helpEmbed()] });
+        return message.reply(helpPanel(0));
     },
 
     async handleComponent(interaction) {
@@ -1060,6 +1199,45 @@ module.exports = {
                 content: `💥 Guilda dissolvida. ✨ **${fmt(r.refunded)}** devolvidos ao líder.${roleNote}`,
                 components: []
             });
+        }
+
+        if (action === 'help-prev' || action === 'help-next') {
+            const current = Number(interaction.message.embeds?.[0]?.footer?.text?.match(/Página (\d+)\//)?.[1] || 1) - 1;
+            const next = current + (action === 'help-next' ? 1 : -1);
+            return interaction.update(helpPanel(next));
+        }
+
+        if (action.startsWith('hierarchy-')) {
+            const state = hierarchySelections.get(interaction.user.id);
+            if (!state) return interaction.reply({ content: 'Painel expirado. Use `O.guild hierarquia` novamente.', ephemeral: true });
+            const g = guilds.get(state.guildId);
+            if (!g || !guilds.isOwner(g, interaction.user.id) || String(state.ownerId) !== String(interaction.user.id)) {
+                return interaction.reply({ content: '❌ Somente o Mestre pode usar este painel.', ephemeral: true });
+            }
+            if (action === 'hierarchy-member') {
+                state.targetId = interaction.values?.[0] || null;
+                return interaction.update(hierarchyPanel(g, interaction.user.id, state.page, state.targetId, state.rankId));
+            }
+            if (action === 'hierarchy-rank') {
+                state.rankId = interaction.values?.[0] || 'membro';
+                return interaction.update(hierarchyPanel(g, interaction.user.id, state.page, state.targetId, state.rankId));
+            }
+            if (action === 'hierarchy-prev' || action === 'hierarchy-next') {
+                const nextPage = state.page + (action === 'hierarchy-next' ? 1 : -1);
+                return interaction.update(hierarchyPanel(g, interaction.user.id, nextPage, null, state.rankId));
+            }
+            if (action === 'hierarchy-refresh') {
+                return interaction.update(hierarchyPanel(g, interaction.user.id, state.page, state.targetId, state.rankId));
+            }
+            if (action === 'hierarchy-apply') {
+                if (!state.targetId) return interaction.reply({ content: 'Escolha um membro primeiro.', ephemeral: true });
+                const result = guilds.setRole(g.id, interaction.user.id, state.targetId, state.rankId);
+                if (!result.ok) return interaction.reply({ content: `❌ ${result.error}`, ephemeral: true });
+                return interaction.update({
+                    ...hierarchyPanel(result.guild, interaction.user.id, state.page, null, state.rankId),
+                    content: `✅ Cargo de <@${state.targetId}> atualizado para **${guilds.rankLabel(state.rankId)}**.`
+                });
+            }
         }
 
         // Inviter confirms the invite
