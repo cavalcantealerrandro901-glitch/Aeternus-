@@ -11,6 +11,11 @@ const stickyMsgId = new Map();
 const countRuntime = new Map();
 const antinukeHits = new Map();
 
+// Um único listener de contagem por cliente, inclusive após hot reload.
+if (!(global.__aeternusCountingMessageHandlers instanceof WeakMap)) {
+    global.__aeternusCountingMessageHandlers = new WeakMap();
+}
+
 function fmt(tpl, map) {
     let s = String(tpl || '');
     for (const [k, v] of Object.entries(map)) {
@@ -241,6 +246,10 @@ async function failCounting(message, ct, state, expected, reason) {
 }
 
 function setup(client) {
+    // Remove o listener anterior de contagem antes de registrar o novo.
+    const previousCountingHandler = global.__aeternusCountingMessageHandlers.get(client);
+    if (previousCountingHandler) client.removeListener('messageCreate', previousCountingHandler);
+
     hydrateCountingRuntime(client);
 
     const onReady = () => hydrateCountingRuntime(client);
@@ -319,7 +328,7 @@ function setup(client) {
         await updateMemberCounter(member.guild);
     });
 
-    client.on('messageCreate', async (message) => {
+    const countingMessageHandler = async (message) => {
         if (!message.guild || message.author.bot) return;
         const s = getSettings(message.guild.id);
 
@@ -440,7 +449,10 @@ function setup(client) {
                 await message.crosspost().catch(() => {});
             }
         } catch (_) {}
-    });
+    };
+    global.__aeternusCountingMessageHandlers.set(client, countingMessageHandler);
+    client.on('messageCreate', countingMessageHandler);
+
 
     client.on('messageReactionAdd', async (reaction, user) => {
         try {
