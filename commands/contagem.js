@@ -12,7 +12,7 @@ function buildStatusEmbed(st) {
                 `**Próximo esperado:** **${st.next ?? 1}**`,
                 st.enabled === false ? '\n⚠️ Contagem desativada no painel.' : '',
                 '',
-                '_Para alterar: `O.contagem <número>` — define o valor **atual**._'
+                '_Para alterar: `O.contagem <número>` — define o **próximo número esperado**._'
             ]
                 .filter(Boolean)
                 .join('\n')
@@ -26,8 +26,8 @@ function buildUpdateEmbed({ admin, before, current, next, channelId, wasDisabled
         .setDescription(
             [
                 `**Administrador:** ${admin}`,
-                `**Antes:** \`${before}\` → **Agora:** \`${current}\``,
-                `**Próximo no canal:** **${next}**`,
+                `**Próximo número definido:** **${next}**`,
+                
                 channelId ? `**Canal:** <#${channelId}>` : null,
                 wasDisabled ? '\n✅ Contagem **reativada** automaticamente.' : null,
                 '',
@@ -84,13 +84,13 @@ module.exports = {
         .addIntegerOption((o) =>
             o
                 .setName('numero')
-                .setDescription('Número ATUAL da contagem (ex: 100 → próximo será 101)')
+                .setDescription('Próximo número esperado (ex: 100 → próximo será 100)')
                 .setRequired(false)
-                .setMinValue(0)
+                .setMinValue(1)
                 .setMaxValue(1_000_000_000)
         )
         .addBooleanOption((o) =>
-            o.setName('zerar').setDescription('Zerar a contagem; o próximo número será 1')
+            o.setName('zerar').setDescription('Reiniciar a contagem; o próximo número será 1')
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
@@ -117,8 +117,8 @@ module.exports = {
         if (parsed.mode === 'invalid') {
             return message.reply(
                 '❌ Número inválido.\n' +
-                    'Use `O.contagem <número>` para definir o valor **atual** (ex: `O.contagem 100`).\n' +
-                    'Use `O.contagem reset` para zerar.'
+                    'Use `O.contagem <número>` para definir o próximo número esperado (ex: `O.contagem 100`).\n' +
+                    'Use `O.contagem reset` para reiniciar em 1.'
             );
         }
 
@@ -128,7 +128,7 @@ module.exports = {
             );
         }
 
-        const before = Number(st.current ?? 0) || 0;
+        const before = Number(st.next ?? 1) || 1;
         const res = setCountingNumber(message.guild.id, parsed.value);
 
         if (!res?.ok) {
@@ -188,9 +188,9 @@ module.exports = {
             return i.reply({ embeds: [buildStatusEmbed(st)], ephemeral: true });
         }
 
-        const target = reset ? 0 : n;
+        const target = reset ? 1 : n;
         if (!Number.isSafeInteger(target) || target < 0 || target > 1_000_000_000) {
-            return i.reply({ content: '❌ Número inválido. Use um inteiro entre 0 e 1.000.000.000.', ephemeral: true });
+            return i.reply({ content: '❌ Número inválido. Use um inteiro entre 1 e 1.000.000.000.', ephemeral: true });
         }
 
         if (!st.channelId) {
@@ -200,7 +200,7 @@ module.exports = {
             });
         }
 
-        const before = Number(st.current ?? 0) || 0;
+        const before = Number(st.next ?? 1) || 1;
         const res = setCountingNumber(i.guild.id, target);
 
         if (!res?.ok) {
