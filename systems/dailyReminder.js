@@ -90,13 +90,13 @@ function buildEmbed(user, st) {
                 `Olá, **${name}**.`,
                 '',
                 'Faz **6 dias** desde seu último resgate diário.',
-                `Sua sequência anterior era de **${Number(st.streak || 0)} dia(s)**.`,
+                `Sua sequência anterior era de **${Number(st.streak || 0)} dia(s)** mas ela ira voltor para **0** casso voçe não colete ela novamente.`,
                 '',
                 'Resgate hoje para evitar que a sequência seja reiniciada no próximo resgate.',
                 '',
                 '**Como resgatar**',
-                'Use `O.daily` ou `/daily` em um servidor com o Aeternus.'
-            ].join('\n'));
+                'Va para um servidor onde eu estou e use `O.daily` ou `/daily` em um servidor com o Aeternus.'
+            ].join('/n'));
     }
 
     let title = '✨ Seu daily está disponível';
