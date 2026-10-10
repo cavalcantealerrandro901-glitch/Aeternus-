@@ -1202,7 +1202,7 @@ module.exports = {
         }
 
         if (action === 'help-prev' || action === 'help-next') {
-            const current = Number(interaction.message.embeds?.[0]?.footer?.text?.match(/Página (\\d+)\\//)?.[1] || 1) - 1;
+            const current = Number(interaction.message.embeds?.[0]?.footer?.text?.match(/Página (\d+)\//)?.[1] || 1) - 1;
             const next = current + (action === 'help-next' ? 1 : -1);
             return interaction.update(helpPanel(next));
         }
