@@ -236,77 +236,16 @@ module.exports = {
             }
         }
         return message.reply([
-                    '❌ Formato incorreto.',
-                    '',
-                    'Use: O.classe criar "Nome" "Descrição" raridade tipo "únicas|..." "ativas|..." "passivas únicas|..." "passivas|..." emoji "desvantagens|..."',
-                    '',
-                    'Exemplo: O.classe criar "Cavaleiro Arcano" "Um guerreiro que combina espada e magia." rara melee "Mestre da Lâmina|Último Bastião|Golpe do Campeão" "Investida|Corte Arcano|Barreira|Ruptura" "Vontade Arcana|Defesa Mística|Sentido Arcano" "Tenacidade|Foco|Resistência|Concentração|Disciplina" ⚔️ "Custo de mana"',
-                    '',
-                    'Use | para separar habilidades, passivas e desvantagens.'
-                ].join('\n'));
-            }
-
-            const [name, desc, rarity, type, uniqueAbilities, activeAbilities, uniquePassives, passives, emoji = '✨', disadvantages = ''] = parts;
-            const validRarities = ['comum', 'incomum', 'rara', 'epica', 'lendaria', 'unica', 'mitica'];
-            const validTypes = ['melee', 'magic', 'ranged', 'support', 'tank'];
-
-            if (!validRarities.includes(String(rarity).toLowerCase())) {
-                return message.reply('❌ Raridade inválida. Use: comum, incomum, rara, epica, lendaria, unica ou mitica.');
-            }
-            if (!validTypes.includes(String(type).toLowerCase())) {
-                return message.reply('❌ Tipo inválido. Use: melee, magic, ranged, support ou tank.');
-            }
-
-            try {
-                const cls = classes.createClass({
-                    name,
-                    desc,
-                    rarity: String(rarity).toLowerCase(),
-                    type: String(type).toLowerCase(),
-                    uniqueAbilities,
-                    activeAbilities,
-                    uniquePassives,
-                    passives,
-                    emoji: emoji || '✨',
-                    disadvantages
-                });
-
-                let dmInfo = '';
-                try {
-                    const r = await dmAllPlayers(message.client, cls);
-                    dmInfo = '\n📬 PV enviado: **' + r.ok + '** · falhou: **' + r.fail + '**';
-                } catch (e) {
-                    dmInfo = '\n⚠️ Não foi possível enviar os PVs: ' + e.message;
-                }
-
-                return message.reply({
-                    content: [
-                        '# ✦ NOVA CLASSE',
-                        '',
-                        '✅ **' + cls.emoji + ' ' + cls.name + '** criada com sucesso.',
-                        '🆔 ID: ' + cls.id,
-                        '⭐ Raridade: **' + (cls.rarityName || cls.rarity) + '**',
-                        dmInfo.trim()
-                    ].filter(Boolean).join('\n'),
-                    embeds: [classEmbed(cls)],
-                    components: [pickButtons(cls.id)]
-                });
-            } catch (e) {
-                return message.reply('❌ ' + e.message);
-            }
-        }
-
-        return message.reply([
             '❌ Subcomando de classe não reconhecido.',
             '',
             'Comandos disponíveis:',
             'O.classe escolher — escolher sua classe',
             'O.classe listar — listar as classes',
-            'O.classe criar ... — criar uma classe (administrador)'
-        ].join('\n'));
+            'O.classe criar <descrição completa> — criar uma classe com IA (criador do bot)'
+        ].join('\\n'));
     },
 
-    async executeSlash(interaction) {
+   async executeSlash(interaction) {
         const sub = interaction.options.getSubcommand();
         if (sub === 'listar') {
             return interaction.reply(classListPayload('comum', 0, 'slash'));
