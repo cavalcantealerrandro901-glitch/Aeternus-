@@ -38,6 +38,35 @@ const MAX_WELCOME = 300;
 const MAX_MEMBERS_BASE = 15;
 const MAX_MEMBERS_PER_LEVEL = 2;
 
+// Hierarquia persistente da guilda. Mestre é sempre o líder.
+const HIERARCHY = [
+    { id: 'mestre', label: '👑 Mestre', limit: 1 },
+    { id: 'grao_mestre', label: '🜲 Grão-Mestre', limit: 4 },
+    { id: 'comandante', label: '⚔️ Comandante', limit: 12 },
+    { id: 'capitao', label: '🗡️ Capitão', limit: 36 },
+    { id: 'tenente', label: '🛡️ Tenente', limit: 108 },
+    { id: 'oficial', label: '⚜️ Oficial', limit: 324 },
+    { id: 'membro', label: '👤 Membro', limit: Infinity }
+];
+const LEGACY_RANK = { owner: 'mestre', officer: 'oficial', member: 'membro' };
+function rankOf(member) {
+    if (!member) return 'membro';
+    if (member.role === 'owner' || member.rank === 'mestre') return 'mestre';
+    const raw = String(member.rank || LEGACY_RANK[member.role] || 'membro');
+    return HIERARCHY.some((r) => r.id === raw) ? raw : 'membro';
+}
+function rankLabel(rank) {
+    return HIERARCHY.find((r) => r.id === rank)?.label || '👤 Membro';
+}
+function rankCounts(guild) {
+    const counts = Object.fromEntries(HIERARCHY.map((r) => [r.id, 0]));
+    for (const member of Array.isArray(guild?.members) ? guild.members : []) {
+        const rank = rankOf(member);
+        counts[rank] = (counts[rank] || 0) + 1;
+    }
+    return counts;
+}
+
 function all() {
     return store.load('guilds.json', {});
 }
@@ -297,14 +326,24 @@ function setRole(guildId, byUserId, targetId, role) {
     const data = all();
     const g = data[guildId];
     if (!g) return { ok: false, error: 'Guilda não encontrada.' };
-    if (!isOwner(g, byUserId)) return { ok: false, error: 'Só o líder altera cargos.' };
+    if (!isOwner(g, byUserId)) return { ok: false, error: 'Só o Mestre pode alterar a hierarquia.' };
     const target = memberOf(g, targetId);
-    if (!target) return { ok: false, error: 'Não é membro.' };
-    if (target.role === 'owner') return { ok: false, error: 'Não pode alterar o líder assim.' };
-    if (!['member', 'officer'].includes(role)) return { ok: false, error: 'Cargo: member ou officer.' };
-    target.role = role;
+    if (!target) return { ok: false, error: 'Essa pessoa não é membro da guilda.' };
+    if (String(target.id) === String(g.ownerId) || target.role === 'owner') {
+        return { ok: false, error: 'O Mestre só pode ser alterado pela transferência de liderança.' };
+    }
+    const requested = LEGACY_RANK[role] || String(role || '');
+    const rank = HIERARCHY.find((r) => r.id === requested);
+    if (!rank || rank.id === 'mestre') return { ok: false, error: 'Hierarquia inválida.' };
+    const counts = rankCounts(g);
+    if (rank.id !== rankOf(target) && Number.isFinite(rank.limit) && counts[rank.id] >= rank.limit) {
+        return { ok: false, error: `Limite atingido para ${rank.label}: máximo de ${rank.limit}.` };
+    }
+    target.rank = rank.id;
+    target.role = rank.id === 'oficial' ? 'officer' : 'member';
+    target.rankUpdatedAt = Date.now();
     save(data);
-    return { ok: true, guild: g };
+    return { ok: true, guild: g, member: target, rank };
 }
 
 function transfer(guildId, byUserId, targetId) {
