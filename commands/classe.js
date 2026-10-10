@@ -258,7 +258,14 @@ module.exports = {
         if (id.startsWith('classe:list:')) {
             const parts = id.split(':');
             const rarity = parts[2] || 'comum';
-            const page = Math.max(0, Number(parts[3]) || 0);
+            // Formato novo: classe:list:<raridade>:<prev|next|page>:<número>
+            // Mantém compatibilidade com botões antigos já enviados.
+            let page;
+            if (parts[3] === 'prev' || parts[3] === 'next' || parts[3] === 'page') {
+                page = Math.max(0, Number(parts[4]) || 0);
+            } else {
+                page = Math.max(0, Number(parts[3]) || 0);
+            }
             return interaction.update(classListPayload(rarity, page, 'component'));
         }
         if (id === 'classe:abrir') {
@@ -371,10 +378,10 @@ function classListPayload(rarity = 'comum', page = 0, source = 'component') {
         .setDescription(lines.join('\n').trim() || '_Nenhuma classe disponível nesta raridade._')
         .setFooter({ text: 'Página ' + (safePage + 1) + '/' + totalPages + ' • ' + list.length + ' classes • ' + rarityInfo.name });
     const prev = new ButtonBuilder()
-        .setCustomId('classe:list:' + rarityInfo.id + ':' + Math.max(0, safePage - 1))
+        .setCustomId('classe:list:' + rarityInfo.id + ':prev:' + Math.max(0, safePage - 1))
         .setLabel('Anterior').setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(safePage === 0);
     const next = new ButtonBuilder()
-        .setCustomId('classe:list:' + rarityInfo.id + ':' + Math.min(totalPages - 1, safePage + 1))
+        .setCustomId('classe:list:' + rarityInfo.id + ':next:' + Math.min(totalPages - 1, safePage + 1))
         .setLabel('Próxima').setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(safePage >= totalPages - 1);
     const rarityIndex = CLASS_RARITIES.findIndex((r) => r.id === rarityInfo.id);
     const nextRarity = CLASS_RARITIES[(rarityIndex + 1) % CLASS_RARITIES.length];
