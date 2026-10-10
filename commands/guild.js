@@ -13,7 +13,9 @@ const eter = require('../utils/eter');
 /** userId -> draft (criar ou editar) */
 const drafts = new Map();
 /** inviteId -> pending invite meta */
-const pendingInvites = new Map();\n/** Seleções temporárias da interface de hierarquia; os cargos reais ficam salvos em guilds.json. */\nconst hierarchySelections = new Map();
+const pendingInvites = new Map();
+/** Seleções temporárias da interface de hierarquia; os cargos reais ficam salvos em guilds.json. */
+const hierarchySelections = new Map();
 const INVITE_TTL_MS = 5 * 60 * 1000;
 
 function fmt(n) {
