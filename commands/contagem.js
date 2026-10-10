@@ -39,28 +39,6 @@ function buildUpdateEmbed({ admin, before, current, next, channelId, wasDisabled
         .setTimestamp();
 }
 
-async function announceInCountChannel(guild, res, adminTag) {
-    if (!res?.channelId || !guild) return;
-    try {
-        const ch = await guild.channels.fetch(res.channelId).catch(() => null);
-        if (!ch?.isTextBased?.()) return;
-        await ch
-            .send({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(0x38bdf8)
-                        .setTitle('🔢 Contador ajustado')
-                        .setDescription(
-                            `Um administrador definiu o contador em **${res.current}**.\n` +
-                                `Próximo número: **${res.next}**\n` +
-                                (adminTag ? `_por ${adminTag}_` : '')
-                        )
-                        .setTimestamp()
-                ]
-            })
-            .catch(() => {});
-    } catch (_) {}
-}
 
 function parseTarget(args) {
     if (!args?.length) return { mode: 'status' };
@@ -151,15 +129,6 @@ module.exports = {
             ]
         });
 
-        await announceInCountChannel(
-            message.guild,
-            {
-                channelId: res.channelId,
-                current: afterSt.current ?? res.current,
-                next: afterSt.next ?? res.next
-            },
-            String(message.author)
-        );
     },
 
     async executeSlash(i) {
@@ -226,14 +195,5 @@ module.exports = {
             ]
         });
 
-        await announceInCountChannel(
-            i.guild,
-            {
-                channelId: res.channelId,
-                current: afterSt.current ?? res.current,
-                next: afterSt.next ?? res.next
-            },
-            String(i.user)
-        );
     }
 };
