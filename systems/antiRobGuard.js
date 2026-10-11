@@ -36,6 +36,9 @@ function setup(client) {
     client.on('guildMemberUpdate', async (oldMember, newMember) => {
         try {
             const roleId = antiRob.ANTI_ROB_ROLE_ID;
+            // Sem variável válida, não existe cargo anti-roubo configurado.
+            if (!roleId) return;
+
             const had = oldMember.roles.cache.has(roleId);
             const has = newMember.roles.cache.has(roleId);
 
