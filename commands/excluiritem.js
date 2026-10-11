@@ -9,7 +9,8 @@ module.exports = {
         if (!player.has(message.author.id)) {
             return message.reply('Crie o perfil com `O.j criar`.');
         }
-        const idx = parseInt(args[0], 10);
+        const rawIndex = String(args[0] || '').trim();
+        const idx = /^\d+$/.test(rawIndex) ? Number(rawIndex) : NaN;
         if (!Number.isFinite(idx) || idx < 1) {
             return message.reply('Uso: `O.excluiritem <número>` — veja os números em `O.j perfil` / inventário.');
         }
@@ -21,7 +22,7 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xef4444)
-                    .setTitle('Item removido')
+                    .setTitle('📦 Item removido do inventário')
                     .setDescription(
                         `Removido: ${removed.emoji || '📦'} **${removed.name}**` +
                             (removed.rarity ? ` (${removed.rarity})` : '')
