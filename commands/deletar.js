@@ -11,7 +11,7 @@ function executeSale(userId, quantityArg, slotArg) {
         return { error: 'Informe um número de slot válido.' };
     }
 
-    const raw = String(quantityArg || '').toLowerCase();
+    const raw = String(quantityArg || '').trim().toLowerCase();
     const quantity = raw === 'all' ? Infinity : Number(quantityArg);
 
     if (raw !== 'all' && (!Number.isInteger(quantity) || quantity < 1)) {
@@ -41,6 +41,7 @@ module.exports = {
                 .setName('quantidade')
                 .setDescription('Quantidade a vender ou all')
                 .setRequired(true)
+                .setMaxLength(12)
             )
             .addIntegerOption((o) => o
                 .setName('numero')
