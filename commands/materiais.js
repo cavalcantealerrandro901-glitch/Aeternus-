@@ -30,7 +30,7 @@ function build(user) {
     const emb = new EmbedBuilder()
         .setColor(0x38bdf8)
         .setAuthor({ name: user.username, iconURL: user.displayAvatarURL({ size: 64 }) })
-        .setTitle('🧰 Materiais de Craft');
+        .setTitle('🧰 AETERNUS • MATERIAIS DE CRAFT');
 
     if (!profile?.name) {
         emb.setDescription(`${user} ainda não tem perfil. Use \`O.j criar\`.`);
@@ -53,5 +53,6 @@ function build(user) {
         ].join('\n')
     );
 
+    emb.setFooter({ text: 'Aeternus • Materiais usados nas receitas de craft' }).setTimestamp();
     return emb;
 }
