@@ -56,7 +56,7 @@ async function postRepairWorkspace({ cmdName, error, context, diagnosis, repair 
         diagnosis?.ok ? '**Diagnóstico (' + diagnosis.provider + '):**\n' + String(diagnosis.diagnosis || '').slice(0, 1200) : '**Diagnóstico:** análise indisponível.',
         repair?.repaired ? '**Estado:** correção publicada. Commit: `' + String(repair.commit || '').slice(0, 12) + '`' :
             repair?.attempted ? '**Estado:** reparo não concluído — ' + String(repair.reason || 'ver logs').slice(0, 300) : '**Estado:** erro registrado; equipe precisa revisar.',
-        'Use o comando de prefixo `reparo interface` para abrir os controles.'
+        'Este sistema funciona automaticamente pelos avisos no canal do erro e no canal de reparo configurado; não utiliza comandos de prefixo ou slash.'
     ].join('\n\n');
     await channel.send({ content: (roleId ? '<@&' + roleId + '>\n' : '') + body, allowedMentions: { parse: [], roles: roleId ? [roleId] : [] } }).catch(() => {});
     return true;
