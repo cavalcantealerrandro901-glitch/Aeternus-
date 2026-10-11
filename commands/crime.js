@@ -76,7 +76,9 @@ function successEmbed(user, crime, amount, balance) {
                 '',
                 '_Cooldown: 20 minutos · você será avisado no PV quando liberar._'
             ].join('\n')
-        );
+        )
+        .setFooter({ text: 'Aeternus Economy • Ação fictícia do jogo' })
+        .setTimestamp();
 }
 
 function failEmbed(user, crime, fine, balance) {
@@ -97,7 +99,9 @@ function failEmbed(user, crime, fine, balance) {
             iconURL: user.displayAvatarURL({ size: 64 })
         })
         .setTitle(`${crime.emoji} Crime fracassou`)
-        .setDescription(lines.join('\n'));
+        .setDescription(lines.join('\n'))
+        .setFooter({ text: 'Aeternus Economy • Ação fictícia do jogo' })
+        .setTimestamp();
 }
 
 function waitEmbed(user, left) {
