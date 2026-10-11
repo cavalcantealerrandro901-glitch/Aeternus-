@@ -798,7 +798,7 @@ async function commitRepairToGitHub(repo, token, rel, content, sha, summary) {
 function isSimpleSyntaxError(error) {
     const text = String(error?.stack || error?.message || error || '');
     return error?.name === 'SyntaxError' ||
-        /SyntaxError|Unexpected token|Unexpected end of input|missing \\)|missing ; after|Invalid or unexpected token|Unexpected identifier/i.test(text);
+        /SyntaxError|Unexpected token|Unexpected end of input|missing \)|missing ; after|Invalid or unexpected token|Unexpected identifier/i.test(text);
 }
 
 /**
