@@ -64,9 +64,10 @@ async function buildEmbed(user, guild, client) {
         ].join('\n'))
         .setFooter({
             text: safe
-                ? 'Anti-roubo global · salvo no banco de usuários'
-                : 'Desprotegido · pode ser roubado em qualquer servidor'
-        });
+                ? 'Aeternus Bank • Proteção global ativa'
+                : 'Aeternus Bank • Proteção anti-roubo necessária'
+        })
+        .setTimestamp();
 }
 
 module.exports = {
