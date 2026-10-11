@@ -119,8 +119,15 @@ module.exports = {
         }
 
         if (durationMs) {
+            const alreadyHasRole = member.roles.cache.has(role.id);
+            const alreadyTemporary = tempRoles.hasTempRole(interaction.guild.id, member.id, role.id);
+            if (alreadyHasRole && !alreadyTemporary) {
+                return interaction.editReply({
+                    embeds: [fail('Esse membro já possui esse cargo de forma permanente. Remova o cargo primeiro ou escolha outro; assim evito transformar um cargo permanente em temporário sem querer.')]
+                });
+            }
             try {
-                if (!member.roles.cache.has(role.id)) {
+                if (!alreadyHasRole) {
                     if (antiRob.isAntiRobRole(role.id)) {
                         antiRob.authorize(interaction.guild.id, member.id, interaction.user.id);
                     }
@@ -240,8 +247,13 @@ module.exports = {
         }
 
         if (durationMs) {
+            const alreadyHasRole = member.roles.cache.has(role.id);
+            const alreadyTemporary = tempRoles.hasTempRole(message.guild.id, member.id, role.id);
+            if (alreadyHasRole && !alreadyTemporary) {
+                return message.reply('❌ Esse membro já possui esse cargo de forma permanente. Remova-o primeiro ou escolha outro para evitar torná-lo temporário sem querer.');
+            }
             try {
-                if (!member.roles.cache.has(role.id)) {
+                if (!alreadyHasRole) {
                     if (antiRob.isAntiRobRole(role.id)) {
                         antiRob.authorize(message.guild.id, member.id, message.author.id);
                     }
