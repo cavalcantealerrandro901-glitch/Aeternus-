@@ -247,13 +247,13 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
         const { e, tag } = row;
         if (meta.economy) {
             blocks.push(
-                `${medal(pos)} ${tag} = ID [\`${e.id}\`]\n   saldo:  ✨ **${fmt(e.value)}** éter`
+                `${medal(pos)} ${tag}\n   ✨ **${fmt(e.value)}** éter`
             );
         } else {
             const extra =
                 e.level != null ? `\n   Nv. **${e.level}**` : '';
             blocks.push(
-                `${medal(pos)} ${tag} = ID [\`${e.id}\`]\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+                `${medal(pos)} ${tag}\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
             );
         }
     }
@@ -262,8 +262,8 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
 
     const posLine =
         mine.rank != null
-            ? `Sua posição no rank: **${mine.rank}** posição.`
-            : 'Sua posição no rank: _você ainda não está no ranking._';
+            ? `Sua posição no ranking: **#${mine.rank}**.`
+            : 'Sua posição: _você ainda não entrou no ranking._';
 
     const serverLabel = guildName || 'Global';
     const hora = clockNow();
@@ -284,7 +284,7 @@ function helpEmbed() {
         .setTitle('🏆 Rankings · Economia Aeternus')
         .setDescription(
             [
-                'Saldos lidos do **MongoDB** (éter).',
+                'Acompanhe os destaques da economia e da progressão dos aventureiros.',
                 '',
                 '**Comandos**',
                 '`O.rank` — **AETERNUS RANK GERAL** (éter global)',
