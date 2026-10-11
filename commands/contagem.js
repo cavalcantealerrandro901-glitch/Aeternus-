@@ -70,9 +70,11 @@ module.exports = {
         .addBooleanOption((o) =>
             o.setName('zerar').setDescription('Zerar a contagem; o próximo número será 1')
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(message, args) {
+        if (!message.guild) return message.reply('❌ Este comando só funciona em servidores.');
         if (
             !message.member?.permissions?.has(PermissionFlagsBits.ManageGuild) &&
             !message.member?.permissions?.has(PermissionFlagsBits.Administrator)
@@ -132,6 +134,9 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.inGuild()) {
+            return i.reply({ content: '❌ Este comando só funciona em servidores.', ephemeral: true });
+        }
         if (
             !i.memberPermissions?.has(PermissionFlagsBits.ManageGuild) &&
             !i.memberPermissions?.has(PermissionFlagsBits.Administrator)
