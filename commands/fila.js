@@ -7,6 +7,7 @@ module.exports = {
     description: 'Mostra a fila de músicas',
 
     async execute(message) {
+        if (!message.guild) return message.reply('❌ A fila só pode ser consultada dentro de um servidor.');
         return message.reply({ embeds: [build(message.guild.id)] });
     },
 };
