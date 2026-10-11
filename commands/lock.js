@@ -23,8 +23,8 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xef4444)
-                        .setTitle('🔒 Canal trancado')
-                        .setDescription(`Canal **trancado**.\n${reason}`)
+                        .setTitle('🔒 AETERNUS • CANAL TRANCADO')
+                        .setDescription(`O canal foi **trancado** com sucesso.\n\n📝 **Motivo:** ${reason}`)
                         .setFooter({ text: `Mod: ${message.author.tag}` })
                         .setTimestamp()
                 ]
