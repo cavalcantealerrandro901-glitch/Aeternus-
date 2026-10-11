@@ -126,7 +126,7 @@ module.exports = {
                 `🔮 **Místicos:** INT ${attrs.inteligencia} · SOR ${attrs.sorte} · PRE ${attrs.precisao} · RES ${attrs.resistencia}`,
                 `⚔️ **Habilidades:** ${activeNames}`,
                 `🧠 **Passivas:** ${passiveNames}`
-            ].join('\\n');
+            ].join('\n');
             await wait.edit({
                 content: info,
                 files: [file],
@@ -161,7 +161,7 @@ module.exports = {
                 `🔮 **Místicos:** INT ${attrs.inteligencia} · SOR ${attrs.sorte} · PRE ${attrs.precisao} · RES ${attrs.resistencia}`,
                 `⚔️ **Habilidades:** ${activeNames}`,
                 `🧠 **Passivas:** ${passiveNames}`
-            ].join('\\n');
+            ].join('\n');
             await interaction.editReply({
                 content: info,
                 files: [file],
