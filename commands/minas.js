@@ -123,17 +123,17 @@ async function sendResult(game, client, type = null) {
             const win = game._lastWin || potentialAt(game.amount, game.opened.size, game.bombCount);
             const profit = win - game.amount;
             title = '✦ SAQUE REALIZADO';
-            description = 'Você decidiu sair do campo antes de encontrar uma mina.';
+            description = 'Saque confirmado. A partida foi encerrada com segurança.';
             color = 0x57F287;
             fields = [
                 { name: 'Recebido', value: fmt(win) + ' ✨', inline: true },
-                { name: 'Lucro', value: '+' + fmt(profit) + ' ✨', inline: true }
+                { name: profit >= 0 ? 'Lucro' : 'Resultado', value: (profit > 0 ? '+' : profit < 0 ? '−' : '') + fmt(Math.abs(profit)) + ' ✨', inline: true }
             ];
         } else if (type === 'win') {
             const win = game._lastWin || potentialAt(game.amount, game.opened.size, game.bombCount);
             const profit = win - game.amount;
             title = '✦ MINES CONCLUÍDO';
-            description = 'Você conseguiu sair do campo em segurança.';
+            description = 'Você concluiu a partida e garantiu o valor acumulado.';
             color = 0x57F287;
             fields = [
                 { name: 'Recebido', value: fmt(win) + ' ✨', inline: true },
@@ -187,7 +187,7 @@ function panelEmbed(game) {
         'Multiplicador atual: ' + currentMult.toFixed(2) + 'x',
         'Prox multi: ' + nextMult.toFixed(2) + 'x  •  ' + fmt(nextGain) + ' ✨',
         '',
-        'Aleatório escolhe uma casa ao acaso e Atualizar reorganiza o tabuleiro da partida.',
+        'Aleatório abre uma casa livre ao acaso. Atualizar recarrega o painel da partida.',
         '',
         'Partida #' + String(game.partida).padStart(4, '0')
     ];
