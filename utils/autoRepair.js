@@ -826,13 +826,29 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction, 
         } catch (e) {
             if (localApplied && !committed) {
                 try {
-                    fs.writeFileSync(full, original, { encoding: 'utf8', mode: 0o600 });
-                    if (rel.startsWith('commands/') && rel.endsWith('.js')) {
-                        const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
-                        loader.loadCommandFile(clientRef, full, { quiet: true });
+                    const current = fs.readFileSync(full, 'utf8');
+                    if (current !== proposed) {
+                        throw new Error('Rollback preventivo: o arquivo mudou após a correção; não será sobrescrito para preservar alterações mais recentes. Backup original: ' + path.relative(ROOT, backupPath));
                     }
+
+                    const rollbackTemp = full + '.rollback-' + process.pid + '-' + require('crypto').randomBytes(3).toString('hex') + '.tmp';
+                    try {
+                        fs.writeFileSync(rollbackTemp, original, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+                        fs.renameSync(rollbackTemp, full);
+                    } finally {
+                        try { if (fs.existsSync(rollbackTemp)) fs.unlinkSync(rollbackTemp); } catch (_) {}
+                    }
+
+                    if (rel.startsWith('commands/') && rel.endsWith('.js') && clientRef) {
+                        const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
+                        const rollbackResult = loader.loadCommandFile(clientRef, full, { quiet: true });
+                        if (!rollbackResult?.ok) {
+                            console.error('[autoRepair:rollback] Arquivo original restaurado, mas recarregar o comando falhou:', rollbackResult?.error || 'erro desconhecido');
+                        }
+                    }
+                    console.warn('[autoRepair:rollback] Versão original restaurada após falha antes da publicação. Backup:', path.relative(ROOT, backupPath));
                 } catch (rollbackError) {
-                    console.error('[autoRepair:rollback] Falha ao restaurar arquivo:', rollbackError?.message || rollbackError);
+                    console.error('[autoRepair:rollback] Restauração segura não concluída:', rollbackError?.message || rollbackError);
                 }
             }
             try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch (_) {}
