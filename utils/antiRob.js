@@ -66,14 +66,11 @@ function getConfiguredRoleId(guildId) {
 }
 
 function resolveRoleId(guild) {
-    if (!guild) return envFallbackId();
-    const configured = getConfiguredRoleId(guild.id);
-    if (configured) return configured;
+    // O ID definido no Render é a fonte principal da configuração.
     const envId = envFallbackId();
-    if (envId && guild.roles?.cache?.has(envId)) return envId;
-    const byName = guild.roles?.cache?.find((r) => NAME_RE.test(r.name));
-    if (byName) return byName.id;
-    return envId;
+    if (envId) return /^\d{15,25}$/.test(envId) ? envId : null;
+    if (!guild) return null;
+    return getConfiguredRoleId(guild.id);
 }
 
 async function memberHasRoleHere(guild, userId) {
