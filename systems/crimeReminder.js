@@ -11,6 +11,7 @@ const BATCH_DELAY_MS = 1200;
 const COLOR = 0xef4444;
 
 let started = false;
+let ticking = false;
 
 function isEnabled() {
     const v = String(process.env.CRIME_REMINDER || 'on').toLowerCase();
@@ -87,8 +88,10 @@ async function sendReady(client, userId, lastCrime) {
 }
 
 async function tick(client) {
-    if (!isEnabled()) return;
+    if (ticking || !isEnabled()) return;
     if (!client?.user) return;
+    ticking = true;
+    try {
 
     const now = Date.now();
     const all = cdMap();
@@ -118,6 +121,9 @@ async function tick(client) {
     }
 
     if (sent > 0) console.log(`[crimeReminder] ${sent} DM(s) de crime enviada(s)`);
+    } finally {
+        ticking = false;
+    }
 }
 
 function setup(client) {
