@@ -77,7 +77,9 @@ function successEmbed(user, amount, balance) {
                 '',
                 '_Cooldown: 1 hora · você será avisado no PV quando liberar._'
             ].join('\n')
-        );
+        )
+        .setFooter({ text: 'Aeternus Economy • Recompensa por hora' })
+        .setTimestamp();
 }
 
 function failEmbed(user, balance) {
@@ -98,7 +100,9 @@ function failEmbed(user, balance) {
                 '',
                 '_Cooldown: 1 hora · você será avisado no PV quando liberar._'
             ].join('\n')
-        );
+        )
+        .setFooter({ text: 'Aeternus Economy • Recompensa por hora' })
+        .setTimestamp();
 }
 
 function waitEmbed(user, left) {
