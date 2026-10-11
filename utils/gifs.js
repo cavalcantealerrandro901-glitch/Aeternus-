@@ -62,6 +62,60 @@ function loadKillLocal() {
 const KILL_LOCAL = loadKillLocal();
 const KILL_CACHE = [...KILL_LOCAL];
 
+// Pool persistente de interações: até 300 URLs únicas por ação.
+// O pool cresce conforme as APIs entregam novos GIFs e evita repetir sempre o último resultado.
+const INTERACTION_POOL_FILE = path.join(__dirname, '..', 'data', 'interaction_gifs.json');
+const INTERACTION_POOL_LIMIT = 300;
+let interactionPool = {};
+
+function loadInteractionPool() {
+    try {
+        const parsed = JSON.parse(fs.readFileSync(INTERACTION_POOL_FILE, 'utf8'));
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return Object.fromEntries(
+                Object.entries(parsed).map(([key, list]) => [
+                    key,
+                    Array.isArray(list)
+                        ? [...new Set(list.filter((url) => typeof url === 'string' && /^https?:\\/\\//i.test(url)))].slice(-INTERACTION_POOL_LIMIT)
+                        : []
+                ])
+            );
+        }
+    } catch (_) {}
+    return {};
+}
+
+function saveInteractionPool() {
+    try {
+        fs.mkdirSync(path.dirname(INTERACTION_POOL_FILE), { recursive: true });
+        fs.writeFileSync(INTERACTION_POOL_FILE, JSON.stringify(interactionPool, null, 2));
+    } catch (error) {
+        console.warn('[gifs] não foi possível salvar o pool:', error.message);
+    }
+}
+
+interactionPool = loadInteractionPool();
+
+function rememberGif(category, url) {
+    if (!url || typeof url !== 'string' || !/^https?:\\/\\//i.test(url)) return;
+    const key = resolveKey(category);
+    const list = interactionPool[key] || (interactionPool[key] = []);
+    if (list.includes(url)) return;
+    list.push(url);
+    if (list.length > INTERACTION_POOL_LIMIT) list.splice(0, list.length - INTERACTION_POOL_LIMIT);
+    saveInteractionPool();
+}
+
+function pickPool(category) {
+    const key = resolveKey(category);
+    return pickFrom(interactionPool[key] || []);
+}
+
+function poolCount(category) {
+    if (category) return (interactionPool[resolveKey(category)] || []).length;
+    return Object.values(interactionPool).reduce((total, list) => total + list.length, 0);
+}
+
 const ALIAS = {
     abraco: 'hug', beijo: 'kiss', tapa: 'slap', carinho: 'pat', cutucar: 'poke',
     morder: 'bite', chorar: 'cry', dancar: 'dance', cafune: 'cuddle', acenar: 'wave',
@@ -155,10 +209,25 @@ async function pickAsync(category) {
         if (k) return k;
         return pickFrom(KILL_LOCAL);
     }
+
     const key = resolveKey(category);
-    const online = (await fetchGifukai(key)) || (await fetchOtaku(key)) || (await fetchWaifu(key));
-    if (online) return online;
-    return (await fetchGifukai(key)) || pickLocal(key);
+    // Consultar as fontes em paralelo aumenta a variedade sem atrasar em cascata.
+    const results = await Promise.allSettled([
+        fetchGifukai(key),
+        fetchOtaku(key),
+        fetchWaifu(key)
+    ]);
+    const fresh = results
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value)
+        .filter((url) => typeof url === 'string' && /^https?:\\/\\//i.test(url));
+
+    for (const url of fresh) rememberGif(key, url);
+
+    // Favorece GIFs recém-retornados, mas também alterna com o acervo salvo.
+    const uniqueFresh = [...new Set(fresh)];
+    if (uniqueFresh.length && Math.random() < 0.75) return pickFrom(uniqueFresh);
+    return pickPool(key) || pickFrom(uniqueFresh) || (await fetchGifukai(key)) || pickLocal(key);
 }
 
 function pick(category) {
@@ -168,10 +237,10 @@ function pick(category) {
 
 function count(category) {
     if (isKillKey(category)) return Math.max(KILL_CACHE.length, KILL_LOCAL.length);
-    return 0;
+    return poolCount(category);
 }
 
 module.exports = {
     pick, pickAsync, count, fetchKillGif, fetchGifukai, fetchOtaku, fetchWaifu,
-    resolveKey, KILL_LOCAL
+    resolveKey, KILL_LOCAL, poolCount, INTERACTION_POOL_LIMIT
 };
