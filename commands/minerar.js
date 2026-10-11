@@ -215,7 +215,7 @@ function waitEmbed(user, left) {
             name: user.username,
             iconURL: user.displayAvatarURL({ size: 64 })
         })
-        .setTitle('⛏️ Picareta descansando')
+        .setTitle('⏳ AETERNUS • MINERAÇÃO EM RECARGA')
         .setDescription(
             [
                 'Sua picareta ainda está esquentando do último turno.',
@@ -223,10 +223,7 @@ function waitEmbed(user, left) {
                 '',
                 '_Quando o tempo acabar, você recebe um aviso no PV._'
             ].join('\n')
-        );
-}
-
-function resultEmbed(user, ore, amount, balance, biome) {
+        )\n        .setFooter({ text: 'Aeternus • Próxima mineração em 5 minutos' })\n        .setTimestamp();\n}\n\nfunction resultEmbed(user, ore, amount, balance, biome) {
     const line = pickLine(ore);
     const got =
         amount > 0
@@ -252,7 +249,7 @@ function resultEmbed(user, ore, amount, balance, biome) {
                 '_Próxima mineração em 5 minutos · aviso no PV quando liberar._'
             ].join('\n')
         )
-        .setFooter({ text: 'Aeternus · Mundo de mineração' });
+        .setFooter({ text: 'Aeternus • Mundo de mineração' })\n        .setTimestamp();
 }
 
 async function run(user, reply) {
