@@ -23,9 +23,9 @@ async function run(userId, amountRaw, reply) {
         embeds: [
             new EmbedBuilder()
                 .setColor(win > 0 ? 0x22c55e : 0xef4444)
-                .setTitle('Caça-níqueis')
+                .setTitle('✦ AETERNUS • CAÇA-NÍQUEIS')
                 .setDescription(
-                    `${roll.join(' | ')}\n${win > 0 ? `✨ **+${fmt(win)}**` : `✨ **-${fmt(bet.amount)}**`}\nSaldo: ✨ **${fmt(eter.get(userId))}**`
+                    `${roll.join(' | ')}\n${win > 0 ? `✨ **+${fmt(win - bet.amount)}** de lucro\n💰 Recebido: **${fmt(win)}** ✨` : `💫 **-${fmt(bet.amount)}** de prejuízo`}\nSaldo: ✨ **${fmt(eter.get(userId))}**`
                 )
         ]
     });
