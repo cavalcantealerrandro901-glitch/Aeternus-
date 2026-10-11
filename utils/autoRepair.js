@@ -597,7 +597,7 @@ async function originalHasSyntaxError(filePath, original) {
     return /SyntaxError|Unexpected token|Unexpected end of input|missing \)|missing ; after|Invalid or unexpected token|Unexpected identifier/i.test(details);
 }
 
-async function waitForFunctionalApproval(channel, rel, cmdName) {
+async function waitForFunctionalApproval(channel, rel, cmdName, risk = { level: 'MÉDIO', reason: 'classificação não disponível' }) {
     if (!channel?.send || typeof channel.awaitMessages !== 'function') {
         throw new Error('Canal configurado de reparo precisa aceitar mensagens; correção não será publicada.');
     }
@@ -614,6 +614,7 @@ async function waitForFunctionalApproval(channel, rel, cmdName) {
             'A correção local foi aplicada e o comando foi recarregado, mas **ainda NÃO foi enviada ao GitHub**.',
             '**Arquivo:** `' + rel + '`',
             '**Comando associado:** `' + String(cmdName || '?') + '`',
+            '**Risco da alteração:** ' + String(risk.level || 'MÉDIO') + ' — ' + String(risk.reason || 'revisão manual obrigatória').slice(0, 220),
             'Teste manualmente o comando no Discord. Não use ações que movimentem moeda, punam membros ou gerem efeitos irreversíveis.',
             'Se funcionar, responda exatamente `APROVAR ' + code + '`. Se falhar, responda `REPROVAR ' + code + '`.',
             'Somente o dono ou a equipe com o cargo configurado pode aprovar. Prazo: 5 minutos. Sem aprovação, a versão original será restaurada e nada será publicado.'
@@ -691,7 +692,41 @@ async function commitRepairToGitHub(repo, token, rel, content, sha, summary) {
 function isSimpleSyntaxError(error) {
     const text = String(error?.stack || error?.message || error || '');
     return error?.name === 'SyntaxError' ||
-        /SyntaxError|Unexpected token|Unexpected end of input|missing \)|missing ; after|Invalid or unexpected token|Unexpected identifier/i.test(text);
+        /SyntaxError|Unexpected token|Unexpected end of input|missing \\)|missing ; after|Invalid or unexpected token|Unexpected identifier/i.test(text);
+}
+
+/**
+ * Classificação conservadora de risco. A IA nunca decide sozinha se pode publicar:
+ * somente reparos de sintaxe, pequenos e sem sinais sensíveis podem seguir automaticamente.
+ */
+function classifyRepairRisk(rel, original, proposed) {
+    const file = String(rel || '').toLowerCase();
+    const before = String(original || '');
+    const after = String(proposed || '');
+    const combined = file + '\n' + before + '\n' + after;
+    const criticalPatterns = [
+        /econom|saldo|eter|éter|currency|bank|transfer|payment|aposta|bet|drop|sorteio|reward|recompensa/i,
+        /permission|permiss|administrator|admin|moderation|modera|ban\s*\(|kick\s*\(|timeout\s*\(|role\.?(add|remove)|cargo/i,
+        /process\.env|token|secret|password|api[_-]?key|oauth|auth|credential/i,
+        /mongoose|mongodb|mongo(uri)?|sequelize|prisma|database|\b(updateOne|deleteOne|deleteMany|findOneAndUpdate|insertOne)\b/i,
+        /unlink(Sync)?\s*\(|rmSync?\s*\(|writeFile(Sync)?\s*\(|rename(Sync)?\s*\(|child_process|execSync|spawnSync/i,
+        /interaction\.memberpermissions|memberpermissions|haspermission|isowner|ownerids|guildowner/i
+    ];
+    if (criticalPatterns.some((pattern) => pattern.test(combined))) {
+        return { level: 'CRÍTICO', automatic: false, reason: 'código relacionado a economia, permissões, segurança, dados persistentes ou operações sensíveis' };
+    }
+    if (!file.startsWith('commands/') || !/\.js$/.test(file)) {
+        return { level: 'ALTO', automatic: false, reason: 'alteração fora de um comando JavaScript comum' };
+    }
+    const oldLines = before.split(/\r?\n/);
+    const newLines = after.split(/\r?\n/);
+    let changed = 0;
+    const max = Math.max(oldLines.length, newLines.length);
+    for (let i = 0; i < max; i++) if (oldLines[i] !== newLines[i]) changed++;
+    if (changed > 8 || Math.abs(before.length - after.length) > 1200) {
+        return { level: 'MÉDIO', automatic: false, reason: 'mudança maior que o limite conservador para correção automática' };
+    }
+    return { level: 'BAIXO', automatic: true, reason: 'comando não sensível e alteração pequena; exige validação de sintaxe e carregamento' };
 }
 
 async function deleteRepairMessages(messages = []) {
@@ -773,6 +808,8 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction, 
         // Só considerar publicação automática se o arquivo original realmente falhava
         // no parser do Node. Erros de runtime com nome SyntaxError exigem aprovação.
         const verifiedSyntaxOnlyRepair = isSimpleSyntaxError(error) && await originalHasSyntaxError(full, original);
+        const repairRisk = classifyRepairRisk(rel, original, proposed);
+        const allowAutomaticPublish = verifiedSyntaxOnlyRepair && repairRisk.automatic;
 
         const backupDir = path.join(ROOT, 'data', 'autorepair-backups');
         fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
@@ -798,10 +835,10 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction, 
 
             const workspace = await getRepairWorkspaceChannel();
             if (!workspace?.channel) throw new Error('Canal de reparo não configurado ou inacessível. Configure AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.');
-            const automaticSyntaxRepair = verifiedSyntaxOnlyRepair;
+            const automaticSyntaxRepair = allowAutomaticPublish;
             let approval = null;
             if (!automaticSyntaxRepair) {
-                approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName);
+                approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName, repairRisk);
             } else {
                 const autoNotice = await workspace.channel.send({
                     content: '🤖 **AETERNUS • REPARO AUTOMÁTICO SIMPLES**\nFoi identificado um erro de sintaxe. A correção passou pela validação de sintaxe e pelo carregamento do comando; será publicada automaticamente.',
