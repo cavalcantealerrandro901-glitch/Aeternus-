@@ -61,6 +61,7 @@ npm run slash      # registra slash commands
 | MONGO_URI | sim (Render) | Connection string MongoDB |
 | CLIENT_ID | recomendado | Application ID |
 | OWNER_ID | recomendado | Dono (DM de erros) |
+| ANTI_ROB_ROLE_ID | opcional | ID numérico do cargo anti-roubo usado pelo sistema de proteção |
 | GUILD_ID | opcional | Slash só neste servidor |
 | PORT | auto no Render | Porta do painel |
 | REQUIRE_MONGO | `1` no Render | Encerra se Mongo falhar |
