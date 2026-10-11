@@ -19,12 +19,12 @@ async function handleKickProcess(context, moderator, targetMember, reason, isSla
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(customId)
-            .setLabel('Aceitar expulsão')
+            .setLabel('Confirmar expulsão')
             .setEmoji('✅')
             .setStyle(ButtonStyle.Danger)
     );
 
-    const content = `Nossa, você <@${moderator.id}> vai expulsar <@${targetMember.id}> mesmo? Uh... Sendo assim, clique no botão ✅ aceitar expulsão, você tem 6 minutos para decidir.`;
+    const content = `⚠️ **Confirmação de expulsão**\nModerador: <@${moderator.id}>\nMembro: <@${targetMember.id}>\nMotivo: **${String(reason).slice(0, 500)}**\n\nConfirme abaixo em até 6 minutos.`;
 
     let sentMsg;
     if (isSlash) {
@@ -52,7 +52,7 @@ async function handleKickProcess(context, moderator, targetMember, reason, isSla
         try {
             await targetMember.kick(`${reason} · por ${moderator.tag}`);
             
-            const successText = `---------- 👢 O usuário <@${targetMember.id}> foi expulso do servidor, mas quem manda quebrar as regras né!!`;
+            const successText = `👢 **Expulsão concluída**\nO membro <@${targetMember.id}> foi removido do servidor.\n**Motivo:** ${String(reason).slice(0, 500)}`;
             
             await originalMessage.reply({ content: successText, allowedMentions: { repliedUser: false } });
         } catch (e) {
