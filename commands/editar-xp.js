@@ -31,6 +31,7 @@ module.exports = {
                 .setDescription('Novo XP total (absoluto)')
                 .setRequired(true)
                 .setMinValue(0)
+                .setMaxValue(1_000_000_000)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
@@ -45,6 +46,9 @@ module.exports = {
         const user = i.options.getUser('usuario', true);
         if (user.bot) return respond(i, '❌ Não é possível editar XP de bots.');
         const amount = i.options.getInteger('quantidade', true);
+        if (!Number.isSafeInteger(amount) || amount < 0 || amount > 1_000_000_000) {
+            return respond(i, '❌ O XP total deve estar entre 0 e 1.000.000.000.');
+        }
         const before = xp.get(user.id);
         const result = xp.setXp(user.id, amount);
         return respond(i, {
