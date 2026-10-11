@@ -46,6 +46,17 @@ module.exports = {
             return respond(interaction, `❌ XP insuficiente. Seu saldo atual é de **${fmt(senderBefore.xp)} XP**.`);
         }
 
+        // Impede transferir XP que faça o remetente perder níveis mantendo os atributos ganhos.
+        const transferable = senderBefore.level === 0
+            ? senderBefore.xp
+            : senderBefore.xp % 1000;
+        if (amount > transferable) {
+            return respond(
+                interaction,
+                `❌ Você pode transferir até **${fmt(transferable)} XP** sem perder nível. Seu XP de níveis anteriores não pode ser transferido.`
+            );
+        }
+
         const receiverBefore = xp.get(target.id);
         xp.addXp(sender.id, -amount);
         const receiverAfter = xp.addXp(target.id, amount);
