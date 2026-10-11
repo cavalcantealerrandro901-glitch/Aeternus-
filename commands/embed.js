@@ -49,7 +49,9 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(0xa78bfa)
             .setTitle(String(title).slice(0, 256))
-            .setDescription(String(desc).slice(0, 4000))\n            .setFooter({ text: 'Aeternus • Mensagem personalizada' })\n            .setTimestamp();
+            .setDescription(String(desc).slice(0, 4000))
+            .setFooter({ text: 'Aeternus • Mensagem personalizada' })
+            .setTimestamp();
 
         await i.channel.send({ embeds: [embed] }).catch(() => {});
 
