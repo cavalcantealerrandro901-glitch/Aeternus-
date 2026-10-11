@@ -19,7 +19,7 @@ module.exports = {
 
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            return message.reply('❌ Sem permissão. Vocé precisa de permisão de geren iar o servudor');
+            return message.reply('❌ Você precisa da permissão **Gerenciar mensagens**.');
         }
         const n = Math.min(100, Math.max(1, parseInt(args[0], 10) || 0));
         if (!n) return message.reply('❌ Uso: `O.limpar <1-100>`');
@@ -39,6 +39,12 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
+            return i.reply({ content: '❌ Você precisa da permissão **Gerenciar mensagens**.', ephemeral: true });
+        }
+        if (!i.guild || !i.channel?.bulkDelete) {
+            return i.reply({ content: '❌ Este comando só funciona em canais de texto de um servidor.', ephemeral: true });
+        }
         const n = i.options.getInteger('quantidade', true);
         await i.deferReply({ ephemeral: true });
         const deleted = await i.channel.bulkDelete(n, true).catch(() => null);
