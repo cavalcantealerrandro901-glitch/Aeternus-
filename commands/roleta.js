@@ -181,7 +181,10 @@ module.exports = {
                                 '`O.roleta 17 2k`',
                                 '`O.roleta verde 500`',
                                 '',
-                                '🔴/⚫ ×**2** · 🟢 ×**14** · número ×**36**',\n                                '',\n                                'Escolha sua aposta com atenção: o resultado é aleatório.',\n                                'Apostas são descontadas antes do giro.'
+                                '🔴/⚫ ×**2** · 🟢 ×**14** · número ×**36**',
+                                '',
+                                'Escolha sua aposta com atenção: o resultado é aleatório.',
+                                'Apostas são descontadas antes do giro.'
                             ].join('\n')
                         )
                 ]
