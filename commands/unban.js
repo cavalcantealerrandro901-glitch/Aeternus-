@@ -15,7 +15,8 @@ module.exports = {
         if (!message.member.permissions.has(PermissionFlagsBits.BanMembers)) {
             return message.reply('❌ Sem permissão.');
         }
-        const id = String(args[0] || '').replace(/\D/g, '');
+        const id = String(args[0] || '').trim();
+        if (!/^\d{15,20}$/.test(id)) return message.reply('❌ Informe um ID válido do Discord.');
         if (!id) return message.reply('❌ Uso: `O.unban <id> [motivo]`');
         const reason = args.slice(1).join(' ').trim() || 'Sem motivo';
         try {
@@ -24,8 +25,8 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0x22c55e)
-                        .setTitle('Unban')
-                        .setDescription(`**ID:** \`${id}\`\n${reason}`)
+                        .setTitle('🔓 Desbanimento concluído')
+                        .setDescription(`**ID do usuário:** \`${id}\`\n**Motivo:** ${reason}`)
                         .setFooter({ text: `Mod: ${message.author.tag}` })
                         .setTimestamp()
                 ]
@@ -37,7 +38,8 @@ module.exports = {
 
     async executeSlash(i) {
         if (!i.memberPermissions?.has(PermissionFlagsBits.BanMembers)) return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
-        const id = String(i.options.getString('id', true)).replace(/\D/g, '');
+        const id = String(i.options.getString('id', true)).trim();
+        if (!/^\d{15,20}$/.test(id)) return i.reply({ content: '❌ Informe um ID válido do Discord.', ephemeral: true });
         const reason = i.options.getString('motivo') || 'Sem motivo';
         try {
             await i.guild.members.unban(id, `${reason} · por ${i.user.tag}`);
