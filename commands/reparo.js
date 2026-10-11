@@ -68,6 +68,11 @@ module.exports = {
         return actionReply({ reply: (p) => interaction.reply(p) }, String(interaction.options.getString('acao') || 'interface').toLowerCase());
     },
     async handleComponent(interaction) {
+        const componentParts = String(interaction.customId || '').split(':');
+        if (componentParts[1] === 'aprovacao') {
+            await interaction.deferUpdate().catch(() => {});
+            return;
+        }
         const gate = allowed({ user: interaction.user, author: interaction.user, member: interaction.member, guild: interaction.guild, channel: interaction.channel });
         if (!gate.ok) return interaction.reply({ content: '⛔ ' + gate.reason, ephemeral: true });
         const action = String(interaction.customId || '').split(':')[1] || 'interface';
