@@ -1,7 +1,7 @@
 /**
  * GIFs de interação
- * Ordem: gifukai → otakugifs → waifu.pics → pool local
- * matar: kill/kick/punch/shoot — pool em data/kill_gifs.json (≥78)
+ * Interações: GIFs de gifukai, otakugifs e waifu.pics guardados em pool persistente.
+ * Capacidade: até 300 GIFs únicos por ação (mais de 200 no total potencial).
  */
 
 const fs = require('fs');
@@ -76,7 +76,7 @@ function loadInteractionPool() {
                 Object.entries(parsed).map(([key, list]) => [
                     key,
                     Array.isArray(list)
-                        ? [...new Set(list.filter((url) => typeof url === 'string' && /^https?:\\/\\//i.test(url)))].slice(-INTERACTION_POOL_LIMIT)
+                        ? [...new Set(list.filter((url) => typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))))].slice(-INTERACTION_POOL_LIMIT)
                         : []
                 ])
             );
@@ -97,7 +97,7 @@ function saveInteractionPool() {
 interactionPool = loadInteractionPool();
 
 function rememberGif(category, url) {
-    if (!url || typeof url !== 'string' || !/^https?:\\/\\//i.test(url)) return;
+    if (!url || typeof url !== 'string' || !(url.startsWith('https://') || url.startsWith('http://'))) return;
     const key = resolveKey(category);
     const list = interactionPool[key] || (interactionPool[key] = []);
     if (list.includes(url)) return;
@@ -220,7 +220,7 @@ async function pickAsync(category) {
     const fresh = results
         .filter((result) => result.status === 'fulfilled')
         .map((result) => result.value)
-        .filter((url) => typeof url === 'string' && /^https?:\\/\\//i.test(url));
+        .filter((url) => typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://')));
 
     for (const url of fresh) rememberGif(key, url);
 
