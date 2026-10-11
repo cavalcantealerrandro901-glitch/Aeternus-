@@ -29,9 +29,9 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0x38bdf8)
-                    .setTitle('Limpar')
-                    .setDescription(`🧹 **${deleted?.size || 0}** mensagens apagadas.`)
-                    .setFooter({ text: `Mod: ${message.author.tag}` })
+                    .setTitle('🧹 AETERNUS • LIMPEZA DO CANAL')
+                    .setDescription(`A limpeza foi concluída.\n\n🗑️ **Mensagens removidas:** ${deleted?.size || 0}\n👮 **Responsável:** ${message.author}`)
+                    .setFooter({ text: 'Aeternus Moderation • Limpeza de mensagens' })
                     .setTimestamp()
             ]
         });
