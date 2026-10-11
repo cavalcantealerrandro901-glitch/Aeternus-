@@ -16,7 +16,7 @@ module.exports = {
         if (!opponent) {
             const embed = new EmbedBuilder().setColor(0xc9a227).setTitle('⚔️ ARENA PvP • AETERNUS')
                 .setDescription(['Desafie outro jogador para um duelo **1v1**.','', '**Como iniciar:**','`O.pvp @oponente`','', 'A batalha acontece no painel web do Aeternus.','Cada jogador usa os ataques disponíveis da própria classe.','Sem apostas e sem moeda envolvida.'].join('\n'))
-                .setFooter({ text: '✦ Aeternus Arena' });
+                .setFooter({ text: 'Aeternus Arena • PvP sem apostas' }).setTimestamp();
             return message.reply({ embeds: [embed] });
         }
         if (opponent.id === message.author.id) return message.reply('Você não pode desafiar a si mesmo.');
@@ -25,7 +25,7 @@ module.exports = {
         if (!result.ok) return message.reply(result.error);
         const embed = new EmbedBuilder().setColor(0xc9a227).setTitle('⚔️ ARENA PvP • DESAFIO CRIADO')
             .setDescription(['**' + message.author.username + '** ⚔️ **' + opponent.username + '**','', 'A batalha foi criada. Cada jogador deve abrir o painel pelo botão abaixo.','', '⏱️ Turnos de **90 segundos**','⚔️ Ataques definidos pela classe','💬 Chat disponível somente durante a batalha','🏆 Vitória concede as recompensas normais do PvP.','', '🔗 [ABRIR ARENA](' + fightLink(result.match.id) + ')'].join('\n'))
-            .setFooter({ text: 'Arena ' + result.match.id }).setTimestamp();
+            .setFooter({ text: 'Aeternus Arena • Desafio ' + result.match.id }).setTimestamp();
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setLabel('⚔️ Abrir Arena').setStyle(ButtonStyle.Link).setURL(fightLink(result.match.id))
         );
