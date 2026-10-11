@@ -17,7 +17,7 @@ function buildAfkText(user, reason, sinceMs) {
     const mins = totalMin % 60;
     let horasLabel;
     if (hours <= 0) {
-        horasLabel = mins <= 0 ? 'menos de 1 min' : mins + ' min';
+        horasLabel = mins <= 0 ? '1 min' : mins + ' min';
     } else if (mins === 0) {
         horasLabel = hours + 'h';
     } else {
@@ -33,7 +33,7 @@ function buildAfkText(user, reason, sinceMs) {
 module.exports = {
     name: 'afk',
     aliases: ['ausente'],
-    description: 'Marca você como ausente',
+    description: '[💤] Ativa o (AFK) e o motivo',
     data: new SlashCommandBuilder()
         .setName('ausente')
         .setDescription('[💤] Ativa o (AFK) e o motivo')
