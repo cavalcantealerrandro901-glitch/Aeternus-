@@ -7,7 +7,7 @@ function serverUrl(guildId) { const base = panelBase(); return (base ? base : ''
 
 function listEmbed(client) {
     const guilds = [...client.guilds.cache.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    const lines = guilds.length ? guilds.map((g, i) => '**' + (i + 1) + '. ' + g.name + '**\n└ ID: `' + g.id + '` · ' + serverUrl(g.id)) : ['_O Aeternus não está em nenhum servidor._'];
+    const lines = guilds.length ? guilds.map((g, i) => '**' + (i + 1) + '. ' + g.name.replace(/([*_`~|])/g, '\\$1') + '**\n└ ID: `' + g.id + '` · ' + serverUrl(g.id)) : ['_O Aeternus não está em nenhum servidor._'];
     return new EmbedBuilder().setColor(0x8b5cf6).setTitle('✦ AETERNUS • GERENCIAMENTO DO BOT').setDescription(['Servidores conectados: **' + guilds.length + '**', '', ...lines].join('\n')).setFooter({ text: 'Acesso restrito ao proprietário do bot.' }).setTimestamp();
 }
 
