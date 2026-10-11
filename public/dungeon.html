@@ -262,17 +262,18 @@ html,body{background:radial-gradient(circle at 50% -10%,#22243a 0,#0a0b11 45%,#0
       });
     }
     (p.actives || []).forEach((a) => skills.push(a));
+    (p.unique || []).forEach((a) => skills.push({ ...a, unique: true }));
     skills.forEach((sk) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'skill';
+      btn.className = 'skill' + (sk.unique ? ' unique' : '');
       const cd = sk.currentCd || 0;
       const need = sk.mana || 0;
-      btn.disabled = !myTurn || acting || cd > 0 || (p.mana || 0) < need || (p.hp || 0) <= 0;
+      btn.disabled = !myTurn || acting || cd > 0 || !!sk.used || (p.mana || 0) < need || (p.hp || 0) <= 0;
       btn.innerHTML =
         '<div class="sn">' + (sk.emoji || '✨') + ' ' + (sk.name || sk.id) + '</div>' +
         '<div class="sd">' + (sk.desc || 'Habilidade') + '</div>' +
-        '<div class="sm">MP ' + need + '</div>' +
+        '<div class="sm">' + (sk.unique ? 'ÚNICA · ' : '') + 'MP ' + need + '</div>' +
         (cd > 0 ? '<div class="scd">CD ' + cd + '</div>' : '');
       btn.onclick = () => doCombat(sk.id);
       box.appendChild(btn);
