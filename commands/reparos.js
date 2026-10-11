@@ -92,18 +92,16 @@ async function showHistory(context) {
 
     let records = autoRepair.getRepairHistory(100);
     let page = 0;
-    const totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
+    let totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
     const payload = {
         embeds: [buildPage(records, page, totalPages)],
         components: [buildButtons(page, totalPages)]
     };
 
-    if (context.isChatInputCommand?.()) await context.reply(payload);
-    else await context.reply(payload);
-
+    const sent = await context.reply(payload);
     const message = context.isChatInputCommand?.()
-        ? await context.fetchReply()
-        : await context.fetchReply().catch(() => null);
+        ? await context.fetchReply().catch(() => null)
+        : sent;
     if (!message) return;
 
     const collector = message.createMessageComponentCollector({
@@ -121,7 +119,8 @@ async function showHistory(context) {
         if (interaction.customId === 'aeternus_reparos_next') page = Math.min(totalPages - 1, page + 1);
         if (interaction.customId === 'aeternus_reparos_refresh') {
             records = autoRepair.getRepairHistory(100);
-            page = Math.min(page, Math.max(0, Math.ceil(records.length / PAGE_SIZE) - 1));
+            totalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
+            page = Math.min(page, totalPages - 1);
         }
 
         const currentTotalPages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
