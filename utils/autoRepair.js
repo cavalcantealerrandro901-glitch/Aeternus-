@@ -1540,6 +1540,22 @@ async function handleCommandError({ cmdName, error, context, message, interactio
     st.lastError = errMsg;
     state.set(name, st);
 
+    // Aviso imediato no canal de origem; os detalhes e a aprovação ficam no canal central.
+    const originChannel = message?.channel || interaction?.channel;
+    const workspaceForNotice = await getRepairWorkspaceChannel().catch(() => null);
+    const originNotice = workspaceForNotice?.channel
+        ? '🛠️ **AETERNUS • REPARO ABERTO**\nOcorreu um erro neste comando. A equipe foi avisada; diagnóstico e acompanhamento estão no canal configurado de reparo.'
+        : '⚠️ **AETERNUS • REPARO NÃO INICIADO**\nOcorreu um erro, mas o canal de reparo não está disponível. Confira AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.';
+    try {
+        if (originChannel?.send) {
+            await originChannel.send({ content: originNotice, allowedMentions: { parse: [] } }).catch(() => {});
+        } else if (interaction && !interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: originNotice, flags: 64 }).catch(() => {});
+        } else if (interaction && (interaction.replied || interaction.deferred)) {
+            await interaction.followUp({ content: originNotice, flags: 64 }).catch(() => {});
+        }
+    } catch (_) {}
+
     const result = await reportError({
         source: name,
         error,
@@ -1559,23 +1575,6 @@ async function handleCommandError({ cmdName, error, context, message, interactio
         repair?.repaired ? '🛠️ **Reparo aplicado:** `' + repair.file + '`\n' + repair.message + '\nResumo: ' + repair.summary + (repair.commit ? '\nCommit: ' + repair.commit.slice(0, 12) : '') :
             (repair?.attempted ? '🛡️ **Reparo automático não aplicado:** ' + String(repair.reason || 'validação não aprovada') : '')
     ].filter(Boolean).join('\n\n');
-    // No canal de origem, apenas avisamos que o reparo foi aberto. Diagnóstico, proposta,
-    // aprovação e resultado detalhado ficam exclusivamente no canal configurado no Render.
-    const originChannel = message?.channel || interaction?.channel;
-    const workspace = await getRepairWorkspaceChannel().catch(() => null);
-    const notice = workspace?.channel
-        ? '🛠️ **AETERNUS • REPARO ABERTO**\nOcorreu um erro neste comando e a equipe foi avisada. O diagnóstico e o acompanhamento estão no canal configurado de reparo.'
-        : '⚠️ **AETERNUS • REPARO NÃO INICIADO**\nOcorreu um erro neste comando, mas o canal de reparo configurado não está disponível. A equipe precisa conferir as variáveis AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.';
-    try {
-        if (originChannel?.send) {
-            await originChannel.send({ content: notice, allowedMentions: { parse: [] } }).catch(() => {});
-        } else if (interaction && !interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: notice, flags: 64 }).catch(() => {});
-        } else if (interaction && (interaction.replied || interaction.deferred)) {
-            await interaction.followUp({ content: notice, flags: 64 }).catch(() => {});
-        }
-    } catch (_) {}
-
     return { ...result, diagnosis };
 }
 
