@@ -8,7 +8,7 @@ function listText(guild) {
     }).join('\n');
 }
 
-function isManager(message) { return message.author.id === message.guild.ownerId || message.member.permissions.has(PermissionFlagsBits.ManageGuild); }
+function isManager(message) { return Boolean(message.guild && (message.author.id === message.guild.ownerId || message.member?.permissions.has(PermissionFlagsBits.ManageGuild))); }
 
 module.exports = {
     name: 'hierarquia',
