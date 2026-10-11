@@ -3,7 +3,7 @@ const store = require('./store');
 /** Cargo de anti-roubo — só pode ser dado via /cargo-membro (ou prefixo cargo) */
 function getAntiRobRoleId() {
     const id = String(process.env.ANTI_ROB_ROLE_ID || process.env.ANTI_ROUBO_ROLE_ID || '').trim();
-    return /^\\d{15,25}$/.test(id) ? id : null;
+    return /^\d{15,25}$/.test(id) ? id : null;
 }
 const KEY = 'antirob_auth.json';
 
