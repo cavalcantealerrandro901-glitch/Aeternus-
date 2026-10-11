@@ -65,7 +65,8 @@ function protectedEmbed(thief, target, { saved }) {
         .setColor(0x3b82f6)
         .setTitle('🔐 Escudo ativo')
         .setDescription(desc)
-        .setFooter({ text: 'Anti-roubo global · Aeternus' });
+        .setFooter({ text: 'Aeternus Security • Proteção anti-roubo global' })
+        .setTimestamp();
 }
 
 async function run(thief, target, reply, botId, guild, client) {
