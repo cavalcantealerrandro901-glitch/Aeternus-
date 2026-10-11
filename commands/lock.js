@@ -44,7 +44,7 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xef4444)
-                        .setTitle('Lock')
+                        .setTitle('🔒 Canal trancado')
                         .setDescription(`Canal **trancado**.\n${reason}`)
                         .setFooter({ text: `Mod: ${i.user.tag}` })
                         .setTimestamp()
