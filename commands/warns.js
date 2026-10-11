@@ -33,8 +33,8 @@ async function replyWarns(guildId, user, reply) {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0x38bdf8)
-                    .setTitle('Warns')
-                    .setDescription(`**${user.tag}** sem advertências.`)
+                    .setTitle('📋 AETERNUS • HISTÓRICO DE ADVERTÊNCIAS')
+                    .setDescription(`👤 **${user.tag}** não possui advertências registradas neste servidor.`)
                     .setTimestamp()
             ]
         });
@@ -47,9 +47,9 @@ async function replyWarns(guildId, user, reply) {
         embeds: [
             new EmbedBuilder()
                 .setColor(0xfbbf24)
-                .setTitle(`Warns · ${user.tag}`)
+                .setTitle(`📋 Advertências • ${user.tag}`)
                 .setDescription(lines.join('\n'))
-                .setFooter({ text: `Total: ${list.length}` })
+                .setFooter({ text: `Aeternus Moderation • ${list.length} advertência(s) registradas` })
                 .setTimestamp()
         ]
     });
