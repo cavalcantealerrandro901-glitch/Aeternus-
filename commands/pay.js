@@ -326,6 +326,7 @@ module.exports = {
                 .setName('valor')
                 .setDescription('Valor (ex: 1000, 1k, half, all)')
                 .setRequired(true)
+                .setMaxLength(32)
         )
         .addBooleanOption((o) =>
             o
@@ -349,9 +350,11 @@ module.exports = {
                     { name: '3 dias', value: '3d' },
                     { name: '5 dias', value: '5d' }
                 )
-        ),
+        )
+        .setDMPermission(false),
 
     async execute(message, args) {
+        if (!message.guild) return message.reply('❌ Este comando só funciona em servidores.');
         const targets = await resolveTargets(message, args);
         const prefix = message.guild?.id ? getPrefix(message.guild.id) : 'O.';
 
@@ -393,6 +396,9 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.inGuild()) {
+            return i.reply({ content: 'Este comando só funciona em servidores.', flags: MessageFlags.Ephemeral });
+        }
         const to = i.options.getUser('usuario', true);
         const amountRaw = i.options.getString('valor', true);
         const auto = i.options.getBoolean('auto') === true;
