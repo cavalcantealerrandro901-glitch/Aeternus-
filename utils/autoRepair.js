@@ -312,8 +312,14 @@ const aiDiagnosisCache = new Map();
 
 function getRepairFile(cmdName, error) {
     const hits = searchProject(cmdName, error);
-    const exact = hits.find((h) => h.rel.startsWith('commands/') && path.basename(h.rel, '.js') === String(cmdName || '').toLowerCase());
-    return exact || hits.find((h) => h.rel.startsWith('commands/')) || hits[0] || null;
+    const stack = String(error?.stack || '');
+    // Prefer an exact path named in the stack, regardless of directory.
+    for (const hit of hits) {
+        if (stack.includes(hit.rel) || stack.includes(hit.file)) return hit;
+    }
+    const needle = String(cmdName || '').toLowerCase();
+    return hits.find((h) => path.basename(h.rel, path.extname(h.rel)).toLowerCase() === needle) ||
+        hits.find((h) => h.rel.startsWith('commands/')) || hits[0] || null;
 }
 
 async function diagnoseWithAI(cmdName, error, context) {
@@ -386,11 +392,21 @@ function githubRepoParts() {
 }
 
 function isAllowedRepairPath(rel) {
-    if (typeof rel !== 'string' || rel.length > 180 || rel.includes('\\') || rel.startsWith('/') || rel.split('/').includes('..')) return false;
-    // Auto-patch is deliberately limited to command modules, which have a controlled hot-reload path.
-    if (!/^commands\/[a-zA-Z0-9_-]+\.js$/.test(rel)) return false;
-    const base = path.basename(rel).toLowerCase();
-    if (['reparo.js', 'reload.js', 'autoRepair.js'.toLowerCase()].includes(base)) return false;
+    if (typeof rel !== 'string' || !rel || rel.length > 180 || rel.includes('\\') || rel.startsWith('/') ||
+        rel.split('/').some((part) => !part || part === '.' || part === '..') || /^[A-Za-z]:/.test(rel)) return false;
+    const normalized = rel.replace(/\\/g, '/');
+    const segments = normalized.split('/');
+    const base = path.basename(normalized).toLowerCase();
+    const ext = path.extname(base);
+    // Never let an LLM modify secrets, dependencies, lockfiles, user data, or CI/deployment controls.
+    if (segments.some((part) => ['node_modules', '.git', '.github', 'data', 'coverage', 'dist', 'build', 'secrets'].includes(part.toLowerCase()))) return false;
+    if (/^(\.env|\.npmrc|\.yarnrc|credentials|secrets?)(\.|$)/i.test(base)) return false;
+    if (/(^|\.)(lock|log)$/i.test(base) || /(^|-)lock\.json$/i.test(base)) return false;
+    if (['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml', 'dockerfile', 'docker-compose.yml', 'docker-compose.yaml'].includes(base)) return false;
+    if (['reparo.js', 'reload.js', 'autorepair.js'].includes(base)) return false;
+    if (!['commands', 'utils', 'systems', 'events', 'bot', 'web', 'public', 'scripts', 'config'].includes(segments[0])) return false;
+    if (!['.js', '.cjs', '.json', '.html', '.css'].includes(ext)) return false;
+    if (segments.length > 8) return false;
     return true;
 }
 
@@ -468,7 +484,13 @@ function validateCandidateContent(original, proposed) {
     return proposed;
 }
 
-async function validateJavaScript(filePath, content) {
+async function validateCandidateFile(filePath, content) {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.json') {
+        try { JSON.parse(content); } catch (e) { throw new Error('JSON inválido: ' + String(e.message || e).slice(0, 300)); }
+        return;
+    }
+    if (!['.js', '.cjs'].includes(ext)) return;
     const os = require('os');
     const { execFile } = require('child_process');
     const { promisify } = require('util');
@@ -528,7 +550,8 @@ async function attemptAiRepair(cmdName, error, context) {
             'Repare somente o defeito diretamente ligado ao erro. Preserve o nome do comando, aliases, permissões, economia, validações e APIs existentes.',
             'Não remova verificações de segurança, não adicione dependências, não altere arquivos externos, não adicione segredos nem chamadas de rede novas.',
             'Retorne JSON estrito: {"path":"commands/arquivo.js","content":"arquivo completo","summary":"resumo curto"}.',
-            'Caminho permitido: ' + rel,
+            'Altere somente o arquivo alvo e devolva o caminho exato. Arquivos permitidos: código e recursos em commands/, utils/, systems/, events/, bot/, web/, public/, scripts/ e config/, com extensões JS/CJS/JSON/HTML/CSS. Não altere dependências, segredos, dados persistentes, workflows ou configurações de deploy.',
+            'Caminho permitido para esta correção: ' + rel,
             'Comando: ' + String(cmdName || '?'),
             'Contexto: ' + redactSecrets(String(context || '?')).slice(0, 400),
             'Erro: ' + safeError,
@@ -563,7 +586,7 @@ async function attemptAiRepair(cmdName, error, context) {
         if (candidate.path !== rel || !isAllowedRepairPath(candidate.path)) throw new Error('IA tentou alterar um caminho não autorizado.');
         const proposed = validateCandidateContent(original, candidate.content);
         if (proposed === original) return { attempted: true, repaired: false, reason: 'A IA não propôs alterações.' };
-        await validateJavaScript(full, proposed);
+        await validateCandidateFile(full, proposed);
 
         const backupDir = path.join(ROOT, 'data', 'autorepair-backups');
         fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
@@ -579,9 +602,11 @@ async function attemptAiRepair(cmdName, error, context) {
             fs.writeFileSync(tempPath, proposed, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
             fs.renameSync(tempPath, full);
             localApplied = true;
-            const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
-            const loadResult = loader.loadCommandFile(clientRef, full, { quiet: true });
-            if (!loadResult?.ok) throw new Error('Hot reload recusado: ' + String(loadResult?.error || 'falha desconhecida'));
+            if (rel.startsWith('commands/') && rel.endsWith('.js')) {
+                const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
+                const loadResult = loader.loadCommandFile(clientRef, full, { quiet: true });
+                if (!loadResult?.ok) throw new Error('Hot reload recusado: ' + String(loadResult?.error || 'falha desconhecida'));
+            }
 
             const saved = await commitRepairToGitHub(repo, token, rel, proposed, remote.sha, candidate.summary);
             commitSha = saved.commit?.sha || '';
@@ -589,14 +614,19 @@ async function attemptAiRepair(cmdName, error, context) {
             return {
                 attempted: true, repaired: true, file: rel, provider: providerUsed,
                 summary: String(candidate.summary).slice(0, 300), backup: path.relative(ROOT, backupPath),
-                commit: commitSha, message: 'Sintaxe validada, backup criado, comando recarregado e correção enviada ao GitHub.'
+                commit: commitSha,
+                message: rel.startsWith('commands/') && rel.endsWith('.js')
+                    ? 'Sintaxe validada, backup criado, comando recarregado e correção enviada ao GitHub.'
+                    : 'Arquivo validado conforme o tipo, backup criado e correção enviada ao GitHub. Alterações em sistemas/eventos/HTML/CSS podem exigir reinicialização para entrar em vigor.'
             };
         } catch (e) {
             if (localApplied) {
                 try {
                     fs.writeFileSync(full, original, { encoding: 'utf8', mode: 0o600 });
-                    const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
-                    loader.loadCommandFile(clientRef, full, { quiet: true });
+                    if (rel.startsWith('commands/') && rel.endsWith('.js')) {
+                        const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
+                        loader.loadCommandFile(clientRef, full, { quiet: true });
+                    }
                 } catch (rollbackError) {
                     console.error('[autoRepair:rollback] Falha ao restaurar arquivo:', rollbackError?.message || rollbackError);
                 }
