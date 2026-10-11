@@ -118,14 +118,15 @@ function buildEmbed(user, category, page) {
         .setTitle('📜 Transações Aeternus')
         .setDescription(
             [
-                '----------------------------------------',
-                `|  ${cat.emoji} **${cat.label}**`,
-                '_____________________________________',
+                `👤 ${user.username} · Histórico financeiro`,
+                `📂 **${cat.emoji} ${cat.label}**`,
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
                 '',
                 body
             ].join('\n')
         )
-        .setFooter({ text: `Página ${p + 1}/${totalPages}` });
+        .setFooter({ text: `Aeternus Economy • Página ${p + 1}/${totalPages} • até 50 registros` })
+        .setTimestamp();
 
     return { embed: emb, page: p, totalPages, category };
 }
