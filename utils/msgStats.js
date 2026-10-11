@@ -20,10 +20,16 @@ function save(data) {
 }
 
 function dayKey(d = new Date()) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    // Mantém a contagem diária alinhada ao reset de cargos (meia-noite de Brasília).
+    const timeZone = process.env.DAILY_ACTIVITY_TIMEZONE || 'America/Sao_Paulo';
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(d);
+    const value = (type) => parts.find((part) => part.type === type)?.value || '00';
+    return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
 function ensure(guildId, userId) {
