@@ -11,6 +11,7 @@ const BATCH_DELAY_MS = 1200;
 const COLOR = 0x10b981;
 
 let started = false;
+let ticking = false;
 
 function isEnabled() {
     const v = String(process.env.WORK_REMINDER || 'on').toLowerCase();
@@ -97,8 +98,10 @@ async function sendReady(client, userId, lastWork, data) {
 }
 
 async function tick(client) {
-    if (!isEnabled()) return;
+    if (ticking || !isEnabled()) return;
     if (!client?.user) return;
+    ticking = true;
+    try {
 
     const cooldown = workUtil.COOLDOWN_MS || 45 * 60 * 1000;
     const now = Date.now();
@@ -130,6 +133,9 @@ async function tick(client) {
     }
 
     if (sent > 0) console.log(`[workReminder] ${sent} DM(s) de trabalho enviada(s)`);
+    } finally {
+        ticking = false;
+    }
 }
 
 function setup(client) {
