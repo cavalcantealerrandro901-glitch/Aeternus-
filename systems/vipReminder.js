@@ -264,7 +264,9 @@ async function processEntry(client, entry, map) {
 }
 
 async function tick(client) {
-    if (!isEnabled()) return;
+    if (ticking || !isEnabled()) return;
+    ticking = true;
+    try {
     const entries = allVipEntries().filter((e) => e.expiresAt);
     if (!entries.length) return;
 
@@ -283,6 +285,9 @@ async function tick(client) {
         }
     }
     if (dirty) saveNotified(map);
+    } finally {
+        ticking = false;
+    }
 }
 
 function setup(client) {
