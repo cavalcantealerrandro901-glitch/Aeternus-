@@ -28,9 +28,9 @@ async function run(userId, choice, amountRaw, reply) {
         embeds: [
             new EmbedBuilder()
                 .setColor(result === 'vitoria' ? 0x22c55e : result === 'empate' ? 0xf59e0b : 0xef4444)
-                .setTitle(title)
+                .setTitle((result === 'vitoria' ? '🏆 ' : result === 'empate' ? '🤝 ' : '🎮 ') + 'AETERNUS • ' + title.toUpperCase())
                 .setDescription(
-                    `Você ${EMOJI[c]} · Bot ${EMOJI[bot]}\nSaldo: ✨ **${fmt(eter.get(userId))}**`
+                    `👤 Você: ${EMOJI[c]} **${c}**\n🤖 Aeternus: ${EMOJI[bot]} **${bot}**\n\n${result === 'vitoria' ? `✨ **+${fmt(bet.amount)}** de lucro` : result === 'perda' ? `💫 **-${fmt(bet.amount)}** de prejuízo` : '↩️ Aposta devolvida.'}\n💼 Saldo: ✨ **${fmt(eter.get(userId))}**`
                 )
         ]
     });
