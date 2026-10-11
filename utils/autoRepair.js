@@ -464,7 +464,7 @@ function collectRelatedRepairContext(rel, source, maxFiles = 8, maxChars = 18000
     try { if (fs.existsSync(packagePath)) addFile('package.json', fs.readFileSync(packagePath, 'utf8')); } catch (_) {}
     while (queue.length && collected.length < maxFiles) {
         const current = queue.shift();
-        const matches = String(current.source || '').matchAll(/(?:require\\s*\\(\\s*|from\\s*)['\"]([^'\"]+)['\"]/g);
+        const matches = String(current.source || '').matchAll(/(?:require\s*\(\s*|from\s*)['"]([^'"]+)['"]/g);
         for (const match of matches) {
             const spec = match[1];
             if (!spec || !spec.startsWith('.')) continue;
