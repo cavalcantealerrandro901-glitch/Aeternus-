@@ -78,7 +78,7 @@ module.exports = {
         .addStringOption((o) =>
             o
                 .setName('valor')
-                .setDescription('Valor fixo: 1000, 1k, 2.5k, 1m…').setMaxLength(32)
+                .setDescription('Valor fixo: 1000, 1k, 2.5k, 1m…')
                 .setRequired(true)
                 .setMaxLength(32)
         ),
