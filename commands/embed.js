@@ -26,7 +26,9 @@ module.exports = {
                 new EmbedBuilder()
                     .setColor(0xa78bfa)
                     .setTitle(title.trim().slice(0, 256))
-                    .setDescription(rest.join('|').trim().slice(0, 4000))\n                    .setFooter({ text: 'Aeternus • Mensagem personalizada' })\n                    .setTimestamp()
+                    .setDescription(rest.join('|').trim().slice(0, 4000))
+                    .setFooter({ text: 'Aeternus • Mensagem personalizada' })
+                    .setTimestamp()
             ]
         });
     },
