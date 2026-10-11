@@ -242,7 +242,7 @@ module.exports = {
             'O.classe escolher — escolher sua classe',
             'O.classe listar — listar as classes',
             'O.classe criar <descrição completa> — criar uma classe com IA (criador do bot)'
-        ].join('\\n'));
+        ].join('\n'));
     },
 
    async executeSlash(interaction) {
