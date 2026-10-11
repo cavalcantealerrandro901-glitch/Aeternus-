@@ -971,8 +971,9 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction }
             const loadResult = loader.loadCommandFile(clientRef, full, { quiet: true });
             if (!loadResult?.ok) throw new Error('Teste do comando falhou no carregamento: ' + String(loadResult?.error || 'falha desconhecida'));
 
-            const testChannel = message?.channel || interaction?.channel;
-            const approval = await waitForFunctionalApproval(testChannel, rel, cmdName);
+            const workspace = await getRepairWorkspaceChannel();
+            if (!workspace?.channel) throw new Error('Canal de reparo não configurado ou inacessível. Configure AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.');
+            const approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName);
             const saved = await commitRepairToGitHub(repo, token, rel, proposed, remote.sha, candidate.summary);
             commitSha = saved.commit?.sha || '';
             committed = true;
@@ -1085,7 +1086,7 @@ function installGlobalHooks() {
         } catch (_) {}
     };
 
-    console.log('[autoRepair] hooks globais instalados (DM em erro de comando garantida)');
+    console.log('[autoRepair] hooks globais instalados (relatórios de reparo centralizados no canal configurado)');
 }
 
 function getStatus() {
@@ -1495,8 +1496,9 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction }
             const loadResult = loader.loadCommandFile(clientRef, full, { quiet: true });
             if (!loadResult?.ok) throw new Error('Teste do comando falhou no carregamento: ' + String(loadResult?.error || 'falha desconhecida'));
 
-            const testChannel = message?.channel || interaction?.channel;
-            const approval = await waitForFunctionalApproval(testChannel, rel, cmdName);
+            const workspace = await getRepairWorkspaceChannel();
+            if (!workspace?.channel) throw new Error('Canal de reparo não configurado ou inacessível. Configure AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.');
+            const approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName);
             const saved = await commitRepairToGitHub(repo, token, rel, proposed, remote.sha, candidate.summary);
             commitSha = saved.commit?.sha || '';
             committed = true;
