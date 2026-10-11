@@ -8,7 +8,7 @@ const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const MAX_ATTEMPTS = 3;
 const DM_COOLDOWN_MS = 12_000;
 const ROOT = path.join(__dirname, '..');
-const SCAN_DIRS = ['commands', 'utils', 'systems', 'events', 'bot', 'web'];
+const SCAN_DIRS = ['commands', 'utils', 'systems', 'events', 'bot', 'web', 'public', 'scripts', 'config'];
 
 const state = new Map();
 const dmCooldown = new Map();
@@ -107,7 +107,7 @@ async function dmOwners(embed, { plainText = '' } = {}) {
     return sent;
 }
 
-function walkJsFiles(dir, acc = [], depth = 0) {
+function walkProjectFiles(dir, acc = [], depth = 0) {
     if (depth > 6) return acc;
     if (!fs.existsSync(dir)) return acc;
     let entries;
@@ -115,8 +115,8 @@ function walkJsFiles(dir, acc = [], depth = 0) {
     for (const ent of entries) {
         if (ent.name.startsWith('.') || ent.name === 'node_modules' || ent.name === 'data') continue;
         const full = path.join(dir, ent.name);
-        if (ent.isDirectory()) walkJsFiles(full, acc, depth + 1);
-        else if (ent.isFile() && ent.name.endsWith('.js')) acc.push(full);
+        if (ent.isDirectory()) walkProjectFiles(full, acc, depth + 1);
+        else if (ent.isFile() && ['.js', '.cjs', '.json', '.html', '.css'].includes(path.extname(ent.name).toLowerCase())) acc.push(full);
     }
     return acc;
 }
@@ -134,13 +134,13 @@ function searchProject(cmdName, error) {
     const needle = String(cmdName || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
     const errText = String(error?.stack || error?.message || error || '').toLowerCase();
     const pathFromErr = [];
-    const re = /([\w./\\-]+\.js):(\d+)/g;
+    const re = /([\w./\\-]+\.(?:js|cjs|json|html|css))(?::(\d+))?/gi;
     let m;
     const stack = String(error?.stack || '');
     while ((m = re.exec(stack))) pathFromErr.push(m[1].replace(/\\/g, '/'));
 
     const files = [];
-    for (const d of SCAN_DIRS) walkJsFiles(path.join(ROOT, d), files);
+    for (const d of SCAN_DIRS) walkProjectFiles(path.join(ROOT, d), files);
 
     const hits = [];
     for (const file of files) {
@@ -154,7 +154,7 @@ function searchProject(cmdName, error) {
             if (p.endsWith(rel) || rel.endsWith(p) || p.includes(base + '.js')) { score += 80; reasons.push('stack'); break; }
         }
         if (errText.includes(rel.toLowerCase()) || errText.includes(base + '.js')) { score += 30; reasons.push('erro menciona arquivo'); }
-        if (needle && file.includes(path.sep + 'commands' + path.sep)) {
+        if (needle && file.includes(path.sep + 'commands' + path.sep) && path.extname(file) === '.js') {
             try {
                 const raw = fs.readFileSync(file, 'utf8');
                 if (fileMentionsCmd(raw, needle)) { score += 90; reasons.push('name/aliases'); }
