@@ -7,6 +7,7 @@ const BATCH_DELAY_MS = 1200;
 const COLOR = 0x22d3ee;
 
 let started = false;
+let ticking = false;
 
 function isEnabled() {
     const v = String(process.env.MINE_REMINDER || 'on').toLowerCase();
@@ -84,8 +85,10 @@ async function sendReady(client, userId, lastTs) {
 }
 
 async function tick(client) {
-    if (!isEnabled()) return;
+    if (ticking || !isEnabled()) return;
     if (!client?.user) return;
+    ticking = true;
+    try {
 
     const now = Date.now();
     const all = cdMap();
@@ -115,6 +118,9 @@ async function tick(client) {
     }
 
     if (sent > 0) console.log(`[mineReminder] ${sent} DM(s) de mineração enviada(s)`);
+    } finally {
+        ticking = false;
+    }
 }
 
 function setup(client) {
