@@ -59,7 +59,7 @@ module.exports = {
             );
         }
 
-        const reason = args.join(' ').trim().slice(0, 180) || 'Ausente no momento';
+        const reason = args.join(' ').trim().slice(0, 180) || 'não definido';
         afk.set(message.author.id, reason);
 
         return message.reply(buildAfkText(message.author, reason, 0));
