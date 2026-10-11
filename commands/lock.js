@@ -23,7 +23,7 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xef4444)
-                        .setTitle('Lock')
+                        .setTitle('🔒 Canal trancado')
                         .setDescription(`Canal **trancado**.\n${reason}`)
                         .setFooter({ text: `Mod: ${message.author.tag}` })
                         .setTimestamp()
@@ -36,6 +36,7 @@ module.exports = {
 
     async executeSlash(i) {
         if (!i.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
+        if (!i.guild || !i.channel) return i.reply({ content: '❌ Este comando só funciona em um canal de servidor.', ephemeral: true });
         const reason = i.options.getString('motivo') || 'Sem motivo';
         try {
             await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, { SendMessages: false });
