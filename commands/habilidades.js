@@ -136,22 +136,49 @@ function panel(userId) {
         };
     }
 
-    const rows = [0, 1, 2, 3].map((slot) =>
-        new ActionRowBuilder().addComponents(
+    // O Discord rejeita opções inválidas ou valores repetidos em um select menu.
+    // Normalizamos os dados e removemos IDs duplicados/reservados antes de montar as 4 listas.
+    const seenAbilityIds = new Set();
+    const safeOptions = list
+        .filter((a) => a && a.id != null && a.name != null)
+        .map((a) => ({
+            id: String(a.id).trim(),
+            name: String(a.name).trim(),
+            desc: String(a.desc || `Mana ${a.mana || 0}`).trim(),
+            unique: Boolean(a.unique)
+        }))
+        .filter((a) => {
+            if (!a.id || a.id === 'none' || a.id.length > 100 || !a.name || seenAbilityIds.has(a.id)) {
+                return false;
+            }
+            seenAbilityIds.add(a.id);
+            return true;
+        })
+        .slice(0, 24);
+
+    const rows = [0, 1, 2, 3].map((slot) => {
+        const equippedId = String((loadout.active || [])[slot] ?? '');
+        const hasEquippedOption = safeOptions.some((a) => a.id === equippedId);
+        return new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
                 .setCustomId(`habilidades:sel:${slot}`)
                 .setPlaceholder(`Ativa ${slot + 1}`)
                 .addOptions([
-                    { label: 'Remover', value: 'none', description: 'Esvaziar este slot' },
-                    ...list.slice(0, 24).map((a) => ({
+                    {
+                        label: 'Remover',
+                        value: 'none',
+                        description: 'Esvaziar este slot',
+                        default: !hasEquippedOption && !equippedId
+                    },
+                    ...safeOptions.map((a) => ({
                         label: `${a.unique ? '⭐ ' : ''}${a.name}`.slice(0, 100),
                         value: a.id,
-                        description: (a.desc || `Mana ${a.mana || 0}`).slice(0, 50),
-                        default: (loadout.active || [])[slot] === a.id
+                        description: a.desc.slice(0, 50) || 'Habilidade ativa',
+                        default: a.id === equippedId
                     }))
                 ])
-        )
-    );
+        );
+    });
     return { embeds: [emb], components: rows };
 }
 
