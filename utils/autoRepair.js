@@ -558,26 +558,43 @@ function validateCandidateContent(original, proposed) {
     return proposed;
 }
 
+async function runNodeSyntaxCheck(filePath, content) {
+    const os = require('os');
+    const { execFile } = require('child_process');
+    const { promisify } = require('util');
+    const execFileAsync = promisify(execFile);
+    const ext = ['.cjs', '.mjs'].includes(path.extname(filePath).toLowerCase())
+        ? path.extname(filePath).toLowerCase() : '.js';
+    const temp = path.join(os.tmpdir(), 'aeternus-repair-check-' + process.pid + '-' + Date.now() + '-' + require('crypto').randomBytes(3).toString('hex') + ext);
+    try {
+        fs.writeFileSync(temp, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+        await execFileAsync(process.execPath, ['--check', temp], { timeout: 10000, maxBuffer: 1024 * 1024 });
+        return { ok: true, error: null };
+    } catch (e) {
+        return { ok: false, error: e };
+    } finally {
+        try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch (_) {}
+    }
+}
+
 async function validateCandidateFile(filePath, content) {
     const ext = path.extname(filePath).toLowerCase();
     if (ext === '.json') {
         try { JSON.parse(content); } catch (e) { throw new Error('JSON inválido: ' + String(e.message || e).slice(0, 300)); }
         return;
     }
-    if (!['.js', '.cjs'].includes(ext)) return;
-    const os = require('os');
-    const { execFile } = require('child_process');
-    const { promisify } = require('util');
-    const execFileAsync = promisify(execFile);
-    const temp = path.join(os.tmpdir(), 'aeternus-repair-' + process.pid + '-' + Date.now() + '.js');
-    try {
-        fs.writeFileSync(temp, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
-        await execFileAsync(process.execPath, ['--check', temp], { timeout: 10000, maxBuffer: 1024 * 1024 });
-    } catch (e) {
-        throw new Error('Validação de sintaxe falhou: ' + String(e.stderr || e.message || e).slice(0, 500));
-    } finally {
-        try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch (_) {}
-    }
+    if (!['.js', '.cjs', '.mjs'].includes(ext)) return;
+    const check = await runNodeSyntaxCheck(filePath, content);
+    if (!check.ok) throw new Error('Validação de sintaxe falhou: ' + String(check.error?.stderr || check.error?.message || check.error).slice(0, 500));
+}
+
+async function originalHasSyntaxError(filePath, original) {
+    const ext = path.extname(filePath).toLowerCase();
+    if (!['.js', '.cjs', '.mjs'].includes(ext)) return false;
+    const check = await runNodeSyntaxCheck(filePath, original);
+    if (check.ok) return false;
+    const details = String(check.error?.stderr || check.error?.message || check.error || '');
+    return /SyntaxError|Unexpected token|Unexpected end of input|missing \)|missing ; after|Invalid or unexpected token|Unexpected identifier/i.test(details);
 }
 
 async function waitForFunctionalApproval(channel, rel, cmdName) {
@@ -753,6 +770,9 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction, 
         const proposed = validateCandidateContent(original, candidate.content);
         if (proposed === original) return { attempted: true, repaired: false, reason: 'A IA não propôs alterações.' };
         await validateCandidateFile(full, proposed);
+        // Só considerar publicação automática se o arquivo original realmente falhava
+        // no parser do Node. Erros de runtime com nome SyntaxError exigem aprovação.
+        const verifiedSyntaxOnlyRepair = isSimpleSyntaxError(error) && await originalHasSyntaxError(full, original);
 
         const backupDir = path.join(ROOT, 'data', 'autorepair-backups');
         fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
@@ -778,7 +798,7 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction, 
 
             const workspace = await getRepairWorkspaceChannel();
             if (!workspace?.channel) throw new Error('Canal de reparo não configurado ou inacessível. Configure AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.');
-            const automaticSyntaxRepair = isSimpleSyntaxError(error);
+            const automaticSyntaxRepair = verifiedSyntaxOnlyRepair;
             let approval = null;
             if (!automaticSyntaxRepair) {
                 approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName);
