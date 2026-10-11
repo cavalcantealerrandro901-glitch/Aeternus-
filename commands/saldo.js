@@ -1,12 +1,8 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const eter = require('../utils/eter');
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
-}
-
-function mention(user) {
-    return '<@' + String(user.id) + '>';
 }
 
 function globalRank(userId) {
@@ -19,27 +15,46 @@ function globalRank(userId) {
     return idx < 0 ? null : idx + 1;
 }
 
-function buildText(target) {
+function buildEmbed(target) {
     const bal = eter.get(target.id);
     const rank = bal > 0 ? globalRank(target.id) : null;
-    const lines = [
-        '╭────────────────────────────╮',
-        '│ ✦ AETERNUS • CARTEIRA',
-        '├────────────────────────────┤',
-        '│ 👤 ' + mention(target),
-        '│',
-        '│ ✨ **' + fmt(bal) + ' ÉTER**',
-        '├────────────────────────────┤'
-    ];
-    if (rank != null) {
-        lines.push('│ 🏆 RANKING GLOBAL', '│ #**' + rank + '**');
-    }
-    lines.push('╰────────────────────────────╯');
-    return lines.join('\n');
+
+    const embed = new EmbedBuilder()
+        .setColor('#FFD700')
+        .setAuthor({
+            name: 'AETERNUS • ECONOMY',
+            iconURL: 'https://cdn-icons-png.flaticon.com/512/3135/3135706.png'
+        })
+        .setTitle(`💳 Saldo — ${target.username}`)
+        .setThumbnail(target.displayAvatarURL({ dynamic: true, size: 256 }))
+        .addFields(
+            {
+                name: '✨ Saldo de Éter',
+                value: `\`\`\`fix\n${fmt(bal)} ÉTER\n\`\`\``,
+                inline: false
+            },
+            {
+                name: '🏆 Posição',
+                value: rank ? `Top **#${rank}**` : '*Sem ranking*',
+                inline: true
+            },
+            {
+                name: '👤 Titular',
+                value: `<@${target.id}>`,
+                inline: true
+            }
+        )
+        .setFooter({
+            text: 'Aeternus Economy',
+            iconURL: target.displayAvatarURL({ dynamic: true })
+        })
+        .setTimestamp();
+
+    return embed;
 }
 
 async function run(target, reply) {
-    return reply(buildText(target));
+    return reply(buildEmbed(target));
 }
 
 module.exports = {
@@ -55,9 +70,9 @@ module.exports = {
 
     async execute(message) {
         const target = message.mentions.users.first() || message.author;
-        await run(target, (t) =>
+        await run(target, (embed) =>
             message.reply({
-                content: t,
+                embeds: [embed],
                 allowedMentions: { parse: [], users: [target.id] }
             })
         );
@@ -65,9 +80,9 @@ module.exports = {
 
     async executeSlash(i) {
         const target = i.options.getUser('usuario') || i.user;
-        await run(target, (t) =>
+        await run(target, (embed) =>
             i.reply({
-                content: t,
+                embeds: [embed],
                 allowedMentions: { parse: [], users: [target.id] }
             })
         );
