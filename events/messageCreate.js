@@ -210,8 +210,32 @@ module.exports = {
 
         try {
             if (afk.has(message.author.id)) {
+                const previousAfk = afk.get(message.author.id);
                 afk.clear(message.author.id);
-                message.reply('👋 AFK removido.').catch(() => {});
+
+                const totalMs = Math.max(0, Date.now() - Number(previousAfk?.at || Date.now()));
+                const totalMinutes = Math.floor(totalMs / 60000);
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                const duration = hours > 0
+                    ? (minutes ? `${hours}h ${minutes}min` : `${hours}h`)
+                    : (totalMinutes > 0 ? `${totalMinutes} min` : 'menos de 1 min');
+
+                const returnMessage = [
+                    '✦ **AETERNUS • CENTRAL DE PRESENÇA**',
+                    '',
+                    '✅ **MODO AUSENTE DESATIVADO**',
+                    `👋 ${message.author}, você está de volta e seu status AFK foi removido.`,
+                    `▸ **Tempo de ausência:** ${duration}`,
+                    '',
+                    '**Tudo certo!** Você voltará a receber as menções normalmente.',
+                    '✧ *Aeternus • Sistema de utilidades*'
+                ].join('\\n');
+
+                message.reply({
+                    content: returnMessage,
+                    allowedMentions: { parse: [], repliedUser: false }
+                }).catch(() => {});
             }
             for (const [id] of message.mentions.users) {
                 if (id === message.author.id || !afk.has(id)) continue;
