@@ -88,6 +88,7 @@ module.exports = {
                 .setName('valor')
                 .setDescription('Valor: 1k, all, half, 50%…')
                 .setRequired(true)
+                .setMaxLength(32)
         ),
 
     async execute(message, args) {
