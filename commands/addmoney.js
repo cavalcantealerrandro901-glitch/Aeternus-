@@ -42,7 +42,7 @@ async function run(modMember, targets, amountRaw, reply) {
     }
 
     const amount = parseAmount(amountRaw, null);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
         return reply('❌ Valor inválido. Use `1000`, `1k`, `2.5k`, `1m`, `1b`…');
     }
 
@@ -78,8 +78,9 @@ module.exports = {
         .addStringOption((o) =>
             o
                 .setName('valor')
-                .setDescription('Valor: 1000, 1k, 2.5k, 1m, 1b…')
+                .setDescription('Valor fixo: 1000, 1k, 2.5k, 1m…').setMaxLength(32)
                 .setRequired(true)
+                .setMaxLength(32)
         ),
 
     async execute(message, args) {
