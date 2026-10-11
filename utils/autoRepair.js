@@ -740,6 +740,9 @@ async function handleCommandError({ cmdName, error, context, message, interactio
     let diagnosis = null;
     try { diagnosis = await diagnoseWithAI(name, error, context); }
     catch (e) { diagnosis = { ok: false, reason: e.message || String(e) }; }
+    await postRepairWorkspace({ cmdName: name, error, context, diagnosis, repair: null }).catch((e) => {
+        console.error('[autoRepair:workspace]', e?.message || e);
+    });
     let repair = null;
     try { repair = await attemptAiRepair(name, error, context, { message, interaction }); }
     catch (e) { repair = { attempted: true, repaired: false, reason: String(e?.message || e).slice(0, 500) }; console.error('[autoRepair:patch]', repair.reason); }
