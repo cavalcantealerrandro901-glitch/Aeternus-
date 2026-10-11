@@ -223,7 +223,12 @@ function waitEmbed(user, left) {
                 '',
                 '_Quando o tempo acabar, você recebe um aviso no PV._'
             ].join('\n')
-        )\n        .setFooter({ text: 'Aeternus • Próxima mineração em 5 minutos' })\n        .setTimestamp();\n}\n\nfunction resultEmbed(user, ore, amount, balance, biome) {
+        )
+        .setFooter({ text: 'Aeternus • Próxima mineração em 5 minutos' })
+        .setTimestamp();
+}
+
+function resultEmbed(user, ore, amount, balance, biome) {
     const line = pickLine(ore);
     const got =
         amount > 0
