@@ -26,7 +26,7 @@ module.exports = {
                 new EmbedBuilder()
                     .setColor(0xa78bfa)
                     .setTitle(title.trim().slice(0, 256))
-                    .setDescription(rest.join('|').trim().slice(0, 4000))
+                    .setDescription(rest.join('|').trim().slice(0, 4000))\n                    .setFooter({ text: 'Aeternus • Mensagem personalizada' })\n                    .setTimestamp()
             ]
         });
     },
@@ -47,7 +47,7 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(0xa78bfa)
             .setTitle(String(title).slice(0, 256))
-            .setDescription(String(desc).slice(0, 4000));
+            .setDescription(String(desc).slice(0, 4000))\n            .setFooter({ text: 'Aeternus • Mensagem personalizada' })\n            .setTimestamp();
 
         await i.channel.send({ embeds: [embed] }).catch(() => {});
 
