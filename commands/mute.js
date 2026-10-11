@@ -29,12 +29,12 @@ async function handleMuteProcess(context, moderator, targetMember, durationMs, r
             .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
             .setCustomId(silentBtnId)
-            .setLabel('Silêncio silencioso')
+            .setLabel('Confirmar em silêncio')
             .setEmoji('🤫')
             .setStyle(ButtonStyle.Secondary)
     );
 
-    const content = `Nossa, você <@${moderator.id}> vai mutar <@${targetMember.id}> mesmo? Uh... Sendo assim, escolha uma das opções abaixo. Você tem 6 minutos para decidir.`;
+    const content = `🔇 **AETERNUS • CONFIRMAR SILENCIAMENTO**\n\n**Moderador:** <@${moderator.id}>\n**Membro:** <@${targetMember.id}>\n**Duração:** ${Math.max(1, Math.round(durationMs / 60000))} minuto(s)\n**Motivo:** ${String(reason || 'Sem motivo').slice(0, 300)}\n\nEscolha uma opção abaixo. A confirmação expira em 6 minutos.`;
 
     let sentMsg;
     if (isSlash) {
