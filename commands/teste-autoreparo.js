@@ -1,13 +1,13 @@
+// COMANDO TEMPORÁRIO: contém um erro de propósito para validar o fluxo de autorreparo.
+// Remova este arquivo depois de concluir o teste.
 module.exports = {
     name: 'teste-autoreparo',
     aliases: ['teste-reparo'],
-    description: 'Comando temporário para testar o autorreparo do Aeternus',
+    description: 'Provoca um erro controlado para testar o sistema de autorreparo',
 
     async execute(message) {
-        await message.reply('🧪 Iniciando teste do autorreparo…');
-        // Correção: removida referência a variável inexistente.
-        // Opcional: enviar confirmação de conclusão.
-        await message.reply('✅ Teste de autorreparo concluído com sucesso.');
-        return true;
+        await message.reply('🧪 Teste controlado iniciado. Vou provocar um erro para testar o autorreparo.');
+        // ERRO INTENCIONAL: ReferenceError reproduzível durante a execução.
+        return aeternusVariavelQueNaoExiste.executar();
     }
 };
