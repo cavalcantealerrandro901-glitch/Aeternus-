@@ -58,8 +58,8 @@ async function postRepairWorkspace({ cmdName, error, context, diagnosis, repair 
             repair?.attempted ? '**Estado:** reparo não concluído — ' + String(repair.reason || 'ver logs').slice(0, 300) : '**Estado:** erro registrado; equipe precisa revisar.',
         'Diagnóstico, proposta, aprovação e resultado detalhado ficam exclusivamente neste canal de reparo configurado no Render. No canal de origem é enviado apenas um aviso curto.'
     ].join('\n\n');
-    await channel.send({ content: (roleId ? '<@&' + roleId + '>\n' : '') + body, allowedMentions: { parse: [], roles: roleId ? [roleId] : [] } }).catch(() => {});
-    return true;
+    const sent = await channel.send({ content: (roleId ? '<@&' + roleId + '>\n' : '') + body, allowedMentions: { parse: [], roles: roleId ? [roleId] : [] } }).catch(() => null);
+    return sent || false;
 }
 function ownerIds() {
     const fromEnv = [
@@ -655,7 +655,7 @@ async function waitForFunctionalApproval(channel, rel, cmdName) {
         content: '✅ **AETERNUS • TESTE APROVADO**\nA aprovação foi registrada. A correção seguirá para publicação.',
         components: []
     }).catch(() => {});
-    return { approvedBy };
+    return { approvedBy, message: promptMessage };
 }
 
 async function commitRepairToGitHub(repo, token, rel, content, sha, summary) {
@@ -671,7 +671,19 @@ async function commitRepairToGitHub(repo, token, rel, content, sha, summary) {
     });
 }
 
-async function attemptAiRepair(cmdName, error, context, { message, interaction } = {}) {
+function isSimpleSyntaxError(error) {
+    const text = String(error?.stack || error?.message || error || '');
+    return error?.name === 'SyntaxError' ||
+        /SyntaxError|Unexpected token|Unexpected end of input|missing \)|missing ; after|Invalid or unexpected token|Unexpected identifier/i.test(text);
+}
+
+async function deleteRepairMessages(messages = []) {
+    for (const message of messages) {
+        try { if (message?.deletable) await message.delete(); } catch (_) {}
+    }
+}
+
+async function attemptAiRepair(cmdName, error, context, { message, interaction, cleanupMessages = [] } = {}) {
     if (String(process.env.AI_AUTO_REPAIR || '').toLowerCase() !== 'true') {
         return { attempted: false, reason: 'reparo automático desativado (AI_AUTO_REPAIR=true para habilitar)' };
     }
@@ -766,15 +778,30 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction }
 
             const workspace = await getRepairWorkspaceChannel();
             if (!workspace?.channel) throw new Error('Canal de reparo não configurado ou inacessível. Configure AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.');
-            const approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName);
+            const automaticSyntaxRepair = isSimpleSyntaxError(error);
+            let approval = null;
+            if (!automaticSyntaxRepair) {
+                approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName);
+            } else {
+                const autoNotice = await workspace.channel.send({
+                    content: '🤖 **AETERNUS • REPARO AUTOMÁTICO SIMPLES**\nFoi identificado um erro de sintaxe. A correção passou pela validação de sintaxe e pelo carregamento do comando; será publicada automaticamente.',
+                    allowedMentions: { parse: [] }
+                }).catch(() => null);
+                if (autoNotice) cleanupMessages.push(autoNotice);
+            }
             const saved = await commitRepairToGitHub(repo, token, rel, proposed, remote.sha, candidate.summary);
             commitSha = saved.commit?.sha || '';
             committed = true;
+            if (approval?.message) cleanupMessages.push(approval.message);
+            await deleteRepairMessages(cleanupMessages);
             return {
-                attempted: true, repaired: true, file: rel, provider: providerUsed,
+                attempted: true, repaired: true, automatic: automaticSyntaxRepair,
+                file: rel, provider: providerUsed,
                 summary: String(candidate.summary).slice(0, 300), backup: path.relative(ROOT, backupPath),
                 commit: commitSha,
-                message: 'Teste funcional aprovado manualmente por <@' + approval.approvedBy + '>, sintaxe validada, comando recarregado, backup criado e correção enviada ao GitHub.'
+                message: automaticSyntaxRepair
+                    ? 'Erro simples de sintaxe corrigido automaticamente, validado, comando recarregado, backup criado e publicado no GitHub.'
+                    : 'Teste funcional aprovado manualmente por <@' + approval.approvedBy + '>, sintaxe validada, comando recarregado, backup criado e correção enviada ao GitHub.'
             };
         } catch (e) {
             if (localApplied && !committed) {
@@ -818,11 +845,12 @@ async function handleCommandError({ cmdName, error, context, message, interactio
     let diagnosis = null;
     try { diagnosis = await diagnoseWithAI(name, error, context); }
     catch (e) { diagnosis = { ok: false, reason: e.message || String(e) }; }
-    await postRepairWorkspace({ cmdName: name, error, context, diagnosis, repair: null }).catch((e) => {
+    const repairReportMessage = await postRepairWorkspace({ cmdName: name, error, context, diagnosis, repair: null }).catch((e) => {
         console.error('[autoRepair:workspace]', e?.message || e);
+        return false;
     });
     let repair = null;
-    try { repair = await attemptAiRepair(name, error, context, { message, interaction }); }
+    try { repair = await attemptAiRepair(name, error, context, { message, interaction, cleanupMessages: repairReportMessage ? [repairReportMessage] : [] }); }
     catch (e) { repair = { attempted: true, repaired: false, reason: String(e?.message || e).slice(0, 500) }; console.error('[autoRepair:patch]', repair.reason); }
 
     // Detalhes, diagnóstico e aprovação ficam somente no canal de reparo configurado.
