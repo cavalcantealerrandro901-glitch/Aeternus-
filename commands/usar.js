@@ -107,7 +107,8 @@ function gearEmbed(userId, username) {
                 `Bônus: FOR **${bonus.forca}** · DEF **${bonus.defesa}** · AGI **${bonus.agilidade}** · VIDA **${bonus.vida}**`
             ].join('\n')
         )
-        .setFooter({ text: 'Aeternus • Equipamentos e bônus de atributos' })\n        .setTimestamp();
+        .setFooter({ text: 'Aeternus • Equipamentos e bônus de atributos' })
+        .setTimestamp();
 }
 
 module.exports = {
