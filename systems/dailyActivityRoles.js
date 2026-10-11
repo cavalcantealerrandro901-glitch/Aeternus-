@@ -100,6 +100,7 @@ async function applyMilestone(message) {
     const master = await getOrCreateRole(guild, MASTER_ROLE);
 
     if (count >= 500) {
+        if (!master) return;
         const already = member.roles.cache.has(master.id);
         const added = await giveRole(member, master);
         if (added && !already) {
@@ -107,6 +108,7 @@ async function applyMilestone(message) {
             await notifyAward(message, master, count);
         }
     } else {
+        if (!active) return;
         const already = member.roles.cache.has(active.id);
         const added = await giveRole(member, active);
         if (added && !already) await notifyAward(message, active, count);
@@ -136,13 +138,14 @@ async function resetGuild(guild) {
 async function resetAllGuilds(client) {
     const today = getDayKey();
     if (today === lastResetDay) return;
-    lastResetDay = today;
-    store.save(STATE_KEY, { day: today });
-
     for (const guild of client.guilds.cache.values()) {
         await resetGuild(guild);
     }
 
+    // Salva o dia somente depois de processar os servidores, para permitir
+    // nova tentativa caso o processo falhe durante a limpeza.
+    lastResetDay = today;
+    store.save(STATE_KEY, { day: today });
     console.log(`🕛 [dailyActivityRoles] Novo ciclo diário: ${today} (${TIME_ZONE})`);
 }
 
