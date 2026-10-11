@@ -30,7 +30,7 @@ function introEmbed(client, prefix, guild) {
             name: `${client.user.username} · Ajuda`,
             iconURL: client.user.displayAvatarURL({ size: 64 })
         })
-        .setTitle('Central de ajuda')
+        .setTitle('✦ AETERNUS • CENTRAL DE AJUDA')
         .setDescription(
             [
                 `Prefixo: \`${prefix}\` · também funciona com **/**`,
@@ -46,7 +46,7 @@ function introEmbed(client, prefix, guild) {
                 .filter((x) => x != null)
                 .join('\n')
         )
-        .setThumbnail(client.user.displayAvatarURL({ size: 256 }));
+        .setThumbnail(client.user.displayAvatarURL({ size: 256 }))\n        .setFooter({ text: 'Aeternus • Selecione uma categoria para explorar' })\n        .setTimestamp();
 }
 
 function categoryEmbed(cat, prefix) {
@@ -64,17 +64,14 @@ function categoryEmbed(cat, prefix) {
                 '',
                 `Detalhe: \`${prefix}ajuda <comando>\` (aceita acentos)`
             ].join('\n')
-        );
-}
-
-function commandEmbed(cmd, prefix, liveCmd) {
+        )\n        .setFooter({ text: 'Aeternus • Central de comandos' })\n        .setTimestamp();\n}\n\nfunction commandEmbed(cmd, prefix, liveCmd) {
     const usage = cmd.usage || cmd.name;
     const example = cmd.example || `${prefix}${cmd.name}`;
     const about = cmd.about || cmd.desc || liveCmd?.description || '—';
 
     const emb = new EmbedBuilder()
         .setColor(0x38bdf8)
-        .setTitle(`Comando · ${cmd.name}`)
+        .setTitle(`✦ AETERNUS • ${cmd.name}`)
         .setDescription(about)
         .addFields(
             {
