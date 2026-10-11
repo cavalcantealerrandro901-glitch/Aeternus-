@@ -141,6 +141,7 @@ async function showHistory(context) {
 
 module.exports = {
     name: 'reparos',
+    rootSlash: true,
     aliases: ['historico-reparos', 'autoreparos'],
     description: 'Consulta o histórico administrativo de autorreparos do Aeternus',
     data: new SlashCommandBuilder()
