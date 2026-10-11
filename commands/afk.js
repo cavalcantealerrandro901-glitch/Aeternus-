@@ -36,7 +36,7 @@ module.exports = {
     description: 'Marca você como ausente',
     data: new SlashCommandBuilder()
         .setName('ausente')
-        .setDescription('Marca você como ausente (AFK)')
+        .setDescription('[💤] Ativa o (AFK) e o motivo')
         .addStringOption((o) =>
             o
                 .setName('motivo')
