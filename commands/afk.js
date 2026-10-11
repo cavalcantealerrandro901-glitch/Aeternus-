@@ -26,7 +26,7 @@ function buildAfkText(user, reason, sinceMs) {
     return [
         '💤 ' + user.toString() + ' **está ausente**',
         '**Horas:** ' + horasLabel,
-        '**Motivo:** ' + (reason || 'Ausente')
+        '**Motivo:** ' + (reason || )
     ].join('\n');
 }
 
