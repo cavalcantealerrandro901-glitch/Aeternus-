@@ -41,8 +41,8 @@ function equipEmbed(userId, n) {
             .join(' · ');
         if (fx) lines.push(`Bônus: ${fx}`);
     }
-    emb.setTitle('⚔️ Item equipado').setDescription(lines.join('\n'));
-    emb.setFooter({ text: 'O.desequipar arma|armadura|acessorio · O.inventario' });
+    emb.setTitle('⚔️ AETERNUS • ITEM EQUIPADO').setDescription(lines.join('\n'));
+    emb.setFooter({ text: 'Aeternus • Equipamentos e inventário' }).setTimestamp();
     return emb;
 }
 
@@ -67,7 +67,7 @@ function useEmbed(userId, n) {
             '\n'
         )
     );
-    emb.setFooter({ text: 'O.inventario · O.j atributos' });
+    emb.setFooter({ text: 'Aeternus • Itens e progressão' }).setTimestamp();
     return emb;
 }
 
@@ -107,7 +107,7 @@ function gearEmbed(userId, username) {
                 `Bônus: FOR **${bonus.forca}** · DEF **${bonus.defesa}** · AGI **${bonus.agilidade}** · VIDA **${bonus.vida}**`
             ].join('\n')
         )
-        .setFooter({ text: 'O.usar <n> · O.equipar <n> · O.desequipar <slot>' });
+        .setFooter({ text: 'Aeternus • Equipamentos e bônus de atributos' })\n        .setTimestamp();
 }
 
 module.exports = {
