@@ -43,8 +43,8 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xfbbf24)
-                    .setTitle('Warn')
-                    .setDescription(`**${user.tag}**\n${reason}\nTotal: **${total}**`)
+                    .setTitle('⚠️ AETERNUS • ADVERTÊNCIA')
+                     .setDescription(`👤 **${user.tag}**\n\n📝 **Motivo:** ${reason}\n📊 **Advertências registradas:** **${total}**`)
                     .setFooter({ text: `Mod: ${message.author.tag}` })
                     .setTimestamp()
             ]
