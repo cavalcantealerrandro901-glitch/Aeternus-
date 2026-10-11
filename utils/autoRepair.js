@@ -636,7 +636,7 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction }
                     ...testResult.details.map((item) => '• ' + item),
                     '',
                     '_O teste estrutural não garante que todos os caminhos funcionem. Comandos foram recarregados, mas não são executados novamente automaticamente para evitar repetir ações como pagamentos, punições ou sorteios._'
-                ].join('\\n');
+                ].join('\n');
                 await testChannel.send({ content: report, allowedMentions: { parse: [] } });
             }
 
