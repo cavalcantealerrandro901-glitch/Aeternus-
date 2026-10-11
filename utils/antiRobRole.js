@@ -1,7 +1,10 @@
 const store = require('./store');
 
 /** Cargo de anti-roubo — só pode ser dado via /cargo-membro (ou prefixo cargo) */
-const ANTI_ROB_ROLE_ID = '1550256144138637423';
+function getAntiRobRoleId() {
+    const id = String(process.env.ANTI_ROB_ROLE_ID || process.env.ANTI_ROUBO_ROLE_ID || '').trim();
+    return /^\\d{15,25}$/.test(id) ? id : null;
+}
 const KEY = 'antirob_auth.json';
 
 function all() {
@@ -45,11 +48,13 @@ function revoke(guildId, userId) {
 }
 
 function isAntiRobRole(roleId) {
-    return String(roleId) === ANTI_ROB_ROLE_ID;
+    const configuredId = getAntiRobRoleId();
+    return Boolean(configuredId && String(roleId) === configuredId);
 }
 
 module.exports = {
-    ANTI_ROB_ROLE_ID,
+    getAntiRobRoleId,
+    get ANTI_ROB_ROLE_ID() { return getAntiRobRoleId(); },
     isAuthorized,
     authorize,
     revoke,
