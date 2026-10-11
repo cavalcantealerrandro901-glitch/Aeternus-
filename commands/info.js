@@ -15,7 +15,7 @@ function userEmbed(user, member, guild) {
             '**Cargos:**',
             member?.roles.cache.filter(r => r.id !== guild?.id).map(r => r.toString()).slice(0, 15).join(' ') || 'Nenhum'
         ].join('\n'))
-        .setFooter({ text: 'Aeternus • Informações' });
+        .setFooter({ text: 'Aeternus • Informações detalhadas' }).setTimestamp();
 }
 
 function serverEmbed(guild) {
