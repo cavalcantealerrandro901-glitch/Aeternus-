@@ -26,7 +26,7 @@ function listEmbed(user) {
     const emb = new EmbedBuilder()
         .setColor(COLOR)
         .setAuthor({ name: user.username, iconURL: user.displayAvatarURL({ size: 64 }) })
-        .setTitle('⚒️ Bancada de Craft');
+        .setTitle('⚒️ AETERNUS • BANCADA DE CRAFT');
 
     if (!profile?.name) {
         emb.setDescription('Crie um personagem com `O.j criar` primeiro.');
@@ -69,7 +69,7 @@ function listEmbed(user) {
         });
     }
 
-    emb.setFooter({ text: 'O.craft <id> · Ex: O.craft caixa_selada' });
+    emb.setFooter({ text: 'Aeternus Craft • O.craft <id> para criar' }).setTimestamp();
     return emb;
 }
 
@@ -211,7 +211,7 @@ module.exports = {
                         .setDescription(
                             `${it.emoji || '🎁'} **${it.name}**\nRaridade: **${items.RARITY[it.rarity]?.name || it.rarity}**\n\n${it.desc || ''}`
                         )
-                        .setFooter({ text: 'Veja em O.inventario' })
+                        .setFooter({ text: 'Aeternus Craft • Confira seu O.inventario' })\n                        .setTimestamp()
                 ],
                 components: []
             });
