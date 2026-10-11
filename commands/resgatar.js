@@ -9,20 +9,23 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('resgatar-codigo')
         .setDescription('Resgatar codigo')
-        .addStringOption((o) => o.setName('codigo').setDescription('Código').setRequired(true)),
+        .addStringOption((o) => o.setName('codigo').setDescription('Código de resgate').setRequired(true).setMaxLength(64)),
 
     async execute(message, args) {
-        const code = (args[0] || '').toUpperCase();
+        const code = String(args[0] || '').trim().toUpperCase();
         if (!code) return message.reply('Uso: `O.resgatar <codigo>`');
         const codes = store.load('codes.json', {});
         const entry = codes[code];
-        if (!entry || entry.usedBy?.includes(message.author.id)) {
+        if (!code || !entry || (Array.isArray(entry.usedBy) && entry.usedBy.includes(message.author.id))) {
             return message.reply('❌ Código inválido ou já usado.');
         }
-        if (entry.max && (entry.usedBy?.length || 0) >= entry.max) {
+        if (entry.max && (Array.isArray(entry.usedBy) ? entry.usedBy.length : 0) >= entry.max) {
             return message.reply('❌ Código esgotado.');
         }
-        entry.usedBy = entry.usedBy || [];
+        if (!Number.isSafeInteger(Number(entry.amount || 0)) || Number(entry.amount || 0) < 0) {
+            return message.reply('❌ Este código está configurado incorretamente. Avise a equipe.');
+        }
+        entry.usedBy = Array.isArray(entry.usedBy) ? entry.usedBy : [];
         entry.usedBy.push(message.author.id);
         codes[code] = entry;
         store.save('codes.json', codes);
@@ -32,23 +35,28 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0x22c55e)
-                    .setTitle('Código resgatado')
-                    .setDescription(amount ? `✨ **+${amount.toLocaleString('pt-BR')}**` : 'Resgatado.')
+                    .setTitle('🎁 Código resgatado')
+                    .setDescription(amount ? `Você recebeu **✨ ${amount.toLocaleString('pt-BR')} éter**.` : 'O código foi resgatado com sucesso.')
+                    .setFooter({ text: 'Aeternus Economy · Resgate confirmado' })
+                    .setTimestamp()
             ]
         });
     },
 
     async executeSlash(i) {
-        const code = String(i.options.getString('codigo', true)).toUpperCase();
+        const code = String(i.options.getString('codigo', true)).trim().toUpperCase();
         const codes = store.load('codes.json', {});
         const entry = codes[code];
-        if (!entry || entry.usedBy?.includes(i.user.id)) {
+        if (!code || !entry || (Array.isArray(entry.usedBy) && entry.usedBy.includes(i.user.id))) {
             return i.reply({ content: '❌ Código inválido ou já usado.', ephemeral: true });
         }
         if (entry.max && (entry.usedBy?.length || 0) >= entry.max) {
             return i.reply({ content: '❌ Código esgotado.', ephemeral: true });
         }
-        entry.usedBy = entry.usedBy || [];
+        if (!Number.isSafeInteger(Number(entry.amount || 0)) || Number(entry.amount || 0) < 0) {
+            return i.reply({ content: '❌ Este código está configurado incorretamente. Avise a equipe.', ephemeral: true });
+        }
+        entry.usedBy = Array.isArray(entry.usedBy) ? entry.usedBy : [];
         entry.usedBy.push(i.user.id);
         codes[code] = entry;
         store.save('codes.json', codes);
