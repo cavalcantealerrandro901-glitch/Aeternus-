@@ -590,7 +590,9 @@ function publicDungeon(match, asUserId) {
                   })),
                   unique: (me.unique || []).map((a) => ({
                       id: a.id, name: a.name, emoji: a.emoji, mana: a.mana, cd: a.cd,
-                      currentCd: me.cds?.[a.id] || 0, desc: a.desc
+                      currentCd: me.cds?.[a.id] || 0, desc: a.desc,
+                      oncePerBattle: !!a.oncePerBattle,
+                      used: (me.usedUniques || []).includes(a.id)
                   })),
                   passives: (me.passives || []).map((a) => ({
                       id: a.id, name: a.name, emoji: a.emoji, desc: a.desc
