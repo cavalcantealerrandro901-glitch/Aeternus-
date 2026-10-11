@@ -1,6 +1,3 @@
-// COMANDO DE TESTE INTENCIONALMENTE COM ERRO.
-// Use apenas para testar o fluxo de autorreparo e remova depois.
-// O erro acontece somente quando o comando é executado.
 module.exports = {
     name: 'teste-autoreparo',
     aliases: ['teste-reparo'],
@@ -8,7 +5,9 @@ module.exports = {
 
     async execute(message) {
         await message.reply('🧪 Iniciando teste do autorreparo…');
-        // BUG INTENCIONAL: esta variável não existe e gera ReferenceError.
-        return aeternusVariavelQueNaoExiste.executar();
+        // Correção: removida referência a variável inexistente.
+        // Opcional: enviar confirmação de conclusão.
+        await message.reply('✅ Teste de autorreparo concluído com sucesso.');
+        return true;
     }
 };
