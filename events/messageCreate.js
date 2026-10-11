@@ -214,31 +214,48 @@ module.exports = {
                 message.reply('👋 AFK removido.').catch(() => {});
             }
             for (const [id] of message.mentions.users) {
-                if (afk.has(id)) {
-                    const d = afk.get(id);
-                    const ms = Math.max(0, Date.now() - Number(d.at || Date.now()));
-                    const totalMin = Math.floor(ms / 60000);
-                    const hours = Math.floor(totalMin / 60);
-                    const mins = totalMin % 60;
-                    let horasLabel;
-                    if (hours <= 0) {
-                        horasLabel = mins <= 0 ? 'menos de 1 min' : `${mins} min`;
-                    } else if (mins === 0) {
-                        horasLabel = `${hours}h`;
-                    } else {
-                        horasLabel = `${hours}h ${mins}min`;
-                    }
-                    const text = [
-                        `💤 <@${id}> está ausente`,
-                        `Horas: ${horasLabel}`,
-                        `Motivo: ${d.reason || 'Ausente'}`
-                    ].join('\n');
-                    const sent = await message.reply(text).catch(() => null);
-                    if (sent) {
-                        setTimeout(() => {
-                            sent.delete().catch(() => {});
-                        }, 6000);
-                    }
+                if (id === message.author.id || !afk.has(id)) continue;
+
+                const d = afk.get(id);
+                const ms = Math.max(0, Date.now() - Number(d.at || Date.now()));
+                const totalMin = Math.floor(ms / 60000);
+                const hours = Math.floor(totalMin / 60);
+                const mins = totalMin % 60;
+                let duration;
+                if (hours <= 0) {
+                    duration = mins <= 0 ? 'menos de 1 min' : `${mins} min`;
+                } else {
+                    duration = mins === 0 ? `${hours}h` : `${hours}h ${mins}min`;
+                }
+
+                // Impede que um motivo de AFK provoque menções ou notificações em massa.
+                const reason = String(d.reason || 'Não informado')
+                    .replace(/@everyone/gi, '@ everyone')
+                    .replace(/@here/gi, '@ here')
+                    .slice(0, 180);
+                const notice = [
+                    '✦ **AETERNUS • AVISO DE AUSÊNCIA**',
+                    '',
+                    `💤 <@${id}> está temporariamente ausente.`,
+                    `▸ **Motivo:** ${reason}`,
+                    `▸ **Ausente há:** ${duration}`,
+                    '',
+                    '**Orientações:**',
+                    '• Evite repetir a menção ou enviar várias mensagens cobrando resposta.',
+                    '• Respeite a ausência; a pessoa responderá quando puder.',
+                    '• Se for urgente, procure outro moderador ou membro disponível.',
+                    '',
+                    '✧ *Aviso automático • Aeternus*'
+                ].join('\n');
+
+                const sent = await message.reply({
+                    content: notice,
+                    allowedMentions: { parse: [], repliedUser: false }
+                }).catch(() => null);
+                if (sent) {
+                    setTimeout(() => {
+                        sent.delete().catch(() => {});
+                    }, 10000);
                 }
             }
         } catch (_) {}
