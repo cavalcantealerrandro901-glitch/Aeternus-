@@ -34,7 +34,8 @@ module.exports = {
                 .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                 .setRequired(false)
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .setDMPermission(false),
 
     async execute(message, args) {
         if (!isMod(message.member)) {
@@ -71,6 +72,9 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.inGuild()) {
+            return i.reply({ content: 'Este comando só funciona em servidores.', flags: 64 });
+        }
         if (!isMod(i.member)) {
             return i.reply({
                 content: 'Sem permissão (**Gerenciar Servidor**).',
