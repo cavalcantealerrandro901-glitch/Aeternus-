@@ -635,44 +635,16 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction }
             fs.writeFileSync(tempPath, proposed, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
             fs.renameSync(tempPath, full);
             localApplied = true;
-            let testResult = { ok: true, details: [] };
-            // Gate de publicação: a correção só vai ao GitHub depois das validações
-            // estáticas e, para comandos, de um hot-reload bem-sucedido.
-            testResult.details.push(path.extname(rel).toLowerCase() === '.json'
-                ? 'JSON válido'
-                : (['.js', '.cjs'].includes(path.extname(rel).toLowerCase())
-                    ? 'sintaxe JavaScript válida'
-                    : 'arquivo passou pelas verificações básicas de conteúdo'));
-
-            if (rel.startsWith('commands/') && rel.endsWith('.js')) {
-                if (!clientRef) throw new Error('Teste do comando impossível: cliente Discord não inicializado.');
-                const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
-                const loadResult = loader.loadCommandFile(clientRef, full, { quiet: true });
-                if (!loadResult?.ok) throw new Error('Teste do comando falhou no carregamento: ' + String(loadResult?.error || 'falha desconhecida'));
-                testResult.details.push('comando carregado novamente pelo loader');
-            } else if (rel.startsWith('systems/') && rel.endsWith('.js')) {
-                // Sistemas podem registrar listeners/timers; não executar setup automaticamente,
-                // pois isso pode duplicar efeitos em produção. Só validar sintaxe antes de publicar.
-                testResult.details.push('teste de execução não realizado para evitar duplicar listeners/timers');
-            } else if (rel.startsWith('events/') && rel.endsWith('.js')) {
-                testResult.details.push('evento validado estaticamente; execução real depende de um evento');
-            } else {
-                testResult.details.push('teste funcional completo não disponível para este tipo de arquivo');
+            if (!rel.startsWith('commands/') || !rel.endsWith('.js')) {
+                throw new Error('O teste funcional interativo está habilitado apenas para comandos JavaScript. Nada foi publicado.');
             }
+            if (!clientRef) throw new Error('Teste do comando impossível: cliente Discord não inicializado.');
+            const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
+            const loadResult = loader.loadCommandFile(clientRef, full, { quiet: true });
+            if (!loadResult?.ok) throw new Error('Teste do comando falhou no carregamento: ' + String(loadResult?.error || 'falha desconhecida'));
 
             const testChannel = message?.channel || interaction?.channel;
-            if (testChannel?.send) {
-                const report = [
-                    '🧪 **AETERNUS • TESTE PRÉ-PUBLICAÇÃO**',
-                    '**Arquivo:** `' + rel + '`',
-                    '**Resultado:** ' + (testResult.ok ? '✅ verificações concluídas' : '❌ reprovado'),
-                    ...testResult.details.map((item) => '• ' + item),
-                    '',
-                    '_O teste estrutural não garante que todos os caminhos funcionem. Comandos foram recarregados, mas não são executados novamente automaticamente para evitar repetir ações como pagamentos, punições ou sorteios._'
-                ].join('\n');
-                await testChannel.send({ content: report, allowedMentions: { parse: [] } });
-            }
-
+            const approval = await waitForFunctionalApproval(testChannel, rel, cmdName);
             const saved = await commitRepairToGitHub(repo, token, rel, proposed, remote.sha, candidate.summary);
             commitSha = saved.commit?.sha || '';
             committed = true;
@@ -680,12 +652,10 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction }
                 attempted: true, repaired: true, file: rel, provider: providerUsed,
                 summary: String(candidate.summary).slice(0, 300), backup: path.relative(ROOT, backupPath),
                 commit: commitSha,
-                message: rel.startsWith('commands/') && rel.endsWith('.js')
-                    ? 'Teste pré-publicação aprovado: sintaxe validada, comando recarregado, backup criado e correção enviada ao GitHub. A execução funcional completa não foi repetida automaticamente para evitar efeitos duplicados.'
-                    : 'Validações estáticas aprovadas e backup criado antes do envio ao GitHub. Isso não comprova funcionamento em runtime; sistemas/eventos/HTML/CSS podem exigir testes específicos ou reinicialização.'
+                message: 'Teste funcional aprovado manualmente por <@' + approval.approvedBy + '>, sintaxe validada, comando recarregado, backup criado e correção enviada ao GitHub.'
             };
         } catch (e) {
-            if (localApplied) {
+            if (localApplied && !committed) {
                 try {
                     fs.writeFileSync(full, original, { encoding: 'utf8', mode: 0o600 });
                     if (rel.startsWith('commands/') && rel.endsWith('.js')) {
