@@ -34,7 +34,7 @@ function buildPanel(userId) {
             `Base: ${Object.values(s.base).reduce((a, b) => a + Number(b || 0), 0).toLocaleString('pt-BR')} pontos`,
             `Classe: +${Object.values(s.classBonus).reduce((a, b) => a + Number(b || 0), 0).toLocaleString('pt-BR')}`,
             `Equipamento: +${Object.values(s.equipBonus).reduce((a, b) => a + Number(b || 0), 0).toLocaleString('pt-BR')}`
-        ].join('\\n'))
+        ].join('\n'))
         .setFooter({ text: 'Aeternus • Atributos finais de combate' });
 
     return { embeds: [emb] };
