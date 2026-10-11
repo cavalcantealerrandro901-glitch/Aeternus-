@@ -31,11 +31,12 @@ function createWelcomeBackMessage(user, previous) {
     return [
         '✦ **AETERNUS • CENTRAL DE PRESENÇA**',
         '',
-        '👋 **BEM-VINDO DE VOLTA!**',
-        `${user}, seu modo ausente foi desativado.`,
-        `▸ **Tempo ausente:** ${duration}`,
+        '✅ **MODO AUSENTE DESATIVADO**',
+        `👋 ${user}, você está de volta e seu status AFK foi removido.`,
+        `▸ **Tempo de ausência:** ${duration}`,
         '',
-        '✧ *Seu status voltou ao normal.*'
+        '**Tudo certo!** Você voltará a receber as menções normalmente.',
+        '✧ *Aeternus • Sistema de utilidades*'
     ].join('\n');
 }
 
