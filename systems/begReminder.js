@@ -11,6 +11,7 @@ const BATCH_DELAY_MS = 1200;
 const COLOR = 0x34d399;
 
 let started = false;
+let ticking = false;
 
 function isEnabled() {
     const v = String(process.env.BEG_REMINDER || 'on').toLowerCase();
@@ -91,8 +92,10 @@ async function sendReady(client, userId, lastBeg) {
 }
 
 async function tick(client) {
-    if (!isEnabled()) return;
+    if (ticking || !isEnabled()) return;
     if (!client?.user) return;
+    ticking = true;
+    try {
 
     const now = Date.now();
     const all = cdMap();
@@ -122,6 +125,9 @@ async function tick(client) {
     }
 
     if (sent > 0) console.log(`[begReminder] ${sent} DM(s) de beg enviada(s)`);
+    } finally {
+        ticking = false;
+    }
 }
 
 function setup(client) {
