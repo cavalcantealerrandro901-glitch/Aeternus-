@@ -38,8 +38,10 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xa78bfa)
-                    .setTitle(`Convites · ${user.username}`)
-                    .setDescription(`Total de usos: **${total}**`)
+                    .setTitle('✦ AETERNUS • CONVITES')
+                    .setDescription(`Usuário: **${user.tag || user.username}**\nTotal de usos: **${total}**`)
+                    .setFooter({ text: 'Aeternus • Estatísticas de convites' })
+                    .setTimestamp()
             ]
         });
     }
