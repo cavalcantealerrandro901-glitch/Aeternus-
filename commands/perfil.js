@@ -169,7 +169,7 @@ module.exports = {
             });
         } catch (e) {
             console.error('[perfil]', e);
-            await interaction.editReply('❌ Não consegui gerar o card.').catch(() => {});
+            await interaction.editReply('❌ **Aeternus • Perfil**\nNão consegui gerar o card agora. Tente novamente em alguns instantes.').catch(() => {});
         }
     },
 
@@ -210,7 +210,7 @@ module.exports = {
                     }))
                 );
             return interaction.reply({
-                content: '🖼️ Escolha o background:',
+                content: '🖼️ **Personalização do perfil**\nEscolha um background que você já possui:',
                 components: [new ActionRowBuilder().addComponents(menu)],
                 ephemeral: true
             });
@@ -236,7 +236,7 @@ module.exports = {
                     }))
                 );
             return interaction.reply({
-                content: '✨ Escolha o efeito do perfil:',
+                content: '✨ **Personalização do perfil**\nEscolha um efeito que você já possui:',
                 components: [new ActionRowBuilder().addComponents(menu)],
                 ephemeral: true
             });
