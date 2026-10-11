@@ -420,22 +420,24 @@ function questionEmbed(session, item) {
     const meta = CATEGORIES[session.catId];
     return new EmbedBuilder()
         .setColor(0xa78bfa)
-        .setTitle(`${meta.emoji} Quiz · ${meta.name}`)
+        .setAuthor({ name: 'AETERNUS • DESAFIO DE CONHECIMENTO' })
+        .setTitle(`${meta.emoji} ${meta.name} · Pergunta ${session.round}`)
         .setDescription(
             [
-                `**Pergunta ${session.round}**`,
+                '━━━━━━━━━━━━━━━━━━━━',
+                `**RODADA ${session.round}**`, 
                 '',
                 `### ${item.q}`,
                 '',
-                `⏱️ **${TIME_MS / 1000}s** para responder neste canal`,
-                `🎁 Acerto: ${eter.format(session.reward)}`,
+                `⏱️ Tempo disponível: **${TIME_MS / 1000} segundos**`, 
+                `🎁 Recompensa por acerto: **${eter.format(session.reward)} Éter**`, 
                 '',
-                '_Qualquer pessoa do canal pode responder. Erros são ignorados._',
-                '_O quiz só termina quando o tempo esgota sem acerto (ou com `O.quiz parar`)._'
+                '_Todos podem participar. Respostas incorretas não encerram a rodada._',
+                '_A rodada avança quando alguém acerta. Para encerrar, use `O.quiz parar`._'
             ].join('\n')
         )
         .setFooter({
-            text: `Canal exclusivo · ${session.round > 1 ? 'Nova pergunta' : 'Quiz iniciado'}`
+            text: `Aeternus Quiz • ${meta.name}`
         })
         .setTimestamp();
 }
