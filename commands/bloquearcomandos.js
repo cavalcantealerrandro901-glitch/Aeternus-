@@ -37,7 +37,8 @@ module.exports = {
                 .addChannelTypes(ChannelType.GuildText)
                 .setRequired(false)
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+        .setDMPermission(false),
 
     async execute(message, args) {
         if (!isMod(message.member)) {
@@ -85,6 +86,9 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.inGuild()) {
+            return i.reply({ content: 'Este comando só funciona em servidores.', flags: 64 });
+        }
         if (!isMod(i.member)) {
             return i.reply({
                 content: 'Sem permissão (**Gerenciar Canais**).',
