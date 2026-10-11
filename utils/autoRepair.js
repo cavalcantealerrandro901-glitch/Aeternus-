@@ -418,6 +418,59 @@ const AUTO_REPAIR_MAX_SOURCE = 24000;
 const AUTO_REPAIR_MAX_OUTPUT = 60000;
 const autoRepairLocks = new Set();
 
+const POST_PUBLISH_VERIFY_MS = Math.max(30_000, Math.min(Number(process.env.AUTO_REPAIR_VERIFY_DELAY_MS) || 120_000, 15 * 60_000));
+const POST_PUBLISH_WINDOW_MS = Math.max(60_000, Math.min(Number(process.env.AUTO_REPAIR_VERIFY_WINDOW_MS) || 10 * 60_000, 60 * 60_000));
+const postPublishWatchers = new Map();
+
+function schedulePostPublishVerification({ rel, cmdName, commit, proposed, workspace }) {
+    if (!rel || !commit || !workspace?.channel) return false;
+    const key = String(rel);
+    const previous = postPublishWatchers.get(key);
+    if (previous?.timer) clearTimeout(previous.timer);
+    const watcher = { rel: key, cmdName: String(cmdName || '?'), commit: String(commit), proposed, channel: workspace.channel, publishedAt: Date.now(), timer: null };
+    watcher.timer = setTimeout(async () => {
+        try {
+            const token = String(process.env.GITHUB_TOKEN || '').trim();
+            const repo = githubRepoParts();
+            if (!token || !repo) throw new Error('Credenciais GitHub ausentes para conferir a versão publicada.');
+            const url = 'https://api.github.com/repos/' + repo + '/contents/' + key.split('/').map(encodeURIComponent).join('/');
+            const remote = await githubRequest(url, token);
+            const remoteContent = Buffer.from(String(remote.content || '').replace(/\\s/g, ''), 'base64').toString('utf8');
+            if (remoteContent !== proposed) {
+                await watcher.channel.send({ content: '🟡 AETERNUS • VERIFICAÇÃO PÓS-PUBLICAÇÃO\nO arquivo ' + key + ' mudou depois do reparo ' + watcher.commit.slice(0, 12) + '. Nenhuma reversão automática foi feita para não sobrescrever uma atualização mais recente.', allowedMentions: { parse: [] } }).catch(() => {});
+                return;
+            }
+            const recentErrors = [...state.entries()]
+                .filter(([name, st]) => Date.now() - Number(st.lastAt || 0) <= POST_PUBLISH_WINDOW_MS)
+                .map(([name, st]) => ({ name, lastError: String(st.lastError || ''), lastAt: st.lastAt }))
+                .filter((entry) => entry.name === watcher.cmdName || entry.lastError.includes(key) || entry.lastError.includes(path.basename(key)));
+            if (recentErrors.length) {
+                const details = recentErrors.slice(0, 3).map((entry) => '- ' + entry.name + ': ' + entry.lastError.replace(/\\s+/g, ' ').slice(0, 220)).join('\n');
+                await watcher.channel.send({ content: [
+                    '🚨 AETERNUS • POSSÍVEL REGRESSÃO PÓS-PUBLICAÇÃO',
+                    'Arquivo: ' + key,
+                    'Commit: ' + watcher.commit.slice(0, 12),
+                    'Janela observada: ' + Math.round(POST_PUBLISH_WINDOW_MS / 60_000) + ' minutos',
+                    'Erros recentes compatíveis:',
+                    details,
+                    'A versão publicada permanece no GitHub. Revise os logs e decida manualmente se deve reverter; coincidência temporal não prova causalidade.'
+                ].join('\n'), allowedMentions: { parse: [] } }).catch(() => {});
+            } else {
+                await watcher.channel.send({ content: '✅ AETERNUS • VERIFICAÇÃO PÓS-PUBLICAÇÃO\nA versão publicada de ' + key + ' continua no GitHub e não foram encontrados erros recentes compatíveis na janela de observação. Isso não substitui testes funcionais.', allowedMentions: { parse: [] } }).catch(() => {});
+            }
+        } catch (e) {
+            console.warn('[autoRepair:post-publish]', e?.message || e);
+            await watcher.channel.send({ content: '⚠️ AETERNUS • VERIFICAÇÃO INCOMPLETA\nNão foi possível verificar ' + key + ' após a publicação: ' + String(e?.message || e).slice(0, 250), allowedMentions: { parse: [] } }).catch(() => {});
+        } finally {
+            if (postPublishWatchers.get(key) === watcher) postPublishWatchers.delete(key);
+        }
+    }, POST_PUBLISH_VERIFY_MS);
+    watcher.timer.unref?.();
+    postPublishWatchers.set(key, watcher);
+    return true;
+}
+
+
 function githubRepoParts() {
     const candidates = [
         process.env.GITHUB_REPO,
@@ -851,6 +904,7 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction, 
             committed = true;
             if (approval?.message) cleanupMessages.push(approval.message);
             await deleteRepairMessages(cleanupMessages);
+            schedulePostPublishVerification({ rel, cmdName, commit: commitSha, proposed, workspace });
             return {
                 attempted: true, repaired: true, automatic: automaticSyntaxRepair,
                 file: rel, provider: providerUsed,
