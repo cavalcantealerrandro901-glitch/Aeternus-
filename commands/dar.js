@@ -51,7 +51,8 @@ module.exports = {
         const lines = [];
 
         if (tipo === 'xp') {
-            const n = Math.max(0, parseInt(valor, 10) || 0);
+            const n = Number(valor);
+            if (!Number.isSafeInteger(n) || n <= 0) return message.reply('Informe uma quantidade inteira maior que zero.');
             xp.addXp(user.id, n);
             lines.push(`✨ +**${n}** XP`);
         } else if (tipo === 'cp') {
@@ -93,7 +94,8 @@ module.exports = {
         } else if (tipo === 'attr' || tipo === 'atributo') {
             const parts = valor.split(/\s+/);
             const key = parts[0];
-            const n = Math.max(0, parseInt(parts[1], 10) || 1);
+            const n = parts[1] == null ? 1 : Number(parts[1]);
+            if (!Number.isSafeInteger(n) || n <= 0) return message.reply('Informe uma quantidade inteira maior que zero.');
             const ok = [
                 'forca',
                 'defesa',
