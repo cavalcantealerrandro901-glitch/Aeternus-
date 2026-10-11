@@ -636,10 +636,10 @@ async function handleCommandError({ cmdName, error, context, message, interactio
     catch (e) { repair = { attempted: true, repaired: false, reason: String(e?.message || e).slice(0, 500) }; console.error('[autoRepair:patch]', repair.reason); }
 
     const statusText = [
-        diagnosis?.ok ? '🧠 **Diagnóstico da IA (' + diagnosis.provider + '):**\\n' + diagnosis.diagnosis : '🔎 Diagnóstico por IA indisponível no momento.',
-        repair?.repaired ? '🛠️ **Reparo aplicado:** `' + repair.file + '`\\n' + repair.message + '\\nResumo: ' + repair.summary + (repair.commit ? '\\nCommit: ' + repair.commit.slice(0, 12) : '') :
+        diagnosis?.ok ? '🧠 **Diagnóstico da IA (' + diagnosis.provider + '):**\n' + diagnosis.diagnosis : '🔎 Diagnóstico por IA indisponível no momento.',
+        repair?.repaired ? '🛠️ **Reparo aplicado:** `' + repair.file + '`\n' + repair.message + '\nResumo: ' + repair.summary + (repair.commit ? '\nCommit: ' + repair.commit.slice(0, 12) : '') :
             (repair?.attempted ? '🛡️ **Reparo automático não aplicado:** ' + String(repair.reason || 'validação não aprovada') : '')
-    ].filter(Boolean).join('\\n\\n');
+    ].filter(Boolean).join('\n\n');
     try {
         if (message?.channel?.send) {
             await message.channel.send({ content: '🚨 **AETERNUS • AUTORREPARO**\n' + statusText, allowedMentions: { parse: [] } }).catch(() => {});
