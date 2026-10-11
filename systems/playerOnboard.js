@@ -9,7 +9,6 @@ const {
 } = require('discord.js');
 const player = require('../utils/player');
 
-const invited = new Set();
 const INVITE_COOLDOWN = 1000 * 60 * 60 * 24;
 const lastInvite = new Map();
 
@@ -50,14 +49,13 @@ async function sendInvite(user) {
 
     const now = Date.now();
     const last = lastInvite.get(user.id) || 0;
-    if (now - last < INVITE_COOLDOWN && invited.has(user.id)) return false;
+    if (now - last < INVITE_COOLDOWN) return false;
 
     try {
         await user.send({
             embeds: [inviteEmbed()],
             components: [inviteRow()]
         });
-        invited.add(user.id);
         lastInvite.set(user.id, now);
         return true;
     } catch {
@@ -72,44 +70,8 @@ function setup(client) {
         setTimeout(() => sendInvite(member.user), 2500);
     });
 
-    const onReady = async () => {
-        try {
-            if (player.count() > 0) {
-                console.log('[player] ' + player.count() + ' perfil(is) carregado(s)');
-                return;
-            }
-            console.log('[player] nenhum perfil — enviando convites iniciais...');
-            let sent = 0;
-            for (const guild of client.guilds.cache.values()) {
-                const members = await guild.members.fetch().catch(() => null);
-                if (!members) continue;
-                for (const m of members.values()) {
-                    if (m.user.bot) continue;
-                    if (await sendInvite(m.user)) sent++;
-                    if (sent >= 40) break;
-                    await new Promise((r) => setTimeout(r, 400));
-                }
-                if (sent >= 40) break;
-            }
-            console.log('[player] convites iniciais enviados: ' + sent);
-        } catch (e) {
-            console.error('[player onboard]', e);
-        }
-    };
-
-    if (client.isReady && client.isReady()) onReady();
-    else client.once('clientReady', onReady);
-
-    client.on('messageCreate', async (message) => {
-        try {
-            if (!message.guild || message.author.bot) return;
-            if (player.has(message.author.id)) return;
-            const last = lastInvite.get(message.author.id) || 0;
-            if (Date.now() - last < INVITE_COOLDOWN) return;
-            if (Math.random() > 0.15) return;
-            await sendInvite(message.author);
-        } catch (_) {}
-    });
+    // Não envia DMs em massa ao iniciar nem sorteia convites em mensagens comuns.
+    // O convite é enviado apenas quando um membro novo entra no servidor.
 
     console.log('[playerOnboard] ativo');
 }
