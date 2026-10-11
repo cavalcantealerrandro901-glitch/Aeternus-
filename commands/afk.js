@@ -25,8 +25,8 @@ function buildAfkText(user, reason, sinceMs) {
     }
     return [
         '💤 ' + user.toString() + ' **está ausente**',
-        '**Horas:** ' + horasLabel,
-        '**Motivo:** ' + (reason || )
+        '**Horas:** ' ** + horasLabel**,
+        '**Motivo:** ' ** + (reason || ** )
     ].join('\n');
 }
 
@@ -79,7 +79,7 @@ module.exports = {
             );
         }
 
-        const reason = (i.options.getString('motivo') || 'Ausente no momento').slice(0, 180);
+        const reason = (i.options.getString('motivo') || 'Não definido').slice(0, 180);
         afk.set(i.user.id, reason);
 
         return i.reply(buildAfkText(i.user, reason, 0));
