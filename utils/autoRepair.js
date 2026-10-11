@@ -13,6 +13,59 @@ const SCAN_DIRS = ['commands', 'utils', 'systems', 'events', 'bot', 'web', 'publ
 const state = new Map();
 const dmCooldown = new Map();
 
+const REPAIR_HISTORY_PATH = path.join(ROOT, 'data', 'auto-repair-history.jsonl');
+const REPAIR_HISTORY_MAX_BYTES = 2 * 1024 * 1024;
+
+function writeRepairHistory(entry) {
+    try {
+        const dir = path.dirname(REPAIR_HISTORY_PATH);
+        fs.mkdirSync(dir, { recursive: true });
+        // Rotação simples para não deixar o histórico crescer sem limite.
+        try {
+            if (fs.existsSync(REPAIR_HISTORY_PATH) && fs.statSync(REPAIR_HISTORY_PATH).size > REPAIR_HISTORY_MAX_BYTES) {
+                const rotated = REPAIR_HISTORY_PATH + '.1';
+                try { if (fs.existsSync(rotated)) fs.unlinkSync(rotated); } catch (_) {}
+                fs.renameSync(REPAIR_HISTORY_PATH, rotated);
+            }
+        } catch (e) {
+            console.warn('[autoRepair:history] Rotação falhou:', e?.message || e);
+        }
+        const safe = {
+            at: new Date().toISOString(),
+            event: String(entry?.event || 'repair-event').slice(0, 50),
+            command: String(entry?.command || '?').slice(0, 100),
+            file: String(entry?.file || '').slice(0, 180),
+            risk: String(entry?.risk || 'não informado').slice(0, 30),
+            reason: redactSecrets(String(entry?.reason || '')).slice(0, 500),
+            summary: redactSecrets(String(entry?.summary || '')).slice(0, 500),
+            provider: String(entry?.provider || '').slice(0, 60),
+            approvedBy: String(entry?.approvedBy || ''),
+            automatic: Boolean(entry?.automatic),
+            commit: String(entry?.commit || '').slice(0, 64)
+        };
+        fs.appendFileSync(REPAIR_HISTORY_PATH, JSON.stringify(safe) + '\n', { encoding: 'utf8', mode: 0o600 });
+        return true;
+    } catch (e) {
+        console.warn('[autoRepair:history] Não foi possível registrar evento:', e?.message || e);
+        return false;
+    }
+}
+
+function getRepairHistory(limit = 20) {
+    try {
+        if (!fs.existsSync(REPAIR_HISTORY_PATH)) return [];
+        const rows = fs.readFileSync(REPAIR_HISTORY_PATH, 'utf8').split(/\r?\n/).filter(Boolean);
+        const count = Math.max(1, Math.min(100, Number(limit) || 20));
+        return rows.slice(-count).reverse().flatMap((line) => {
+            try { return [JSON.parse(line)]; } catch (_) { return []; }
+        });
+    } catch (e) {
+        console.warn('[autoRepair:history] Leitura falhou:', e?.message || e);
+        return [];
+    }
+}
+
+
 let clientRef = null;
 let hooksInstalled = false;
 
@@ -905,6 +958,18 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction, 
             if (approval?.message) cleanupMessages.push(approval.message);
             await deleteRepairMessages(cleanupMessages);
             schedulePostPublishVerification({ rel, cmdName, commit: commitSha, proposed, workspace });
+            writeRepairHistory({
+                event: 'published',
+                command: cmdName,
+                file: rel,
+                risk: repairRisk?.level || 'não informado',
+                reason: repairRisk?.reason || '',
+                summary: candidate.summary,
+                provider: providerUsed,
+                approvedBy: approval?.approvedBy || '',
+                automatic: automaticSyntaxRepair,
+                commit: commitSha
+            });
             return {
                 attempted: true, repaired: true, automatic: automaticSyntaxRepair,
                 file: rel, provider: providerUsed,
@@ -915,6 +980,13 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction, 
                     : 'Teste funcional aprovado manualmente por <@' + approval.approvedBy + '>, sintaxe validada, comando recarregado, backup criado e correção enviada ao GitHub.'
             };
         } catch (e) {
+            writeRepairHistory({
+                event: committed ? 'post-publish-error' : 'repair-failed',
+                command: cmdName,
+                file: rel,
+                reason: String(e?.message || e),
+                commit: commitSha
+            });
             if (localApplied && !committed) {
                 try {
                     const current = fs.readFileSync(full, 'utf8');
@@ -1064,6 +1136,7 @@ module.exports = {
     scanAll,
     ownerIds,
     getStatus,
+    getRepairHistory,
     diagnoseWithAI,
     attemptAiRepair,
     installGlobalHooks,
