@@ -25,7 +25,8 @@ module.exports = {
                     new EmbedBuilder()
                         .setColor(0x22c55e)
                         .setTitle('🔓 AETERNUS • DESBANIMENTO CONCLUÍDO')
-                        .setDescription(`**ID do usuário:** \`${id}\`\n**Motivo:** ${reason}`)\n                        .setFooter({ text: 'Aeternus Moderation • Desbanimento' })
+                        .setDescription(`**ID do usuário:** \`${id}\`\n**Motivo:** ${reason}`)
+                        .setFooter({ text: 'Aeternus Moderation • Desbanimento' })
                         .setFooter({ text: `Mod: ${message.author.tag}` })
                         .setTimestamp()
                 ]
