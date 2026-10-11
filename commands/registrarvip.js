@@ -32,7 +32,7 @@ async function notifyUserPurchase(client, user, rec) {
         const cat = vip.categoryLabel(rec.category);
         const emb = new EmbedBuilder()
             .setColor(COLOR)
-            .setTitle('Registro feito')
+            .setTitle('✦ AETERNUS • REGISTRO CONFIRMADO')
             .setDescription(
                 [
                     `Seu registro de **${cat}** foi anotado.`,
