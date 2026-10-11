@@ -40,25 +40,25 @@ function balLine(user) {
 function menuEmbed(user) {
     return new EmbedBuilder()
         .setColor(0x8b5cf6)
-        .setAuthor({ name: 'Aeternus Boutique' })
-        .setTitle('🛒  Loja Aeternus')
+        .setAuthor({ name: 'AETERNUS • MARKETPLACE' })
+        .setTitle('🛒 Marketplace Aeternus')
         .setDescription(
             [
                 `👤 ${user}`,
                 balLine(user),
                 '',
-                'Escolha uma categoria:',
+                'Selecione uma categoria para explorar:',
                 '',
-                '👑 **`loja vip`** — cargos VIP deste servidor',
-                '🎨 **`loja decoração`** — fundos de perfil (painel)',
-                '🎁 **`loja itens`** — títulos, boosts e caixas (painel)',
-                '✨ **`loja efeitos`** — efeitos especiais no perfil (painel)',
+                '👑 **VIP** — cargos e benefícios deste servidor',
+                '🎨 **Decorações** — fundos para personalizar seu perfil',
+                '🎁 **Itens** — títulos, boosts e caixas disponíveis',
+                '✨ **Efeitos** — detalhes visuais para seu perfil',
                 '',
-                '_VIPs são configurados no painel de confirmação do servidor._'
+                '_Use os botões abaixo para abrir uma categoria. Os itens e preços dependem da configuração do servidor._'
             ].join('\n')
         )
         .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setFooter({ text: 'O.loja · catálogo Aeternus' })
+        .setFooter({ text: 'Aeternus • Marketplace' })
         .setTimestamp();
 }
 
