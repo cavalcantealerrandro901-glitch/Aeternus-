@@ -19,12 +19,12 @@ async function handleBanProcess(context, moderator, targetMember, reason, isSlas
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId(customId)
-            .setLabel('Aceitar expulsão')
+            .setLabel('Confirmar banimento')
             .setEmoji('✅')
             .setStyle(ButtonStyle.Danger)
     );
 
-    const content = `Nossa, você <@${moderator.id}> vai banir <@${targetMember.id}> mesmo? Uh... Sendo assim, clique no botão ✅ aceitar expulsão, você tem 6 minutos para decidir.`;
+    const content = `⚠️ **Confirmação de banimento**\nModerador: <@${moderator.id}>\nMembro: <@${targetMember.id}>\nMotivo: **${String(reason).slice(0, 500)}**\n\nConfirme abaixo em até 6 minutos.`;
 
     let sentMsg;
     if (isSlash) {
@@ -52,7 +52,7 @@ async function handleBanProcess(context, moderator, targetMember, reason, isSlas
         try {
             await targetMember.ban({ reason: `${reason} · por ${moderator.tag}` });
             
-            const successText = `---------- 🔨 O usuário <@${targetMember.id}> foi expulso do servidor para sempre, mas quem manda quebrar as regras né!!`;
+            const successText = `🔨 **Banimento concluído**\nO membro <@${targetMember.id}> foi banido do servidor.\n**Motivo:** ${String(reason).slice(0, 500)}`;
             
             await originalMessage.reply({ content: successText, allowedMentions: { repliedUser: false } });
         } catch (e) {
