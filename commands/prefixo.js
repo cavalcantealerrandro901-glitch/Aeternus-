@@ -30,7 +30,10 @@ module.exports = {
                                 '',
                                 '_Quando você mudar, o prefixo antigo (ex.: `O.`) **deixa de funcionar** neste servidor._'
                             ].join('\n')
-                        )\n                        .setFooter({ text: 'Aeternus • Configurações do servidor' })\n                        .setTimestamp()\n                ]
+                        )
+                        .setFooter({ text: 'Aeternus • Configurações do servidor' })
+                        .setTimestamp()
+                ]
             });
         }
 
