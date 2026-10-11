@@ -20,9 +20,9 @@ async function run(userId, num, amountRaw, reply) {
         embeds: [
             new EmbedBuilder()
                 .setColor(win ? 0x22c55e : 0xef4444)
-                .setTitle(win ? 'Acertou' : 'Errou')
+                .setTitle(win ? '🎲 AETERNUS • ACERTOU' : '🎲 AETERNUS • NÃO FOI DESSA VEZ')
                 .setDescription(
-                    `🎲 Saiu **${roll}** (você: **${choice}**)\n${win ? `✨ **+${fmt(bet.amount * 5)}**` : `✨ **-${fmt(bet.amount)}**`}\nSaldo: ✨ **${fmt(eter.get(userId))}**`
+                    `🎲 Resultado: **${roll}**\n🎯 Sua escolha: **${choice}**\n${win ? `✨ **+${fmt(bet.amount * 5)}** de lucro` : `💫 **-${fmt(bet.amount)}** de prejuízo`}\n\n💼 Saldo: ✨ **${fmt(eter.get(userId))}**`
                 )
         ]
     });
