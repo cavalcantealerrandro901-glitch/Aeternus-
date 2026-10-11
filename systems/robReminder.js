@@ -11,6 +11,7 @@ const BATCH_DELAY_MS = 1200;
 const COLOR = 0xa855f7;
 
 let started = false;
+let ticking = false;
 
 function isEnabled() {
     const v = String(process.env.ROB_REMINDER || 'on').toLowerCase();
@@ -90,8 +91,10 @@ async function sendReady(client, userId, lastTs) {
 }
 
 async function tick(client) {
-    if (!isEnabled()) return;
+    if (ticking || !isEnabled()) return;
     if (!client?.user) return;
+    ticking = true;
+    try {
 
     const now = Date.now();
     const all = cdMap();
@@ -122,6 +125,9 @@ async function tick(client) {
     }
 
     if (sent > 0) console.log(`[robReminder] ${sent} DM(s) de roubo enviada(s)`);
+    } finally {
+        ticking = false;
+    }
 }
 
 function setup(client) {
