@@ -18,8 +18,8 @@ module.exports = {
             owners.includes(message.author.id) ||
             message.author.id === message.client.application?.owner?.id;
 
-        if (!isOwner && owners.length) {
-            return message.reply('❌ Só o dono do bot pode usar este comando.');
+        if (!isOwner) {
+            return message.reply('❌ Só o dono do bot pode consultar o estado interno e varrer arquivos.');
         }
 
         const query = (args[0] || '').toLowerCase();
