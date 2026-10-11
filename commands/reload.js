@@ -7,8 +7,6 @@
  *   O.reload all commands
  *   O.reload all systems
  */
-const { PermissionFlagsBits } = require('discord.js');
-
 module.exports = {
     name: 'reload',
     aliases: ['recarregar', 'rl'],
@@ -22,12 +20,13 @@ module.exports = {
             .map((s) => s.trim())
             .filter(Boolean);
 
-        const isOwner = ownerIds.includes(message.author.id);
-        const isAdmin =
-            message.member?.permissions?.has(PermissionFlagsBits.Administrator) || false;
+        const applicationOwnerId = message.client.application?.owner?.id;
+        const isOwner =
+            ownerIds.includes(message.author.id) ||
+            message.author.id === applicationOwnerId;
 
-        if (!isOwner && !isAdmin) {
-            return message.reply('❌ Apenas o dono do bot ou administradores podem usar este comando.');
+        if (!isOwner) {
+            return message.reply('❌ Apenas o dono do bot pode recarregar comandos e sistemas.');
         }
 
         const tipo = String(args[0] || '').toLowerCase();
