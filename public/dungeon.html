@@ -55,7 +55,7 @@ html,body{background:radial-gradient(circle at 50% -10%,#22243a 0,#0a0b11 45%,#0
 .info-grid{gap:3px}.info{gap:4px;padding:3px 4px;border-radius:7px;background:#090c13;border:1px solid #ffffff08}.info .ico{width:15px;flex:0 0 15px}.info strong{font-size:9px;white-space:normal}.info small{font-size:8px;line-height:1.35;white-space:normal;margin-top:2px}
 .vs-col{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding-top:16px}.vs{font-family:Cinzel,serif;font-size:20px;color:var(--gold)}.fx{min-height:26px;text-align:center;color:#fca5a5;font-size:12px;line-height:1.35}
 .actions{max-width:1200px;margin:10px auto 0;padding:0 10px}.panel{background:linear-gradient(180deg,#121622,#0b0e15);border:1px solid var(--line);border-radius:16px;padding:14px}.panel h3{font-family:Cinzel,serif;font-size:13px;letter-spacing:.1em;color:var(--gold);margin:0 0 10px}
-.skills{grid-template-columns:repeat(5,1fr);gap:8px}.skill{border:1px solid #c9a22728;background:#151925;border-radius:11px;padding:9px;text-align:left;color:var(--text);min-height:92px}.skill:disabled{opacity:.38;cursor:not-allowed}.skill:not(:disabled):hover{border-color:#c9a22788;background:#1b1e2a}.skill .sn{font-family:Inter,system-ui,sans-serif;font-size:12px;font-weight:700;color:var(--gold)}.skill .sd{font-size:10px;color:var(--muted);line-height:1.35;margin-top:5px}.skill .sm,.skill .scd{font-size:10px;color:#93c5fd;margin-top:7px}.skill .scd{color:#fbbf24}
+.skills{grid-template-columns:repeat(5,1fr);gap:8px}.skill{border:1px solid #c9a22728;background:#151925;border-radius:11px;padding:9px;text-align:left;color:var(--text);min-height:92px}.skill:disabled{opacity:.38;cursor:not-allowed}.skill.unique{border-color:#a855f755}.skill:not(:disabled):hover{border-color:#c9a22788;background:#1b1e2a}.skill .sn{font-family:Inter,system-ui,sans-serif;font-size:12px;font-weight:700;color:var(--gold)}.skill .sd{font-size:10px;color:var(--muted);line-height:1.35;margin-top:5px}.skill .sm,.skill .scd{font-size:10px;color:#93c5fd;margin-top:7px}.skill .scd{color:#fbbf24}
 .combat-log{max-width:1200px;margin:12px auto 0;padding:0 10px}.log-panel{min-height:72px;max-height:150px}.log{max-height:130px;overflow:auto;font-size:11px;line-height:1.4}.log .line{padding:4px 0;border-bottom:1px solid #ffffff07;color:var(--muted)}.log .line:last-child{color:var(--text)}
 @media(max-width:900px){.field{grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:4px}.skills{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.header{padding:8px 5px 5px}.header h1{font-size:11px}.field{grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:2px;padding:3px 5px}.fighter{padding:5px}.avatar{width:32px;height:32px;flex-basis:32px;font-size:19px}.identity{gap:4px}.fighter .name{font-size:11px}.fighter .meta{font-size:8px}.badges{gap:2px}.badge{font-size:8px;padding:2px 4px}.bar-label{font-size:9px}.bar{height:6px}.section h3{font-size:7px;letter-spacing:.08em}.attrs{grid-template-columns:repeat(4,1fr)}.info-grid{grid-template-columns:1fr 1fr 1fr;gap:2px}.info strong{font-size:8px}.info small{font-size:7px}.info .ico{width:12px;flex-basis:12px}.vs{font-size:15px}.fx{font-size:8px;min-height:0}.actions,.combat-log,.explore-panel{padding-left:5px;padding-right:5px}.skills{grid-template-columns:1fr 1fr}.skill{min-height:80px;padding:7px}.skill .sn{font-size:9px}.skill .sd,.skill .sm,.skill .scd{font-size:8px}.explore-grid{grid-template-columns:1fr}.map-section{padding-left:5px;padding-right:5px}}
@@ -312,6 +312,14 @@ html,body{background:radial-gradient(circle at 50% -10%,#22243a 0,#0a0b11 45%,#0
         (mine ? 'você' : (e?.name || 'inimigo')) + '</strong>';
       if (s.lastEffect?.type === 'hit') {
         $('fxText').textContent = '⚔️ ' + (s.lastEffect.dmg || '') + ' dano';
+        const targetSide = String(s.lastEffect.to) === String(s.player?.id) ? 'A' : 'B';
+        const card = $('combatCard' + targetSide);
+        if (card) {
+          card.classList.remove('hit');
+          void card.offsetWidth;
+          card.classList.add('hit');
+          setTimeout(() => card.classList.remove('hit'), 500);
+        }
       } else $('fxText').textContent = '';
       renderSkills(s);
     } else {
