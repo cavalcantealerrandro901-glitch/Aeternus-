@@ -21,6 +21,7 @@ module.exports = {
         ),
 
     async execute(message, args) {
+        if (!message.guild) return message.reply('❌ Os lembretes precisam ser criados dentro de um servidor.');
         if (!args.length) {
             return message.reply(
                 'Uso:\n' +
@@ -61,6 +62,7 @@ module.exports = {
 
         const quando = args[0];
         const texto = args.slice(1).join(' ').trim();
+        if (texto.length > 1000) return message.reply('❌ O texto do lembrete deve ter no máximo 1.000 caracteres.');
         if (!texto) {
             return message.reply('Informe o texto do lembrete. Ex: `O.lembrete 30m beber água`');
         }
@@ -101,8 +103,10 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.guild || !i.channel) return i.reply({ content: '❌ Os lembretes precisam ser criados dentro de um servidor.', flags: 64 });
         const quando = i.options.getString('quando', true);
         const texto = i.options.getString('texto', true);
+        if (texto.length > 1000) return i.reply({ content: '❌ O texto do lembrete deve ter no máximo 1.000 caracteres.', flags: 64 });
         const at = reminders.parseWhen(quando);
         if (!at) {
             return i.reply({
