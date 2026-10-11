@@ -31,6 +31,7 @@ module.exports = {
                 .setDescription('Quantidade de XP a adicionar')
                 .setRequired(true)
                 .setMinValue(1)
+                .setMaxValue(1_000_000_000)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
@@ -45,6 +46,9 @@ module.exports = {
         const user = i.options.getUser('usuario', true);
         if (user.bot) return respond(i, '❌ Não é possível dar XP a bots.');
         const amount = i.options.getInteger('quantidade', true);
+        if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1_000_000_000) {
+            return respond(i, '❌ A quantidade deve estar entre 1 e 1.000.000.000 XP.');
+        }
         const before = xp.get(user.id);
         const result = xp.addXp(user.id, amount);
         return respond(i, {
