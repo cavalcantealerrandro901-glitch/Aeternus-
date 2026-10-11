@@ -114,7 +114,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
         if (result === 'push') lines.push('Aposta devolvida na íntegra.');
         lines.push(`💼 Saldo: ✨ **${fmt(eter.get(session.userId))}**`);
     } else {
-        lines.push('', '_Carta · Parar · Dobrar (1ª decisão)_');
+        lines.push('', '_Use **Pedir carta** para comprar, **Parar** para encerrar ou **Dobrar** na primeira decisão._');
     }
     if (note) lines.push('', note);
     return new EmbedBuilder()
@@ -133,7 +133,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
                         : '🃏  Blackjack'
         )
         .setDescription(lines.join('\n'))
-        .setFooter({ text: 'BJ 3:2 · Dealer 17 · Ás 1/11 · ' + betFooter() })
+        .setFooter({ text: 'Aeternus Economy • Blackjack 3:2 · Dealer para em 17 · Ás vale 1 ou 11 · ' + betFooter() })
         .setTimestamp();
 }
 function playButtons(userId, canDouble) {
