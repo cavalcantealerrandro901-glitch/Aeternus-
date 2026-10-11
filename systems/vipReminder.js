@@ -14,6 +14,7 @@ const vip = require('../utils/vip');
 
 const CHECK_MS = 5 * 60 * 1000;
 const BATCH_DELAY_MS = 600;
+let ticking = false;
 const COLOR = 0xa78bfa;
 const COLOR_END = 0xf43f5e;
 
