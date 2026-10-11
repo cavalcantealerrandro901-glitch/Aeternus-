@@ -63,7 +63,7 @@ module.exports = {
                             '',
                             `Antes: **${fmt(before.xp)}** XP · Nv. **${before.level}**`,
                             `Agora: **${fmt(result.xp)}** XP · Nv. **${result.level}**\nPróximo nível em **${fmt((result.level + 1) * 1000)}** XP total`,
-                            result.leveled
+                            result.levelsGained > 0
                                 ? `\n🎉 Subiu de nível! (${result.oldLevel} → ${result.level})`
                                 : ''
                         ]
