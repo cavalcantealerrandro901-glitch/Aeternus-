@@ -23,8 +23,8 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0x22c55e)
-                        .setTitle('Unlock')
-                        .setDescription(`Canal **destrancado**.\n${reason}`)
+                        .setTitle('🔓 AETERNUS • CANAL DESTRANCADO')
+                        .setDescription(`O canal foi **destrancado** com sucesso.\n\n📝 **Motivo:** ${reason}`)
                         .setFooter({ text: `Mod: ${message.author.tag}` })
                         .setTimestamp()
                 ]
