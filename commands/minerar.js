@@ -254,7 +254,8 @@ function resultEmbed(user, ore, amount, balance, biome) {
                 '_Próxima mineração em 5 minutos · aviso no PV quando liberar._'
             ].join('\n')
         )
-        .setFooter({ text: 'Aeternus • Mundo de mineração' })\n        .setTimestamp();
+        .setFooter({ text: 'Aeternus • Mundo de mineração' })
+        .setTimestamp();
 }
 
 async function run(user, reply) {
