@@ -17,7 +17,6 @@ module.exports = {
         }
         const id = String(args[0] || '').trim();
         if (!/^\d{15,20}$/.test(id)) return message.reply('❌ Informe um ID válido do Discord.');
-        if (!id) return message.reply('❌ Uso: `O.unban <id> [motivo]`');
         const reason = args.slice(1).join(' ').trim() || 'Sem motivo';
         try {
             await message.guild.members.unban(id, `${reason} · por ${message.author.tag}`);
