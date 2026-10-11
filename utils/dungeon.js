@@ -431,12 +431,21 @@ function combatMove(matchId, playerId, { moveId } = {}) {
     if (moveId === 'basic' || moveId === attacker.basicAttack?.id) {
         skill = { ...attacker.basicAttack, power: attacker.basicAttack?.power || 1 };
     } else {
-        skill = attacker.actives?.find((a) => a.id === moveId);
+        const active = attacker.actives?.find((a) => a.id === moveId);
+        const unique = attacker.unique?.find((a) => a.id === moveId);
+        skill = active || unique;
         if (!skill) return { ok: false, error: 'Habilidade não equipada.' };
         if ((attacker.cds?.[skill.id] || 0) > 0) return { ok: false, error: 'Em recarga.' };
+        if (unique && skill.oncePerBattle && (attacker.usedUniques || []).includes(skill.id)) {
+            return { ok: false, error: 'Essa habilidade única já foi usada nesta batalha.' };
+        }
         if ((attacker.mana || 0) < (skill.mana || 0)) return { ok: false, error: 'Mana insuficiente.' };
         attacker.mana -= skill.mana || 0;
         if (skill.cd) attacker.cds[skill.id] = skill.cd;
+        if (unique && skill.oncePerBattle) {
+            if (!Array.isArray(attacker.usedUniques)) attacker.usedUniques = [];
+            attacker.usedUniques.push(skill.id);
+        }
     }
     if (skill.type === 'heal') {
         const heal = Math.floor(18 + (attacker.attrs.vida || 10) * 2.5);
