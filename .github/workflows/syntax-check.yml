@@ -9,15 +9,23 @@ jobs:
   syntax:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check JavaScript syntax
+      - name: Check JavaScript syntax from repository API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
         shell: bash
         run: |
-          set -e
-          while IFS= read -r -d '' file; do
+          set -euo pipefail
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$GH_REPOSITORY/git/trees/$GH_SHA?recursive=1" -o /tmp/tree.json
+          node -e "const t=require('/tmp/tree.json'); for (const x of (t.tree||[])) if (x.type==='blob' && /\\.js$/.test(x.path)) console.log(x.path)" > /tmp/jsfiles.txt
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
             echo "Checking $file"
-            node --check "$file"
-          done < <(find . -path './node_modules' -prune -o -path './.git' -prune -o -type f -name '*.js' -print0)
+            curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" "https://api.github.com/repos/$GH_REPOSITORY/contents/$file?ref=$GH_SHA" -o /tmp/check.js
+            node --check /tmp/check.js
+          done < /tmp/jsfiles.txt
