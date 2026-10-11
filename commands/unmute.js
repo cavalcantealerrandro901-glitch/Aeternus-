@@ -25,14 +25,16 @@ module.exports = {
         }
         const member = resolveMember(message, args);
         if (!member) return message.reply('❌ Mencione o membro ou informe o ID.');
-        const reason = args.slice(1).join(' ').trim() || 'Sem motivo';
+        const hasMention = Boolean(message.mentions.members.first());
+        const hasId = /^\d{15,20}$/.test(String(args[0] || '').replace(/[<@!>]/g, ''));
+        const reason = args.slice(hasMention || hasId ? 1 : 0).join(' ').trim() || 'Sem motivo';
         try {
             await member.timeout(null, `${reason} · por ${message.author.tag}`);
             await message.reply({
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0x22c55e)
-                        .setTitle('Unmute')
+                        .setTitle('🔊 Silêncio removido')
                         .setDescription(`**${member.user.tag}**\n${reason}`)
                         .setFooter({ text: `Mod: ${message.author.tag}` })
                         .setTimestamp()
