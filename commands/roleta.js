@@ -170,7 +170,7 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xa78bfa)
-                        .setTitle('🎡  Roleta Aeternus')
+                        .setTitle('🎡 AETERNUS • ROLETA EUROPEIA')
                         .setDescription(
                             [
                                 '**Uso**',
@@ -181,7 +181,7 @@ module.exports = {
                                 '`O.roleta 17 2k`',
                                 '`O.roleta verde 500`',
                                 '',
-                                '🔴/⚫ ×**2** · 🟢 ×**14** · número ×**36**'
+                                '🔴/⚫ ×**2** · 🟢 ×**14** · número ×**36**',\n                                '',\n                                'Escolha sua aposta com atenção: o resultado é aleatório.',\n                                'Apostas são descontadas antes do giro.'
                             ].join('\n')
                         )
                 ]
