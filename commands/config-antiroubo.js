@@ -27,6 +27,7 @@ module.exports = {
         .setDMPermission(false),
 
     async execute(message, args) {
+        if (!message.guild) return message.reply('❌ Este comando só funciona em servidores.');
         if (!message.member?.permissions?.has(PermissionFlagsBits.ManageGuild)) {
             return message.reply('❌ Precisa de **Gerenciar Servidor**.');
         }
@@ -34,6 +35,7 @@ module.exports = {
         if (sub === 'definir' || sub === 'set') {
             const role = message.mentions.roles.first();
             if (!role) return message.reply('Uso: `O.config-antiroubo definir @cargo`');
+            if (role.managed || role.id === message.guild.id) return message.reply('❌ Escolha um cargo normal, não gerenciado nem @everyone.');
             const r = antiRob.setAntiRobRole(message.guild.id, role.id);
             if (!r.ok) return message.reply('❌ ' + r.error);
             return message.reply('✅ Cargo local: ' + role + '\nQuem receber este cargo terá proteção **salva no banco** (vale em todos os servidores).');
@@ -63,12 +65,14 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.inGuild()) return i.reply({ content: '❌ Este comando só funciona em servidores.', ephemeral: true });
         if (!i.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
             return i.reply({ content: '❌ Precisa de **Gerenciar Servidor**.', ephemeral: true });
         }
         const sub = i.options.getSubcommand();
         if (sub === 'definir') {
             const role = i.options.getRole('cargo', true);
+            if (role.managed || role.id === i.guild.id) return i.reply({ content: '❌ Escolha um cargo normal, não gerenciado nem @everyone.', ephemeral: true });
             const r = antiRob.setAntiRobRole(i.guild.id, role.id);
             if (!r.ok) return i.reply({ content: '❌ ' + r.error, ephemeral: true });
             return i.reply({
