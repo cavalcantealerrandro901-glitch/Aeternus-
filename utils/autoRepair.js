@@ -56,7 +56,7 @@ async function postRepairWorkspace({ cmdName, error, context, diagnosis, repair 
         diagnosis?.ok ? '**Diagnóstico (' + diagnosis.provider + '):**\n' + String(diagnosis.diagnosis || '').slice(0, 1200) : '**Diagnóstico:** análise indisponível.',
         repair?.repaired ? '**Estado:** correção publicada. Commit: `' + String(repair.commit || '').slice(0, 12) + '`' :
             repair?.attempted ? '**Estado:** reparo não concluído — ' + String(repair.reason || 'ver logs').slice(0, 300) : '**Estado:** erro registrado; equipe precisa revisar.',
-        'Este sistema funciona automaticamente pelos avisos no canal do erro e no canal de reparo configurado; não utiliza comandos de prefixo ou slash.'
+        'Diagnóstico, proposta, aprovação e resultado detalhado ficam exclusivamente neste canal de reparo configurado no Render. No canal de origem é enviado apenas um aviso curto.'
     ].join('\n\n');
     await channel.send({ content: (roleId ? '<@&' + roleId + '>\n' : '') + body, allowedMentions: { parse: [], roles: roleId ? [roleId] : [] } }).catch(() => {});
     return true;
@@ -313,7 +313,7 @@ async function reportError({ source = 'system', error, context = '', tryReload =
     const searchHits = searchProject(name, error);
 
     const dmKey = 'any:' + key;
-    if (fromCommand || canDm(dmKey)) {
+    if (!fromCommand && canDm(dmKey)) {
         if (fromCommand) dmCooldown.set(dmKey, Date.now());
         await dmOwners(
             errorEmbed({ cmdName: name, error, context: context || 'sistema / global', searchHits, status: 'error' }),
@@ -329,7 +329,7 @@ async function reportError({ source = 'system', error, context = '', tryReload =
             if (lastReload.ok) { repaired = true; break; }
             await new Promise((r) => setTimeout(r, 250 * i));
         }
-        if (fromCommand || canDm('res:' + name)) {
+        if (!fromCommand && canDm('res:' + name)) {
             await dmOwners(
                 errorEmbed({
                     cmdName: name,
@@ -703,8 +703,8 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction }
             if (!loadResult?.ok) throw new Error('Teste do comando falhou no carregamento: ' + String(loadResult?.error || 'falha desconhecida'));
 
             const workspace = await getRepairWorkspaceChannel();
-            const testChannel = workspace?.channel || message?.channel || interaction?.channel;
-            const approval = await waitForFunctionalApproval(testChannel, rel, cmdName);
+            if (!workspace?.channel) throw new Error('Canal de reparo não configurado ou inacessível. Configure AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.');
+            const approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName);
             const saved = await commitRepairToGitHub(repo, token, rel, proposed, remote.sha, candidate.summary);
             commitSha = saved.commit?.sha || '';
             committed = true;
@@ -825,7 +825,7 @@ function installGlobalHooks() {
         } catch (_) {}
     };
 
-    console.log('[autoRepair] hooks globais instalados (DM em erro de comando garantida)');
+    console.log('[autoRepair] hooks globais instalados (relatórios centralizados no canal configurado)');
 }
 
 function getStatus() {
@@ -1033,24 +1033,20 @@ async function handleCommandError({ cmdName, error, context, message, interactio
         repair?.repaired ? '🛠️ **Reparo aplicado:** `' + repair.file + '`\n' + repair.message + '\nResumo: ' + repair.summary + (repair.commit ? '\nCommit: ' + repair.commit.slice(0, 12) : '') :
             (repair?.attempted ? '🛡️ **Reparo automático não aplicado:** ' + String(repair.reason || 'validação não aprovada') : '')
     ].filter(Boolean).join('\n\n');
+    // No canal de origem, apenas avisamos que o reparo foi aberto. Diagnóstico, proposta,
+    // aprovação e resultado detalhado ficam exclusivamente no canal configurado no Render.
+    const originChannel = message?.channel || interaction?.channel;
+    const workspace = await getRepairWorkspaceChannel().catch(() => null);
+    const notice = workspace?.channel
+        ? '🛠️ **AETERNUS • REPARO ABERTO**\nOcorreu um erro neste comando e a equipe foi avisada. O diagnóstico e o acompanhamento estão no canal configurado de reparo.'
+        : '⚠️ **AETERNUS • REPARO NÃO INICIADO**\nOcorreu um erro neste comando, mas o canal de reparo configurado não está disponível. A equipe precisa conferir as variáveis AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.';
     try {
-        if (message?.channel?.send) {
-            await message.channel.send({ content: '🚨 **AETERNUS • AUTORREPARO**\n' + statusText, allowedMentions: { parse: [] } }).catch(() => {});
-        } else if (interaction?.channel?.send) {
-            await interaction.channel.send({ content: '🚨 **AETERNUS • AUTORREPARO**\n' + statusText, allowedMentions: { parse: [] } }).catch(() => {});
-        }
-    } catch (_) {}
-
-    try {
-        if (message?.reply) {
-            await message.reply('❌ O comando falhou. O erro foi registrado e o sistema de diagnóstico foi acionado.').catch(() => {});
-        } else if (interaction) {
-            const payload = { content: '❌ A interação falhou. O erro foi registrado e o sistema de diagnóstico foi acionado.', flags: 64 };
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(payload).catch(() => {});
-            } else {
-                await interaction.reply(payload).catch(() => {});
-            }
+        if (originChannel?.send) {
+            await originChannel.send({ content: notice, allowedMentions: { parse: [] } }).catch(() => {});
+        } else if (interaction && !interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: notice, flags: 64 }).catch(() => {});
+        } else if (interaction && (interaction.replied || interaction.deferred)) {
+            await interaction.followUp({ content: notice, flags: 64 }).catch(() => {});
         }
     } catch (_) {}
 
@@ -1231,8 +1227,8 @@ async function attemptAiRepair(cmdName, error, context, { message, interaction }
             if (!loadResult?.ok) throw new Error('Teste do comando falhou no carregamento: ' + String(loadResult?.error || 'falha desconhecida'));
 
             const workspace = await getRepairWorkspaceChannel();
-            const testChannel = workspace?.channel || message?.channel || interaction?.channel;
-            const approval = await waitForFunctionalApproval(testChannel, rel, cmdName);
+            if (!workspace?.channel) throw new Error('Canal de reparo não configurado ou inacessível. Configure AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.');
+            const approval = await waitForFunctionalApproval(workspace.channel, rel, cmdName);
             const saved = await commitRepairToGitHub(repo, token, rel, proposed, remote.sha, candidate.summary);
             commitSha = saved.commit?.sha || '';
             committed = true;
@@ -1561,24 +1557,20 @@ async function handleCommandError({ cmdName, error, context, message, interactio
         repair?.repaired ? '🛠️ **Reparo aplicado:** `' + repair.file + '`\n' + repair.message + '\nResumo: ' + repair.summary + (repair.commit ? '\nCommit: ' + repair.commit.slice(0, 12) : '') :
             (repair?.attempted ? '🛡️ **Reparo automático não aplicado:** ' + String(repair.reason || 'validação não aprovada') : '')
     ].filter(Boolean).join('\n\n');
+    // No canal de origem, apenas avisamos que o reparo foi aberto. Diagnóstico, proposta,
+    // aprovação e resultado detalhado ficam exclusivamente no canal configurado no Render.
+    const originChannel = message?.channel || interaction?.channel;
+    const workspace = await getRepairWorkspaceChannel().catch(() => null);
+    const notice = workspace?.channel
+        ? '🛠️ **AETERNUS • REPARO ABERTO**\nOcorreu um erro neste comando e a equipe foi avisada. O diagnóstico e o acompanhamento estão no canal configurado de reparo.'
+        : '⚠️ **AETERNUS • REPARO NÃO INICIADO**\nOcorreu um erro neste comando, mas o canal de reparo configurado não está disponível. A equipe precisa conferir as variáveis AUTO_REPAIR_GUILD_ID e AUTO_REPAIR_CHANNEL_ID no Render.';
     try {
-        if (message?.channel?.send) {
-            await message.channel.send({ content: '🚨 **AETERNUS • AUTORREPARO**\n' + statusText, allowedMentions: { parse: [] } }).catch(() => {});
-        } else if (interaction?.channel?.send) {
-            await interaction.channel.send({ content: '🚨 **AETERNUS • AUTORREPARO**\n' + statusText, allowedMentions: { parse: [] } }).catch(() => {});
-        }
-    } catch (_) {}
-
-    try {
-        if (message?.reply) {
-            await message.reply('❌ O comando falhou. O erro foi registrado e o sistema de diagnóstico foi acionado.').catch(() => {});
-        } else if (interaction) {
-            const payload = { content: '❌ A interação falhou. O erro foi registrado e o sistema de diagnóstico foi acionado.', flags: 64 };
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(payload).catch(() => {});
-            } else {
-                await interaction.reply(payload).catch(() => {});
-            }
+        if (originChannel?.send) {
+            await originChannel.send({ content: notice, allowedMentions: { parse: [] } }).catch(() => {});
+        } else if (interaction && !interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: notice, flags: 64 }).catch(() => {});
+        } else if (interaction && (interaction.replied || interaction.deferred)) {
+            await interaction.followUp({ content: notice, flags: 64 }).catch(() => {});
         }
     } catch (_) {}
 
