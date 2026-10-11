@@ -210,6 +210,7 @@ const GUILD_HELP_PAGES = [
             `Criar uma guilda custa **✨ ${fmt(guilds.CREATE_COST)}** e o assistente é feito no privado.`,
             '',
             '**Comece por aqui**',
+
             '`O.guild criar` — criar sua guilda',
             '`O.guild info` — ver sua guilda e seus membros',
             '`O.guild membros` — consultar os integrantes',
