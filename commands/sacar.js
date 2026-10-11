@@ -83,16 +83,16 @@ async function run(user, amountRaw, guild, reply) {
 
     const emb = new EmbedBuilder()
         .setColor(0x86efac)
-        .setTitle('💸 SAQUE REALIZADO!!')
+        .setTitle('🏦 Saque realizado')
         .setDescription(
             [
-                '----------------------------------------',
+                '━━━━━━━━━━━━━━━━━━━━',
                 '',
-                `Você sacou ✨ **${fmt(result.amount)}** éter`,
+                `✨ Valor sacado: **${fmt(result.amount)} Éter**`,
                 '',
-                `🏦 E agora você possui no banco ✨ **${fmt(result.bank)}** éter`,
+                `🏦 Saldo restante no banco: **${fmt(result.bank)} Éter**`,
                 '',
-                '---------------------------------------',
+                '━━━━━━━━━━━━━━━━━━━━',
                 '',
                 `💡 Dica: use \`/depositar-eter\` ou \`${prefix}depositar <valor>\`.`
             ].join('\n')
