@@ -23,7 +23,7 @@ module.exports = {
         const last = cds[message.author.id] || 0;
         if (Date.now() - last < CD) {
             const m = Math.ceil((CD - (Date.now() - last)) / 60000);
-            return message.reply(`⏳ Descanso: **${m}** min.`);
+            return message.reply(`⏳ **AETERNUS • INTERVALO DE TRABALHO**\nVocê poderá trabalhar novamente em **${m} minuto(s)**.`);
         }
         const [job, min, max] = JOBS[Math.floor(Math.random() * JOBS.length)];
         const pay = min + Math.floor(Math.random() * (max - min + 1));
@@ -35,7 +35,7 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xfbbf24)
-                    .setTitle('Trabalho')
+                    .setTitle('💼 AETERNUS • TURNO CONCLUÍDO')
                     .setDescription(
                         `Cargo: **${job}**\n✨ **+${pay.toLocaleString('pt-BR')}**`
                     )
