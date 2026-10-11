@@ -24,7 +24,7 @@ async function handleKickProcess(context, moderator, targetMember, reason, isSla
             .setStyle(ButtonStyle.Danger)
     );
 
-    const content = `⚠️ **Confirmação de expulsão**\nModerador: <@${moderator.id}>\nMembro: <@${targetMember.id}>\nMotivo: **${String(reason).slice(0, 500)}**\n\nConfirme abaixo em até 6 minutos.`;
+    const content = `👢 **AETERNUS • CONFIRMAR EXPULSÃO**\n\n**Moderador:** <@${moderator.id}>\n**Membro:** <@${targetMember.id}>\n**Motivo:** ${String(reason).slice(0, 500)}\n\nConfirme a ação no botão abaixo. O pedido expira em 6 minutos.`;
 
     let sentMsg;
     if (isSlash) {
