@@ -6,7 +6,6 @@
  * - Depois de salvo no DB, continua protegido em TODOS os servidores
  */
 const store = require('./store');
-const { getSettings, setSettings } = require('./settings');
 
 const KEY = 'antirob_users.json';
 const NAME_RE = /anti[\s_-]*roubo|antiroubo|prote[cç][aã]o[\s_-]*(banco|cofre|eter)|escudo[\s_-]*banco/i;
@@ -55,22 +54,10 @@ function revokeProtection(userId) {
     return { ok: true };
 }
 
-function getConfiguredRoleId(guildId) {
-    if (!guildId) return null;
-    try {
-        const s = getSettings(String(guildId));
-        const id = s?.economy?.antiRobRoleId;
-        if (id && /^\d{15,25}$/.test(String(id))) return String(id);
-    } catch (_) {}
-    return null;
-}
-
-function resolveRoleId(guild) {
-    // O ID definido no Render é a fonte principal da configuração.
+function resolveRoleId() {
+    // A configuração é feita exclusivamente pelas variáveis de ambiente do Render.
     const envId = envFallbackId();
-    if (envId) return /^\d{15,25}$/.test(envId) ? envId : null;
-    if (!guild) return null;
-    return getConfiguredRoleId(guild.id);
+    return envId && /^\d{15,25}$/.test(envId) ? envId : null;
 }
 
 async function memberHasRoleHere(guild, userId) {
@@ -133,13 +120,6 @@ async function onMemberRolesUpdate(oldMember, newMember) {
     return null;
 }
 
-function setAntiRobRole(guildId, roleId) {
-    const id = roleId ? String(roleId).replace(/[<@&>]/g, '').trim() : null;
-    if (id && !/^\d{15,25}$/.test(id)) return { ok: false, error: 'ID de cargo inválido.' };
-    setSettings(String(guildId), { economy: { antiRobRoleId: id || null } });
-    return { ok: true, roleId: id };
-}
-
 function mentionRole(guild) {
     const id = resolveRoleId(guild);
     if (!id) return '_nenhum cargo neste servidor_';
@@ -162,8 +142,6 @@ module.exports = {
     revokeProtection,
     getRecord,
     resolveRoleId,
-    setAntiRobRole,
-    getConfiguredRoleId,
     mentionRole,
     onMemberRolesUpdate,
     statusFor,
