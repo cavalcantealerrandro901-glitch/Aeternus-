@@ -519,7 +519,7 @@ async function commitRepairToGitHub(repo, token, rel, content, sha, summary) {
     });
 }
 
-async function attemptAiRepair(cmdName, error, context) {
+async function attemptAiRepair(cmdName, error, context, { message, interaction } = {}) {
     if (String(process.env.AI_AUTO_REPAIR || '').toLowerCase() !== 'true') {
         return { attempted: false, reason: 'reparo automático desativado (AI_AUTO_REPAIR=true para habilitar)' };
     }
@@ -532,14 +532,14 @@ async function attemptAiRepair(cmdName, error, context) {
 
     const hit = getRepairFile(cmdName, error);
     const rel = hit?.rel;
-    if (!isAllowedRepairPath(rel)) return { attempted: false, reason: 'Arquivo fora da lista segura; reparo automático limitado a commands/*.js.' };
+    if (!isAllowedRepairPath(rel)) return { attempted: false, reason: 'Arquivo fora da lista segura de reparo automático.' };
     const lockKey = rel;
     if (autoRepairLocks.has(lockKey)) return { attempted: false, reason: 'Já existe reparo em andamento para este arquivo.' };
     autoRepairLocks.add(lockKey);
 
     try {
         const full = path.resolve(ROOT, rel);
-        if (!full.startsWith(path.resolve(ROOT, 'commands') + path.sep) || !fs.existsSync(full)) {
+        if (!full.startsWith(path.resolve(ROOT) + path.sep) || !fs.existsSync(full) || !full.endsWith(path.normalize(rel))) {
             throw new Error('Caminho local inválido ou arquivo ausente.');
         }
         const original = fs.readFileSync(full, 'utf8');
@@ -602,10 +602,42 @@ async function attemptAiRepair(cmdName, error, context) {
             fs.writeFileSync(tempPath, proposed, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
             fs.renameSync(tempPath, full);
             localApplied = true;
+            let testResult = { ok: true, details: [] };
+            // Gate de publicação: a correção só vai ao GitHub depois das validações
+            // estáticas e, para comandos, de um hot-reload bem-sucedido.
+            testResult.details.push(path.extname(rel).toLowerCase() === '.json'
+                ? 'JSON válido'
+                : (['.js', '.cjs'].includes(path.extname(rel).toLowerCase())
+                    ? 'sintaxe JavaScript válida'
+                    : 'arquivo passou pelas verificações básicas de conteúdo'));
+
             if (rel.startsWith('commands/') && rel.endsWith('.js')) {
+                if (!clientRef) throw new Error('Teste do comando impossível: cliente Discord não inicializado.');
                 const loader = require(path.join(ROOT, 'bot', 'loaders.js'));
                 const loadResult = loader.loadCommandFile(clientRef, full, { quiet: true });
-                if (!loadResult?.ok) throw new Error('Hot reload recusado: ' + String(loadResult?.error || 'falha desconhecida'));
+                if (!loadResult?.ok) throw new Error('Teste do comando falhou no carregamento: ' + String(loadResult?.error || 'falha desconhecida'));
+                testResult.details.push('comando carregado novamente pelo loader');
+            } else if (rel.startsWith('systems/') && rel.endsWith('.js')) {
+                // Sistemas podem registrar listeners/timers; não executar setup automaticamente,
+                // pois isso pode duplicar efeitos em produção. Só validar sintaxe antes de publicar.
+                testResult.details.push('teste de execução não realizado para evitar duplicar listeners/timers');
+            } else if (rel.startsWith('events/') && rel.endsWith('.js')) {
+                testResult.details.push('evento validado estaticamente; execução real depende de um evento');
+            } else {
+                testResult.details.push('teste funcional completo não disponível para este tipo de arquivo');
+            }
+
+            const testChannel = message?.channel || interaction?.channel;
+            if (testChannel?.send) {
+                const report = [
+                    '🧪 **AETERNUS • TESTE PRÉ-PUBLICAÇÃO**',
+                    '**Arquivo:** `' + rel + '`',
+                    '**Resultado:** ' + (testResult.ok ? '✅ verificações concluídas' : '❌ reprovado'),
+                    ...testResult.details.map((item) => '• ' + item),
+                    '',
+                    '_O teste estrutural não garante que todos os caminhos funcionem. Comandos foram recarregados, mas não são executados novamente automaticamente para evitar repetir ações como pagamentos, punições ou sorteios._'
+                ].join('\\n');
+                await testChannel.send({ content: report, allowedMentions: { parse: [] } });
             }
 
             const saved = await commitRepairToGitHub(repo, token, rel, proposed, remote.sha, candidate.summary);
@@ -616,8 +648,8 @@ async function attemptAiRepair(cmdName, error, context) {
                 summary: String(candidate.summary).slice(0, 300), backup: path.relative(ROOT, backupPath),
                 commit: commitSha,
                 message: rel.startsWith('commands/') && rel.endsWith('.js')
-                    ? 'Sintaxe validada, backup criado, comando recarregado e correção enviada ao GitHub.'
-                    : 'Arquivo validado conforme o tipo, backup criado e correção enviada ao GitHub. Alterações em sistemas/eventos/HTML/CSS podem exigir reinicialização para entrar em vigor.'
+                    ? 'Teste pré-publicação aprovado: sintaxe validada, comando recarregado, backup criado e correção enviada ao GitHub. A execução funcional completa não foi repetida automaticamente para evitar efeitos duplicados.'
+                    : 'Validações estáticas aprovadas e backup criado antes do envio ao GitHub. Isso não comprova funcionamento em runtime; sistemas/eventos/HTML/CSS podem exigir testes específicos ou reinicialização.'
             };
         } catch (e) {
             if (localApplied) {
@@ -662,7 +694,7 @@ async function handleCommandError({ cmdName, error, context, message, interactio
     try { diagnosis = await diagnoseWithAI(name, error, context); }
     catch (e) { diagnosis = { ok: false, reason: e.message || String(e) }; }
     let repair = null;
-    try { repair = await attemptAiRepair(name, error, context); }
+    try { repair = await attemptAiRepair(name, error, context, { message, interaction }); }
     catch (e) { repair = { attempted: true, repaired: false, reason: String(e?.message || e).slice(0, 500) }; console.error('[autoRepair:patch]', repair.reason); }
 
     const statusText = [
