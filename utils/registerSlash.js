@@ -70,7 +70,7 @@ function collectSlashBody(client) {
 
             // Comandos que já possuem subcomandos próprios continuam sendo comandos raiz.
             // Apenas normalizamos o nome para remover hífens; suas opções são preservadas.
-            if (hasNested) {
+            if (hasNested || cmd.rootSlash === true) {
                 const rootName = safeName(json.name);
                 if (rootRoutes.has(rootName)) {
                     console.warn('[slash] nome raiz duplicado após normalização:', rootName, '—', cmd.name);
