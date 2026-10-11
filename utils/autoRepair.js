@@ -548,22 +548,25 @@ async function validateCandidateFile(filePath, content) {
 
 async function waitForFunctionalApproval(channel, rel, cmdName) {
     if (!channel?.send || typeof channel.awaitMessages !== 'function') {
-        throw new Error('Teste funcional exige um canal de texto que aceite mensagens; correção não será publicada.');
+        throw new Error('Canal configurado de reparo precisa aceitar mensagens; correção não será publicada.');
     }
     const owners = new Set(ownerIds());
     const cfg = repairWorkspaceConfig();
-    if (!owners.size && !cfg.roleId) throw new Error('Configure OWNER_ID/OWNER_IDS ou AUTO_REPAIR_ROLE_ID para validar a aprovação.');
+    if (!owners.size && !cfg.roleId) {
+        throw new Error('Configure OWNER_ID/OWNER_IDS ou AUTO_REPAIR_ROLE_ID para validar a aprovação.');
+    }
+
     const code = require('crypto').randomBytes(3).toString('hex').toUpperCase();
     const promptMessage = await channel.send({
         content: [
             '🧪 **AETERNUS • TESTE FUNCIONAL OBRIGATÓRIO**',
             'A correção local foi aplicada e o comando foi recarregado, mas **ainda NÃO foi enviada ao GitHub**.',
-            '**Arquivo:** \`' + rel + '\`',
-            '**Comando associado:** \`' + String(cmdName || '?') + '\`',
-            'Agora teste manualmente o comando no Discord. Não use ações que movimentem moeda, punam membros ou gerem efeitos irreversíveis.',
-            'Se funcionar, responda exatamente \`APROVAR ' + code + '\` nesta conversa. Se falhar, responda \`REPROVAR ' + code + '\`.',
+            '**Arquivo:** `' + rel + '`',
+            '**Comando associado:** `' + String(cmdName || '?') + '`',
+            'Teste manualmente o comando no Discord. Não use ações que movimentem moeda, punam membros ou gerem efeitos irreversíveis.',
+            'Se funcionar, responda exatamente `APROVAR ' + code + '`. Se falhar, responda `REPROVAR ' + code + '`.',
             'Somente o dono ou a equipe com o cargo configurado pode aprovar. Prazo: 5 minutos. Sem aprovação, a versão original será restaurada e nada será publicado.'
-        ].join('\n'),
+        ].join('\\n'),
         allowedMentions: { parse: [] },
         components: [new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('reparo:aprovacao:' + code + ':APROVAR').setLabel('Aprovar').setStyle(ButtonStyle.Success),
@@ -571,15 +574,19 @@ async function waitForFunctionalApproval(channel, rel, cmdName) {
             new ButtonBuilder().setCustomId('reparo:aprovacao:' + code + ':CANCELAR').setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
         )]
     });
+
     const messageDecision = channel.awaitMessages({
         filter: (m) => {
             const ownerAllowed = owners.has(String(m.author?.id));
-            const roleAllowed = Boolean(cfg.roleId && m.guild && m.member?.roles?.cache?.has(cfg.roleId));
-            return (ownerAllowed || roleAllowed) && new RegExp('^(APROVAR|REPROVAR)\\s+' + code + '
+            const roleAllowed = Boolean(cfg.roleId && m.guildId === cfg.guildId && m.member?.roles?.cache?.has(cfg.roleId));
+            return (ownerAllowed || roleAllowed) &&
+                new RegExp('^(APROVAR|REPROVAR)\\s+' + code + '$', 'i').test(String(m.content || '').trim());
+        },
         max: 1,
         time: 5 * 60_000,
         errors: ['time']
     }).then((c) => ({ type: 'message', value: c?.first() || null })).catch(() => null);
+
     const buttonDecision = channel.awaitMessageComponent({
         message: promptMessage,
         time: 5 * 60_000,
@@ -590,12 +597,31 @@ async function waitForFunctionalApproval(channel, rel, cmdName) {
             return (ownerAllowed || roleAllowed) && p[0] === 'reparo' && p[1] === 'aprovacao' && p[2] === code;
         }
     }).then((i) => ({ type: 'button', value: i })).catch(() => null);
+
     const decision = await Promise.race([messageDecision, buttonDecision]);
-    const answer = decision?.type === 'message' ? String(decision.value?.content || '').trim() :
-        decision?.type === 'button' ? String(decision.value.customId.split(':')[3] || '') : '';
-    const approvedBy = decision?.type === 'message' ? decision.value?.author?.id : decision?.value?.user?.id;
+    const answer = decision?.type === 'message'
+        ? String(decision.value?.content || '').trim()
+        : decision?.type === 'button'
+            ? String(decision.value.customId.split(':')[3] || '')
+            : '';
+    const approvedBy = decision?.type === 'message'
+        ? decision.value?.author?.id
+        : decision?.value?.user?.id;
+
     if (decision?.type === 'button') await decision.value.deferUpdate().catch(() => {});
-    if (answer !== 'APROVAR' && !new RegExp('^APROVAR\\s+' + code + '
+    if (answer !== 'APROVAR' && !new RegExp('^APROVAR\\s+' + code + '$', 'i').test(answer)) {
+        await promptMessage.edit({
+            content: '🛑 **AETERNUS • REPARO CANCELADO**\nA correção não foi aprovada no prazo. O arquivo original será restaurado e nada será publicado.',
+            components: []
+        }).catch(() => {});
+        throw new Error('Aprovação do teste funcional não recebida; correção revertida.');
+    }
+
+    await promptMessage.edit({
+        content: '✅ **AETERNUS • TESTE APROVADO**\nA aprovação foi registrada. A correção seguirá para publicação.',
+        components: []
+    }).catch(() => {});
+    return { approvedBy };
 }
 
 async function commitRepairToGitHub(repo, token, rel, content, sha, summary) {
