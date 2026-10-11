@@ -18,7 +18,7 @@ module.exports = {
                 embeds: [
                     new EmbedBuilder()
                         .setColor(0xa78bfa)
-                        .setTitle('Prefixo do servidor')
+                        .setTitle('⚙️ AETERNUS • PREFIXO DO SERVIDOR')
                         .setDescription(
                             [
                                 `Prefixo atual: \`${atual}\``,
@@ -30,8 +30,7 @@ module.exports = {
                                 '',
                                 '_Quando você mudar, o prefixo antigo (ex.: `O.`) **deixa de funcionar** neste servidor._'
                             ].join('\n')
-                        )
-                ]
+                        )\n                        .setFooter({ text: 'Aeternus • Configurações do servidor' })\n                        .setTimestamp()\n                ]
             });
         }
 
