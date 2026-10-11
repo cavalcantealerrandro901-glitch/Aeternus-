@@ -27,9 +27,9 @@ async function run(userId, side, amountRaw, reply) {
         embeds: [
             new EmbedBuilder()
                 .setColor(win ? 0x22c55e : 0xef4444)
-                .setTitle(win ? 'Ganhou' : 'Perdeu')
+                .setTitle(win ? '🪙 AETERNUS • VITÓRIA' : '🪙 AETERNUS • DERROTA')
                 .setDescription(
-                    `Resultado: **${result}**\n${
+                    `🪙 Resultado: **${result.toUpperCase()}**\n🎯 Escolha: **${s.toUpperCase()}**\n${
                         win
                             ? '✨ **+' + fmt(bet.amount) + '**'
                             : '✨ **-' + fmt(bet.amount) + '**'
