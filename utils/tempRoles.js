@@ -97,6 +97,11 @@ function setTempRole(guildId, { userId, roleId, durationMs, notify, by, reason }
     return data[guildId].entries[key];
 }
 
+function hasTempRole(guildId, userId, roleId) {
+    const data = all();
+    return Boolean(data[guildId]?.entries?.[entryKey(userId, roleId)]);
+}
+
 function clearTempRole(guildId, userId, roleId) {
     const data = guildData(guildId);
     const key = entryKey(userId, roleId);
@@ -169,6 +174,7 @@ module.exports = {
     formatDuration,
     setTempRole,
     clearTempRole,
+    hasTempRole,
     getMessages,
     setMessage,
     fillTemplate,
