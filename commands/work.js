@@ -56,7 +56,9 @@ function resultEmbed(user, r) {
         })
         .setTitle(`${r.rank.emoji}  Turno concluído`)
         .setDescription(lines.join('\n'))
-        .setThumbnail(user.displayAvatarURL({ size: 128 }));
+        .setThumbnail(user.displayAvatarURL({ size: 128 }))
+        .setFooter({ text: 'Aeternus Economy • Carreira profissional' })
+        .setTimestamp();
 }
 
 function cooldownEmbed(user, leftText, st) {
