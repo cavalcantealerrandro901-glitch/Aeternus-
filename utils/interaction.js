@@ -126,8 +126,10 @@ async function run(message, def, opts) {
             embeds: [
                 new EmbedBuilder()
                     .setColor(def.color || 0xf472b6)
-                    .setTitle((def.returnEmoji || '✨') + '  ' + def.name)
-                    .setDescription('Mencione alguém (ex.: `O.' + def.name + ' @user`).')
+                    .setAuthor({ name: 'AETERNUS • INTERAÇÕES' })
+                    .setTitle((def.returnEmoji || '✨') + '  ' + String(def.name).toUpperCase())
+                    .setDescription('Escolha alguém para interagir!\n\n**Como usar**\nMencione um membro: `O.' + def.name + ' @user`')
+                    .setFooter({ text: 'Aeternus • Interações entre membros' })
             ]
         });
     }
@@ -145,10 +147,12 @@ async function run(message, def, opts) {
     const embed = new EmbedBuilder()
         .setColor(def.color || 0xf472b6)
         .setAuthor({
-            name: String(author.username),
+            name: 'AETERNUS • ' + String(def.name).toUpperCase(),
             iconURL: author.displayAvatarURL({ size: 64 })
         })
+        .setTitle((def.returnEmoji || '✨') + '  ' + (def.title || String(def.name).toUpperCase()))
         .setDescription(text)
+        .setFooter({ text: 'Aeternus • Uma interação, um momento' })
         .setTimestamp();
 
     if (gif) {
@@ -189,7 +193,10 @@ async function run(message, def, opts) {
                     .replace(/{author}/g, '**' + author.username + '**');
                 const botEmbed = new EmbedBuilder()
                     .setColor(def.color || 0xf472b6)
+                    .setAuthor({ name: 'AETERNUS • RESPOSTA AUTOMÁTICA', iconURL: target.displayAvatarURL({ size: 64 }) })
+                    .setTitle((def.returnEmoji || '✨') + '  ' + (def.title || String(def.name).toUpperCase()))
                     .setDescription(botText)
+                    .setFooter({ text: 'Aeternus • Interações entre membros' })
                     .setTimestamp();
                 if (replyGif) botEmbed.setImage(replyGif);
 
