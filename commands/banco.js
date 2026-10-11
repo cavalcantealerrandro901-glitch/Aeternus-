@@ -44,7 +44,7 @@ async function buildEmbed(user, guild, client) {
             'Você pode ser roubado em **qualquer** servidor.',
             roleId
                 ? 'Peça ' + roleMention + ' à equipe (uma vez) para proteção permanente.'
-                : 'A equipe pode definir o cargo com `/config-antiroubo`.'
+                : 'O administrador precisa configurar ANTI_ROB_ROLE_ID (ou ANTI_ROUBO_ROLE_ID) nas variáveis do Render.'
         ].join('\n');
     }
 
