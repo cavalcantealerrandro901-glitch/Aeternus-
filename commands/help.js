@@ -46,7 +46,9 @@ function introEmbed(client, prefix, guild) {
                 .filter((x) => x != null)
                 .join('\n')
         )
-        .setThumbnail(client.user.displayAvatarURL({ size: 256 }))\n        .setFooter({ text: 'Aeternus • Selecione uma categoria para explorar' })\n        .setTimestamp();
+        .setThumbnail(client.user.displayAvatarURL({ size: 256 }))
+        .setFooter({ text: 'Aeternus • Selecione uma categoria para explorar' })
+        .setTimestamp();
 }
 
 function categoryEmbed(cat, prefix) {
@@ -64,7 +66,12 @@ function categoryEmbed(cat, prefix) {
                 '',
                 `Detalhe: \`${prefix}ajuda <comando>\` (aceita acentos)`
             ].join('\n')
-        )\n        .setFooter({ text: 'Aeternus • Central de comandos' })\n        .setTimestamp();\n}\n\nfunction commandEmbed(cmd, prefix, liveCmd) {
+        )
+        .setFooter({ text: 'Aeternus • Central de comandos' })
+        .setTimestamp();
+}
+
+function commandEmbed(cmd, prefix, liveCmd) {
     const usage = cmd.usage || cmd.name;
     const example = cmd.example || `${prefix}${cmd.name}`;
     const about = cmd.about || cmd.desc || liveCmd?.description || '—';
