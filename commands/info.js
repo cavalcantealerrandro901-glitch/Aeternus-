@@ -102,6 +102,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (!i.guild && i.options.getSubcommand() !== 'bot') return i.reply({ content: '❌ Esta consulta precisa ser feita dentro de um servidor.', ephemeral: true });
         const sub = i.options.getSubcommand();
         if (sub === 'bot') return i.reply({ embeds: [botEmbed(i.client)] });
         if (sub === 'servidor') return i.reply({ embeds: [serverEmbed(i.guild)] });
