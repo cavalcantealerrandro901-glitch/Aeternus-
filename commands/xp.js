@@ -18,7 +18,7 @@ function bar(pct, size = 14) {
 }
 
 function titleForLevel(level) {
-    if (level >= 150) return { emoji: '⚜️' , nome: 'Infinito' };
+    if (level >= 150) return { emoji: '⚜️', name: 'Infinito' };
     if (level >= 136) return { emoji: '🌟', nome: 'Estrelar' };
     if (level >= 120) return { emoji: '👑', nome: 'Rei dos Reis' };
     if (level >= 100) return { emoji: '🌌', name: 'Cósmico' };
