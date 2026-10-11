@@ -3,10 +3,10 @@ const { PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 module.exports = {
     name: 'say',
     aliases: ['falar', 'dizer'],
-    description: 'Fazer o bot falar',
+    description: 'Enviar uma mensagem como o Aeternus',
     data: new SlashCommandBuilder()
-        .setName('enviar-mensagem')
-        .setDescription('Enviar mensagem')
+        .setName('mensagem-envia')
+        .setDescription('Publica uma mensagem como o bot')
         .addStringOption((o) =>
             o.setName('mensagem').setDescription('Texto da mensagem (menções não serão notificadas)').setRequired(true).setMaxLength(2000)
         )
@@ -20,11 +20,12 @@ module.exports = {
         if (!text) return message.reply('❌ Escreva a mensagem que deseja publicar.');
         await message.delete().catch(() => {});
         await message.channel.send({ content: text, allowedMentions: { parse: [] } });
+        return;
     },
 
     async executeSlash(i) {
         if (!i.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
-            return i.reply({ content: '❌ Sem permissão (Gerenciar Mensagens).', ephemeral: true });
+            return i.reply({ content: '❌ Sem permissão (Gerenciar Mensagens).', flags: 64 });
         }
         const text = i.options.getString('mensagem', true).trim().slice(0, 2000);
         if (!text) return i.reply({ content: '❌ A mensagem não pode estar vazia.', ephemeral: true });
