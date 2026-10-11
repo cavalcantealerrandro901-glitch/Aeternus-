@@ -211,7 +211,8 @@ module.exports = {
                         .setDescription(
                             `${it.emoji || '🎁'} **${it.name}**\nRaridade: **${items.RARITY[it.rarity]?.name || it.rarity}**\n\n${it.desc || ''}`
                         )
-                        .setFooter({ text: 'Aeternus Craft • Confira seu O.inventario' })\n                        .setTimestamp()
+                        .setFooter({ text: 'Aeternus Craft • Confira seu O.inventario' })
+                        .setTimestamp()
                 ],
                 components: []
             });
