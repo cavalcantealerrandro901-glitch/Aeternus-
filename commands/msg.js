@@ -17,7 +17,7 @@ module.exports = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(0xa78bfa)
-                    .setTitle(`Mensagens · ${user.username}`)
+                    .setTitle(`📊 Mensagens · ${user.username}`)
                     .setDescription(
                         [
                             `Hoje: **${s.today ?? s.day ?? 0}**`,
@@ -48,7 +48,12 @@ module.exports = {
                             `Hoje: **${s.today ?? s.day ?? 0}**`,
                             `Semana: **${s.week ?? 0}**`,
                             `Mês: **${s.month ?? 0}**`,
-                            `Total: **${s.total ?? 0}**`
+                            `Total: **${s.total ?? 0}**`,
+                            '',
+                            '🏅 **Cargos por mensagens hoje**',
+                            '• 100 mensagens → **Ativo**',
+                            '• 500 mensagens → **Ativo Master**',
+                            `• Progresso: **${Math.min(Number(s.today ?? s.day ?? 0), 500)}/500**`
                         ].join('\n')
                     )
             ]
