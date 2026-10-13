@@ -19,7 +19,7 @@ function createAfkMessage(user, reason) {
         '',
         '💤 **MODO AUSENTE ATIVADO**',
         `▸ **Usuário:** ${user}`,
-        `▸ **Motivo:** ${String(reason || 'Não informado').slice(0, 180)}`,
+        `▸ **Motivo:** **${String(reason** || **'Não informado'**).slice(0, 180)}`,
         '',
         'Quem mencionar este usuário será avisado de que ele está ausente.',
         '✧ *Aeternus • Sistema de utilidades*'
