@@ -3,13 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>✦ Aeternus • Arena PvP</title>
+<title>⚔️ COLISEU AETERNUS</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
-:root{--bg:#07080d;--panel:#10131c;--card:#151925;--card2:#0d1018;--gold:#c9a227;--text:#f4f4f5;--muted:#9299aa;--red:#ef4444;--blue:#3b82f6;--green:#22c55e;--line:#ffffff12}
+:root{--bg:#07080d;--panel:#10131c;--card:#151925;--card2:#0d1018;--gold:#c9a227;--purple:#8B5CF6;--text:#f4f4f5;--muted:#9299aa;--red:#ef4444;--blue:#3b82f6;--green:#22c55e;--line:#ffffff12}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% -10%,#22243a 0,#0a0b11 45%,#05060a 100%);color:var(--text);font-family:Inter,system-ui,sans-serif}button,input{font:inherit}.hidden{display:none!important}
 #battle{max-width:1250px;margin:auto;padding:18px 14px 28px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.brand{font-family:Cinzel,serif;color:var(--gold);letter-spacing:.14em}.status{font-size:13px;color:var(--muted);text-align:right}.status strong{color:var(--gold)}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;position:relative}
+.brand{font-family:Cinzel,serif;color:var(--purple);letter-spacing:.12em;font-size:15px;text-shadow:0 0 18px color-mix(in srgb,var(--purple) 55%,transparent)}
+.battle-phrase{position:absolute;left:50%;transform:translateX(-50%);font-family:Cinzel,serif;color:var(--gold);font-size:14px;letter-spacing:.06em;text-align:center;white-space:nowrap;text-shadow:0 0 20px color-mix(in srgb,var(--gold) 50%,transparent);pointer-events:none}
+.status{font-size:13px;color:var(--muted);text-align:right}.status strong{color:var(--gold)}
+.vsmark{font-size:28px!important;filter:drop-shadow(0 0 12px #c9a22788)}
+.panel.log-panel{border-color:#c9a22755;box-shadow:0 0 24px #c9a22722}
+.panel.log-panel h3{color:var(--gold)}
 .arena{display:grid;grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr);gap:8px;align-items:start;max-width:1200px;margin:0 auto}
 .card{--frame:#c9a227;background:linear-gradient(160deg,var(--card),var(--card2));border:1px solid color-mix(in srgb,var(--frame) 78%,transparent);border-radius:11px;padding:8px;min-width:0;box-shadow:0 18px 50px #0008,0 0 22px color-mix(in srgb,var(--frame) 18%,transparent);transition:border-color .3s,box-shadow .3s,transform .2s}.card.me,.card.enemy{border-color:color-mix(in srgb,var(--frame) 78%,transparent)}.card.hit{animation:cardHit .42s ease}.card.skill{animation:cardSkill .5s ease}.card.passive{animation:cardPassive .8s ease}.card.mana{animation:cardMana .45s ease}@keyframes cardHit{0%,100%{transform:translateX(0)}30%{transform:translateX(-7px);filter:brightness(1.25)}60%{transform:translateX(6px)}}@keyframes cardSkill{0%{box-shadow:0 0 0 color-mix(in srgb,var(--frame) 0%,transparent)}45%{box-shadow:0 0 38px color-mix(in srgb,var(--frame) 75%,transparent);filter:brightness(1.18)}100%{box-shadow:0 0 22px color-mix(in srgb,var(--frame) 18%,transparent)}}@keyframes cardPassive{0%{box-shadow:0 0 0 color-mix(in srgb,var(--frame) 0%,transparent)}50%{box-shadow:0 0 45px color-mix(in srgb,var(--frame) 80%,transparent)}100%{box-shadow:0 0 22px color-mix(in srgb,var(--frame) 18%,transparent)}}@keyframes cardMana{0%{filter:brightness(1)}45%{filter:brightness(1.3)}100%{filter:brightness(1)}}
 .identity{display:flex;align-items:center;gap:9px;margin-bottom:7px}.avatar{width:46px;height:46px;border-radius:14px;object-fit:cover;background:#090b11;border:1px solid #ffffff18;display:grid;place-items:center;font-size:25px;flex:0 0 40px}.avatar img{width:100%;height:100%;object-fit:cover;border-radius:10px}.name{font-size:13px;font-weight:700}.class{font-size:9px;color:var(--muted);margin-top:4px}.class b{color:var(--gold)}
@@ -21,15 +27,19 @@
 .vs{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.vsmark{font-family:Cinzel,serif;font-size:20px;color:var(--gold)}.turn{font-size:11px;text-align:center;color:var(--muted);line-height:1.35}.timer{font-size:20px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}.effect{min-height:26px;text-align:center;color:#fca5a5;font-size:12px}
 .actions{margin-top:10px;background:linear-gradient(180deg,#121622,#0b0e15);border:1px solid var(--line);border-radius:16px;padding:14px}.actions-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:10px}.actions h2{font-family:Cinzel,serif;font-size:13px;color:var(--gold);margin:0}.hint{font-size:11px;color:var(--muted)}.skills{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.skill{border:1px solid #c9a22728;background:#151925;border-radius:11px;padding:9px;text-align:left;color:var(--text);min-height:92px}.skill:disabled{opacity:.38;cursor:not-allowed}.skill:not(:disabled):hover{border-color:#c9a22788;background:#1b1e2a}.sn{font-size:12px;font-weight:700;color:var(--gold)}.sd{font-size:10px;color:var(--muted);line-height:1.35;margin-top:5px}.sm{font-size:10px;color:#93c5fd;margin-top:7px}.scd{color:#fbbf24}.unique{border-color:#a855f755}
 .bottom{display:grid;grid-template-columns:1.3fr .7fr;gap:12px;margin-top:12px}.panel{background:#0e1118;border:1px solid var(--line);border-radius:14px;padding:12px}.panel h3{font-size:11px;color:var(--gold);letter-spacing:.12em;margin:0 0 8px}.log,.chat-body{max-height:130px;overflow:auto;font-size:11px}.line{padding:4px 0;color:var(--muted);border-bottom:1px solid #ffffff07}.chat-msg{padding:3px 0;color:var(--muted)}.chat-msg b{color:var(--gold)}.chat-row{display:flex;gap:6px;margin-top:8px}.chat-row input{min-width:0;flex:1;background:#090c13;border:1px solid #ffffff12;border-radius:8px;padding:8px;color:var(--text)}.chat-row button,.danger{border:1px solid #c9a22755;background:#17130b;color:var(--gold);border-radius:8px;padding:8px 12px}.danger{border-color:#ef444455;color:#fca5a5}.actions-footer{display:flex;justify-content:center;margin-top:10px}.actions-footer button{border:1px solid #ffffff15;background:#11151e;color:var(--muted);border-radius:9px;padding:8px 14px}.overlay{position:fixed;inset:0;background:#000c;display:grid;place-items:center;z-index:10}.box{max-width:360px;background:#121620;border:1px solid #c9a22755;border-radius:16px;padding:22px;text-align:center}.box h2{font-family:Cinzel,serif;color:var(--gold)}.box p{color:var(--muted);font-size:13px}.box button{border:1px solid #c9a22755;background:#18140c;color:var(--gold);padding:9px 14px;border-radius:8px}
-@media(max-width:900px){.arena{grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:4px}.skills{grid-template-columns:repeat(2,1fr)}.attrs{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:650px){#battle{width:100%;padding:8px 5px 18px}.top{align-items:flex-start}.arena{grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:2px}.vs{order:0;flex-direction:column;padding:2px}.vsmark{font-size:15px}.turn{display:block;font-size:8px}.effect{min-height:0;font-size:8px}.card{padding:5px}.bottom{grid-template-columns:1fr}.skills{grid-template-columns:1fr 1fr}.avatar{width:32px;height:32px;flex-basis:32px;font-size:19px}.identity{gap:4px}.badges{gap:2px}.badge{font-size:8px;padding:2px 4px}.attrs{grid-template-columns:repeat(4,1fr)}.info-grid{grid-template-columns:1fr 1fr 1fr;gap:2px}.info strong{font-size:8px}.info small{font-size:7px}.info .ico{width:12px}.section h3{font-size:7px;letter-spacing:.08em}.name{font-size:11px}.class{font-size:8px}.barline{font-size:9px}.bar{height:6px}}
+@media(max-width:900px){.arena{grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);gap:4px}.skills{grid-template-columns:repeat(2,1fr)}.attrs{grid-template-columns:repeat(4,1fr)}.battle-phrase{font-size:11px;white-space:normal;max-width:55%}}
+@media(max-width:650px){#battle{width:100%;padding:8px 5px 18px}.top{align-items:flex-start}.battle-phrase{display:none}.arena{grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr);gap:2px}.vs{order:0;flex-direction:column;padding:2px}.vsmark{font-size:15px}.turn{display:block;font-size:8px}.effect{min-height:0;font-size:8px}.card{padding:5px}.bottom{grid-template-columns:1fr}.skills{grid-template-columns:1fr 1fr}.avatar{width:32px;height:32px;flex-basis:32px;font-size:19px}.identity{gap:4px}.badges{gap:2px}.badge{font-size:8px;padding:2px 4px}.attrs{grid-template-columns:repeat(4,1fr)}.info-grid{grid-template-columns:1fr 1fr 1fr;gap:2px}.info strong{font-size:8px}.info small{font-size:7px}.info .ico{width:12px}.section h3{font-size:7px;letter-spacing:.08em}.name{font-size:11px}.class{font-size:8px}.barline{font-size:9px}.bar{height:6px}}
 </style>
     <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
 <div id="lobby" style="max-width:440px;margin:80px auto;padding:24px;text-align:center;color:#9299aa">Carregando arena…</div>
 <main id="battle" class="hidden">
-  <div class="top"><div class="brand">✦ AETERNUS • ARENA</div><div class="status"><span id="turnText">Aguardando…</span><br><strong id="timer">—</strong></div></div>
+  <div class="top">
+    <div class="brand">COLISEU AETERNUS</div>
+    <div class="battle-phrase">A batalha começou… apenas um sairá de pé</div>
+    <div class="status"><span id="turnText">Aguardando…</span><br><strong id="timer">—</strong></div>
+  </div>
   <section class="arena">
     <article class="card me" id="cardA">
       <div class="identity"><div class="avatar" id="avatarA">⚔️</div><div><div class="name" id="nameA">—</div><div class="class" id="classA">—</div><div class="badges" id="badgesA"></div></div></div>
@@ -39,7 +49,7 @@
       
       <div class="info-grid"><div class="section"><h3>✨ Únicas</h3><div class="info-list" id="uniqueA"></div></div><div class="section"><h3>🔮 Passivas</h3><div class="info-list" id="passivesA"></div></div><div class="section"><h3>🎒 Itens</h3><div class="info-list" id="itemsA"></div></div></div>
     </article>
-    <div class="vs"><div class="vsmark">VS</div><div class="effect" id="fxText"></div><div class="turn" id="turnDetail">—</div></div>
+    <div class="vs"><div class="vsmark">⚔️</div><div class="effect" id="fxText"></div><div class="turn" id="turnDetail">—</div></div>
     <article class="card enemy" id="cardB">
       <div class="identity"><div class="avatar" id="avatarB">⚔️</div><div><div class="name" id="nameB">—</div><div class="class" id="classB">—</div><div class="badges" id="badgesB"></div></div></div>
       <div class="barbox"><div class="barline"><span>❤️ Vida</span><b id="hpTextB">0 / 0</b></div><div class="bar hp"><i id="hpBarB"></i></div></div>
@@ -54,8 +64,8 @@
     <div class="skills" id="skills"></div>
   </section>
   <section class="bottom">
-    <div class="panel"><h3>⚔️ LOG DE ATAQUES</h3><div class="log" id="log"></div></div>
-    <div class="panel"><h3>💬 CHAT DA BATALHA</h3><div class="chat-body" id="chatBody"></div><div class="chat-row"><input id="chatInput" maxlength="200" placeholder="Mensagem…"><button id="chatSendBtn" type="button">Enviar</button></div></div>
+    <div class="panel log-panel"><h3>📜 REGISTRO DE BATALHA</h3><div class="log" id="log"></div></div>
+    <div class="panel"><h3>💬 CHAT DA ARENA</h3><div class="chat-body" id="chatBody"></div><div class="chat-row"><input id="chatInput" maxlength="200" placeholder="Mensagem…"><button id="chatSendBtn" type="button">Enviar</button></div></div>
   </section>
   <div class="actions-footer"><button id="forfeitBtn" class="danger" type="button">🚪 Desistir</button></div>
 </main>
@@ -66,7 +76,7 @@
   const $=id=>document.getElementById(id);
   const params=new URLSearchParams(location.search); let matchId=params.get('id')||'', asUser=''; let state=null, pollTimer=null, tickTimer=null, acting=false, previousEffect=null;
   const attrLabels={forca:'Força',defesa:'Defesa',agilidade:'Agilidade',vida:'Vida',inteligencia:'Int.',sorte:'Sorte',precisao:'Precisão',resistencia:'Res.'};
-  function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+  function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&','<':'<','>':'>','"':'"'}[m]));}
   function scale(id,cur,max){$(id).style.transform='scaleX('+(max>0?Math.max(0,Math.min(1,cur/max)):0)+')';}
   function timer(ms){const s=Math.max(0,Math.ceil(ms/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
   function sides(s){const a=s.teamA?.[0],b=s.teamB?.[0];if(String(a?.id)===asUser)return [a,b];if(String(b?.id)===asUser)return [b,a];return [a,b];}
