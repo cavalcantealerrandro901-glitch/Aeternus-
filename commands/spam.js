@@ -127,7 +127,7 @@ module.exports = {
             spamAllow.add(message.guild.id, ch.id);
             return message.reply(
                 [
-                    `✅ Spam **permitido** em ${ch} (\\`true\\`).`,
+                    '✅ Spam **permitido** em ' + ch.toString() + ' (`true`).',
                     'Anti-spam **desligado** neste chat.'
                 ].join('\n')
             );
@@ -135,7 +135,7 @@ module.exports = {
         spamAllow.remove(message.guild.id, ch.id);
         return message.reply(
             [
-                `🛡️ Spam **bloqueado** em ${ch} (\\`false\\`).`,
+                '🛡️ Spam **bloqueado** em ' + ch.toString() + ' (`false`).',
                 'Anti-spam **ligado** de novo.'
             ].join('\n')
         );
@@ -187,7 +187,7 @@ module.exports = {
             spamAllow.add(i.guild.id, ch.id);
             return i.reply({
                 content: [
-                    `✅ Spam **permitido** em ${ch} (\\`true\\`).`,
+                    '✅ Spam **permitido** em ' + ch.toString() + ' (`true`).',
                     'Anti-spam **desligado** neste chat.'
                 ].join('\n'),
                 flags: 64
@@ -197,7 +197,7 @@ module.exports = {
         spamAllow.remove(i.guild.id, ch.id);
         return i.reply({
             content: [
-                `🛡️ Spam **bloqueado** em ${ch} (\\`false\\`).`,
+                '🛡️ Spam **bloqueado** em ' + ch.toString() + ' (`false`).',
                 'Anti-spam **ligado** de novo.'
             ].join('\n'),
             flags: 64
