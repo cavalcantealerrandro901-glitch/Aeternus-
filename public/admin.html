@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administração — Aeternus</title>
 <link rel="stylesheet" href="/dashboard.css">
+<link rel="stylesheet" href="/admin-menu.css">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -48,7 +49,7 @@
     </div>
 
     <div class="menu-cat">
-      <div class="menu-cat-title">🎉 Drops &amp; Sorteios</div>
+      <div class="menu-cat-title">🎉 Drops & Sorteios</div>
       <a href="#drops" data-system="drop-ativacao">Ativação e publicação</a>
       <a href="#drops" data-system="drop-req">Requisitos de participação</a>
       <a href="#drops" data-system="drop-entries">Entradas extras por cargo</a>
@@ -291,8 +292,6 @@
     });
   });
 
-  // Swipe / arrastar da esquerda para a direita = abrir
-  // Arrastar o menu para a esquerda = fechar
   var startX = 0;
   var startY = 0;
   var tracking = false;
@@ -314,18 +313,15 @@
     var dy = Math.abs(endY - startY);
     if (dy > 80) return;
 
-    // Abrir: arraste da borda esquerda para a direita
     if (!panel.classList.contains('open') && startX <= edgeZone && dx > 60) {
       openMenu();
       return;
     }
-    // Fechar: arraste para a esquerda com menu aberto
     if (panel.classList.contains('open') && dx < -60) {
       closeMenu();
     }
   }, { passive: true });
 
-  // Mouse drag (desktop) — mesma lógica
   var mouseDown = false;
   document.addEventListener('mousedown', function (e) {
     startX = e.clientX;
