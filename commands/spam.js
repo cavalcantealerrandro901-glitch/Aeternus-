@@ -14,6 +14,32 @@ function isMod(member) {
     );
 }
 
+function clean(s) {
+    return String(s || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+}
+
+const TRUE_VALS = new Set(['true', '1', 'on', 'sim', 'ativar', 'yes', 's', 'ligar', 'permitir', 'liberar']);
+const FALSE_VALS = new Set(['false', '0', 'off', 'nao', 'desativar', 'no', 'n', 'desligar', 'bloquear']);
+
+function parseAllow(args) {
+    const list = Array.isArray(args) ? args : [args];
+    for (const a of list) {
+        const c = clean(a);
+        if (TRUE_VALS.has(c)) return true;
+        if (FALSE_VALS.has(c)) return false;
+    }
+    // também aceita se a mensagem inteira tiver a palavra
+    const joined = clean(list.join(' '));
+    if (TRUE_VALS.has(joined)) return true;
+    if (FALSE_VALS.has(joined)) return false;
+    return null;
+}
+
 module.exports = {
     name: 'spam',
     aliases: ['permitirspam', 'canallivre'],
@@ -42,48 +68,46 @@ module.exports = {
             return message.reply('Sem permissão (**Gerenciar Servidor**).');
         }
 
-        const raw = (args[0] || '').toLowerCase();
-        const trueVals = ['true', '1', 'on', 'sim', 'ativar', 'yes', 's'];
-        const falseVals = ['false', '0', 'off', 'nao', 'não', 'desativar', 'no', 'n'];
+        const allow = parseAllow(args);
 
-        if (!trueVals.includes(raw) && !falseVals.includes(raw)) {
+        if (allow === null) {
+            console.log('[spam] args recebidos:', JSON.stringify(args), '| content:', message.content);
             return message.reply(
-                'Uso: `O.spam true` · `O.spam false` · `O.spam true #canal`\n' +
-                    '**Sem canal** = servidor inteiro\n' +
-                    '**true** = spam permitido · **false** = anti-spam ligado'
+                'Uso:\n' +
+                    '`O.spam true` — libera spam em **todo o servidor**\n' +
+                    '`O.spam false` — liga anti-spam em **todo o servidor**\n' +
+                    '`O.spam true #canal` — libera só naquele canal\n' +
+                    '`O.spam false #canal` — bloqueia só naquele canal'
             );
         }
 
-        const allow = trueVals.includes(raw);
         const mentioned =
             message.mentions.channels.first() ||
-            (args[1] ? message.guild.channels.cache.get(args[1]) : null);
+            (Array.isArray(args) && args[1] ? message.guild.channels.cache.get(args[1]) : null);
 
         // Sem menção de canal → servidor inteiro
         if (!mentioned) {
             if (allow) {
                 spamAllow.addServerWide(message.guild.id);
                 return message.reply(
-                    `✅ Spam **permitido em todo o servidor** (\`true\`).\n` +
-                        `Anti-spam **desligado** em todos os canais.`
+                    '✅ Spam **permitido em todo o servidor** (`true`).\n' +
+                        'Anti-spam **desligado** em todos os canais.'
                 );
             }
             spamAllow.removeServerWide(message.guild.id);
-            // Limpa também canais individuais para voltar ao estado padrão
             const list = spamAllow.list(message.guild.id);
             for (const id of list) {
                 if (id !== '*') spamAllow.remove(message.guild.id, id);
             }
             return message.reply(
-                `🛡️ Spam **bloqueado em todo o servidor** (\`false\`).\n` +
-                    `Anti-spam **ligado** de novo em todos os canais.`
+                '🛡️ Spam **bloqueado em todo o servidor** (`false`).\n' +
+                    'Anti-spam **ligado** de novo em todos os canais.'
             );
         }
 
         const ch = mentioned;
 
         if (allow) {
-            // Se estava server-wide, remove o * e adiciona só o canal
             if (spamAllow.isServerWide(message.guild.id)) {
                 spamAllow.removeServerWide(message.guild.id);
             }
@@ -112,14 +136,13 @@ module.exports = {
         const allow = i.options.getBoolean('permitir', true);
         const ch = i.options.getChannel('canal');
 
-        // Sem canal → servidor inteiro
         if (!ch) {
             if (allow) {
                 spamAllow.addServerWide(i.guild.id);
                 return i.reply({
                     content:
-                        `✅ Spam **permitido em todo o servidor** (\`true\`).\n` +
-                        `Anti-spam **desligado** em todos os canais.`,
+                        '✅ Spam **permitido em todo o servidor** (`true`).\n' +
+                        'Anti-spam **desligado** em todos os canais.',
                     flags: 64
                 });
             }
@@ -130,8 +153,8 @@ module.exports = {
             }
             return i.reply({
                 content:
-                    `🛡️ Spam **bloqueado em todo o servidor** (\`false\`).\n` +
-                    `Anti-spam **ligado** de novo em todos os canais.`,
+                    '🛡️ Spam **bloqueado em todo o servidor** (`false`).\n' +
+                    'Anti-spam **ligado** de novo em todos os canais.',
                 flags: 64
             });
         }
@@ -144,7 +167,7 @@ module.exports = {
             return i.reply({
                 content:
                     `✅ Spam **permitido** em ${ch} (\`true\`).\n` +
-                    `Anti-spam **desligado** neste chat.`,
+                    'Anti-spam **desligado** neste chat.',
                 flags: 64
             });
         }
@@ -153,7 +176,7 @@ module.exports = {
         return i.reply({
             content:
                 `🛡️ Spam **bloqueado** em ${ch} (\`false\`).\n` +
-                `Anti-spam **ligado** de novo.`,
+                'Anti-spam **ligado** de novo.',
             flags: 64
         });
     }
