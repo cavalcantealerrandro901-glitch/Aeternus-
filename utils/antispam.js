@@ -1,3 +1,4 @@
+const { PermissionFlagsBits } = require('discord.js');
 const { getSettings } = require('./settings');
 const spamAllow = require('./spamAllow');
 
@@ -41,7 +42,8 @@ function getBucket(guildId, userId) {
         };
         buckets.set(k, b);
     }
-    if (b.strikes > 0 && Date.now() - b.lastStrikeAt > 2 * 3600_000) {
+    // Strikes só resetam após 6 horas (mais rigoroso)
+    if (b.strikes > 0 && Date.now() - b.lastStrikeAt > 6 * 3600_000) {
         b.strikes = 0;
     }
     return b;
@@ -122,28 +124,76 @@ function check(message) {
     b.repeats = 0;
     b.recent = [];
 
-    if (b.strikes <= 3) {
+    // 1-2: aviso | 3: mute 1h | 4+: ban
+    if (b.strikes <= 2) {
         return {
             block: true,
             reason,
             punish: 'warn',
             strike: b.strikes,
-            maxWarns: 3
+            maxWarns: 2
         };
     }
-    if (b.strikes === 4) {
+    if (b.strikes === 3) {
         return { block: true, reason, punish: 'mute', strike: b.strikes };
     }
     return { block: true, reason, punish: 'ban', strike: b.strikes };
 }
 
+async function resolveMember(message) {
+    let member = message.member;
+    if (!member && message.guild) {
+        try {
+            member = await message.guild.members.fetch(message.author.id);
+        } catch (e) {
+            console.warn('[antispam] fetch member falhou:', e.message);
+        }
+    }
+    return member;
+}
+
+function botCanModerate(guild, member) {
+    if (!guild || !member) return { ok: false, why: 'sem guild/member' };
+    const me = guild.members.me;
+    if (!me) return { ok: false, why: 'bot sem member cache' };
+
+    if (!me.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return { ok: false, why: 'bot sem permissão Moderate Members' };
+    }
+    if (member.id === guild.ownerId) {
+        return { ok: false, why: 'não pode moderar o dono' };
+    }
+    if (member.roles.highest.position >= me.roles.highest.position) {
+        return { ok: false, why: 'cargo do alvo >= cargo do bot' };
+    }
+    return { ok: true };
+}
+
+function botCanBan(guild, member) {
+    if (!guild || !member) return { ok: false, why: 'sem guild/member' };
+    const me = guild.members.me;
+    if (!me) return { ok: false, why: 'bot sem member cache' };
+
+    if (!me.permissions.has(PermissionFlagsBits.BanMembers)) {
+        return { ok: false, why: 'bot sem permissão Ban Members' };
+    }
+    if (member.id === guild.ownerId) {
+        return { ok: false, why: 'não pode banir o dono' };
+    }
+    if (member.roles.highest.position >= me.roles.highest.position) {
+        return { ok: false, why: 'cargo do alvo >= cargo do bot' };
+    }
+    return { ok: true };
+}
+
 async function apply(message, result) {
     if (!result?.block) return;
 
-    const member = message.member;
     const user = message.author;
     const punish = result.punish || 'delete';
+    const member = await resolveMember(message);
 
+    // Sempre tenta apagar a mensagem ofensiva
     try {
         if (message.deletable !== false) {
             await message.delete().catch((e) => {
@@ -159,7 +209,7 @@ async function apply(message, result) {
 
         if (punish === 'warn') {
             const n = result.strike || 1;
-            const maxW = result.maxWarns || 3;
+            const maxW = result.maxWarns || 2;
             const left = Math.max(0, maxW - n);
             const next =
                 left > 0
@@ -183,40 +233,109 @@ async function apply(message, result) {
         }
 
         if (punish === 'mute') {
-            if (member?.moderatable) {
-                await member
-                    .timeout(60 * 60 * 1000, `Anti-spam: ${result.reason}`)
-                    .catch((e) => console.warn('[antispam] timeout:', e.message));
+            const can = botCanModerate(message.guild, member);
+            let muted = false;
+
+            if (can.ok && member) {
+                try {
+                    await member.timeout(
+                        60 * 60 * 1000,
+                        `Anti-spam: ${result.reason}`
+                    );
+                    muted = true;
+                    console.log(`[antispam] mute OK · ${user.tag}`);
+                } catch (e) {
+                    console.warn('[antispam] timeout falhou:', e.message);
+                }
             } else {
-                console.warn('[antispam] não dá para mutar', user.tag);
+                console.warn(
+                    `[antispam] não dá para mutar ${user.tag}: ${can.why}`
+                );
             }
-            const w = await message.channel
-                .send(
-                    `🔇 ${user} recebeu **mute de 1 hora** por spam/repetição.\n` +
-                        `Se continuar: **ban**.`
-                )
-                .catch(() => null);
+
+            // Fallback: se não conseguiu timeout, tenta ban (última opção)
+            if (!muted) {
+                const canBan = botCanBan(message.guild, member);
+                if (canBan.ok && member) {
+                    try {
+                        await member.ban({
+                            reason: `Anti-spam (mute falhou → ban): ${result.reason}`,
+                            deleteMessageSeconds: 0
+                        });
+                        muted = true; // tratado
+                        console.log(`[antispam] ban fallback (mute impossível) · ${user.tag}`);
+                        const w = await message.channel
+                            .send(
+                                `🔨 **${user.tag}** foi **banido** (não foi possível mutar: ${can.why}).\n` +
+                                    `Motivo: **${result.reason}**`
+                            )
+                            .catch(() => null);
+                        if (w) setTimeout(() => w.delete().catch(() => {}), 20_000);
+                        return;
+                    } catch (e) {
+                        console.warn('[antispam] ban fallback falhou:', e.message);
+                    }
+                }
+            }
+
+            const msg = muted
+                ? `🔇 ${user} recebeu **mute de 1 hora** por spam/repetição.\nSe continuar: **ban**.`
+                : `⚠️ Não consegui mutar ${user} (${can.why}).\nColoque o cargo do bot **acima** do alvo e dê **Moderar Membros**.`;
+            const w = await message.channel.send(msg).catch(() => null);
             if (w) setTimeout(() => w.delete().catch(() => {}), 15_000);
-            console.log(`[antispam] mute · ${user.tag}`);
             return;
         }
 
         if (punish === 'ban') {
-            if (member?.bannable) {
-                await member
-                    .ban({
+            const can = botCanBan(message.guild, member);
+            let banned = false;
+
+            if (can.ok && member) {
+                try {
+                    await member.ban({
                         reason: `Anti-spam (após avisos): ${result.reason}`,
                         deleteMessageSeconds: 0
-                    })
-                    .catch((e) => console.warn('[antispam] ban:', e.message));
+                    });
+                    banned = true;
+                    console.log(`[antispam] ban OK · ${user.tag}`);
+                } catch (e) {
+                    console.warn('[antispam] ban falhou:', e.message);
+                }
             } else {
-                console.warn('[antispam] não dá para banir', user.tag);
+                console.warn(
+                    `[antispam] não dá para banir ${user.tag}: ${can.why}`
+                );
             }
-            const w = await message.channel
-                .send(`🔨 **${user.tag}** foi banido por ignorar avisos de anti-spam.`)
-                .catch(() => null);
+
+            // Se ban falhou, tenta pelo menos mutar longo
+            if (!banned) {
+                const canMute = botCanModerate(message.guild, member);
+                if (canMute.ok && member) {
+                    try {
+                        await member.timeout(
+                            24 * 60 * 60 * 1000,
+                            `Anti-spam (ban falhou → mute 24h): ${result.reason}`
+                        );
+                        console.log(`[antispam] mute 24h fallback · ${user.tag}`);
+                        const w = await message.channel
+                            .send(
+                                `🔇 **${user.tag}** recebeu **mute de 24h** (ban falhou: ${can.why}).\n` +
+                                    `Motivo: **${result.reason}**`
+                            )
+                            .catch(() => null);
+                        if (w) setTimeout(() => w.delete().catch(() => {}), 20_000);
+                        return;
+                    } catch (e) {
+                        console.warn('[antispam] mute fallback falhou:', e.message);
+                    }
+                }
+            }
+
+            const msg = banned
+                ? `🔨 **${user.tag}** foi banido por ignorar avisos de anti-spam.`
+                : `⚠️ Não consegui banir ${user} (${can.why}).\nColoque o cargo do bot **acima** do alvo e dê **Banir Membros**.`;
+            const w = await message.channel.send(msg).catch(() => null);
             if (w) setTimeout(() => w.delete().catch(() => {}), 15_000);
-            console.log(`[antispam] ban · ${user.tag}`);
         }
     } catch (e) {
         console.error('[antispam] apply:', e);
