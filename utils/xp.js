@@ -89,7 +89,8 @@ function dailyMultiplier() {
 }
 
 function rollAttrGain() {
-    return 1;
+    // Cada ponto gasto concede entre 3 e 5 no atributo escolhido
+    return 3 + Math.floor(Math.random() * 3);
 }
 
 function loadCur(userId) {
@@ -189,10 +190,17 @@ function spendAttrPoints(userId, attrKey, amount) {
     const pts = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
     if (pts < n) return { ok: false, error: 'Pontos insuficientes.' };
     ensureAttrs(cur);
-    cur.attrs[key] = (cur.attrs[key] || 0) + n;
+    let gained = 0;
+    const rolls = [];
+    for (let i = 0; i < n; i++) {
+        const roll = rollAttrGain(); // 3–5 por ponto gasto
+        rolls.push(roll);
+        gained += roll;
+    }
+    cur.attrs[key] = (cur.attrs[key] || 0) + gained;
     cur.attrPoints = pts - n;
     saveCur(data, userId, cur);
-    return { ok: true, gained: n, attrs: cur.attrs, attrPoints: cur.attrPoints };
+    return { ok: true, gained, spent: n, rolls, attrs: cur.attrs, attrPoints: cur.attrPoints };
 }
 
 function redistribuirAttrs(userId) {
