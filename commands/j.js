@@ -200,7 +200,8 @@ module.exports = {
         .setDescription('Personagem e atributos')
         .addSubcommand((s) => s.setName('perfil').setDescription('Ver perfil'))
         .addSubcommand((s) => s.setName('criar').setDescription('Criar personagem'))
-        .addSubcommand((s) => s.setName('atributos').setDescription('Ver e gastar pontos de atributo')),
+        .addSubcommand((s) => s.setName('atributos').setDescription('Ver e gastar pontos de atributo'))
+        .addSubcommand((s) => s.setName('deletar').setDescription('Apagar permanentemente o seu personagem')),
 
     async execute(message, args) {
         const sub = (args[0] || 'perfil').toLowerCase();
@@ -211,6 +212,32 @@ module.exports = {
                 return message.reply('Personagem criado. Use `O.j perfil` e `O.classe`.');
             }
             return message.reply('Sistema indisponível.');
+        }
+        if (sub === 'deletar' || sub === 'apagar' || sub === 'delete' || sub === 'resetar') {
+            if (!player.get(message.author.id)) {
+                return message.reply('Você não tem perfil para deletar.');
+            }
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('j:deleteconfirm:' + message.author.id).setLabel('Sim, deletar perfil').setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
+                new ButtonBuilder().setCustomId('j:deletecancel:' + message.author.id).setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
+            );
+            return message.reply({
+                content: '⚠️ **Atenção:** isso apaga permanentemente seu personagem (classe, inventário, atributos e XP do perfil).\nConfirma a exclusão?',
+                components: [row]
+            });
+        }
+        if (sub === 'perfil' && args[1] && ['deletar', 'apagar', 'delete', 'resetar'].includes(String(args[1]).toLowerCase())) {
+            if (!player.get(message.author.id)) {
+                return message.reply('Você não tem perfil para deletar.');
+            }
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('j:deleteconfirm:' + message.author.id).setLabel('Sim, deletar perfil').setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
+                new ButtonBuilder().setCustomId('j:deletecancel:' + message.author.id).setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
+            );
+            return message.reply({
+                content: '⚠️ **Atenção:** isso apaga permanentemente seu personagem (classe, inventário, atributos e XP do perfil).\nConfirma a exclusão?',
+                components: [row]
+            });
         }
         if (sub === 'atributos' || sub === 'attrs' || sub === 'stats') {
             const inv = typeof xp.scanInvalidAttrs === 'function' ? xp.scanInvalidAttrs(message.author.id) : null;
@@ -230,6 +257,20 @@ module.exports = {
         const sub = interaction.options.getSubcommand(false) || 'perfil';
         const reply = (p) => interaction.replied || interaction.deferred ? interaction.editReply(p) : interaction.reply(p);
         if (sub === 'criar') return beginCreate(interaction);
+        if (sub === 'deletar') {
+            if (!player.get(interaction.user.id)) {
+                return reply({ content: 'Você não tem perfil para deletar.', ephemeral: true });
+            }
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('j:deleteconfirm:' + interaction.user.id).setLabel('Sim, deletar perfil').setStyle(ButtonStyle.Danger).setEmoji('🗑️'),
+                new ButtonBuilder().setCustomId('j:deletecancel:' + interaction.user.id).setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
+            );
+            return reply({
+                content: '⚠️ **Atenção:** isso apaga permanentemente seu personagem (classe, inventário, atributos e XP do perfil).\nConfirma a exclusão?',
+                components: [row],
+                ephemeral: true
+            });
+        }
         if (sub === 'atributos') {
             const inv = typeof xp.scanInvalidAttrs === 'function' ? xp.scanInvalidAttrs(interaction.user.id) : null;
             if (inv && inv.hasInvalid) return reply(invalidPointsMessage(interaction.user.id, inv));
@@ -242,6 +283,49 @@ module.exports = {
 
     async handleComponent(interaction) {
         const id = String(interaction.customId || '');
+        if (id.startsWith('j:deleteconfirm:')) {
+            const ownerId = id.split(':')[2];
+            if (String(interaction.user.id) !== String(ownerId)) {
+                return safeReply(interaction, { content: 'Só o dono do perfil pode confirmar.', flags: MessageFlags.Ephemeral });
+            }
+            let res = { ok: false, error: 'Indisponível.' };
+            try {
+                if (typeof player.remove === 'function') res = player.remove(ownerId);
+                else {
+                    const data = player.all();
+                    if (!data[ownerId]) res = { ok: false, error: 'Perfil não encontrado.' };
+                    else {
+                        delete data[ownerId];
+                        player.save(data);
+                        try {
+                            const xd = xp.all ? xp.all() : null;
+                            if (xd && xd[ownerId]) {
+                                delete xd[ownerId];
+                                require('../utils/store').save('xp.json', xd);
+                            }
+                        } catch (_) {}
+                        res = { ok: true };
+                    }
+                }
+            } catch (e) {
+                res = { ok: false, error: e.message || 'Erro ao deletar.' };
+            }
+            if (!res.ok) {
+                return safeUpdate(interaction, { content: '❌ ' + (res.error || 'Não foi possível deletar.'), components: [] });
+            }
+            return safeUpdate(interaction, {
+                content: '🗑️ Perfil deletado com sucesso. Use `O.j criar` para começar de novo.',
+                embeds: [],
+                components: []
+            });
+        }
+        if (id.startsWith('j:deletecancel:')) {
+            const ownerId = id.split(':')[2];
+            if (String(interaction.user.id) !== String(ownerId)) {
+                return safeReply(interaction, { content: 'Só o dono pode cancelar.', flags: MessageFlags.Ephemeral });
+            }
+            return safeUpdate(interaction, { content: '✅ Exclusão cancelada. Seu perfil continua intacto.', embeds: [], components: [] });
+        }
         if (id.startsWith('j:attrfix:')) {
             const ownerId = id.split(':')[2];
             if (String(interaction.user.id) !== String(ownerId)) return safeReply(interaction, { content: 'Só o dono pode aceitar.', flags: MessageFlags.Ephemeral });
@@ -345,64 +429,43 @@ module.exports = {
             const meta = ATTR_META.find((a) => a.key === attrKey);
 
             if (!meta || String(interaction.user.id) !== String(ownerId)) {
-                return interaction.reply({ content: 'Solicitação inválida.', flags: MessageFlags.Ephemeral });
+                return interaction.reply({ content: 'Inválido.', flags: MessageFlags.Ephemeral });
             }
 
-            const raw = String(interaction.fields.getTextInputValue('quantidade') || '').trim();
+            const raw = interaction.fields.getTextInputValue('quantidade');
+            const amount = Math.floor(Number(String(raw).replace(/[^0-9]/g, '')) || 0);
+            const pts = Number(xp.get(ownerId).attrPoints || 0);
 
-            // Revalidação completa no momento do depósito.
-            // Isso impede que um valor antigo ou incompatível seja aplicado.
-            if (!raw || !/^\d+$/.test(raw)) {
+            if (amount <= 0 || amount > pts) {
                 return interaction.reply({
-                    content: '❌ O valor informado não é válido. Digite apenas um número inteiro positivo.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-
-            const amount = Number(raw);
-            const current = xp.get(ownerId) || {};
-            const available = Number(current.attrPoints || 0);
-            const attrs = current.attrs || {};
-
-            if (!Object.prototype.hasOwnProperty.call(attrs, attrKey)) {
-                return interaction.reply({
-                    content: '❌ Esse atributo não é compatível com o sistema atual.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-
-            if (!Number.isSafeInteger(amount) || amount < 1) {
-                return interaction.reply({
-                    content: '❌ A quantidade precisa ser um número inteiro maior que **0**.',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-
-            if (amount > available) {
-                return interaction.reply({
-                    content: '❌ Valor incompatível: você informou **' + amount + '**, mas possui apenas **' + available + '** ponto(s) disponíveis.',
+                    content: 'Quantidade inválida. Você tem **' + pts + '** ponto(s).',
                     flags: MessageFlags.Ephemeral
                 });
             }
 
             const spent = xp.spendAttrPoints(ownerId, attrKey, amount);
             if (!spent?.ok) {
-                return interaction.reply({ content: String(spent?.error || 'Não foi possível distribuir os pontos.'), flags: MessageFlags.Ephemeral });
+                return interaction.reply({ content: String(spent?.error || 'Falha.'), flags: MessageFlags.Ephemeral });
             }
 
             const payload = atributosPayload(interaction.user);
-            payload.content = '✅ **' + spent.spent + '** ponto(s) investido(s) em ' + meta.emoji + ' **' + meta.label + '** → **+' + spent.gained + '** atributo(s).';
+            payload.content = '✅ **' + amount + '** ponto(s) em ' + meta.emoji + ' **' + meta.label + '** → **+' + spent.gained + '**.';
             return interaction.reply(payload);
         }
 
-        if (interaction.customId !== 'j:name') return;
-        const nome = interaction.fields.getTextInputValue('nome').trim();
-        if (nome.length < 2) return interaction.reply({ content: 'Nome muito curto.', flags: MessageFlags.Ephemeral });
-        if (typeof player.create === 'function') {
-            player.create(interaction.user.id, { name: nome, photoUrl: interaction.user.displayAvatarURL({ size: 256 }) });
-            const profile = player.get(interaction.user.id);
-            return interaction.reply({ content: '✅ Personagem **' + nome + '** criado!', embeds: [profileEmbed(interaction.user, profile, { guildName: interaction.guild?.name })] });
+        if (interaction.customId === 'j:name') {
+            const nome = interaction.fields.getTextInputValue('nome').trim();
+            if (nome.length < 2) {
+                return interaction.reply({ content: 'Nome muito curto.', flags: MessageFlags.Ephemeral });
+            }
+            drafts.set(interaction.user.id, { step: 'done', name: nome });
+            if (typeof player.create === 'function') {
+                player.create(interaction.user.id, { name: nome });
+            }
+            return interaction.reply({
+                content: 'Personagem **' + nome + '** criado! Use `O.classe` para escolher a classe e `O.j perfil` para ver o perfil.',
+                flags: MessageFlags.Ephemeral
+            });
         }
-        return interaction.reply({ content: 'Sistema indisponível.', flags: MessageFlags.Ephemeral });
     }
 };
