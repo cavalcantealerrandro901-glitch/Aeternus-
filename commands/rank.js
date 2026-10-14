@@ -246,19 +246,15 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
 
         if (meta.economy) {
             blocks.push(
-                [
-                    `${medal(pos)}  ${tag}`,
-                    `┗ \\`${bar}\\`  ·  ${meta.emoji} **${fmt(e.value)}** ${meta.unit}`
-                ].join('\n')
+                medal(pos) + '  ' + tag + '\n' +
+                '\u2517 `' + bar + '`  \u00b7  ' + meta.emoji + ' **' + fmt(e.value) + '** ' + meta.unit
             );
         } else {
-            const nivel = e.level != null ? `Nível **${e.level}**` : '';
+            const nivel = e.level != null ? ('Nível **' + e.level + '**  \u00b7  ') : '';
             blocks.push(
-                [
-                    `${medal(pos)}  ${tag}`,
-                    `┗ ${nivel ? nivel + '  ·  ' : ''}${meta.emoji} **${fmt(e.value)}** ${meta.unit}`,
-                    `　\\`${bar}\\``
-                ].join('\n')
+                medal(pos) + '  ' + tag + '\n' +
+                '\u2517 ' + nivel + meta.emoji + ' **' + fmt(e.value) + '** ' + meta.unit + '\n' +
+                '  `' + bar + '`'
             );
         }
     }
@@ -294,7 +290,6 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
         })
         .setTimestamp();
 
-    // Thumbnail do 1º lugar da página, se disponível
     const first = resolved.find((r) => r && r.avatar);
     if (first?.avatar) emb.setThumbnail(first.avatar);
 
@@ -386,7 +381,7 @@ module.exports = {
         let mode = parseMode(args);
         const invoked = String(message.content || '')
             .trim()
-            .split(/\s+/ )[0]
+            .split(/\s+/)[0]
             .toLowerCase()
             .replace(/^[oO]\./, '')
             .replace(/^!/, '');
