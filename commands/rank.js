@@ -14,7 +14,14 @@ function fmt(n) {
 }
 
 function medal(i) {
-    return ['🥇', '🥈', '🥉'][i] || `**#${i + 1}**`;
+    return ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i] || `**#${i + 1}**`;
+}
+
+function progressBar(value, max, size = 10) {
+    const m = Math.max(1, Number(max) || 1);
+    const v = Math.max(0, Number(value) || 0);
+    const filled = Math.round(Math.min(1, v / m) * size);
+    return '█'.repeat(filled) + '░'.repeat(Math.max(0, size - filled));
 }
 
 function clockNow() {
@@ -23,13 +30,6 @@ function clockNow() {
         minute: '2-digit',
         timeZone: 'America/Sao_Paulo'
     });
-}
-
-/** Nome visual sem ping real */
-function displayTag(user, fallbackId) {
-    if (!user) return `@usuário-${String(fallbackId).slice(-4)}`;
-    const name = user.globalName || user.username || `id-${fallbackId}`;
-    return `@${name}`;
 }
 
 function parseMode(args) {
@@ -70,7 +70,6 @@ function parseMode(args) {
         return 'local';
     }
 
-    // padrão e aliases de economia
     if (
         a === 'global' ||
         a === 'mundo' ||
@@ -90,48 +89,48 @@ function parseMode(args) {
 function modeMeta(mode) {
     if (mode === 'xpglobal') {
         return {
-            title: 'AETERNUS RANK XP · GLOBAL',
+            title: '👑 COLISEU AETERNUS · RANK XP GLOBAL',
             emoji: '⭐',
             unit: 'XP',
-            color: 0xc084fc,
+            color: 0xc9a227,
             scope: 'global',
-            economy: false
+            economy: false,
+            tip: 'Continue batalhando e evoluindo para subir no ranking global de XP!'
         };
     }
     if (mode === 'xp') {
         return {
-            title: 'AETERNUS RANK XP · SERVIDOR',
+            title: '👑 COLISEU AETERNUS · RANK XP',
             emoji: '⭐',
             unit: 'XP',
             color: 0xa78bfa,
             scope: 'local',
-            economy: false
+            economy: false,
+            tip: 'Continue conversando e interagindo para subir no ranking de XP!'
         };
     }
     if (mode === 'local') {
         return {
-            title: 'AETERNUS RANK · SERVIDOR',
+            title: '✨ AETERNUS · RANK ÉTER (SERVIDOR)',
             emoji: '✨',
             unit: 'éter',
             color: 0xa78bfa,
             scope: 'local',
-            economy: true
+            economy: true,
+            tip: 'Trabalhe, craft e complete missões para acumular éter neste servidor!'
         };
     }
     return {
-        title: 'AETERNUS RANK GERAL',
+        title: '✨ AETERNUS · RANK GERAL',
         emoji: '✨',
         unit: 'éter',
-        color: 0xa78bfa,
+        color: 0xc9a227,
         scope: 'global',
-        economy: true
+        economy: true,
+        tip: 'Acumule éter em todos os servidores para dominar o ranking geral!'
     };
 }
 
-/**
- * Lista do ranking — saldos de Éter no Mongo (rápido: sem fetch em massa).
- * Bots só são filtrados via cache; a página confirma com fetch paralelo.
- */
 async function buildList(mode, guild, client) {
     if (mode === 'xp' || mode === 'xpglobal') {
         const data = xp.all() || {};
@@ -142,7 +141,6 @@ async function buildList(mode, guild, client) {
         }));
 
         if (mode === 'xp' && guild) {
-            // Usa cache; evita fetch completo do servidor se já houver membros
             const memberIds = new Set();
             guild.members.cache.forEach((m) => {
                 if (m.user && !m.user.bot) memberIds.add(m.id);
@@ -165,7 +163,6 @@ async function buildList(mode, guild, client) {
             .sort((a, b) => b.value - a.value || b.level - a.level);
     }
 
-    // Economia: só dados do Mongo + sort (sem API Discord)
     const data = eter.all() || {};
     let entries = Object.entries(data).map(([id, v]) => ({
         id: String(id),
@@ -195,7 +192,6 @@ async function buildList(mode, guild, client) {
         .sort((a, b) => b.value - a.value);
 }
 
-/** Bot conhecido no cache — não faz fetch */
 function isKnownBot(client, id) {
     const u = client?.users?.cache?.get(String(id));
     return Boolean(u?.bot);
@@ -219,8 +215,8 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
     const slice = list.slice(start, start + PAGE_SIZE);
     const mine = findMyRank(list, viewerId);
     const guildName = guild?.name || 'Global';
+    const topValue = list[0]?.value || 1;
 
-    // Fetch só da página atual, em paralelo
     const resolved = await Promise.all(
         slice.map(async (e) => {
             let u = client.users.cache.get(e.id) || null;
@@ -231,11 +227,12 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
             if (inGuild) {
                 tag = `<@${e.id}>`;
             } else if (u) {
-                tag = `**@${u.globalName || u.username}**`;
+                tag = `**${u.globalName || u.username}**`;
             } else {
-                tag = `**@usuário-${String(e.id).slice(-4)}**`;
+                tag = `**usuário-${String(e.id).slice(-4)}**`;
             }
-            return { e, tag };
+            const avatar = u?.displayAvatarURL?.({ size: 64 }) || null;
+            return { e, tag, avatar, name: u?.globalName || u?.username || null };
         })
     );
 
@@ -245,15 +242,23 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
         if (!row) continue;
         const pos = start + i;
         const { e, tag } = row;
+        const bar = progressBar(e.value, topValue, 8);
+
         if (meta.economy) {
             blocks.push(
-                `${medal(pos)} ${tag}\n   ✨ **${fmt(e.value)}** éter`
+                [
+                    `${medal(pos)}  ${tag}`,
+                    `┗ \\`${bar}\\`  ·  ${meta.emoji} **${fmt(e.value)}** ${meta.unit}`
+                ].join('\n')
             );
         } else {
-            const extra =
-                e.level != null ? `\n   Nv. **${e.level}**` : '';
+            const nivel = e.level != null ? `Nível **${e.level}**` : '';
             blocks.push(
-                `${medal(pos)} ${tag}\n   ${meta.emoji} **${fmt(e.value)}** ${meta.unit}${extra}`
+                [
+                    `${medal(pos)}  ${tag}`,
+                    `┗ ${nivel ? nivel + '  ·  ' : ''}${meta.emoji} **${fmt(e.value)}** ${meta.unit}`,
+                    `　\\`${bar}\\``
+                ].join('\n')
             );
         }
     }
@@ -262,42 +267,61 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
 
     const posLine =
         mine.rank != null
-            ? `Sua posição no ranking: **#${mine.rank}**.`
-            : 'Sua posição: _você ainda não entrou no ranking._';
+            ? `📍 **Sua posição:** #${mine.rank}  ·  ${meta.emoji} **${fmt(mine.value)}** ${meta.unit}` +
+              (mine.level ? `  ·  Nv. **${mine.level}**` : '')
+            : '📍 **Sua posição:** _ainda fora do ranking_';
 
-    const serverLabel = guildName || 'Global';
     const hora = clockNow();
 
-    return new EmbedBuilder()
+    const emb = new EmbedBuilder()
         .setColor(meta.color)
         .setTitle(meta.title)
-        .setDescription([posLine, '', body].join('\n'))
+        .setDescription(
+            [
+                posLine,
+                '',
+                `🏆 **RANKING** · Página **${p + 1}/${totalPages}**`,
+                '━━━━━━━━━━━━━━━━━━━━',
+                '',
+                body,
+                '',
+                '━━━━━━━━━━━━━━━━━━━━',
+                `💡 **Dica:** ${meta.tip}`
+            ].join('\n')
+        )
         .setFooter({
-            text: `Aeternus rank • ${serverLabel} • hoje as ${hora}`
+            text: `Aeternus Bot · ${guildName} · atualizado às ${hora}`
         })
         .setTimestamp();
+
+    // Thumbnail do 1º lugar da página, se disponível
+    const first = resolved.find((r) => r && r.avatar);
+    if (first?.avatar) emb.setThumbnail(first.avatar);
+
+    return emb;
 }
 
 function helpEmbed() {
     return new EmbedBuilder()
-        .setColor(0xa78bfa)
-        .setTitle('🏆 Rankings · Economia Aeternus')
+        .setColor(0xc9a227)
+        .setTitle('👑 COMANDO RANK · AETERNUS')
         .setDescription(
             [
-                'Acompanhe os destaques da economia e da progressão dos aventureiros.',
+                'Veja o ranking dos aventureiros mais ativos!',
                 '',
-                '**Comandos**',
-                '`O.rank` — **AETERNUS RANK GERAL** (éter global)',
-                '`O.rank local` — éter deste servidor',
-                '`O.rank xp` — XP deste servidor',
-                '`O.rank xp global` — XP global',
+                '**📖 Como usar**',
+                '`O.rank` — rank geral de **éter**',
+                '`O.rank local` — éter **deste servidor**',
+                '`O.rank xp` — XP **deste servidor**',
+                '`O.rank xp global` — XP **global**',
+                '',
+                '**Exemplo:** `O.rank xp`',
                 '',
                 '⬅️ Voltar · 👤 Meu rank · ➡️ Próximo'
             ].join('\n')
         )
-        .setFooter({ text: 'Aeternus · Rank' });
+        .setFooter({ text: 'Aeternus Bot · Rank' });
 }
-
 
 function navRow(mode, page, totalPages) {
     const maxPage = Math.max(0, totalPages - 1);
@@ -353,7 +377,7 @@ async function sendRank(ctx, mode, page = 0) {
 module.exports = {
     name: 'rank',
     aliases: ['top', 'leaderboard', 'lb', 'ranking', 'rankxp', 'topxp', 'xpglobal'],
-    description: 'Ranking de economia (éter) e XP — dados do MongoDB',
+    description: 'Ranking de economia (éter) e XP',
 
     async execute(message, args) {
         if (['ajuda', 'help', '?'].includes(String(args[0] || '').toLowerCase())) {
@@ -362,7 +386,7 @@ module.exports = {
         let mode = parseMode(args);
         const invoked = String(message.content || '')
             .trim()
-            .split(/\s+/)[0]
+            .split(/\s+/ )[0]
             .toLowerCase()
             .replace(/^[oO]\./, '')
             .replace(/^!/, '');
@@ -396,7 +420,7 @@ module.exports = {
             const list = await buildList(mode, guild, interaction.client);
             const mine = findMyRank(list, interaction.user.id);
             const meta = modeMeta(mode);
-            const foot = 'Aeternus rank • ' + (guild?.name || 'Global') + ' • hoje as ' + clockNow();
+            const foot = 'Aeternus Bot · ' + (guild?.name || 'Global') + ' · ' + clockNow();
 
             if (!mine.rank) {
                 return interaction.reply({
@@ -408,13 +432,15 @@ module.exports = {
                                 '<@' + interaction.user.id + '> ainda não aparece no ranking.\nGanhe éter/XP para entrar na lista!'
                             )
                             .setFooter({ text: foot })
-                    ]
+                    ],
+                    ephemeral: true
                 }).catch(() => {});
             }
 
             const saldoLine = meta.economy
-                ? 'saldo:  ✨ **' + fmt(mine.value) + '** éter'
-                : meta.emoji + ' **' + fmt(mine.value) + '** ' + meta.unit;
+                ? '✨ **' + fmt(mine.value) + '** éter'
+                : meta.emoji + ' **' + fmt(mine.value) + '** ' + meta.unit +
+                  (mine.level ? ' · Nv. **' + mine.level + '**' : '');
 
             return interaction.reply({
                 embeds: [
@@ -422,13 +448,14 @@ module.exports = {
                         .setColor(meta.color)
                         .setTitle(meta.title)
                         .setDescription(
-                            '<@' + interaction.user.id + '>\n' +
-                            'Sua posição no rank: **' + mine.rank + '** posição.\n\n' +
+                            '👤 <@' + interaction.user.id + '>\n\n' +
+                            '📍 **Posição:** #' + mine.rank + '\n' +
                             saldoLine
                         )
                         .setFooter({ text: foot })
                         .setTimestamp()
-                ]
+                ],
+                ephemeral: true
             }).catch(() => {});
         }
 
