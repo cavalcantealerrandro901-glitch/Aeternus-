@@ -3,6 +3,39 @@ const player = require('../utils/player');
 const craft = require('../utils/craft');
 const items = require('../utils/items');
 
+/** Catálogo padrão de materiais (fallback se items.MATERIALS não existir). */
+const DEFAULT_MATERIALS = {
+    fragmento_eter: { id: 'fragmento_eter', name: 'Fragmento de Éter', emoji: '✨' },
+    po_arcano: { id: 'po_arcano', name: 'Pó Arcano', emoji: '🪄' },
+    essencia_sombria: { id: 'essencia_sombria', name: 'Essência Sombria', emoji: '🌑' },
+    cristal_bruto: { id: 'cristal_bruto', name: 'Cristal Bruto', emoji: '💎' },
+    fibra_antiga: { id: 'fibra_antiga', name: 'Fibra Antiga', emoji: '🧵' },
+    osso_runico: { id: 'osso_runico', name: 'Osso Rúnico', emoji: '🦴' },
+    lima_solar: { id: 'lima_solar', name: 'Lima Solar', emoji: '☀️' },
+    gota_lunar: { id: 'gota_lunar', name: 'Gota Lunar', emoji: '🌙' }
+};
+
+function materialCatalog() {
+    if (items && items.MATERIALS && typeof items.MATERIALS === 'object') {
+        return items.MATERIALS;
+    }
+    if (typeof items?.getMaterialDef === 'function') {
+        // monta a partir das chaves do inventário do usuário + defaults
+        return DEFAULT_MATERIALS;
+    }
+    return DEFAULT_MATERIALS;
+}
+
+function materialDef(id) {
+    const key = String(id || '').trim();
+    if (typeof items?.getMaterialDef === 'function') {
+        const def = items.getMaterialDef(key);
+        if (def) return def;
+    }
+    const cat = materialCatalog();
+    return cat[key] || { id: key, name: key, emoji: '📦' };
+}
+
 module.exports = {
     name: 'materiais',
     aliases: ['mats', 'materials', 'fragmentos'],
@@ -37,11 +70,24 @@ function build(user) {
         return emb;
     }
 
-    const mats = craft.materialsOf(user.id);
-    const lines = Object.values(items.MATERIALS).map((def) => {
-        const n = mats[def.id] || 0;
-        return `${def.emoji} **${def.name}** — ×${n}`;
+    const mats = (typeof craft.materialsOf === 'function' ? craft.materialsOf(user.id) : null) || profile.materials || {};
+    const catalog = materialCatalog() || {};
+
+    // une catálogo + materiais que o jogador tenha (mesmo se não estiverem no catálogo)
+    const ids = new Set([
+        ...Object.keys(catalog),
+        ...Object.keys(mats || {})
+    ]);
+
+    const lines = [...ids].map((id) => {
+        const def = materialDef(id);
+        const n = Math.max(0, Math.floor(Number(mats[id]) || 0));
+        return `${def.emoji || '📦'} **${def.name || id}** — ×${n}`;
     });
+
+    if (!lines.length) {
+        lines.push('_Nenhum material registrado ainda._');
+    }
 
     emb.setDescription(
         [
