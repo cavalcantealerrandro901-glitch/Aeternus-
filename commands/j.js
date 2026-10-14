@@ -1,9 +1,21 @@
 async function safeUpdate(interaction, payload) {
     try {
-        if (interaction.deferred || interaction.replied) return await interaction.editReply(payload);
+        if (interaction.deferred || interaction.replied) {
+            return await interaction.editReply(payload);
+        }
         return await interaction.update(payload);
     } catch (e) {
         if (e && (e.code === 10062 || e.code === 40060)) return null;
+        // Fallback: edita a mensagem do componente em vez de abrir nova
+        try {
+            if (interaction.message && typeof interaction.message.edit === 'function') {
+                await interaction.message.edit(payload).catch(() => {});
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.deferUpdate().catch(() => {});
+                }
+                return true;
+            }
+        } catch (_) {}
         return null;
     }
 }
@@ -147,7 +159,7 @@ function atributosPayload(user) {
             '', '⚔️ **ATRIBUTOS** _(efetivos)_', ...attrLines, '',
             points > 0 ? '✦ Pontos disponíveis: **' + points + '**' : '✦ Pontos disponíveis: **0**'
         ].join('\n'))
-        .setFooter({ text: '+1 · Gastar vários · Redistribuir' });
+        .setFooter({ text: '1 ponto → +3 a +5 · Gastar vários · Redistribuir' });
     const components = [];
     for (let i = 0; i < ATTR_META.length; i += 4) {
         const row = new ActionRowBuilder();
@@ -345,7 +357,7 @@ module.exports = {
             const spent = xp.spendAttrPoint(ownerId, attrKey);
             if (!spent?.ok) return safeReply(interaction, { content: String(spent?.error || 'Falha.'), flags: MessageFlags.Ephemeral });
             const payload = atributosPayload(interaction.user);
-            payload.content = '✅ **' + meta.emoji + ' ' + meta.label + '** +1';
+            payload.content = '✅ **' + meta.emoji + ' ' + meta.label + '** +' + (spent.gained || 1) + ' _(1 ponto → 3–5)_';
             return safeUpdate(interaction, payload);
         }
         if (id.startsWith('j:attrdist:')) {
@@ -415,8 +427,11 @@ module.exports = {
             if (String(interaction.user.id) !== String(ownerId)) return safeReply(interaction, { content: 'Só o dono.', flags: MessageFlags.Ephemeral });
             const res = xp.redistribuirAttrs(ownerId);
             if (!res?.ok) return safeReply(interaction, { content: 'Falha ao redistribuir.', flags: MessageFlags.Ephemeral });
-            await safeUpdate(interaction, atributosPayload(interaction.user));
-            return interaction.followUp({ content: res.refund > 0 ? '🔄 **' + res.refund + '** pontos devolvidos.' : '🔄 Já na base.', flags: MessageFlags.Ephemeral }).catch(() => {});
+            const payload = atributosPayload(interaction.user);
+            payload.content = res.refund > 0
+                ? '🔄 **' + res.refund + '** pontos devolvidos. Redistribua como quiser.'
+                : '🔄 Já na base.';
+            return safeUpdate(interaction, payload);
         }
         if (id === 'j:start') return beginCreate(interaction);
     },
@@ -449,8 +464,18 @@ module.exports = {
             }
 
             const payload = atributosPayload(interaction.user);
-            payload.content = '✅ **' + amount + '** ponto(s) em ' + meta.emoji + ' **' + meta.label + '** → **+' + spent.gained + '**.';
-            return interaction.reply(payload);
+            const summary = '✅ **' + amount + '** ponto(s) em ' + meta.emoji + ' **' + meta.label + '** → **+' + spent.gained + '**';
+            payload.content = summary;
+
+            // Edita o painel antigo em vez de criar mensagem nova (evita flood)
+            try {
+                if (interaction.message && typeof interaction.message.edit === 'function') {
+                    await interaction.message.edit(payload).catch(() => {});
+                    return interaction.reply({ content: summary, flags: MessageFlags.Ephemeral });
+                }
+            } catch (_) {}
+
+            return interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
         }
 
         if (interaction.customId === 'j:name') {
