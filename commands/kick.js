@@ -46,17 +46,21 @@ async function handleKickProcess(context, moderator, targetMember, reason, isSla
     collector.on('collect', async i => {
         const originalMessage = i.message || sentMsg;
         try { await i.deferUpdate(); } catch (_) { return; }
-        if (!targetMember.kickable) {
-            return originalMessage.reply({ content: '❌ Não consigo expulsar este membro (cargo mais alto).', allowedMentions: { repliedUser: false } });
-        }
         try {
-            await targetMember.kick(`${reason} · por ${moderator.tag}`);
-            
-            const successText = `👢 **Expulsão concluída**\nO membro <@${targetMember.id}> foi removido do servidor.\n**Motivo:** ${String(reason).slice(0, 500)}`;
-            
-            await originalMessage.reply({ content: successText, allowedMentions: { repliedUser: false } });
+            const currentModerator = await context.guild.members.fetch(moderator.id).catch(() => null);
+            const currentTarget = await context.guild.members.fetch(targetMember.id).catch(() => null);
+            const botMember = await context.guild.members.fetchMe().catch(() => null);
+            if (!currentModerator || !currentTarget || !botMember) return originalMessage.reply({ content: '❌ Não consegui verificar os cargos atuais. Nenhuma ação foi executada.', allowedMentions: { parse: [], repliedUser: false } });
+            if (!currentModerator.permissions.has(PermissionFlagsBits.KickMembers)) return originalMessage.reply({ content: '❌ Você não tem mais a permissão **Expulsar membros**.', allowedMentions: { parse: [], repliedUser: false } });
+            if (!botMember.permissions.has(PermissionFlagsBits.KickMembers)) return originalMessage.reply({ content: '❌ Preciso da permissão **Expulsar membros** para continuar.', allowedMentions: { parse: [], repliedUser: false } });
+            if (currentTarget.id === currentModerator.id || currentTarget.id === botMember.id) return originalMessage.reply({ content: '❌ Essa expulsão não é permitida.', allowedMentions: { parse: [], repliedUser: false } });
+            if (context.guild.ownerId !== currentModerator.id && currentTarget.roles.highest.comparePositionTo(currentModerator.roles.highest) >= 0) return originalMessage.reply({ content: '❌ Seu cargo precisa estar acima do cargo do membro.', allowedMentions: { parse: [], repliedUser: false } });
+            if (!currentTarget.kickable) return originalMessage.reply({ content: '❌ Não consigo expulsar este membro. Confira a hierarquia e minhas permissões.', allowedMentions: { parse: [], repliedUser: false } });
+            await currentTarget.kick(`${reason} · por ${currentModerator.user.tag}`);
+            const successText = `👢 **Expulsão concluída**\nO membro <@${currentTarget.id}> foi removido do servidor.\n**Motivo:** ${String(reason).slice(0, 500)}`;
+            await originalMessage.reply({ content: successText, allowedMentions: { parse: [], repliedUser: false } });
         } catch (e) {
-            await originalMessage.reply({ content: '❌ Não consegui expulsar o usuário.', allowedMentions: { repliedUser: false } });
+            await originalMessage.reply({ content: '❌ Não consegui expulsar o usuário.', allowedMentions: { parse: [], repliedUser: false } });
         }
     });
 
@@ -81,23 +85,19 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
 
     async execute(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.KickMembers)) {
-            return message.reply('❌ Sem permissão.');
-        }
+        if (!message.member) return message.reply('❌ Não consegui verificar sua conta neste servidor.');
         const member = resolveMember(message, args);
         if (!member) return message.reply('❌ Mencione o membro ou informe o ID.');
         if (member.id === message.author.id) return message.reply('❌ Você não pode se expulsar.');
         if (member.id === message.client.user.id) return message.reply('❌ Não posso me expulsar.');
-        if (!member.kickable) return message.reply('❌ Não consigo expulsar este membro (cargo mais alto).');
+        // As permissões e a hierarquia serão verificadas novamente ao confirmar.
 
         const reason = reasonFrom(args, !!message.mentions.members.first());
         await handleKickProcess(message, message.author, member, reason, false);
     },
 
     async executeSlash(i) {
-        if (!i.member.permissions.has(PermissionFlagsBits.KickMembers)) {
-            return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
-        }
+        if (!i.inGuild()) return i.reply({ content: '❌ Este comando só funciona em servidores.', ephemeral: true });
         const user = i.options.getUser('usuario', true);
         const reason = i.options.getString('motivo') || 'Sem motivo';
         const member = await i.guild.members.fetch(user.id).catch(() => null);
