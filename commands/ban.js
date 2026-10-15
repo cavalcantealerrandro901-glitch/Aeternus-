@@ -168,8 +168,8 @@ module.exports = {
 
     async execute(message, args) {
         const moderator = message.member;
-        if (!moderator?.permissions?.has(PermissionFlagsBits.BanMembers)) {
-            return message.reply({ content: '❌ Você não tem a permissão **Banir membros**.', allowedMentions: SAFE_MENTIONS });
+        if (!moderator) {
+            return message.reply({ content: '❌ Não consegui verificar sua conta neste servidor.', allowedMentions: SAFE_MENTIONS });
         }
 
         const member = resolveMember(message, args);
@@ -177,11 +177,7 @@ module.exports = {
             return message.reply({ content: '❌ Mencione o membro ou informe um ID válido.', allowedMentions: SAFE_MENTIONS });
         }
 
-        const check = moderatorCanBan(moderator, member, message.guild);
-        if (!check.ok) {
-            return message.reply({ content: `❌ ${check.error}`, allowedMentions: SAFE_MENTIONS });
-        }
-
+        // As permissões e a hierarquia serão verificadas novamente quando o moderador clicar em confirmar.
         const reason = reasonFrom(args, Boolean(message.mentions.members.first()));
         return handleBanProcess(message, moderator, member, reason, false);
     },
@@ -195,10 +191,6 @@ module.exports = {
         if (!moderator) {
             return i.reply({ content: '❌ Não consegui verificar suas permissões neste servidor.', ephemeral: true });
         }
-        if (!moderator.permissions.has(PermissionFlagsBits.BanMembers)) {
-            return i.reply({ content: '❌ Você não tem a permissão **Banir membros**.', ephemeral: true });
-        }
-
         const user = i.options.getUser('usuario', true);
         const reason = sanitizeReason(i.options.getString('motivo'));
         const member = await i.guild.members.fetch(user.id).catch(() => null);
@@ -206,11 +198,7 @@ module.exports = {
             return i.reply({ content: '❌ Membro não encontrado neste servidor.', ephemeral: true });
         }
 
-        const check = moderatorCanBan(moderator, member, i.guild);
-        if (!check.ok) {
-            return i.reply({ content: `❌ ${check.error}`, ephemeral: true });
-        }
-
+        // As permissões do moderador, as permissões do bot e a hierarquia serão verificadas ao clicar em confirmar.
         return handleBanProcess(i, moderator, member, reason, true);
     }
 };
