@@ -125,6 +125,28 @@ function runCandidateTests(targetPath, content) {
     if (syntax.error || syntax.status !== 0) {
       return { ok: false, kind: 'syntax', detail: String(syntax.stderr || syntax.stdout || syntax.error?.message || 'Sintaxe JavaScript inválida.').slice(0, 1100) };
     }
+    // Para arquivos em commands/, além da sintaxe, carrega o módulo isoladamente
+    // e verifica se ele exporta uma estrutura executável de comando.
+    if (String(targetPath).startsWith('commands/')) {
+      const commandCheck = [
+        "const file = process.argv[1];",
+        "let command;",
+        "try { command = require(file); } catch (e) { console.error((e && e.stack) || String(e)); process.exit(2); }",
+        "if (command && command.default) command = command.default;",
+        "const executable = command && (typeof command.execute === 'function' || typeof command.run === 'function');",
+        "if (!executable) { console.error('O arquivo não exporta uma função execute() ou run().'); process.exit(3); }"
+      ].join(' ');
+      const safeEnv = Object.assign({}, process.env, { CI: 'true', NODE_ENV: 'test', HOME: tempRoot });
+      for (const key of Object.keys(safeEnv)) {
+        if (/(KEY|TOKEN|SECRET|PASSWORD|PASSWD|MONGO|DATABASE_URL|DISCORD)/i.test(key)) delete safeEnv[key];
+      }
+      const loaded = spawnSync(process.execPath, ['-e', commandCheck, safeTarget], {
+        cwd: tempRoot, encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024, env: safeEnv
+      });
+      if (loaded.error || loaded.status !== 0) {
+        return { ok: false, kind: 'command-load', detail: String(loaded.stderr || loaded.stdout || loaded.error?.message || 'Falha ao carregar/exportar o comando.').slice(-1400) };
+      }
+    }
     let testScript = null;
     let useNpmTest = false;
     try {
