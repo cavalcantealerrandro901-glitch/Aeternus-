@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
@@ -74,12 +74,12 @@ module.exports = {
         if (interaction.user.id !== ownerId) {
             return interaction.reply({
                 content: '❌ Esse botão pertence a outra pessoa. Use seu próprio comando!',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
         await run(ownerId, side, amountRaw, async (payload) => {
             if (typeof payload === 'string') {
-                return interaction.reply({ content: payload, ephemeral: true });
+                return interaction.reply({ content: payload, flags: MessageFlags.Ephemeral });
             }
             const sent = await interaction.channel.send({
                 ...payload,
@@ -93,7 +93,7 @@ module.exports = {
                 )
             );
             await interaction.message.edit({ components: disabledRows });
-            await interaction.reply({ content: '✅ Nova rodada enviada! O botão da mensagem anterior foi desativado.', ephemeral: true });
+            await interaction.reply({ content: '✅ Nova rodada enviada! O botão da mensagem anterior foi desativado.', flags: MessageFlags.Ephemeral });
             return sent;
         });
     },
@@ -108,7 +108,7 @@ module.exports = {
             i.options.getString('valor', true),
             (p) =>
                 typeof p === 'string'
-                    ? i.reply({ content: p, ephemeral: true })
+                    ? i.reply({ content: p, flags: MessageFlags.Ephemeral })
                     : i.reply(p)
         );
     }
