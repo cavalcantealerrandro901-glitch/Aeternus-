@@ -13,17 +13,27 @@ function fmtSince(ms) {
     return `${totalMinutes} min`;
 }
 
+// Neutraliza menções em massa no motivo e limita a interpretação de menções pelo Discord.
+function sanitizeReason(value) {
+    return String(value || 'Não informado')
+        .replace(/@everyone/gi, '@ everyone')
+        .replace(/@here/gi, '@ here')
+        .slice(0, 180);
+}
+
+const SAFE_MENTIONS = { parse: [], repliedUser: false };
+
 function createAfkMessage(user, reason) {
     return [
         '✦ **AETERNUS • CENTRAL DE PRESENÇA**',
         '',
         '💤 **MODO AUSENTE ATIVADO**',
         `▸ **Usuário:** ${user}`,
-        `▸ **Motivo:** ${String(reason || 'Não informado').slice(0, 180)}`,
+        `▸ **Motivo:** ${sanitizeReason(reason)}`,
         '',
         'Quem mencionar este usuário será avisado de que ele está ausente.',
         '✧ *Aeternus • Sistema de utilidades*'
-    ].join('\n');
+    ].join('\\n');
 }
 
 function createWelcomeBackMessage(user, previous) {
@@ -37,13 +47,11 @@ function createWelcomeBackMessage(user, previous) {
         '',
         '**Tudo certo!** Você voltará a receber as menções normalmente.',
         '✧ *Aeternus • Sistema de utilidades*'
-    ].join('\n');
+    ].join('\\n');
 }
 
 function getReason(args) {
-    return String(Array.isArray(args) ? args.join(' ') : '')
-        .trim()
-        .slice(0, 180) || 'Não informado';
+    return sanitizeReason(Array.isArray(args) ? args.join(' ') : '');
 }
 
 module.exports = {
@@ -65,23 +73,35 @@ module.exports = {
         if (afk.has(message.author.id)) {
             const previous = afk.get(message.author.id);
             afk.clear(message.author.id);
-            return message.reply(createWelcomeBackMessage(message.author, previous));
+            return message.reply({
+                content: createWelcomeBackMessage(message.author, previous),
+                allowedMentions: SAFE_MENTIONS
+            });
         }
 
         const reason = getReason(args);
         afk.set(message.author.id, reason);
-        return message.reply(createAfkMessage(message.author, reason));
+        return message.reply({
+            content: createAfkMessage(message.author, reason),
+            allowedMentions: SAFE_MENTIONS
+        });
     },
 
     async executeSlash(interaction) {
         if (afk.has(interaction.user.id)) {
             const previous = afk.get(interaction.user.id);
             afk.clear(interaction.user.id);
-            return interaction.reply(createWelcomeBackMessage(interaction.user, previous));
+            return interaction.reply({
+                content: createWelcomeBackMessage(interaction.user, previous),
+                allowedMentions: SAFE_MENTIONS
+            });
         }
 
         const reason = getReason([interaction.options.getString('motivo') || '']);
         afk.set(interaction.user.id, reason);
-        return interaction.reply(createAfkMessage(interaction.user, reason));
+        return interaction.reply({
+            content: createAfkMessage(interaction.user, reason),
+            allowedMentions: SAFE_MENTIONS
+        });
     }
 };
