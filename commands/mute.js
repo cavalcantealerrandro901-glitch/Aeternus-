@@ -94,7 +94,7 @@ module.exports = {
     aliases: ['mutar', 'timeout', 'silenciar'],
     description: 'Silenciar membro',
     data: new SlashCommandBuilder()
-        .setName('mutar-membro')
+        .setName('silenciar')
         .setDescription('Silenciar membro')
         .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
         .addStringOption((o) => o.setName('tempo').setDescription('Duração (ex: 10m, 1h)').setRequired(false))
