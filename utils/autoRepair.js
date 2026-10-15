@@ -59,7 +59,7 @@ async function diagnose(source, cmdName, error, context) {
 async function reportError({ source = 'system', error, context = '', tryReload = false, fromCommand = false, cmdName, message, interaction, client } = {}) {
     const stack = errorText(error).slice(0, 5800);
     const fingerprint = crypto.createHash('sha1').update([source, cmdName || '', context, stack.split('\n').slice(0, 3).join('\n')].join('|')).digest('hex').slice(0, 12);
-    console.warn('[autoRepair][' + source + '][' + fingerprint + '] ' + stack.slice(0, 1200);
+    console.warn('[autoRepair][' + source + '][' + fingerprint + '] ' + stack.slice(0, 1200));
     const now = Date.now();
     if (now - minuteAt >= 60000) { minuteAt = now; minuteCount = 0; }
     if (minuteCount >= 25) { console.warn('[autoRepair] Limite de segurança: 25 alertas por minuto.'); return { ok: false, reason: 'rate_limited', fingerprint }; }
