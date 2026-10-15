@@ -150,19 +150,15 @@ module.exports = {
     name: 'ban',
     aliases: ['banir'],
     description: 'Banir membro',
+    rootSlash: true,
     data: new SlashCommandBuilder()
         .setName('banir')
-        .setDescription('Banir membro')
-        .addUserOption(o =>
-            o.setName('usuario')
-                .setDescription('Membro que será banido')
-                .setRequired(true)
-        )
-        .addStringOption(o =>
-            o.setName('motivo')
-                .setDescription('Motivo do banimento (opcional)')
-                .setRequired(false)
-                .setMaxLength(400)
+        .setDescription('Banir um membro do servidor')
+        .addSubcommand(sc => sc
+            .setName('membro')
+            .setDescription('Banir um membro')
+            .addUserOption(o => o.setName('usuario').setDescription('Membro que será banido').setRequired(true))
+            .addStringOption(o => o.setName('motivo').setDescription('Motivo do banimento (opcional)').setRequired(false).setMaxLength(400))
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 
@@ -183,6 +179,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (i.options.getSubcommand(false) !== 'membro') return i.reply({ content: 'Use /banir membro para banir alguém.', ephemeral: true });
         if (!i.inGuild()) {
             return i.reply({ content: '❌ Este comando só pode ser usado dentro de um servidor.', ephemeral: true });
         }
