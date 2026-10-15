@@ -99,13 +99,6 @@ async function reportError({ source = 'system', error, context = '', tryReload =
         });
         repairWorkflow.registerIncidentMessage(fingerprint, alertMessage);
     } catch (e) { console.warn('[autoRepair] Falha ao enviar alerta: ' + e.message); return { ok: false, reason: 'send_failed', error: e.message, fingerprint }; }
-    if (!duplicate) {
-        const result = await diagnose(source, cmdName, error, context);
-        try {
-            const diagnosisMessage = await channel.send({ content: ('# DIAGNÓSTICO DA IA\n**Provedor:** ' + result.provider + '\n**Incidente:** ' + fingerprint + '\n\n' + result.text).slice(0, 1950), allowedMentions: { parse: [] } });
-            repairWorkflow.registerIncidentMessage(fingerprint, diagnosisMessage);
-        } catch (e) { console.warn('[autoRepair] Falha ao enviar diagnóstico: ' + e.message); }
-    }
     // Inicia geração e testes em segundo plano; o alerta não espera a IA terminar.
     repairWorkflow.autoTestIncident(fingerprint, channel).catch((e) => console.warn('[autoRepair] Autoteste falhou: ' + String(e.message || e)));
     return { ok: true, fingerprint, duplicate, tryReload: !!tryReload, fromCommand: !!fromCommand };
