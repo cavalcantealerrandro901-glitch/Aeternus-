@@ -6,7 +6,7 @@ const SLASH_NAME_MAP = {
     addmoney: 'adicionar-eter',
     removemoney: 'remover-eter',
     afk: 'ausente',
-    ban: 'banir-membro',
+    ban: 'banir',
     kick: 'expulsar-membro',
     mute: 'silenciar',
     unmute: 'dessilenciar',
