@@ -134,10 +134,13 @@ function modeMeta(mode) {
 async function buildList(mode, guild, client) {
     if (mode === 'xp' || mode === 'xpglobal') {
         const data = xp.all() || {};
+        const eterData = eter.all() || {};
         let entries = Object.entries(data).map(([id, v]) => ({
             id: String(id),
             value: Number(v?.xp || 0),
-            level: Number(v?.level || 0)
+            level: Number(v?.level || 0),
+            xp: Number(v?.xp || 0),
+            eter: Number(eterData[id] || 0)
         }));
 
         if (mode === 'xp' && guild) {
@@ -164,10 +167,17 @@ async function buildList(mode, guild, client) {
     }
 
     const data = eter.all() || {};
-    let entries = Object.entries(data).map(([id, v]) => ({
-        id: String(id),
-        value: Number(v || 0)
-    }));
+    const xpData = xp.all() || {};
+    let entries = Object.entries(data).map(([id, v]) => {
+        const st = xpData[id] || {};
+        return {
+            id: String(id),
+            value: Number(v || 0),
+            eter: Number(v || 0),
+            xp: Number(st.xp || 0),
+            level: Number(st.level || 0)
+        };
+    });
 
     if (mode === 'local' && guild) {
         const memberIds = new Set();
@@ -223,16 +233,16 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
             if (!u) u = await client.users.fetch(e.id).catch(() => null);
             if (u?.bot) return null;
             const inGuild = Boolean(guild?.members?.cache?.get(e.id));
-            let tag;
-            if (inGuild) {
-                tag = `<@${e.id}>`;
-            } else if (u) {
-                tag = `**${u.globalName || u.username}**`;
-            } else {
-                tag = `**usuário-${String(e.id).slice(-4)}**`;
-            }
-            const avatar = u?.displayAvatarURL?.({ size: 64 }) || null;
-            return { e, tag, avatar, name: u?.globalName || u?.username || null };
+            const displayName = u
+                ? (u.globalName || u.username || ('id-' + String(e.id).slice(-4)))
+                : ('usuário-' + String(e.id).slice(-4));
+            const tag = inGuild ? ('<@' + e.id + '>') : ('**' + displayName + '**');
+            return {
+                e,
+                tag,
+                name: displayName,
+                id: e.id
+            };
         })
     );
 
@@ -241,22 +251,22 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
         const row = resolved[i];
         if (!row) continue;
         const pos = start + i;
-        const { e, tag } = row;
+        const { e, tag, name, id } = row;
         const bar = progressBar(e.value, topValue, 8);
+        const nivel = e.level != null ? Number(e.level) : 0;
+        const xpVal = e.xp != null ? e.xp : (meta.economy ? 0 : e.value);
+        const saldo = e.eter != null ? e.eter : (meta.economy ? e.value : 0);
 
-        if (meta.economy) {
-            blocks.push(
-                medal(pos) + '  ' + tag + '\n' +
-                '\u2517 `' + bar + '`  \u00b7  ' + meta.emoji + ' **' + fmt(e.value) + '** ' + meta.unit
-            );
-        } else {
-            const nivel = e.level != null ? ('Nível **' + e.level + '**  \u00b7  ') : '';
-            blocks.push(
-                medal(pos) + '  ' + tag + '\n' +
-                '\u2517 ' + nivel + meta.emoji + ' **' + fmt(e.value) + '** ' + meta.unit + '\n' +
-                '  `' + bar + '`'
-            );
-        }
+        blocks.push(
+            [
+                medal(pos) + '  ' + tag,
+                '┗ **Nome:** ' + name,
+                '　**ID:** `' + id + '`',
+                '　⭐ **XP:** ' + fmt(xpVal) + (nivel ? ('  ·  Nv. **' + nivel + '**') : ''),
+                '　✨ **Saldo:** ' + fmt(saldo) + ' éter',
+                '　`' + bar + '`'
+            ].join('\n')
+        );
     }
 
     const body = blocks.length ? blocks.join('\n\n') : '_Ninguém no ranking ainda._';
@@ -289,9 +299,6 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
             text: `Aeternus Bot · ${guildName} · atualizado às ${hora}`
         })
         .setTimestamp();
-
-    const first = resolved.find((r) => r && r.avatar);
-    if (first?.avatar) emb.setThumbnail(first.avatar);
 
     return emb;
 }
@@ -432,10 +439,10 @@ module.exports = {
                 }).catch(() => {});
             }
 
-            const saldoLine = meta.economy
-                ? '✨ **' + fmt(mine.value) + '** éter'
-                : meta.emoji + ' **' + fmt(mine.value) + '** ' + meta.unit +
-                  (mine.level ? ' · Nv. **' + mine.level + '**' : '');
+            const entry = list[mine.rank - 1] || {};
+            const xpVal = entry.xp != null ? entry.xp : (meta.economy ? 0 : mine.value);
+            const saldo = entry.eter != null ? entry.eter : (meta.economy ? mine.value : 0);
+            const nivel = entry.level != null ? entry.level : mine.level;
 
             return interaction.reply({
                 embeds: [
@@ -443,9 +450,15 @@ module.exports = {
                         .setColor(meta.color)
                         .setTitle(meta.title)
                         .setDescription(
-                            '👤 <@' + interaction.user.id + '>\n\n' +
-                            '📍 **Posição:** #' + mine.rank + '\n' +
-                            saldoLine
+                            [
+                                '👤 <@' + interaction.user.id + '>',
+                                '',
+                                '📍 **Posição:** #' + mine.rank,
+                                '**Nome:** ' + (interaction.user.globalName || interaction.user.username),
+                                '**ID:** `' + interaction.user.id + '`',
+                                '⭐ **XP:** ' + fmt(xpVal) + (nivel ? ('  ·  Nv. **' + nivel + '**') : ''),
+                                '✨ **Saldo:** ' + fmt(saldo) + ' éter'
+                            ].join('\n')
                         )
                         .setFooter({ text: foot })
                         .setTimestamp()
