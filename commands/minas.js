@@ -155,6 +155,10 @@ async function sendResult(game, client, type = null) {
 
         const result = await channel.send({
             content: '<@' + game.userId + '>',
+            reply: game.messageId
+                ? { messageReference: game.messageId, failIfNotExists: false }
+                : undefined,
+            allowedMentions: { users: [game.userId] },
             embeds: [
                 new EmbedBuilder()
                     .setColor(color)
@@ -392,8 +396,10 @@ module.exports = {
         }
 
         const msg = await message.reply({
+            content: '<@' + message.author.id + '>',
             embeds: [panelEmbed(game)],
-            components: fullComponents(game)
+            components: fullComponents(game),
+            allowedMentions: { users: [message.author.id] }
         });
 
         game.channelId = msg.channel.id;
@@ -497,6 +503,11 @@ module.exports = {
                 const msg = await channel
                     .send({
                         content: '<@' + newGame.userId + '>',
+                        reply: {
+                            messageReference: interaction.message.id,
+                            failIfNotExists: false
+                        },
+                        allowedMentions: { users: [newGame.userId] },
                         embeds: [panelEmbed(newGame)],
                         components: fullComponents(newGame)
                     })
