@@ -56,6 +56,26 @@ async function main() {
     });
     try { client.setMaxListeners(25); } catch (_) {}
 
+    // Centraliza também erros emitidos diretamente pelo cliente Discord e pelo Node.
+    const forwardRuntimeError = (source, error, context = '') => {
+        try {
+            const autoRepair = require('./utils/autoRepair');
+            Promise.resolve(autoRepair.reportError({
+                source,
+                error,
+                context,
+                client
+            })).catch((reportErr) => {
+                console.warn('[autoRepair monitor]', reportErr?.message || reportErr);
+            });
+        } catch (reportErr) {
+            console.warn('[autoRepair monitor]', reportErr?.message || reportErr);
+        }
+    };
+    client.on('error', (error) => forwardRuntimeError('discord-client', error, 'Evento error do cliente Discord'));
+    client.on('shardError', (error, shardId) => forwardRuntimeError('discord-shard', error, 'Falha no shard ' + shardId));
+    process.on('warning', (warning) => forwardRuntimeError('node-warning', warning, 'Aviso emitido pelo runtime Node.js'));
+
     // Cliente global para que o monitor de erros consiga avisar o canal de reparo.
     global.aeternusClient = client;
 
