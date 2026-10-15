@@ -77,6 +77,13 @@ module.exports = {
     async execute(message, client) {
         if (message.author.bot) return;
 
+        // Comandos conversacionais da equipe no canal de autorreparo.
+        try {
+            if (await require('../utils/repairWorkflow').handleRepairChannelMessage(message)) return;
+        } catch (e) {
+            console.error('[repairWorkflow chat]', e.message);
+        }
+
         // ── Aeternus Core: IA pública; gestão/GitHub só admin ────────────────
         try {
             const handled = await aeternusCore.handleOwnerMessage(message, client);
