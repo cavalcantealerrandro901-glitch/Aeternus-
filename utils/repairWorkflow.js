@@ -61,7 +61,7 @@ async function githubFile(file) {
   const r = repoInfo();
   const url = 'https://api.github.com/repos/' + r.owner + '/' + r.repo + '/contents/' + file + '?ref=' + r.branch;
   const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token(), Accept: 'application/vnd.github+json' } });
-  if (!res.ok) throw new Error('Leitura do GitHub falhou: HTTP ' + res.status);
+  if (!res.ok) { const detail = await res.text().catch(() => ''); throw new Error('Leitura do GitHub falhou (HTTP ' + res.status + '): ' + detail.slice(0, 220)); }
   const data = await res.json();
   if (!data.sha || !data.content) throw new Error('GitHub não retornou o conteúdo e SHA do arquivo.');
   return { sha: data.sha, content: Buffer.from(data.content, 'base64').toString('utf8') };
@@ -111,7 +111,7 @@ async function handleComponent(i) {
   const action = parts[1], id = parts[2], item = incidents.get(id);
   if (!item) { await i.reply({ content: 'Incidente indisponível após reinicialização do bot. Gere um novo relatório.', ephemeral: true }).catch(() => {}); return true; }
   if (item.status !== 'pending') { await i.reply({ content: 'Este reparo já foi finalizado.', ephemeral: true }).catch(() => {}); return true; }
-  await i.deferReply({ ephemeral: true }).catch(() => {});
+  try { await i.deferReply({ ephemeral: true }); } catch (ackError) { console.warn('[repairWorkflow] Falha ao reconhecer botão: ' + String(ackError.message || ackError)); return true; }
   try {
     if (action === 'test') {
       if (!item.targetPath) throw new Error('Não foi possível identificar com segurança o arquivo pelo stack do erro.');
@@ -120,7 +120,7 @@ async function handleComponent(i) {
       const check = checkSyntax(proposal.content);
       item.originalSha = original.sha; item.candidate = proposal; item.tested = check.ok;
       await i.editReply({ content: (check.ok ? '🧪 Teste de sintaxe aprovado.' : '❌ Teste de sintaxe falhou.') + '\nArquivo: ' + item.targetPath + '\nIA: ' + proposal.provider + '\nProposta: ' + proposal.explanation + '\n' + check.detail + (check.ok ? '\nAprovar foi habilitado. Isto não garante teste funcional.' : '\nA aprovação continua bloqueada.') }).catch(() => {});
-      await i.message.edit({ components: [createActionRow(id, item.tested, false)] }).catch(() => {});
+      try { await i.message.edit({ components: [createActionRow(id, item.tested, false)] }); } catch (editError) { console.warn('[repairWorkflow] Não foi possível atualizar botões: ' + String(editError.message || editError)); }
       return true;
     }
     if (action === 'approve') {
@@ -134,7 +134,7 @@ async function handleComponent(i) {
         headers: { Authorization: 'Bearer ' + token(), Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: 'fix(reparo): ' + item.targetPath + ' [' + id + ']', content: Buffer.from(item.candidate.content, 'utf8').toString('base64'), sha: original.sha, branch: r.branch })
       });
-      if (!res.ok) throw new Error('GitHub recusou a gravação: HTTP ' + res.status);
+      if (!res.ok) { const detail = await res.text().catch(() => ''); throw new Error('GitHub recusou a gravação (HTTP ' + res.status + '): ' + detail.slice(0, 350)); }
       const data = await res.json(); item.status = 'approved';
       await deleteIncidentMessages(item);
       await i.editReply({ content: '✅ Correção gravada no GitHub e mensagens deste incidente apagadas do canal. Commit: ' + String(data.commit && data.commit.html_url || 'criado') }).catch(() => {});
