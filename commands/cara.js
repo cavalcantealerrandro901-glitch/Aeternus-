@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
@@ -35,6 +35,15 @@ async function run(userId, side, amountRaw, reply) {
                             : '✨ **-' + fmt(bet.amount) + '**'
                     }\nSaldo: ✨ **${fmt(eter.get(userId))}**\n\n${win ? '🏆 A sorte sorriu para você nesta rodada!' : '💔 Desta vez não deu certo; fica para a próxima.'}`
                 )
+        ],
+        components: [
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`cara:girar:${userId}:${s}:${bet.amount}`)
+                    .setLabel('Girar moeda')
+                    .setEmoji('🪙')
+                    .setStyle(ButtonStyle.Primary)
+            )
         ]
     });
 }
@@ -56,6 +65,24 @@ module.exports = {
         .addStringOption((o) =>
             o.setName('valor').setDescription('Valor (1k a 35m)').setRequired(true)
         ),
+
+
+    async handleComponent(interaction) {
+        const parts = String(interaction.customId || '').split(':');
+        if (parts[0] !== 'cara' || parts[1] !== 'girar') return;
+        const [, , ownerId, side, amountRaw] = parts;
+        if (interaction.user.id !== ownerId) {
+            return interaction.reply({
+                content: '❌ Esse botão pertence a outra pessoa. Use seu próprio comando!',
+                ephemeral: true
+            });
+        }
+        await run(ownerId, side, amountRaw, (payload) =>
+            typeof payload === 'string'
+                ? interaction.reply({ content: payload, ephemeral: true })
+                : interaction.update(payload)
+        );
+    },
 
     async execute(message, args) {
         await run(message.author.id, args[0], args[1], (p) => message.reply(p));
