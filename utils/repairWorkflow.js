@@ -7,8 +7,7 @@ const incidents = new Map();
 
 function createActionRow(id, tested = false, closed = false) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('repair:test:' + id).setLabel('Testar').setEmoji('🧪').setStyle(ButtonStyle.Primary).setDisabled(closed),
-    new ButtonBuilder().setCustomId('repair:approve:' + id).setLabel('Aprovar').setEmoji('✅').setStyle(ButtonStyle.Success).setDisabled(closed || !tested),
+    new ButtonBuilder().setCustomId('repair:approve:' + id).setLabel('Aprovar').setEmoji('✅').setStyle(ButtonStyle.Success).setDisabled(closed),
     new ButtonBuilder().setCustomId('repair:reject:' + id).setLabel('Recusar').setEmoji('❌').setStyle(ButtonStyle.Danger).setDisabled(closed)
   );
 }
@@ -214,6 +213,49 @@ async function makeRepairProposal(item, current, previousFailure, attempt) {
   }
   throw last || new Error('A IA não conseguiu gerar uma proposta.');
 }
+async function autoTestIncident(id, channel) {
+  const item = incidents.get(id);
+  if (!item || item.status !== 'pending' || item.autoTesting) return;
+  item.autoTesting = true;
+  try {
+    if (!item.targetPath) throw new Error('Não foi possível identificar o arquivo com segurança no erro.');
+    const original = await githubFile(item.targetPath);
+    let failure = '';
+    let proposal = null;
+    let check = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      proposal = await makeRepairProposal(item, original.content, failure, attempt);
+      check = runCandidateTests(item.targetPath, proposal.content);
+      item.version = attempt;
+      if (check.ok) break;
+      failure = check.kind + ': ' + check.detail;
+      const msg = await channel.send({
+        content: '🧪 **Autorreparo · versão ' + attempt + '/3 falhou** · Incidente ' + id + '\\n**Arquivo:** `' + item.targetPath + '`\\n**Falha:** ' + check.detail.slice(0, 850) + '\\n🤖 A IA está corrigindo essa falha automaticamente.',
+        allowedMentions: { parse: [] }
+      }).catch(() => null);
+      if (msg) registerIncidentMessage(id, msg);
+    }
+    item.originalSha = original.sha;
+    item.candidate = proposal;
+    item.tested = !!(check && check.ok);
+    item.lastTest = check;
+    const status = item.tested
+      ? '✅ **Correção pronta para aprovação**\\n**Arquivo:** `' + item.targetPath + '`\\n**Versão:** ' + item.version + '/3 · **IA:** ' + proposal.provider + '\\n**Resumo:** ' + proposal.explanation + '\\n' + check.detail + '\\nUse **Aprovar** para gravar no GitHub.'
+      : '❌ **Autorreparo não passou nos testes** · Incidente ' + id + '\\n**Arquivo:** `' + item.targetPath + '`\\n**Última falha:** ' + String(check?.detail || 'Falha desconhecida').slice(0, 900) + '\\nAprovar permanece disponível, mas o sistema não gravará uma versão que falhou nos testes.';
+    const msg = await channel.send({ content: status, allowedMentions: { parse: [] } }).catch(() => null);
+    if (msg) registerIncidentMessage(id, msg);
+  } catch (e) {
+    item.tested = false;
+    item.lastTest = { ok: false, detail: String(e.message || e) };
+    const msg = await channel.send({
+      content: '⚠️ **Autorreparo automático não concluído** · Incidente ' + id + '\\n' + String(e.message || e).slice(0, 900) + '\\nO botão Aprovar continua disponível, mas nenhum código será gravado sem uma proposta validada.',
+      allowedMentions: { parse: [] }
+    }).catch(() => null);
+    if (msg) registerIncidentMessage(id, msg);
+  } finally {
+    item.autoTesting = false;
+  }
+}
 async function handleComponent(i) {
   if (!String(i.customId || '').startsWith('repair:')) return false;
   if (!canManage(i)) { await i.reply({ content: '⛔ Somente a equipe autorizada pode usar estes botões.', ephemeral: true }).catch(() => {}); return true; }
@@ -223,47 +265,9 @@ async function handleComponent(i) {
   if (item.status !== 'pending') { await i.reply({ content: 'Este reparo já foi finalizado.', ephemeral: true }).catch(() => {}); return true; }
   try { await i.deferReply({ ephemeral: true }); } catch (ackError) { console.warn('[repairWorkflow] Falha ao reconhecer botão: ' + String(ackError.message || ackError)); return true; }
   try {
-    if (action === 'test') {
-      if (!item.targetPath) throw new Error('Não foi possível identificar com segurança o arquivo pelo stack do erro.');
-      const original = await githubFile(item.targetPath);
-      let failure = '';
-      let proposal = null;
-      let check = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        proposal = await makeRepairProposal(item, original.content, failure, attempt);
-        check = runCandidateTests(item.targetPath, proposal.content);
-        item.version = attempt;
-        if (check.ok) break;
-        failure = check.kind + ': ' + check.detail;
-        const update = await i.channel.send({
-          content: '🧪 **Teste ' + attempt + '/3 falhou** · Incidente ' + id + '\n**Arquivo:** `' + item.targetPath + '`\n**Falha:** ' + check.detail.slice(0, 900) + '\n🤖 A IA recebeu essa falha e está gerando uma nova versão.',
-          allowedMentions: { parse: [] }
-        }).catch(() => null);
-        if (update) registerIncidentMessage(id, update);
-      }
-      item.originalSha = original.sha;
-      item.candidate = proposal;
-      item.tested = !!(check && check.ok);
-      item.lastTest = check;
-      if (item.tested) {
-        const update = await i.channel.send({
-          content: '✅ **Versão ' + item.version + ' passou nos testes disponíveis**\n**Arquivo:** `' + item.targetPath + '`\n**IA:** ' + proposal.provider + '\n**Resumo:** ' + proposal.explanation + '\n' + check.detail + '\nA versão está pronta para aprovação.',
-          allowedMentions: { parse: [] }
-        }).catch(() => null);
-        if (update) registerIncidentMessage(id, update);
-      } else {
-        const update = await i.channel.send({
-          content: '❌ **Testes falharam após 3 versões** · Incidente ' + id + '\n**Arquivo:** `' + item.targetPath + '`\n**Última falha:** ' + String(check?.detail || 'Falha desconhecida').slice(0, 1000) + '\nA aprovação continua bloqueada. Clique em **Testar** novamente para iniciar outra rodada.',
-          allowedMentions: { parse: [] }
-        }).catch(() => null);
-        if (update) registerIncidentMessage(id, update);
-      }
-      await i.editReply({ content: (item.tested ? '✅ Versão ' + item.version + ' aprovada nos testes disponíveis.' : '❌ Nenhuma das 3 versões passou nos testes.') + '\nArquivo: ' + item.targetPath + '\nIA: ' + (proposal?.provider || 'indisponível') + '\n' + String(proposal?.explanation || '') + '\n' + String(check?.detail || '') + (item.tested ? '\nO botão Aprovar foi habilitado.' : '\nAprovar permanece bloqueado.') }).catch(() => {});
-      try { await i.message.edit({ components: [createActionRow(id, item.tested, false)] }); } catch (editError) { console.warn('[repairWorkflow] Não foi possível atualizar botões: ' + String(editError.message || editError)); }
-      return true;
-    }
     if (action === 'approve') {
-      if (!item.tested || !item.candidate) throw new Error('Use Testar e passe na verificação de sintaxe antes de aprovar.');
+      if (item.autoTesting) throw new Error('A IA ainda está testando a correção automaticamente. Aguarde a mensagem de resultado e tente novamente.');
+      if (!item.tested || !item.candidate) throw new Error('A correção ainda não passou nos testes. O botão está ativo, mas o sistema bloqueia a gravação de código não validado.');
       const r = repoInfo();
       const original = await githubFile(item.targetPath);
       if (original.sha !== item.originalSha) throw new Error('O arquivo mudou no GitHub. Gere uma nova proposta para não sobrescrever alterações.');
@@ -289,4 +293,4 @@ async function handleComponent(i) {
   } catch (e) { await i.editReply({ content: '⚠️ Não foi possível concluir: ' + String(e.message || e).slice(0, 1000) }).catch(() => {}); }
   return true;
 }
-module.exports = { registerIncident, registerIncidentMessage, createActionRow, handleComponent };
+module.exports = { registerIncident, registerIncidentMessage, createActionRow, handleComponent, autoTestIncident };
