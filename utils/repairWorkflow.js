@@ -126,19 +126,28 @@ function runCandidateTests(targetPath, content) {
       return { ok: false, kind: 'syntax', detail: String(syntax.stderr || syntax.stdout || syntax.error?.message || 'Sintaxe JavaScript inválida.').slice(0, 1100) };
     }
     let testScript = null;
+    let useNpmTest = false;
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(tempRoot, 'package.json'), 'utf8'));
-      if (pkg.scripts && typeof pkg.scripts.test === 'string' && pkg.scripts.test.trim()) testScript = pkg.scripts.test;
+      if (pkg.scripts && typeof pkg.scripts.test === 'string' && pkg.scripts.test.trim()) useNpmTest = true;
     } catch (_) {}
-    if (testScript) {
-      const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-      const tests = spawnSync(npm, ['test'], { cwd: tempRoot, encoding: 'utf8', timeout: 45000, maxBuffer: 2 * 1024 * 1024 });
+    // Opcional: configurar AUTO_REPAIR_TEST_COMMAND no Render para a suíte específica do projeto.
+    // Executa apenas na cópia temporária e sem variáveis de ambiente que normalmente guardam segredos.
+    const customCommand = String(process.env.AUTO_REPAIR_TEST_COMMAND || '').trim();
+    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    if (customCommand || useNpmTest) {
+      const command = customCommand || (process.platform === 'win32' ? 'npm.cmd test' : 'npm test');
+      const safeEnv = Object.assign({}, process.env, { CI: 'true', NODE_ENV: 'test', HOME: tempRoot });
+      for (const key of Object.keys(safeEnv)) {
+        if (/(KEY|TOKEN|SECRET|PASSWORD|PASSWD|MONGO|DATABASE_URL|DISCORD)/i.test(key)) delete safeEnv[key];
+      }
+      const tests = spawnSync(command, { cwd: tempRoot, shell: true, env: safeEnv, encoding: 'utf8', timeout: 45000, maxBuffer: 2 * 1024 * 1024 });
       if (tests.error || tests.status !== 0) {
         return { ok: false, kind: 'project-tests', detail: String(tests.stderr || tests.stdout || tests.error?.message || 'A suíte de testes falhou.').slice(-1400) };
       }
-      return { ok: true, kind: 'project-tests', detail: 'Sintaxe aprovada e suíte npm test aprovada.' };
+      return { ok: true, kind: 'project-tests', detail: customCommand ? 'Sintaxe aprovada e AUTO_REPAIR_TEST_COMMAND passou.' : 'Sintaxe aprovada e suíte npm test aprovada.' };
     }
-    return { ok: true, kind: 'syntax', detail: 'Sintaxe JavaScript aprovada. O projeto não possui script npm test configurado; testes funcionais específicos não puderam ser executados.' };
+    return { ok: true, kind: 'syntax', detail: 'Sintaxe JavaScript aprovada. Nenhuma suíte funcional foi configurada. Configure AUTO_REPAIR_TEST_COMMAND no Render ou crie um script npm test para executar testes funcionais.' };
   } catch (e) {
     return { ok: false, kind: 'runner', detail: String(e.message || e).slice(0, 1100) };
   } finally {
