@@ -56,6 +56,32 @@ async function main() {
     });
     try { client.setMaxListeners(25); } catch (_) {}
 
+    // Cliente global para que o monitor de erros consiga avisar o canal de reparo.
+    global.aeternusClient = client;
+
+    // Encaminha console.error de qualquer sistema para o canal central.
+    // O próprio autoRepair usa console.warn para evitar recursão.
+    const originalConsoleError = console.error.bind(console);
+    console.error = (...args) => {
+        originalConsoleError(...args);
+        try {
+            const autoRepair = require('./utils/autoRepair');
+            const detail = args.map((value) => {
+                if (value instanceof Error) return value.stack || (value.name + ': ' + value.message);
+                if (typeof value === 'string') return value;
+                try { return JSON.stringify(value); } catch (_) { return String(value); }
+            }).join(' ').slice(0, 5500);
+            autoRepair.reportError({
+                source: 'console.error',
+                error: detail || 'console.error chamado sem detalhes',
+                context: 'Erro registrado por console.error',
+                client
+            }).catch((reportErr) => originalConsoleError('[autoRepair monitor]', reportErr));
+        } catch (e) {
+            originalConsoleError('[autoRepair monitor]', e);
+        }
+    };
+
     client.commands = new Collection();
     client.slash = new Collection();
     client.prefixDefault = 'O.';
