@@ -1,119 +1,94 @@
-const { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+    EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder,
+    ActionRowBuilder, ButtonBuilder, ButtonStyle
+} = require('discord.js');
+const {
+    SAFE_MENTIONS, sanitizeReason, resolveMember, checkAction, recordAction
+} = require('../utils/moderation');
 
-function resolveMember(message, args) {
-    const m = message.mentions.members.first();
-    if (m) return m;
-    const id = String(args[0] || '').replace(/\D/g, '');
-    if (id) return message.guild.members.cache.get(id) || null;
-    return null;
-}
+const CONFIRM_TIMEOUT = 6 * 60 * 1000;
 
-function reasonFrom(args, hasMention) {
-    const start = hasMention || (args[0] && /^\d{15,}$/.test(args[0].replace(/\D/g, ''))) ? 1 : 1;
-    const r = args.slice(start).join(' ').trim();
-    return r || 'Sem motivo';
-}
-
-async function handleKickProcess(context, moderator, targetMember, reason, isSlash = false) {
-    const customId = `kick_confirm_${moderator.id}_${Date.now()}`;
-    const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(customId)
-            .setLabel('Confirmar expulsão')
-            .setEmoji('✅')
-            .setStyle(ButtonStyle.Danger)
+function row(id, disabled = false) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(id).setLabel('Confirmar expulsão')
+            .setEmoji('👢').setStyle(ButtonStyle.Danger).setDisabled(disabled)
     );
+}
 
-    const content = `👢 **AETERNUS • CONFIRMAR EXPULSÃO**\n\n**Moderador:** <@${moderator.id}>\n**Membro:** <@${targetMember.id}>\n**Motivo:** ${String(reason).slice(0, 500)}\n\nConfirme a ação no botão abaixo. O pedido expira em 6 minutos.`;
-
-    let sentMsg;
-    if (isSlash) {
-        sentMsg = await context.reply({
-            content,
-            components: [row],
-            fetchReply: true
-        });
-    } else {
-        sentMsg = await context.reply({
-            content,
-            components: [row]
-        });
+async function handle(context, moderator, target, reason, slash) {
+    const botMember = await context.guild.members.fetchMe().catch(() => null);
+    const check = checkAction(context.guild, moderator, target, botMember, PermissionFlagsBits.KickMembers, 'kickable');
+    if (!check.ok) {
+        const payload = { content: '❌ ' + check.error, allowedMentions: SAFE_MENTIONS };
+        return slash ? context.reply({ ...payload, ephemeral: true }) : context.reply(payload);
     }
-
-    const filter = i => i.customId === customId && i.user.id === moderator.id;
-    const collector = sentMsg.createMessageComponentCollector({ filter, time: 6 * 60 * 1000, max: 1 });
-
-    collector.on('collect', async i => {
-        const originalMessage = i.message || sentMsg;
-        try { await i.deferUpdate(); } catch (_) { return; }
-        try {
-            const currentModerator = await context.guild.members.fetch(moderator.id).catch(() => null);
-            const currentTarget = await context.guild.members.fetch(targetMember.id).catch(() => null);
-            const botMember = await context.guild.members.fetchMe().catch(() => null);
-            if (!currentModerator || !currentTarget || !botMember) return originalMessage.reply({ content: '❌ Não consegui verificar os cargos atuais. Nenhuma ação foi executada.', allowedMentions: { parse: [], repliedUser: false } });
-            if (!currentModerator.permissions.has(PermissionFlagsBits.KickMembers)) return originalMessage.reply({ content: '❌ Você não tem mais a permissão **Expulsar membros**.', allowedMentions: { parse: [], repliedUser: false } });
-            if (!botMember.permissions.has(PermissionFlagsBits.KickMembers)) return originalMessage.reply({ content: '❌ Preciso da permissão **Expulsar membros** para continuar.', allowedMentions: { parse: [], repliedUser: false } });
-            if (currentTarget.id === currentModerator.id || currentTarget.id === botMember.id) return originalMessage.reply({ content: '❌ Essa expulsão não é permitida.', allowedMentions: { parse: [], repliedUser: false } });
-            if (context.guild.ownerId !== currentModerator.id && currentTarget.roles.highest.comparePositionTo(currentModerator.roles.highest) >= 0) return originalMessage.reply({ content: '❌ Seu cargo precisa estar acima do cargo do membro.', allowedMentions: { parse: [], repliedUser: false } });
-            if (!currentTarget.kickable) return originalMessage.reply({ content: '❌ Não consigo expulsar este membro. Confira a hierarquia e minhas permissões.', allowedMentions: { parse: [], repliedUser: false } });
-            await currentTarget.kick(`${reason} · por ${currentModerator.user.tag}`);
-            const successText = `👢 **Expulsão concluída**\nO membro <@${currentTarget.id}> foi removido do servidor.\n**Motivo:** ${String(reason).slice(0, 500)}`;
-            await originalMessage.reply({ content: successText, allowedMentions: { parse: [], repliedUser: false } });
-        } catch (e) {
-            await originalMessage.reply({ content: '❌ Não consegui expulsar o usuário.', allowedMentions: { parse: [], repliedUser: false } });
-        }
+    const customId = 'kick_confirm_' + moderator.id + '_' + Date.now();
+    const embed = new EmbedBuilder().setColor(0xEA580C).setTitle('⚠️ Confirmar expulsão')
+        .setDescription('Revise os dados antes de confirmar.')
+        .addFields(
+            { name: 'Moderador', value: '<@' + moderator.id + '>', inline: true },
+            { name: 'Membro', value: '<@' + target.id + '>', inline: true },
+            { name: 'Motivo', value: reason.slice(0, 400) }
+        ).setFooter({ text: 'Esta confirmação expira em 6 minutos.' });
+    const payload = { embeds: [embed], components: [row(customId)], allowedMentions: SAFE_MENTIONS };
+    const sent = slash ? await context.reply({ ...payload, fetchReply: true }) : await context.reply(payload);
+    const collector = sent.createMessageComponentCollector({
+        filter: i => i.customId === customId && i.user.id === moderator.id,
+        time: CONFIRM_TIMEOUT, max: 1
     });
 
-    collector.on('end', async (collected, reasonCollected) => {
-        if (reasonCollected === 'time') {
-            try {
-                await sentMsg.reply({ content: '⏳ Tempo esgotado para confirmar a expulsão.', allowedMentions: { repliedUser: false } });
-            } catch (_) {}
+    collector.on('collect', async i => {
+        await i.deferUpdate().catch(() => null);
+        await sent.edit({ components: [row(customId, true)] }).catch(() => null);
+        try {
+            const currentModerator = await context.guild.members.fetch(moderator.id).catch(() => null);
+            const currentTarget = await context.guild.members.fetch(target.id).catch(() => null);
+            const currentBot = await context.guild.members.fetchMe().catch(() => null);
+            const currentCheck = checkAction(context.guild, currentModerator, currentTarget, currentBot, PermissionFlagsBits.KickMembers, 'kickable');
+            if (!currentCheck.ok) return sent.reply({ content: '❌ ' + currentCheck.error + ' Nenhuma expulsão foi executada.', allowedMentions: SAFE_MENTIONS });
+            await currentTarget.kick((reason + ' · por ' + currentModerator.user.tag).slice(0, 512));
+            await recordAction(context.guild, 'kick', currentModerator.user, currentTarget, reason);
+            const result = new EmbedBuilder().setColor(0x22C55E).setTitle('✅ Expulsão concluída')
+                .setDescription('O membro foi removido do servidor.')
+                .addFields(
+                    { name: 'Moderador', value: '<@' + currentModerator.id + '>', inline: true },
+                    { name: 'Membro', value: '<@' + currentTarget.id + '>', inline: true },
+                    { name: 'Motivo', value: reason }
+                ).setFooter({ text: 'Aeternus • Registro de moderação' }).setTimestamp();
+            await sent.reply({ embeds: [result], allowedMentions: SAFE_MENTIONS });
+        } catch (error) {
+            console.error('[kick] Falha ao expulsar:', error?.message || error);
+            await sent.reply({ content: '❌ Não consegui expulsar o membro. Confira as permissões e a hierarquia.', allowedMentions: SAFE_MENTIONS }).catch(() => null);
         }
+    });
+    collector.on('end', async (_collected, reasonEnd) => {
+        await sent.edit({ components: [row(customId, true)] }).catch(() => null);
+        if (reasonEnd === 'time') await sent.reply({ content: '⏳ A confirmação expirou. Nenhuma ação foi executada.', allowedMentions: SAFE_MENTIONS }).catch(() => null);
     });
 }
 
 module.exports = {
-    name: 'kick',
-    aliases: ['expulsar'],
-    description: 'Expulsar server',
-    rootSlash: true,
-    data: new SlashCommandBuilder()
-        .setName('expulsar')
-        .setDescription('Expulsar um membro do servidor')
-        .addSubcommand(sc => sc
-            .setName('server')
-            .setDescription('Expulsar um membro do servidor')
+    name: 'kick', aliases: ['expulsar'], description: 'Expulsar membro', rootSlash: true,
+    data: new SlashCommandBuilder().setName('expulsar').setDescription('Expulsar um membro do servidor')
+        .addSubcommand(sc => sc.setName('server').setDescription('Expulsar um membro do servidor')
             .addUserOption(o => o.setName('usuario').setDescription('Membro').setRequired(true))
-            .addStringOption(o => o.setName('motivo').setDescription('Motivo').setRequired(false))
-        )
+            .addStringOption(o => o.setName('motivo').setDescription('Motivo').setMaxLength(400)))
         .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
 
     async execute(message, args) {
-        if (!message.member) return message.reply('❌ Não consegui verificar sua conta neste servidor.');
-        const member = resolveMember(message, args);
-        if (!member) return message.reply('❌ Mencione o membro ou informe o ID.');
-        if (member.id === message.author.id) return message.reply('❌ Você não pode se expulsar.');
-        if (member.id === message.client.user.id) return message.reply('❌ Não posso me expulsar.');
-        // As permissões e a hierarquia serão verificadas novamente ao confirmar.
-
-        const reason = reasonFrom(args, !!message.mentions.members.first());
-        await handleKickProcess(message, message.author, member, reason, false);
+        if (!message.guild || !message.member) return message.reply({ content: '❌ Este comando só funciona em servidores.', allowedMentions: SAFE_MENTIONS });
+        const target = resolveMember(message, args);
+        if (!target) return message.reply({ content: '❌ Mencione o membro ou informe um ID válido.', allowedMentions: SAFE_MENTIONS });
+        return handle(message, message.member, target, sanitizeReason(args.slice(1).join(' ')), false);
     },
 
     async executeSlash(i) {
-        if (i.options.getSubcommand(false) !== 'server') return i.reply({ content: 'Use /expulsar server para expulsar alguém.', ephemeral: true });
         if (!i.inGuild()) return i.reply({ content: '❌ Este comando só funciona em servidores.', ephemeral: true });
+        if (i.options.getSubcommand(false) !== 'server') return i.reply({ content: 'Use /expulsar server.', ephemeral: true });
+        const moderator = await i.guild.members.fetch(i.user.id).catch(() => null);
         const user = i.options.getUser('usuario', true);
-        const reason = i.options.getString('motivo') || 'Sem motivo';
-        const member = await i.guild.members.fetch(user.id).catch(() => null);
-        if (!member) return i.reply({ content: '❌ Membro não encontrado.', ephemeral: true });
-        if (member.id === i.user.id) return i.reply({ content: '❌ Você não pode se expulsar.', ephemeral: true });
-        if (member.id === i.client.user.id) return i.reply({ content: '❌ Não posso me expulsar.', ephemeral: true });
-        if (!member.kickable) {
-            return i.reply({ content: '❌ Não consigo expulsar este membro (cargo mais alto).', ephemeral: true });
-        }
-
-        await handleKickProcess(i, i.user, member, reason, true);
+        const target = await i.guild.members.fetch(user.id).catch(() => null);
+        if (!moderator || !target) return i.reply({ content: '❌ Não consegui localizar o moderador ou o membro no servidor.', ephemeral: true });
+        return handle(i, moderator, target, sanitizeReason(i.options.getString('motivo')), true);
     }
 };
