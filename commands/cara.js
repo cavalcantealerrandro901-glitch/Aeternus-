@@ -77,13 +77,18 @@ module.exports = {
                 flags: MessageFlags.Ephemeral
             });
         }
+        await interaction.deferUpdate();
         await run(ownerId, side, amountRaw, async (payload) => {
             if (typeof payload === 'string') {
-                return interaction.reply({ content: payload, flags: MessageFlags.Ephemeral });
+                return interaction.followUp({ content: payload, flags: MessageFlags.Ephemeral });
             }
             const sent = await interaction.channel.send({
                 ...payload,
-                content: '<@' + ownerId + '> 🪙 **Nova rodada de cara ou coroa!**'
+                content: '<@' + ownerId + '> 🪙 **Nova rodada de cara ou coroa!**',
+                reply: {
+                    messageReference: interaction.message.id,
+                    failIfNotExists: false
+                }
             });
             const disabledRows = interaction.message.components.map((row) =>
                 new ActionRowBuilder().addComponents(
@@ -93,7 +98,6 @@ module.exports = {
                 )
             );
             await interaction.message.edit({ components: disabledRows });
-            await interaction.reply({ content: '✅ Nova rodada enviada! O botão da mensagem anterior foi desativado.', flags: MessageFlags.Ephemeral });
             return sent;
         });
     },
