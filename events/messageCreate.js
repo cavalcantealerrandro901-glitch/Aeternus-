@@ -264,23 +264,24 @@ module.exports = {
                     .replace(/@everyone/gi, '@ everyone')
                     .replace(/@here/gi, '@ here')
                     .slice(0, 180);
-                const notice = [
-                    '✦ **AETERNUS • AVISO DE AUSÊNCIA**',
-                    '',
-                    `💤 <@${id}> está temporariamente ausente.`,
-                    `▸ **Motivo:** ${reason}`,
-                    `▸ **Ausente há:** ${duration}`,
-                    '',
-                    '**Orientações:**',
-                    '• Evite repetir a menção ou enviar várias mensagens cobrando resposta.',
-                    '• Respeite a ausência; a pessoa responderá quando puder.',
-                    '• Se for urgente, procure outro moderador ou membro disponível.',
-                    '',
-                    '✧ *Aviso automático • Aeternus*'
-                ].join('\n');
+                const notice = new EmbedBuilder()
+                    .setColor(0x8B5CF6)
+                    .setAuthor({
+                        name: 'AETERNUS • CENTRAL DE PRESENÇA',
+                        iconURL: message.client.user.displayAvatarURL({ size: 64 })
+                    })
+                    .setTitle('💤 Aviso de ausência')
+                    .setDescription(`<@${id}> está temporariamente ausente.`)
+                    .addFields(
+                        { name: '📝 Motivo', value: reason || 'Não informado' },
+                        { name: '⏱️ Ausente há', value: duration, inline: true },
+                        { name: '🛡️ Orientações', value: 'Evite repetir a menção ou cobrar resposta. Respeite a ausência; a pessoa responderá quando puder. Se for urgente, procure outro moderador ou membro disponível.' }
+                    )
+                    .setFooter({ text: 'Aviso automático • Aeternus' })
+                    .setTimestamp();
 
                 const sent = await message.reply({
-                    content: notice,
+                    embeds: [notice],
                     allowedMentions: { parse: [], repliedUser: false }
                 }).catch(() => null);
                 if (sent) {
