@@ -34,54 +34,54 @@
 
     <div class="menu-cat">
       <div class="menu-cat-title">⌂ Visão geral</div>
-      <a class="active" href="#visao-geral" data-system="visao">Resumo do servidor</a>
+      <a class="active" href="#" data-panel="visao" data-system="visao">Resumo do servidor</a>
     </div>
 
     <div class="menu-cat">
       <div class="menu-cat-title">⚙️ Geral</div>
-      <a href="#geral" data-system="geral">Informações do servidor</a>
-      <a href="#geral" data-system="prefixo">Prefixo e idioma</a>
+      <a href="#" data-panel="geral" data-system="geral">Informações do servidor</a>
+      <a href="#" data-panel="geral" data-system="prefixo">Prefixo e idioma</a>
     </div>
 
     <div class="menu-cat">
       <div class="menu-cat-title">🎁 Economia</div>
-      <a href="#economia" data-system="daily">Daily (recompensa diária)</a>
+      <a href="#" data-panel="economia" data-system="daily">Daily (recompensa diária)</a>
     </div>
 
     <div class="menu-cat">
       <div class="menu-cat-title">🎉 Drops & Sorteios</div>
-      <a href="#drops" data-system="drop-ativacao">Ativação e publicação</a>
-      <a href="#drops" data-system="drop-req">Requisitos de participação</a>
-      <a href="#drops" data-system="drop-entries">Entradas extras por cargo</a>
-      <a href="#drops" data-system="drop-templates">Modelos de drop</a>
-      <a href="#drops" data-system="drop-result">Resultado e vencedores</a>
+      <a href="#" data-panel="drops" data-system="drop-ativacao">Ativação e publicação</a>
+      <a href="#" data-panel="drops" data-system="drop-req">Requisitos de participação</a>
+      <a href="#" data-panel="drops" data-system="drop-entries">Entradas extras por cargo</a>
+      <a href="#" data-panel="drops" data-system="drop-templates">Modelos de drop</a>
+      <a href="#" data-panel="drops" data-system="drop-result">Resultado e vencedores</a>
     </div>
 
     <div class="menu-cat">
       <div class="menu-cat-title">🏅 Atividade</div>
-      <a href="#atividade" data-system="msg-roles">Cargos por mensagens</a>
+      <a href="#" data-panel="atividade" data-system="msg-roles">Cargos por mensagens</a>
     </div>
 
     <div class="menu-cat">
       <div class="menu-cat-title">🛒 Loja</div>
-      <a href="#loja" data-system="loja">Ativar / desativar loja</a>
-      <a href="#loja" data-system="vips">VIPs cadastrados</a>
+      <a href="#" data-panel="loja" data-system="loja">Ativar / desativar loja</a>
+      <a href="#" data-panel="loja" data-system="vips">VIPs cadastrados</a>
     </div>
 
     <div class="menu-cat">
       <div class="menu-cat-title">🛡️ Moderação</div>
-      <a href="#moderacao" data-system="mod">Ban / kick / mute / avisos</a>
-      <a href="#moderacao" data-system="antispam">Anti-spam</a>
+      <a href="#" data-panel="moderacao" data-system="mod">Ban / kick / mute / avisos</a>
+      <a href="#" data-panel="moderacao" data-system="antispam">Anti-spam</a>
     </div>
 
     <div class="menu-cat">
       <div class="menu-cat-title">🔐 Segurança</div>
-      <a href="#seguranca" data-system="security">Proteção do servidor</a>
+      <a href="#" data-panel="seguranca" data-system="security">Proteção do servidor</a>
     </div>
 
     <div class="menu-cat">
       <div class="menu-cat-title">📋 Configurações</div>
-      <a href="#configuracoes" data-system="config">Configurações avançadas</a>
+      <a href="#" data-panel="configuracoes" data-system="config">Configurações avançadas</a>
     </div>
 
   </nav>
@@ -105,14 +105,14 @@
     </section>
 
     <section id="admin-content" class="hidden">
-      <div class="server-info-grid">
+      <div id="panel-visao" class="system-panel server-info-grid" data-panel="visao">
         <article class="admin-card server-info-card"><span>👥</span><small>Membros</small><strong id="server-members">—</strong></article>
         <article class="admin-card server-info-card"><span>💬</span><small>Canais</small><strong id="server-channels">—</strong></article>
         <article class="admin-card server-info-card"><span>🎭</span><small>Cargos</small><strong id="server-roles">—</strong></article>
         <article class="admin-card server-info-card"><span>🚀</span><small>Nível de impulsos</small><strong id="server-boost">—</strong></article>
       </div>
 
-      <section id="geral" class="admin-section">
+      <section id="geral" class="admin-section system-panel hidden" data-panel="geral">
         <div class="section-heading"><span>⚙️</span><div><h2>Geral</h2><p>Informações principais do servidor selecionado.</p></div></div>
         <div class="server-details-grid">
           <div><small>Nome</small><strong id="detail-name">—</strong></div>
@@ -124,7 +124,7 @@
         </div>
       </section>
 
-      <section id="economia" class="admin-section">
+      <section id="economia" class="admin-section system-panel hidden" data-panel="economia">
         <div class="section-heading"><span>🎁</span><div><h2>Economia</h2><p>Configure a recompensa diária de éter.</p></div></div>
         <div class="admin-settings-grid">
           <article class="admin-card admin-setting-card">
@@ -136,7 +136,7 @@
         </div>
       </section>
 
-      <section id="drops" class="admin-section">
+      <section id="drops" class="admin-section system-panel hidden" data-panel="drops">
         <div class="section-heading"><span>🎉</span><div><h2>Drops & Sorteios</h2><p>Controle completo dos drops, participantes, modelos e resultados do servidor.</p></div></div>
 
         <article class="admin-card drop-config-card">
@@ -207,12 +207,12 @@
         <div class="drop-save-bar"><span id="drop-status" class="setting-status"></span><button id="save-drops" class="btn btn-primary">Salvar configurações de Drops</button></div>
       </section>
 
-      <section id="atividade" class="admin-section">
+      <section id="atividade" class="admin-section system-panel hidden" data-panel="atividade">
         <div class="section-heading"><span>🏅</span><div><h2>Atividade</h2><p>Categoria reservada para os sistemas de atividade do Aeternus.</p></div></div>
         <article class="admin-card placeholder-card"><strong>Cargos por mensagens</strong><span>Configure metas, cargos e notificações de atividade.</span><em>Em configuração</em></article>
       </section>
 
-      <section id="loja" class="admin-section">
+      <section id="loja" class="admin-section system-panel hidden" data-panel="loja">
         <div class="section-heading"><span>🛒</span><div><h2>Loja</h2><p>Controle a disponibilidade da loja deste servidor.</p></div></div>
         <article class="admin-card admin-setting-card">
           <div class="shop-summary"><strong id="shop-status">Carregando...</strong><span id="shop-vips">0 VIP(s) cadastrados</span></div>
@@ -221,17 +221,17 @@
         </article>
       </section>
 
-      <section id="moderacao" class="admin-section">
+      <section id="moderacao" class="admin-section system-panel hidden" data-panel="moderacao">
         <div class="section-heading"><span>🛡️</span><div><h2>Moderação</h2><p>Categoria reservada para as ferramentas de moderação.</p></div></div>
         <article class="admin-card placeholder-card"><strong>Moderação do servidor</strong><span>Banimentos, expulsões, silenciamento, avisos e controle de canais.</span><em>Em configuração</em></article>
       </section>
 
-      <section id="seguranca" class="admin-section">
+      <section id="seguranca" class="admin-section system-panel hidden" data-panel="seguranca">
         <div class="section-heading"><span>🔐</span><div><h2>Segurança</h2><p>Categoria reservada para proteção e permissões.</p></div></div>
         <article class="admin-card placeholder-card"><strong>Proteção do servidor</strong><span>Recursos de segurança e controle de acesso.</span><em>Em configuração</em></article>
       </section>
 
-      <section id="configuracoes" class="admin-section">
+      <section id="configuracoes" class="admin-section system-panel hidden" data-panel="configuracoes">
         <div class="section-heading"><span>📋</span><div><h2>Configurações</h2><p>Dados gerais usados pelo Aeternus neste servidor.</p></div></div>
         <article class="admin-card placeholder-card"><strong>Configurações avançadas</strong><span>Mais opções administrativas serão adicionadas aqui.</span><em>Em configuração</em></article>
       </section>
@@ -282,15 +282,28 @@
   closeBtn.addEventListener('click', closeMenu);
   overlay.addEventListener('click', closeMenu);
 
+  function showPanel(panelId) {
+    document.querySelectorAll('.system-panel').forEach(function (el) {
+      el.classList.add('hidden');
+    });
+    var target = document.querySelector('.system-panel[data-panel="' + panelId + '"]');
+    if (target) target.classList.remove('hidden');
+    document.querySelectorAll('.admin-category-menu a').forEach(function (i) {
+      i.classList.toggle('active', i.getAttribute('data-panel') === panelId);
+    });
+  }
+
   document.querySelectorAll('.admin-category-menu a').forEach(function (link) {
-    link.addEventListener('click', function () {
-      document.querySelectorAll('.admin-category-menu a').forEach(function (i) {
-        i.classList.remove('active');
-      });
-      link.classList.add('active');
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      var panelId = link.getAttribute('data-panel') || 'visao';
+      showPanel(panelId);
       closeMenu();
     });
   });
+
+  // default: só informações do servidor
+  showPanel('visao');
 
   var startX = 0;
   var startY = 0;

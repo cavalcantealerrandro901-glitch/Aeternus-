@@ -306,12 +306,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  document.querySelectorAll('.admin-category-menu a').forEach((link) => {
-    link.addEventListener('click', () => {
-      document.querySelectorAll('.admin-category-menu a').forEach((item) => item.classList.remove('active'));
-      link.classList.add('active');
-    });
-  });
+  // Menu de sistemas: troca de painel tratada no script inline do admin.html
 
   load();
 });
