@@ -92,16 +92,18 @@ async function reportError({ source = 'system', error, context = '', tryReload =
             error,
             errorText: stack
         });
-        await channel.send({
+        const alertMessage = await channel.send({
             content: report.slice(0, 1950),
             components: [repairWorkflow.createActionRow(fingerprint, false, false)],
             allowedMentions: { parse: [], roles: roleId ? [roleId] : [] }
         });
+        repairWorkflow.registerIncidentMessage(fingerprint, alertMessage);
     } catch (e) { console.warn('[autoRepair] Falha ao enviar alerta: ' + e.message); return { ok: false, reason: 'send_failed', error: e.message, fingerprint }; }
     if (!duplicate) {
         const result = await diagnose(source, cmdName, error, context);
         try {
-            await channel.send({ content: ('# DIAGNÓSTICO DA IA\n**Provedor:** ' + result.provider + '\n**Incidente:** ' + fingerprint + '\n\n' + result.text).slice(0, 1950), allowedMentions: { parse: [] } });
+            const diagnosisMessage = await channel.send({ content: ('# DIAGNÓSTICO DA IA\n**Provedor:** ' + result.provider + '\n**Incidente:** ' + fingerprint + '\n\n' + result.text).slice(0, 1950), allowedMentions: { parse: [] } });
+            repairWorkflow.registerIncidentMessage(fingerprint, diagnosisMessage);
         } catch (e) { console.warn('[autoRepair] Falha ao enviar diagnóstico: ' + e.message); }
     }
     return { ok: true, fingerprint, duplicate, tryReload: !!tryReload, fromCommand: !!fromCommand };
