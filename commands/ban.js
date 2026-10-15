@@ -75,7 +75,7 @@ async function handleBanProcess(context, moderator, targetMember, reason, isSlas
             iconURL: moderator.displayAvatarURL?.({ size: 64 }) || undefined
         })
         .setTitle('🔨 Confirmar banimento')
-        .setDescription('Revise os dados abaixo. O banimento só será executado após a confirmação.')
+        .setDescription('⚠️ Antes de banir esse membro, dá uma conferida nas informações abaixo pra ter certeza de que está tudo certo.\n\n🔨 Se estiver tudo certo, é só confirmar o banimento no botão abaixo.')
         .addFields(
             { name: '👮 Moderador', value: `<@${moderator.id}>`, inline: true },
             { name: '👤 Membro', value: `<@${targetMember.id}>`, inline: true },
