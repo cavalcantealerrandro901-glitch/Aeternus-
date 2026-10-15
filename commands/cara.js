@@ -40,12 +40,12 @@ async function run(userId, side, amountRaw, reply) {
 }
 
 module.exports = {
-    name: 'cara',
-    aliases: ['coinflip', 'cf', 'coroa'],
+    name: 'cara e coroa',
+    aliases: ['coinflip', 'cf', 'caracoroa'],
     description: 'Cara ou coroa (aposta 1k–35m)',
     data: new SlashCommandBuilder()
-        .setName('cara-coroa')
-        .setDescription('Cara ou coroa (1.000 a 35.000.000 ✨)')
+        .setName('cara coroa')
+        .setDescription('Cara ou coroa')
         .addStringOption((o) =>
             o
                 .setName('lado')
