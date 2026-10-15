@@ -8,7 +8,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#03030a;--card:rgba(255,255,255,.04);--bd:rgba(255,255,255,.08);--p:#a78bfa;--p2:#7c3aed;--t:#f8fafc;--m:#94a3b8;--g:#34d399;--y:#fbbf24}
-body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.6;min-height:100vh}
+body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--t);line-height:1.65;min-height:100vh}
 .mesh{position:fixed;inset:0;z-index:0;pointer-events:none;background:
   radial-gradient(at 15% 10%,rgba(124,58,237,.4) 0,transparent 40%),
   radial-gradient(at 85% 20%,rgba(6,182,212,.2) 0,transparent 35%),
@@ -19,29 +19,30 @@ nav{position:relative;z-index:2;display:flex;align-items:center;justify-content:
 .lk{color:var(--m);text-decoration:none;margin-left:1.2rem;font-weight:600;font-size:.9rem}
 .lk:hover{color:var(--t)}
 .wrap{position:relative;z-index:2;max-width:980px;margin:0 auto;padding:2.5rem 6vw 5rem}
-h1{font-family:Syne,sans-serif;font-size:clamp(1.8rem,4vw,2.6rem);margin-bottom:.4rem}
-.sub{color:var(--m);margin-bottom:2rem;font-size:1.05rem}
+h1{font-family:Syne,sans-serif;font-size:clamp(1.8rem,4vw,2.6rem);margin-bottom:.5rem}
+.sub{color:var(--m);margin-bottom:2rem;font-size:1.05rem;max-width:42rem}
 .toc{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:2.5rem}
 .toc a{padding:.4rem .85rem;border-radius:999px;background:var(--card);border:1px solid var(--bd);color:var(--m);text-decoration:none;font-size:.82rem;font-weight:600}
 .toc a:hover{border-color:var(--p);color:var(--t)}
 section{margin-bottom:2.8rem;scroll-margin-top:1rem}
 h2{font-family:Syne,sans-serif;font-size:1.35rem;margin-bottom:.85rem;padding-bottom:.4rem;border-bottom:1px solid var(--bd);color:#e9d5ff}
-h3{font-size:1.02rem;margin:1.1rem 0 .45rem;color:#c4b5fd}
+h3{font-size:1.02rem;margin:1.15rem 0 .45rem;color:#c4b5fd}
 p,li{color:var(--m);font-size:.95rem}
 ul,ol{padding-left:1.25rem;margin:.4rem 0 .8rem}
-li{margin:.25rem 0}
+li{margin:.3rem 0}
 code{background:rgba(167,139,250,.15);color:#e9d5ff;padding:.12rem .4rem;border-radius:.35rem;font-size:.88em}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:1rem;padding:1.15rem 1.3rem;margin:.7rem 0}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin:.8rem 0}
 .gc{background:var(--card);border:1px solid var(--bd);border-radius:.9rem;padding:1rem}
-.gc strong{display:block;color:var(--t);margin-bottom:.3rem}
+.gc strong{display:block;color:var(--t);margin-bottom:.35rem}
 table{width:100%;border-collapse:collapse;margin:.6rem 0 1rem;font-size:.9rem}
 th,td{border:1px solid var(--bd);padding:.5rem .65rem;text-align:left}
 th{background:rgba(124,58,237,.2);color:#e9d5ff}
 .tag{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.75rem;font-weight:700;background:rgba(52,211,153,.15);color:var(--g)}
+.note{border-left:3px solid var(--p);padding:.6rem 0 .6rem 1rem;margin:1rem 0;color:var(--m);font-size:.92rem}
 footer{text-align:center;padding:2rem;color:#475569;font-size:.8rem;position:relative;z-index:2}
 </style>
-    <link rel="stylesheet" href="dashboard.css">
+<link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
 <div class="mesh"></div>
@@ -54,119 +55,146 @@ footer{text-align:center;padding:2rem;color:#475569;font-size:.8rem;position:rel
   </div>
 </nav>
 <div class="wrap">
-  <h1>Wiki Oficial</h1>
-  <p class="sub">Guia completo do Aeternus — RPG, economia, guildas, arena, masmorra e jogos. Prefixo padrão: <code>O.</code></p>
+  <h1>Wiki do Aeternus</h1>
+  <p class="sub">Aqui está o que você precisa para jogar de verdade: criar personagem, subir de nível, gerenciar guilda, usar a economia e não se perder nos comandos. Prefixo padrão: <code>O.</code></p>
 
   <div class="toc">
-    <a href="#inicio">Início</a>
-    <a href="#perfil">Perfil &amp; Classes</a>
+    <a href="#inicio">Começar</a>
+    <a href="#perfil">Perfil e classes</a>
     <a href="#combate">Combate</a>
     <a href="#guildas">Guildas</a>
     <a href="#economia">Economia</a>
     <a href="#jogos">Jogos</a>
-    <a href="#comandos">Comandos</a><a href="#admin">Painel Admin</a>
+    <a href="#moderacao">Moderação</a>
+    <a href="#comandos">Atalhos</a>
+    <a href="#admin">Painel admin</a>
   </div>
 
   <section id="inicio">
-    <h2>🌌 O que é o Aeternus?</h2>
-    <p>Bot Discord com RPG, economia, moderação, sistemas sociais e interfaces web. Dados persistentes no <strong>MongoDB</strong>. Prefixo <code>O.</code> e slash commands.</p>
+    <h2>Por onde começar</h2>
+    <p>O Aeternus mistura RPG, economia e ferramentas de servidor no mesmo bot. Tudo que você faz no Discord (perfil, éter, guilda, drops) fica salvo no banco — se o bot reiniciar, seu progresso continua.</p>
+    <p>Na primeira vez no servidor:</p>
+    <ol>
+      <li>Crie o personagem com <code>O.j criar</code> (nome, classe e, se quiser, foto no privado do bot).</li>
+      <li>Confira o perfil com <code>O.j perfil</code>.</li>
+      <li>Pegue o daily com <code>O.daily</code> e explore <code>O.ajuda</code> quando esquecer algum comando.</li>
+    </ol>
     <div class="grid">
-      <div class="gc"><strong>⚔️ RPG</strong>Classes, atributos, habilidades, arena e masmorra.</div>
-      <div class="gc"><strong>🏰 Guildas</strong>Clãs com baú, banco, cargo-tag e convites.</div>
-      <div class="gc"><strong>✨ Economia</strong>Éter, cristais (CP), banco, daily e loja.</div>
-      <div class="gc"><strong>🎮 Jogos</strong>Experiências interativas e sistemas de entretenimento integrados ao bot.</div>
+      <div class="gc"><strong>RPG</strong>Classes, atributos, habilidades, arena e masmorra — o núcleo de progressão.</div>
+      <div class="gc"><strong>Guildas</strong>Clã com baú compartilhado, banco, cargo-tag e convites.</div>
+      <div class="gc"><strong>Economia</strong>Éter, cristais (CP), banco, daily, loja e transferências.</div>
+      <div class="gc"><strong>Jogos</strong>Minas, blackjack, cara ou coroa e outros modos com aposta.</div>
     </div>
   </section>
 
   <section id="perfil">
-    <h2>👤 Perfil e classes</h2>
+    <h2>Perfil e classes</h2>
     <div class="card">
-      <h3>Criar personagem</h3>
-      <p><code>O.j criar</code> — nome, classe e foto (no PV).</p>
-      <p><code>O.j perfil</code> — nível, XP, mana, éter, cristais, guilda e atributos.</p>
+      <h3>Personagem</h3>
+      <p><code>O.j criar</code> abre a criação: você escolhe o nome, a classe e pode enviar uma foto no PV do bot para o card de perfil.</p>
+      <p><code>O.j perfil</code> mostra nível, XP, mana, éter, cristais, guilda e atributos. É o “espelho” do seu personagem no servidor.</p>
     </div>
-    <h3>Classes públicas</h3>
+    <h3>Classes abertas a todo mundo</h3>
     <ul>
-      <li>⚔️ Cavalheiro do Éter · 🔮 Bruxo das Ruínas · 🏹 Caçador das Sombras</li>
-      <li>🛡️ Guardião Rúnico · 💚 Oráculo Vital</li>
+      <li><strong>Cavalheiro do Éter</strong> — linha de frente, mais resistente.</li>
+      <li><strong>Bruxo das Ruínas</strong> — foco em dano mágico.</li>
+      <li><strong>Caçador das Sombras</strong> — pressão e precisão.</li>
+      <li><strong>Guardião Rúnico</strong> — defesa e controle.</li>
+      <li><strong>Oráculo Vital</strong> — suporte e recuperação.</li>
     </ul>
-    <p>Classes <span class="tag">exclusivas</span> (ex.: Deus Criador, Ceifador Negro, L Detetive) não aparecem na lista pública.</p>
-    <p><code>O.classe</code> · <code>O.habilidades</code> · <code>O.passivas</code> — loadout de combate (4 ativas + 5 passivas).</p>
+    <p>Classes <span class="tag">exclusivas</span> (por exemplo Deus Criador, Ceifador Negro, L Detetive) não entram na lista pública — só quem já tem acesso as vê no fluxo de criação.</p>
+    <p>No combate você monta o loadout com <code>O.classe</code>, <code>O.habilidades</code> e <code>O.passivas</code>: até 4 habilidades ativas e 5 passivas. Vale testar combinações antes de entrar na arena ou na masmorra.</p>
   </section>
 
   <section id="combate">
-    <h2>⚔️ Combate</h2>
-    <h3>Arena / PvP</h3>
-    <p>O Aeternus possui uma arena web para batalhas entre jogadores, com turnos, HP, mana, habilidades, efeitos e chat durante a partida.</p>
-    <p>A identidade do jogador é validada pelo servidor através da sessão autenticada.</p>
+    <h2>Combate</h2>
+    <h3>Arena (PvP)</h3>
+    <p>A arena roda na web: turnos, HP, mana, habilidades e efeitos. A identidade do jogador vem da sessão logada — não dá para “entrar como outra pessoa” só trocando o nome na tela.</p>
+    <p>Use <code>O.pvp</code> no Discord para o fluxo de desafio e o link da partida quando o sistema pedir.</p>
     <h3>Masmorra</h3>
-    <p><code>O.masmorra</code> — pisos com várias ondas de monstros e boss no final. Botão para o próximo piso ao vencer.</p>
-    <h3>Recompensas</h3>
-    <p>PvP e masmorra podem dropar itens e <strong>CP (cristais)</strong>, além de XP.</p>
+    <p><code>O.masmorra</code> leva você por pisos com ondas de monstros e um boss no fim. Ao vencer um piso, o bot oferece o próximo. É o lugar mais estável para farmar XP e cristais se você ainda não curte PvP.</p>
+    <h3>O que cai de recompensa</h3>
+    <p>Arena e masmorra podem dar XP, itens e <strong>cristais (CP)</strong>. Cristal não substitui éter: é outro recurso, mais ligado a progressão e loja especial.</p>
   </section>
 
   <section id="guildas">
-    <h2>🏰 Guildas</h2>
+    <h2>Guildas</h2>
+    <p>Guilda no Aeternus é clã de verdade: inventário compartilhado, cargos no Discord e ranking. A criação e a edição acontecem no privado do bot para não poluir o chat do servidor.</p>
     <table>
-      <tr><th>Comando</th><th>Função</th></tr>
-      <tr><td><code>O.guild criar</code></td><td>Criação no PV (nome, tag, desc, boas-vindas, imagem)</td></tr>
-      <tr><td><code>O.guild editar …</code></td><td>Edita no PV: nome, tag, desc, imagem…</td></tr>
-      <tr><td><code>O.guild convidar @user</code></td><td>Convite com botões + DM</td></tr>
-      <tr><td><code>O.guild inventario</code></td><td>Baú compartilhado</td></tr>
-      <tr><td><code>O.guild depositaritem n [qtd]</code></td><td>Oficial deposita itens (várias unidades)</td></tr>
-      <tr><td><code>O.guild retiraritem n</code></td><td>Membro retira do baú</td></tr>
-      <tr><td><code>O.guild sincronizar</code></td><td>Aplica cargo-tag aos membros</td></tr>
-      <tr><td><code>O.guild ranking</code></td><td>Top guildas</td></tr>
+      <tr><th>Comando</th><th>O que faz</th></tr>
+      <tr><td><code>O.guild criar</code></td><td>Abre a criação no PV (nome, tag, descrição, boas-vindas, imagem)</td></tr>
+      <tr><td><code>O.guild editar</code></td><td>Altera nome, tag, descrição ou imagem — também no PV</td></tr>
+      <tr><td><code>O.guild convidar @user</code></td><td>Envia convite com botões e avisa o jogador no DM</td></tr>
+      <tr><td><code>O.guild inventario</code></td><td>Mostra o baú da guilda</td></tr>
+      <tr><td><code>O.guild depositaritem n [qtd]</code></td><td>Oficial coloca itens no baú (pode várias unidades)</td></tr>
+      <tr><td><code>O.guild retiraritem n</code></td><td>Membro tira um item do baú</td></tr>
+      <tr><td><code>O.guild sincronizar</code></td><td>Aplica o cargo-tag em quem ainda não tem</td></tr>
+      <tr><td><code>O.guild ranking</code></td><td>Lista as guildas mais fortes / ativas</td></tr>
     </table>
     <div class="card">
-      <strong>Cargo-tag (adesivo)</strong>
-      <p>Ao criar a guilda, o bot cria um <em>cargo</em> com a tag e dá aos membros. Não é a tag de clã nativa do Discord (API limitada). Precisa de <strong>Gerenciar Cargos</strong>. Ao dissolver, o cargo é apagado.</p>
+      <strong>Sobre o cargo-tag</strong>
+      <p>Quando a guilda nasce, o bot cria um cargo com a tag e entrega aos membros. Não é a tag de clã nativa do Discord (a API limita isso). O bot precisa de <strong>Gerenciar Cargos</strong> e o cargo dele deve ficar acima do cargo da guilda. Se a guilda for dissolvida, o cargo some junto.</p>
     </div>
   </section>
 
   <section id="economia">
-    <h2>✨ Economia</h2>
+    <h2>Economia</h2>
+    <p>Éter é a moeda do dia a dia. Cristais (CP) são mais raros e costumam vir de combate ou eventos. O banco guarda éter fora da carteira — útil se o servidor tiver roubo ativo.</p>
     <ul>
-      <li><code>O.saldo</code> · <code>O.daily</code> · <code>O.banco</code> · <code>O.dep</code> · <code>O.sacar</code> · <code>O.pay</code></li>
-      <li><code>O.work</code> · <code>O.beg</code> · <code>O.crime</code> · <code>O.rob</code></li>
-      <li>Admin: <code>O.addmoney @user 10k</code> · <code>O.removemoney @user half</code></li>
+      <li><code>O.saldo</code> — quanto você tem na mão e no banco</li>
+      <li><code>O.daily</code> — recompensa diária (o valor mínimo e máximo o admin define no painel)</li>
+      <li><code>O.dep</code> / <code>O.sacar</code> — move éter entre carteira e banco</li>
+      <li><code>O.pay @user quantia</code> — transfere para outra pessoa</li>
+      <li><code>O.work</code>, <code>O.beg</code>, <code>O.crime</code>, <code>O.rob</code> — formas de ganhar (ou perder) éter com risco</li>
     </ul>
-    <p>Valores: <code>1000</code>, <code>1k</code>, <code>2.5k</code>, <code>1m</code>, <code>1b</code>, <code>all</code>, <code>half</code>, <code>50%</code>.</p>
+    <p>Admins com permissão podem usar <code>O.addmoney</code> e <code>O.removemoney</code>. Quantias aceitam atalhos: <code>1k</code>, <code>2.5k</code>, <code>1m</code>, <code>all</code>, <code>half</code>, <code>50%</code>.</p>
+    <div class="note">Transferência e pagamento não têm “desfazer”. Confira o @ e o valor antes de confirmar.</div>
   </section>
 
   <section id="jogos">
-    <h2>🎮 Jogos</h2>
-    <h3>Mines (<code>O.minas</code>)</h3>
-    <p>Campo 4×4. Multi só sobe após um <strong>limiar de gemas</strong>:</p>
+    <h2>Jogos</h2>
+    <h3>Minas — <code>O.minas</code></h3>
+    <p>Campo 4×4. Você escolhe quantas bombas e quanto apostar. O multiplicador só sobe depois de um limiar de gemas abertas:</p>
     <ul>
-      <li><strong>1 bomba</strong> → precisa abrir <strong>7</strong> casas para multiplicar</li>
-      <li>Mais bombas → limiar menor e multi maior (mais risco)</li>
+      <li>Com <strong>1 bomba</strong>, precisa abrir cerca de <strong>7</strong> casas seguras antes do multi começar a valer a pena.</li>
+      <li>Mais bombas = limiar menor e multiplicador maior, mas o risco de explodir sobe junto.</li>
     </ul>
-    <p>Ex.: <code>O.minas 3 1k</code> · <code>O.minas 5 all</code></p>
+    <p>Exemplos: <code>O.minas 3 1k</code> · <code>O.minas 5 all</code></p>
     <h3>Outros</h3>
-    <p><code>O.blackjack</code> · <code>O.cara</code> · <code>O.dado</code> e mais na categoria Jogos da ajuda.</p>
+    <p><code>O.blackjack</code>, <code>O.cara</code>, <code>O.dado</code> e o restante da categoria Jogos aparecem em <code>O.ajuda</code>. A regra de ouro: só aposte o que você topa perder naquela rodada.</p>
   </section>
 
-  <section id="admin">
-    <h2>🛠️ Painel de Administração</h2>
-    <p>O Aeternus possui uma interface web própria para administração do servidor. Esta área está sendo construída por etapas.</p>
-    <div class="card"><h3>1. Login com Discord</h3><p>O administrador entra usando a autenticação do Discord. O painel cria uma sessão para identificar o usuário.</p></div>
-    <div class="card"><h3>2. Seleção do servidor</h3><p>Depois do login, o painel carrega os servidores da conta e mostra os servidores onde o Aeternus está conectado e que podem ser administrados.</p></div>
-    <div class="card"><h3>3. Servidor selecionado</h3><p>O administrador escolhe um servidor e ele fica marcado como selecionado. As próximas versões poderão abrir as configurações específicas desse servidor.</p></div>
+  <section id="moderacao">
+    <h2>Moderação e anti-spam</h2>
+    <p>O bot avisa, depois silencia e, se a pessoa continuar, pode banir. Mute e ban só funcionam se o cargo do Aeternus estiver <strong>acima</strong> do membro e se o bot tiver as permissões de moderar e banir.</p>
+    <ul>
+      <li><code>O.spam true</code> — libera spam em <strong>todo o servidor</strong></li>
+      <li><code>O.spam false</code> — liga de novo o anti-spam no servidor inteiro</li>
+      <li><code>O.spam true #canal</code> — libera só naquele canal</li>
+    </ul>
+    <p>Também existem <code>O.ban</code>, <code>O.kick</code>, <code>O.mute</code>, <code>O.unmute</code>, <code>O.warn</code> e <code>O.warns</code> para moderação manual.</p>
   </section>
 
   <section id="comandos">
-    <h2>📜 Atalhos úteis</h2>
+    <h2>Atalhos que valem a pena decorar</h2>
     <div class="grid">
-      <div class="gc"><strong>Ajuda</strong><code>O.ajuda</code> · <code>O.wiki</code></div>
+      <div class="gc"><strong>Ajuda</strong><code>O.ajuda</code> · <code>O.ajuda nome</code> · <code>O.wiki</code></div>
       <div class="gc"><strong>Perfil</strong><code>O.j perfil</code> · <code>O.xp</code></div>
       <div class="gc"><strong>Guilda</strong><code>O.guild</code> · <code>O.clã</code></div>
       <div class="gc"><strong>Combate</strong><code>O.pvp</code> · <code>O.masmorra</code></div>
     </div>
-    <p>Detalhes de cada comando: <code>O.ajuda &lt;comando&gt;</code></p>
+    <p>Se um comando não responder, confira se o prefixo do servidor ainda é <code>O.</code> (o admin pode mudar) e se o bot tem permissão de ler e enviar mensagens naquele canal.</p>
+  </section>
+
+  <section id="admin">
+    <h2>Painel de administração</h2>
+    <p>O painel web é o lugar para configurar o servidor sem depender só de comandos no chat.</p>
+    <div class="card"><h3>1. Entrar com Discord</h3><p>Você autentica com a conta Discord. A sessão identifica quem é admin e quais servidores pode gerenciar.</p></div>
+    <div class="card"><h3>2. Escolher o servidor</h3><p>Só aparecem servidores onde o Aeternus está presente e onde sua conta tem poder de administrar.</p></div>
+    <div class="card"><h3>3. Ajustar sistemas</h3><p>No servidor selecionado você controla daily, drops, loja e o menu de sistemas (categorias com cada módulo embaixo). O menu abre pelo botão ou arrastando da esquerda para a direita e ocupa cerca de 45% da tela.</p></div>
   </section>
 </div>
-<footer>Aeternus · Wiki Oficial · Atualizada com RPG, economia, segurança web e painel de administração</footer>
-    <script src="dashboard-app.js"></script>
+<footer>Aeternus · Wiki oficial · Se algo estiver desatualizado, use O.ajuda no Discord ou o painel do servidor</footer>
+<script src="dashboard-app.js"></script>
 </body>
 </html>

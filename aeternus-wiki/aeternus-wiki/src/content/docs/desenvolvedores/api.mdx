@@ -1,20 +1,30 @@
 ---
-title: API REST do Aeternus
-description: Documentação técnica dos endpoints da API REST do Aeternus para integração de aplicações externas.
+title: API REST
+description: Endpoints para consultar saldo, economia e estado do bot de fora do Discord.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-# 🌐 API REST Oficial
+# API REST do Aeternus
 
-A API do Aeternus permite que consultes saldos de utilizadores, histórico de economia e estado do bot diretamente a partir do teu próprio site ou aplicação.
+Se você tem um site, app ou painel próprio, a API permite ler dados de economia e o estado do bot sem depender só de comandos no chat.
 
----
+## Autenticação
 
-### 🔑 Autenticação
-
-Todas as requisições para a API devem incluir o cabeçalho `Authorization` com o teu token de API:
+Toda requisição autenticada leva o header:
 
 ```http
-Authorization: Bearer AETERNUS_API_KEY_AQUI
+Authorization: Bearer SEU_TOKEN_AQUI
+```
 
+O token é emitido pela equipe do Aeternus. Não publique em repositório público nem em front-end aberto — use só no servidor da sua aplicação.
+
+## Boas práticas
+
+- Trate `401` como token inválido ou expirado.
+- Trate `429` como limite de taxa: espere o `Retry-After` antes de tentar de novo.
+- Não faça polling agressivo em endpoints de saldo; cacheie por alguns segundos no seu lado.
+
+## O que esperar daqui
+
+A superfície da API cresce conforme o painel e o bot estabilizam novos módulos (drops, loja, guildas). Quando um endpoint novo entrar em produção, esta página ganha o caminho, o método e um exemplo de resposta real — sem placeholder vazio.
