@@ -1,201 +1,102 @@
 const {
-    EmbedBuilder,
-    PermissionFlagsBits,
-    SlashCommandBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle
+    EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder,
+    ActionRowBuilder, ButtonBuilder, ButtonStyle
 } = require('discord.js');
+const {
+    SAFE_MENTIONS, sanitizeReason, resolveMember, checkAction, recordAction
+} = require('../utils/moderation');
 
-const SAFE_MENTIONS = { parse: [], repliedUser: false };
-const AETERNUS_PURPLE = 0x8B5CF6;
 const CONFIRM_TIMEOUT = 6 * 60 * 1000;
 
-function resolveMember(message, args) {
-    const mentioned = message.mentions.members.first();
-    if (mentioned) return mentioned;
-
-    const id = String(args[0] || '').match(/^\d{15,25}$/)?.[0];
-    if (!id) return null;
-    return message.guild.members.cache.get(id) || null;
-}
-
-function sanitizeReason(value) {
-    return String(value || 'Sem motivo')
-        .replace(/@everyone/gi, '@ everyone')
-        .replace(/@here/gi, '@ here')
-        .replace(/[\u0000-\u001F\u007F]/g, ' ')
-        .trim()
-        .slice(0, 400) || 'Sem motivo';
-}
-
-function reasonFrom(args, hasMention) {
-    const firstIsId = /^\d{15,25}$/.test(String(args[0] || ''));
-    const start = hasMention || firstIsId ? 1 : 1;
-    return sanitizeReason(args.slice(start).join(' '));
-}
-
-function moderatorCanBan(moderator, targetMember, guild) {
-    if (!moderator?.permissions?.has(PermissionFlagsBits.BanMembers)) {
-        return { ok: false, error: 'Você não tem a permissão **Banir membros**.' };
-    }
-    if (targetMember.id === moderator.id) {
-        return { ok: false, error: 'Você não pode banir a si mesmo.' };
-    }
-    if (targetMember.id === moderator.client?.user?.id) {
-        return { ok: false, error: 'Não posso banir a mim mesmo.' };
-    }
-    if (guild.ownerId !== moderator.id &&
-        targetMember.roles.highest.comparePositionTo(moderator.roles.highest) >= 0) {
-        return { ok: false, error: 'Seu cargo precisa estar acima do cargo do membro que deseja banir.' };
-    }
-    if (!targetMember.bannable) {
-        return { ok: false, error: 'Não consigo banir esse membro. Confira a hierarquia de cargos e a permissão do Aeternus.' };
-    }
-    return { ok: true };
-}
-
-function confirmationRow(customId, disabled = false) {
+function row(id, disabled = false) {
     return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(customId)
-            .setLabel('Confirmar banimento')
-            .setEmoji('🔨')
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(disabled)
+        new ButtonBuilder().setCustomId(id).setLabel('Confirmar banimento')
+            .setEmoji('🔨').setStyle(ButtonStyle.Danger).setDisabled(disabled)
     );
 }
 
-async function handleBanProcess(context, moderator, targetMember, reason, isSlash = false) {
-    const customId = `ban_confirm_${moderator.id}_${Date.now()}`;
-    const embed = new EmbedBuilder()
-        .setColor(AETERNUS_PURPLE)
-        .setDescription('⚠️ Antes de banir esse membro, dá uma conferida nas informações abaixo pra ter certeza de que está tudo certo.\n\n🔨 Se estiver tudo certo, é só confirmar o banimento no botão abaixo.');
+async function handle(context, moderator, target, reason, slash) {
+    const botMember = await context.guild.members.fetchMe().catch(() => null);
+    const check = checkAction(context.guild, moderator, target, botMember, PermissionFlagsBits.BanMembers, 'bannable');
+    if (!check.ok) {
+        const payload = { content: '❌ ' + check.error, allowedMentions: SAFE_MENTIONS };
+        return slash ? context.reply({ ...payload, ephemeral: true }) : context.reply(payload);
+    }
 
-    const payload = {
-        embeds: [embed],
-        components: [confirmationRow(customId)],
-        allowedMentions: SAFE_MENTIONS
-    };
-    const sentMsg = isSlash
-        ? await context.reply({ ...payload, fetchReply: true })
-        : await context.reply(payload);
-
-    const collector = sentMsg.createMessageComponentCollector({
+    const customId = 'ban_confirm_' + moderator.id + '_' + Date.now();
+    const embed = new EmbedBuilder().setColor(0x8B5CF6)
+        .setTitle('⚠️ Confirmar banimento')
+        .setDescription('Revise os dados antes de confirmar.')
+        .addFields(
+            { name: 'Moderador', value: '<@' + moderator.id + '>', inline: true },
+            { name: 'Membro', value: '<@' + target.id + '>', inline: true },
+            { name: 'Motivo', value: reason.slice(0, 400) }
+        ).setFooter({ text: 'Esta confirmação expira em 6 minutos.' });
+    const payload = { embeds: [embed], components: [row(customId)], allowedMentions: SAFE_MENTIONS };
+    const sent = slash ? await context.reply({ ...payload, fetchReply: true }) : await context.reply(payload);
+    const collector = sent.createMessageComponentCollector({
         filter: i => i.customId === customId && i.user.id === moderator.id,
-        time: CONFIRM_TIMEOUT,
-        max: 1
+        time: CONFIRM_TIMEOUT, max: 1
     });
 
     collector.on('collect', async i => {
+        await i.deferUpdate().catch(() => null);
+        await sent.edit({ components: [row(customId, true)] }).catch(() => null);
         try {
-            await i.deferUpdate();
-            await sentMsg.edit({ components: [confirmationRow(customId, true)] }).catch(() => {});
-
             const currentModerator = await context.guild.members.fetch(moderator.id).catch(() => null);
-            const currentTarget = await context.guild.members.fetch(targetMember.id).catch(() => null);
-            if (!currentModerator || !currentTarget) {
-                await sentMsg.reply({
-                    content: '❌ Não foi possível confirmar os cargos atuais do moderador e do membro. Nenhum banimento foi executado.',
-                    allowedMentions: SAFE_MENTIONS
-                });
-                return;
+            const currentTarget = await context.guild.members.fetch(target.id).catch(() => null);
+            const currentBot = await context.guild.members.fetchMe().catch(() => null);
+            const currentCheck = checkAction(context.guild, currentModerator, currentTarget, currentBot, PermissionFlagsBits.BanMembers, 'bannable');
+            if (!currentCheck.ok) {
+                return sent.reply({ content: '❌ ' + currentCheck.error + ' Nenhum banimento foi executado.', allowedMentions: SAFE_MENTIONS });
             }
-
-            const check = moderatorCanBan(currentModerator, currentTarget, context.guild);
-            if (!check.ok) {
-                await sentMsg.reply({ content: `❌ ${check.error}`, allowedMentions: SAFE_MENTIONS });
-                return;
-            }
-
-            await currentTarget.ban({
-                reason: `${reason} · por ${moderator.user?.tag || moderator.tag || moderator.id}`.slice(0, 512)
-            });
-
-            const success = new EmbedBuilder()
-                .setColor(0x22C55E)
-                .setTitle('✅ Banimento concluído')
+            await currentTarget.ban({ reason: (reason + ' · por ' + currentModerator.user.tag).slice(0, 512) });
+            await recordAction(context.guild, 'ban', currentModerator.user, currentTarget, reason);
+            const result = new EmbedBuilder().setColor(0x22C55E).setTitle('✅ Banimento concluído')
                 .setDescription('O banimento foi realizado com sucesso.')
                 .addFields(
-                    { name: '👮 Moderador', value: `${currentModerator.displayName} (<@${currentModerator.id}>)`, inline: true },
-                    { name: '⛔ Acusado', value: `<@${currentTarget.id}>`, inline: true },
-                    { name: '📝 Motivo', value: reason.slice(0, 400) }
-                )
-                .setFooter({ text: 'Aeternus • Registro de moderação' })
-                .setTimestamp();
-
-            // Responde à mensagem inicial, mantendo-a marcada como referência.
-            await sentMsg.reply({ embeds: [success], allowedMentions: SAFE_MENTIONS });
+                    { name: 'Moderador', value: '<@' + currentModerator.id + '>', inline: true },
+                    { name: 'Membro', value: '<@' + currentTarget.id + '>', inline: true },
+                    { name: 'Motivo', value: reason }
+                ).setFooter({ text: 'Aeternus • Registro de moderação' }).setTimestamp();
+            await sent.reply({ embeds: [result], allowedMentions: SAFE_MENTIONS });
         } catch (error) {
             console.error('[ban] Falha ao banir:', error?.message || error);
-            await sentMsg.reply({
-                content: '❌ Não consegui concluir o banimento. Confira as permissões e a hierarquia do Aeternus.',
-                allowedMentions: SAFE_MENTIONS
-            }).catch(() => {});
+            await sent.reply({ content: '❌ Não consegui concluir o banimento. Confira as permissões e a hierarquia do Aeternus.', allowedMentions: SAFE_MENTIONS }).catch(() => null);
         }
     });
-
-    collector.on('end', async (_collected, endReason) => {
-        await sentMsg.edit({ components: [confirmationRow(customId, true)] }).catch(() => {});
-        if (endReason === 'time') {
-            await sentMsg.reply({
-                content: '⏳ A confirmação do banimento expirou. Nenhuma ação foi executada.',
-                allowedMentions: SAFE_MENTIONS
-            }).catch(() => {});
-        }
+    collector.on('end', async (_collected, reasonEnd) => {
+        await sent.edit({ components: [row(customId, true)] }).catch(() => null);
+        if (reasonEnd === 'time') await sent.reply({
+            content: '⏳ A confirmação expirou. Nenhuma ação foi executada.',
+            allowedMentions: SAFE_MENTIONS
+        }).catch(() => null);
     });
 }
 
 module.exports = {
-    name: 'ban',
-    aliases: ['banir'],
-    description: 'Banir membro',
-    rootSlash: true,
-    data: new SlashCommandBuilder()
-        .setName('banir')
-        .setDescription('Banir um membro do servidor')
-        .addSubcommand(sc => sc
-            .setName('membro')
-            .setDescription('Banir um membro')
+    name: 'ban', aliases: ['banir'], description: 'Banir membro', rootSlash: true,
+    data: new SlashCommandBuilder().setName('banir').setDescription('Banir um membro do servidor')
+        .addSubcommand(sc => sc.setName('membro').setDescription('Banir um membro')
             .addUserOption(o => o.setName('usuario').setDescription('Membro que será banido').setRequired(true))
-            .addStringOption(o => o.setName('motivo').setDescription('Motivo do banimento (opcional)').setRequired(false).setMaxLength(400))
-        )
+            .addStringOption(o => o.setName('motivo').setDescription('Motivo do banimento').setMaxLength(400)))
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 
     async execute(message, args) {
-        const moderator = message.member;
-        if (!moderator) {
-            return message.reply({ content: '❌ Não consegui verificar sua conta neste servidor.', allowedMentions: SAFE_MENTIONS });
-        }
-
-        const member = resolveMember(message, args);
-        if (!member) {
-            return message.reply({ content: '❌ Mencione o membro ou informe um ID válido.', allowedMentions: SAFE_MENTIONS });
-        }
-
-        // As permissões e a hierarquia serão verificadas novamente quando o moderador clicar em confirmar.
-        const reason = reasonFrom(args, Boolean(message.mentions.members.first()));
-        return handleBanProcess(message, moderator, member, reason, false);
+        if (!message.guild || !message.member) return message.reply({ content: '❌ Este comando só funciona em servidores.', allowedMentions: SAFE_MENTIONS });
+        const target = resolveMember(message, args);
+        if (!target) return message.reply({ content: '❌ Mencione o membro ou informe um ID válido.', allowedMentions: SAFE_MENTIONS });
+        const reason = sanitizeReason(args.slice(1).join(' '));
+        return handle(message, message.member, target, reason, false);
     },
 
     async executeSlash(i) {
-        if (i.options.getSubcommand(false) !== 'membro') return i.reply({ content: 'Use /banir membro para banir alguém.', ephemeral: true });
-        if (!i.inGuild()) {
-            return i.reply({ content: '❌ Este comando só pode ser usado dentro de um servidor.', ephemeral: true });
-        }
-
+        if (!i.inGuild()) return i.reply({ content: '❌ Este comando só funciona em servidores.', ephemeral: true });
+        if (i.options.getSubcommand(false) !== 'membro') return i.reply({ content: 'Use /banir membro.', ephemeral: true });
         const moderator = await i.guild.members.fetch(i.user.id).catch(() => null);
-        if (!moderator) {
-            return i.reply({ content: '❌ Não consegui verificar suas permissões neste servidor.', ephemeral: true });
-        }
         const user = i.options.getUser('usuario', true);
-        const reason = sanitizeReason(i.options.getString('motivo'));
-        const member = await i.guild.members.fetch(user.id).catch(() => null);
-        if (!member) {
-            return i.reply({ content: '❌ Membro não encontrado neste servidor.', ephemeral: true });
-        }
-
-        // As permissões do moderador, as permissões do bot e a hierarquia serão verificadas ao clicar em confirmar.
-        return handleBanProcess(i, moderator, member, reason, true);
+        const target = await i.guild.members.fetch(user.id).catch(() => null);
+        if (!moderator || !target) return i.reply({ content: '❌ Não consegui localizar o moderador ou o membro no servidor.', ephemeral: true });
+        return handle(i, moderator, target, sanitizeReason(i.options.getString('motivo')), true);
     }
 };
