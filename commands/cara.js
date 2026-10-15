@@ -33,7 +33,7 @@ async function run(userId, side, amountRaw, reply) {
                         win
                             ? '✨ **+' + fmt(bet.amount) + '**'
                             : '✨ **-' + fmt(bet.amount) + '**'
-                    }\nSaldo: ✨ **${fmt(eter.get(userId))}**`
+                    }\nSaldo: ✨ **${fmt(eter.get(userId))}**\n\n${win ? '🏆 A sorte sorriu para você nesta rodada!' : '💔 Desta vez não deu certo; fica para a próxima.'}`
                 )
         ]
     });
