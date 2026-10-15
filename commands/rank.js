@@ -219,88 +219,6 @@ function findMyRank(list, userId) {
     };
 }
 
-async function pageEmbed(client, list, mode, page, guild, viewerId) {
-    const meta = modeMeta(mode);
-    const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
-    const p = Math.min(Math.max(0, page), totalPages - 1);
-    const start = p * PAGE_SIZE;
-    const slice = list.slice(start, start + PAGE_SIZE);
-    const mine = findMyRank(list, viewerId);
-    const guildName = guild?.name || 'Global';
-    const topValue = list[0]?.value || 1;
-
-    const resolved = await Promise.all(
-        slice.map(async (e) => {
-            let u = client.users.cache.get(e.id) || null;
-            if (!u) u = await client.users.fetch(e.id).catch(() => null);
-            if (u?.bot) return null;
-            const inGuild = Boolean(guild?.members?.cache?.get(e.id));
-            const displayName = u
-                ? (u.globalName || u.username || ('id-' + String(e.id).slice(-4)))
-                : ('usuário-' + String(e.id).slice(-4));
-            const tag = inGuild ? ('<@' + e.id + '>') : ('**' + displayName + '**');
-            const avatar = u?.displayAvatarURL?.({ size: 128, extension: 'png' }) || null;
-            return { e, tag, name: displayName, id: e.id, avatar };
-        })
-    );
-
-    const blocks = [];
-    for (let i = 0; i < resolved.length; i++) {
-        const row = resolved[i];
-        if (!row) continue;
-        const pos = start + i;
-        const { e, tag, name, id } = row;
-        const bar = progressBar(e.value, topValue, 8);
-        const nivel = e.level != null ? Number(e.level) : 0;
-        const xpVal = e.xp != null ? e.xp : (meta.economy ? 0 : e.value);
-        const saldo = e.eter != null ? e.eter : (meta.economy ? e.value : 0);
-
-        const lines = [
-            medal(pos) + '  ' + tag,
-            '┗ **Nome:** ' + name,
-            '　**ID:** `' + id + '`'
-        ];
-        if (meta.economy) {
-            lines.push('　✨ **Saldo:** ' + fmt(saldo) + ' éter');
-        } else {
-            lines.push('　⭐ **XP:** ' + fmt(xpVal) + (nivel ? ('  ·  Nv. **' + nivel + '**') : ''));
-        }
-        lines.push('　`' + bar + '`');
-        blocks.push(lines.join('\n'));
-    }
-
-    const body = blocks.length ? blocks.join('\n\n') : '_Ninguém no ranking ainda._';
-
-    const posLine =
-        mine.rank != null
-            ? `📍 **Sua posição:** #${mine.rank}  ·  ${meta.emoji} **${fmt(mine.value)}** ${meta.unit}` +
-              (mine.level ? `  ·  Nv. **${mine.level}**` : '')
-            : '📍 **Sua posição:** _ainda fora do ranking_';
-
-    const hora = clockNow();
-
-    return new EmbedBuilder()
-        .setColor(meta.color)
-        .setTitle(meta.title)
-        .setDescription(
-            [
-                posLine,
-                '',
-                `🏆 **RANKING** · Página **${p + 1}/${totalPages}**`,
-                '━━━━━━━━━━━━━━━━━━━━',
-                '',
-                body,
-                '',
-                '━━━━━━━━━━━━━━━━━━━━',
-                `💡 **Dica:** ${meta.tip}`
-            ].join('\n')
-        )
-        .setFooter({
-            text: `Aeternus Bot · ${guildName} · atualizado às ${hora}`
-        })
-        .setTimestamp();
-}
-
 function helpEmbed() {
     return new EmbedBuilder()
         .setColor(0xc9a227)
@@ -358,20 +276,11 @@ async function sendRank(ctx, mode, page = 0) {
     const list = await buildList(mode, guild, ctx.client);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
     const p = Math.min(Math.max(0, page), totalPages - 1);
-    const viewerId = ctx.user?.id || ctx.author?.id;
-    const emb = await pageEmbed(
-        ctx.client,
-        list,
-        mode,
-        p,
-        guild || null,
-        viewerId
-    );
-
     const meta = modeMeta(mode);
     const start = p * PAGE_SIZE;
     const slice = list.slice(start, start + PAGE_SIZE);
 
+    // Só a imagem: o bot escreve nome/id/xp|saldo e coloca as fotos no card
     const rows = [];
     for (const e of slice) {
         let u = ctx.client.users.cache.get(e.id) || null;
@@ -386,32 +295,40 @@ async function sendRank(ctx, mode, page = 0) {
         });
     }
 
-    const payload = {
-        embeds: [emb],
-        components: [navRow(mode, p, totalPages)],
-        files: []
-    };
-
+    let files = [];
     try {
         const card = await rankCard.render({
             title: meta.title,
             subtitle: meta.economy ? 'Ranking de éter' : 'Ranking de XP',
             rows,
-            economy: meta.economy,
+            economy: !!meta.economy,
             page: p + 1,
             totalPages,
             tip: meta.tip
         });
         if (card?.buffer) {
-            const file = new AttachmentBuilder(card.buffer, { name: card.name || 'rank.png' });
-            payload.files = [file];
-            emb.setImage('attachment://' + (card.name || 'rank.png'));
+            files = [new AttachmentBuilder(card.buffer, { name: card.name || 'rank.png' })];
         }
     } catch (err) {
         console.warn('[rank] card image:', err.message);
     }
 
-    return payload;
+    // Sem embed de texto — apenas a imagem + navegação
+    if (!files.length) {
+        return {
+            content: '_Não foi possível gerar o card do ranking._',
+            components: [navRow(mode, p, totalPages)],
+            embeds: [],
+            files: []
+        };
+    }
+
+    return {
+        content: '',
+        embeds: [],
+        components: [navRow(mode, p, totalPages)],
+        files
+    };
 }
 
 module.exports = {
@@ -464,15 +381,7 @@ module.exports = {
 
             if (!mine.rank) {
                 return interaction.reply({
-                    embeds: [
-                        new EmbedBuilder()
-                            .setColor(0x64748b)
-                            .setTitle(meta.title)
-                            .setDescription(
-                                '<@' + interaction.user.id + '> ainda não aparece no ranking.\nGanhe éter/XP para entrar na lista!'
-                            )
-                            .setFooter({ text: foot })
-                    ],
+                    content: '<@' + interaction.user.id + '> ainda não aparece no ranking. Ganhe éter/XP para entrar!',
                     ephemeral: true
                 }).catch(() => {});
             }
@@ -481,29 +390,12 @@ module.exports = {
             const xpVal = entry.xp != null ? entry.xp : (meta.economy ? 0 : mine.value);
             const saldo = entry.eter != null ? entry.eter : (meta.economy ? mine.value : 0);
             const nivel = entry.level != null ? entry.level : mine.level;
-            const meLines = [
-                '👤 <@' + interaction.user.id + '>',
-                '',
-                '📍 **Posição:** #' + mine.rank,
-                '**Nome:** ' + (interaction.user.globalName || interaction.user.username),
-                '**ID:** `' + interaction.user.id + '`'
-            ];
-            if (meta.economy) {
-                meLines.push('✨ **Saldo:** ' + fmt(saldo) + ' éter');
-            } else {
-                meLines.push('⭐ **XP:** ' + fmt(xpVal) + (nivel ? ('  ·  Nv. **' + nivel + '**') : ''));
-            }
+            let line = '📍 **#' + mine.rank + '** · ' + (interaction.user.globalName || interaction.user.username);
+            if (meta.economy) line += ' · ✨ **' + fmt(saldo) + '** éter';
+            else line += ' · ⭐ **' + fmt(xpVal) + '** XP' + (nivel ? ' · Nv. **' + nivel + '**' : '');
 
             return interaction.reply({
-                embeds: [
-                    new EmbedBuilder()
-                        .setColor(meta.color)
-                        .setTitle(meta.title)
-                        .setDescription(meLines.join('\n'))
-                        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
-                        .setFooter({ text: foot })
-                        .setTimestamp()
-                ],
+                content: line,
                 ephemeral: true
             }).catch(() => {});
         }
