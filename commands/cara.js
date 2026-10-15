@@ -78,15 +78,8 @@ module.exports = {
             });
         }
         await run(ownerId, side, amountRaw, async (payload) => {
-            const original = interaction.message;
-            const jumpUrl = original?.url;
             if (typeof payload === 'string') {
                 return interaction.reply({ content: payload, ephemeral: true });
-            }
-            const embed = payload.embeds?.[0];
-            if (embed && jumpUrl) {
-                const current = embed.data?.description || '';
-                embed.setDescription(current + '\\n\\n↩️ **Rodada anterior:** [ver mensagem anterior](' + jumpUrl + ')');
             }
             const sent = await interaction.channel.send({
                 ...payload,
