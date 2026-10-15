@@ -2,10 +2,12 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    AttachmentBuilder
 } = require('discord.js');
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
+const rankCard = require('../utils/rankCard');
 
 const PAGE_SIZE = 5;
 
@@ -236,16 +238,9 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
             const displayName = u
                 ? (u.globalName || u.username || ('id-' + String(e.id).slice(-4)))
                 : ('usuário-' + String(e.id).slice(-4));
-            // Menção = foto do membro no Discord
             const tag = inGuild ? ('<@' + e.id + '>') : ('**' + displayName + '**');
             const avatar = u?.displayAvatarURL?.({ size: 128, extension: 'png' }) || null;
-            return {
-                e,
-                tag,
-                name: displayName,
-                id: e.id,
-                avatar
-            };
+            return { e, tag, name: displayName, id: e.id, avatar };
         })
     );
 
@@ -260,8 +255,6 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
         const xpVal = e.xp != null ? e.xp : (meta.economy ? 0 : e.value);
         const saldo = e.eter != null ? e.eter : (meta.economy ? e.value : 0);
 
-        // Rank de XP → foto (menção), nome, id, xp
-        // Rank de saldo → foto (menção), nome, id, saldo
         const lines = [
             medal(pos) + '  ' + tag,
             '┗ **Nome:** ' + name,
@@ -286,7 +279,7 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
 
     const hora = clockNow();
 
-    const emb = new EmbedBuilder()
+    return new EmbedBuilder()
         .setColor(meta.color)
         .setTitle(meta.title)
         .setDescription(
@@ -306,12 +299,6 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
             text: `Aeternus Bot · ${guildName} · atualizado às ${hora}`
         })
         .setTimestamp();
-
-    // Foto do 1º da página
-    const first = resolved.find((r) => r && r.avatar);
-    if (first?.avatar) emb.setThumbnail(first.avatar);
-
-    return emb;
 }
 
 function helpEmbed() {
@@ -381,10 +368,50 @@ async function sendRank(ctx, mode, page = 0) {
         viewerId
     );
 
-    return {
+    const meta = modeMeta(mode);
+    const start = p * PAGE_SIZE;
+    const slice = list.slice(start, start + PAGE_SIZE);
+
+    const rows = [];
+    for (const e of slice) {
+        let u = ctx.client.users.cache.get(e.id) || null;
+        if (!u) u = await ctx.client.users.fetch(e.id).catch(() => null);
+        if (u?.bot) continue;
+        rows.push({
+            name: u ? (u.globalName || u.username) : ('usuário-' + String(e.id).slice(-4)),
+            id: e.id,
+            value: e.value,
+            level: e.level,
+            avatarURL: u ? u.displayAvatarURL({ size: 128, extension: 'png' }) : null
+        });
+    }
+
+    const payload = {
         embeds: [emb],
-        components: [navRow(mode, p, totalPages)]
+        components: [navRow(mode, p, totalPages)],
+        files: []
     };
+
+    try {
+        const card = await rankCard.render({
+            title: meta.title,
+            subtitle: meta.economy ? 'Ranking de éter' : 'Ranking de XP',
+            rows,
+            economy: meta.economy,
+            page: p + 1,
+            totalPages,
+            tip: meta.tip
+        });
+        if (card?.buffer) {
+            const file = new AttachmentBuilder(card.buffer, { name: card.name || 'rank.png' });
+            payload.files = [file];
+            emb.setImage('attachment://' + (card.name || 'rank.png'));
+        }
+    } catch (err) {
+        console.warn('[rank] card image:', err.message);
+    }
+
+    return payload;
 }
 
 module.exports = {
