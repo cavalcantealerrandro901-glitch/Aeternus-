@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const repairWorkflow = require('./repairWorkflow');
 const seen = new Map();
 let minuteAt = Date.now();
 let minuteCount = 0;
@@ -83,7 +84,19 @@ async function reportError({ source = 'system', error, context = '', tryReload =
         '', '**Erro / stack:**', stack.slice(0, 2400)
     ].filter(Boolean).join('\n');
     try {
-        await channel.send({ content: report.slice(0, 1950), allowedMentions: { parse: [], roles: roleId ? [roleId] : [] } });
+        repairWorkflow.registerIncident({
+            id: fingerprint,
+            source,
+            cmdName,
+            context,
+            error,
+            errorText: stack
+        });
+        await channel.send({
+            content: report.slice(0, 1950),
+            components: [repairWorkflow.createActionRow(fingerprint, false, false)],
+            allowedMentions: { parse: [], roles: roleId ? [roleId] : [] }
+        });
     } catch (e) { console.warn('[autoRepair] Falha ao enviar alerta: ' + e.message); return { ok: false, reason: 'send_failed', error: e.message, fingerprint }; }
     if (!duplicate) {
         const result = await diagnose(source, cmdName, error, context);
