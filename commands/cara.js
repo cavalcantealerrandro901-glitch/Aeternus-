@@ -77,11 +77,24 @@ module.exports = {
                 ephemeral: true
             });
         }
-        await run(ownerId, side, amountRaw, (payload) =>
-            typeof payload === 'string'
-                ? interaction.reply({ content: payload, ephemeral: true })
-                : interaction.update(payload)
-        );
+        await run(ownerId, side, amountRaw, async (payload) => {
+            const original = interaction.message;
+            const jumpUrl = original?.url;
+            if (typeof payload === 'string') {
+                return interaction.reply({ content: payload, ephemeral: true });
+            }
+            const embed = payload.embeds?.[0];
+            if (embed && jumpUrl) {
+                const current = embed.data?.description || '';
+                embed.setDescription(current + '\\n\\n↩️ **Rodada anterior:** [ver mensagem anterior](' + jumpUrl + ')');
+            }
+            const sent = await interaction.channel.send({
+                ...payload,
+                content: '<@' + ownerId + '> 🪙 **Nova rodada de cara ou coroa!**'
+            });
+            await interaction.reply({ content: '✅ Nova rodada enviada! A mensagem anterior foi mantida.', ephemeral: true });
+            return sent;
+        });
     },
 
     async execute(message, args) {
