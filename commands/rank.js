@@ -236,12 +236,15 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
             const displayName = u
                 ? (u.globalName || u.username || ('id-' + String(e.id).slice(-4)))
                 : ('usuário-' + String(e.id).slice(-4));
+            // Menção = foto do membro no Discord
             const tag = inGuild ? ('<@' + e.id + '>') : ('**' + displayName + '**');
+            const avatar = u?.displayAvatarURL?.({ size: 128, extension: 'png' }) || null;
             return {
                 e,
                 tag,
                 name: displayName,
-                id: e.id
+                id: e.id,
+                avatar
             };
         })
     );
@@ -257,16 +260,20 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
         const xpVal = e.xp != null ? e.xp : (meta.economy ? 0 : e.value);
         const saldo = e.eter != null ? e.eter : (meta.economy ? e.value : 0);
 
-        blocks.push(
-            [
-                medal(pos) + '  ' + tag,
-                '┗ **Nome:** ' + name,
-                '　**ID:** `' + id + '`',
-                '　⭐ **XP:** ' + fmt(xpVal) + (nivel ? ('  ·  Nv. **' + nivel + '**') : ''),
-                '　✨ **Saldo:** ' + fmt(saldo) + ' éter',
-                '　`' + bar + '`'
-            ].join('\n')
-        );
+        // Rank de XP → foto (menção), nome, id, xp
+        // Rank de saldo → foto (menção), nome, id, saldo
+        const lines = [
+            medal(pos) + '  ' + tag,
+            '┗ **Nome:** ' + name,
+            '　**ID:** `' + id + '`'
+        ];
+        if (meta.economy) {
+            lines.push('　✨ **Saldo:** ' + fmt(saldo) + ' éter');
+        } else {
+            lines.push('　⭐ **XP:** ' + fmt(xpVal) + (nivel ? ('  ·  Nv. **' + nivel + '**') : ''));
+        }
+        lines.push('　`' + bar + '`');
+        blocks.push(lines.join('\n'));
     }
 
     const body = blocks.length ? blocks.join('\n\n') : '_Ninguém no ranking ainda._';
@@ -299,6 +306,10 @@ async function pageEmbed(client, list, mode, page, guild, viewerId) {
             text: `Aeternus Bot · ${guildName} · atualizado às ${hora}`
         })
         .setTimestamp();
+
+    // Foto do 1º da página
+    const first = resolved.find((r) => r && r.avatar);
+    if (first?.avatar) emb.setThumbnail(first.avatar);
 
     return emb;
 }
@@ -443,23 +454,26 @@ module.exports = {
             const xpVal = entry.xp != null ? entry.xp : (meta.economy ? 0 : mine.value);
             const saldo = entry.eter != null ? entry.eter : (meta.economy ? mine.value : 0);
             const nivel = entry.level != null ? entry.level : mine.level;
+            const meLines = [
+                '👤 <@' + interaction.user.id + '>',
+                '',
+                '📍 **Posição:** #' + mine.rank,
+                '**Nome:** ' + (interaction.user.globalName || interaction.user.username),
+                '**ID:** `' + interaction.user.id + '`'
+            ];
+            if (meta.economy) {
+                meLines.push('✨ **Saldo:** ' + fmt(saldo) + ' éter');
+            } else {
+                meLines.push('⭐ **XP:** ' + fmt(xpVal) + (nivel ? ('  ·  Nv. **' + nivel + '**') : ''));
+            }
 
             return interaction.reply({
                 embeds: [
                     new EmbedBuilder()
                         .setColor(meta.color)
                         .setTitle(meta.title)
-                        .setDescription(
-                            [
-                                '👤 <@' + interaction.user.id + '>',
-                                '',
-                                '📍 **Posição:** #' + mine.rank,
-                                '**Nome:** ' + (interaction.user.globalName || interaction.user.username),
-                                '**ID:** `' + interaction.user.id + '`',
-                                '⭐ **XP:** ' + fmt(xpVal) + (nivel ? ('  ·  Nv. **' + nivel + '**') : ''),
-                                '✨ **Saldo:** ' + fmt(saldo) + ' éter'
-                            ].join('\n')
-                        )
+                        .setDescription(meLines.join('\n'))
+                        .setThumbnail(interaction.user.displayAvatarURL({ size: 128 }))
                         .setFooter({ text: foot })
                         .setTimestamp()
                 ],
