@@ -70,19 +70,7 @@ async function handleBanProcess(context, moderator, targetMember, reason, isSlas
     const customId = `ban_confirm_${moderator.id}_${Date.now()}`;
     const embed = new EmbedBuilder()
         .setColor(AETERNUS_PURPLE)
-        .setAuthor({
-            name: 'AETERNUS • CENTRAL DE MODERAÇÃO',
-            iconURL: moderator.displayAvatarURL?.({ size: 64 }) || undefined
-        })
-        .setTitle('🔨 Confirmar banimento')
-        .setDescription('⚠️ Antes de banir esse membro, dá uma conferida nas informações abaixo pra ter certeza de que está tudo certo.\n\n🔨 Se estiver tudo certo, é só confirmar o banimento no botão abaixo.')
-        .addFields(
-            { name: '👮 Moderador', value: `<@${moderator.id}>`, inline: true },
-            { name: '👤 Membro', value: `<@${targetMember.id}>`, inline: true },
-            { name: '📝 Motivo', value: reason.slice(0, 400) }
-        )
-        .setFooter({ text: 'A confirmação expira em 6 minutos • Aeternus' })
-        .setTimestamp();
+        .setDescription('⚠️ Antes de banir esse membro, dá uma conferida nas informações abaixo pra ter certeza de que está tudo certo.\n\n🔨 Se estiver tudo certo, é só confirmar o banimento no botão abaixo.');
 
     const payload = {
         embeds: [embed],
