@@ -121,7 +121,7 @@ async function handleBanProcess(context, moderator, targetMember, reason, isSlas
             }
 
             await currentTarget.ban({
-                reason: `${reason} · por ${moderator.tag}`.slice(0, 512)
+                reason: `${reason} · por ${moderator.user?.tag || moderator.tag || moderator.id}`.slice(0, 512)
             });
 
             const success = new EmbedBuilder()
