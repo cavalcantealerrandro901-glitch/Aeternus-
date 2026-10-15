@@ -93,12 +93,17 @@ module.exports = {
     name: 'mute',
     aliases: ['mutar', 'timeout', 'silenciar'],
     description: 'Silenciar membro',
+    rootSlash: true,
     data: new SlashCommandBuilder()
         .setName('silenciar')
-        .setDescription('Silenciar membro')
-        .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
-        .addStringOption((o) => o.setName('tempo').setDescription('Duração (ex: 10m, 1h)').setRequired(false))
-        .addStringOption((o) => o.setName('motivo').setDescription('Motivo').setRequired(false))
+        .setDescription('Silenciar um membro do servidor')
+        .addSubcommand(sc => sc
+            .setName('membro')
+            .setDescription('Silenciar um membro')
+            .addUserOption(o => o.setName('usuario').setDescription('Membro').setRequired(true))
+            .addStringOption(o => o.setName('tempo').setDescription('Duração (ex: 10m, 1h)').setRequired(false))
+            .addStringOption(o => o.setName('motivo').setDescription('Motivo').setRequired(false))
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async execute(message, args) {
@@ -118,6 +123,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (i.options.getSubcommand(false) !== 'membro') return i.reply({ content: 'Use /silenciar membro para silenciar alguém.', ephemeral: true });
         if (!i.inGuild()) return i.reply({ content: '❌ Este comando só funciona em servidores.', ephemeral: true });
         const user = i.options.getUser('usuario', true);
         const timeStr = i.options.getString('tempo');
