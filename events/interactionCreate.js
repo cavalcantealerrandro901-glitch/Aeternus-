@@ -1,5 +1,6 @@
 const classAdvancement = require('../utils/classAdvancement');
 const autoRepair = require('../utils/autoRepair');
+const repairWorkflow = require('../utils/repairWorkflow');
 const { Collection } = require('discord.js');
 
 async function bridgeSlashToPrefix(interaction, cmd, client) {
@@ -49,6 +50,10 @@ module.exports = {
     name: 'interactionCreate',
     async execute(interaction, client) {
         try {
+            if (interaction.isButton?.() && String(interaction.customId || '').startsWith('repair:')) {
+                await repairWorkflow.handleComponent(interaction);
+                return;
+            }
             if (interaction.isModalSubmit()) {
                 const parts = (interaction.customId || '').split(':');
                 const cmd = client.commands.get(parts[0]);
