@@ -1,30 +1,24 @@
 ---
-title: Registos de Alterações (Changelog)
-description: Histórico de atualizações e novidades do Aeternus.
+title: Changelog
+description: Mudanças recentes que afetam quem joga ou administra.
 ---
 
-# 📝 Changelog do Aeternus
+# O que mudou recentemente
 
-Acompanha todas as novidades, melhorias e correções do bot.
+## Anti-spam e moderação
 
----
+- Avisos → mute → ban com verificação real de permissão e hierarquia de cargo.
+- Se o mute falhar, o bot tenta ban; se o ban falhar, tenta mute longo — e avisa no chat o motivo.
+- `O.spam true` / `false` **sem canal** vale para o **servidor inteiro**. Com `#canal`, vale só naquele canal.
 
-## 🚀 Versão 2.4.0 — Atualização da Economia
-*Lançado a 15 de Outubro*
+## Painel admin
 
-### ✨ Novidades
-- **Novo Sistema de Transferências:** Envia coins para outros utilizadores em tempo real.
-- **Histórico de Transações:** Registo detalhado das movimentações de saldo.
+- Menu de sistemas por categoria (economia, drops, loja, moderação…).
+- Abre pelo botão ou arrastando da borda esquerda; ocupa cerca de 45% da tela.
 
-### 🛠️ Melhorias e Correções
-- Otimização do tempo de resposta do comando `/saldo`.
-- Correção de bugs visuais no painel de perfil.
+## Wiki
 
----
+- Textos reescritos em português mais direto.
+- Páginas de status, suporte e changelog deixaram de ficar em branco.
 
-## 🎵 Versão 2.3.0 — Sistema de Música
-*Lançado a 1 de Setembro*
-
-### ✨ Novidades
-- Adicionado suporte a playlists do Spotify e YouTube.
-- Novo comando de filtro de áudio (`/bassboost`).
+Quando um deploy grande entrar (novos comandos de combate, loja completa, etc.), a entrada nova sobe no topo desta página com data e o que muda na prática para o jogador.
