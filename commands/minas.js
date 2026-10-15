@@ -110,6 +110,9 @@ async function sendResult(game, client, type = null) {
     if (game.resultSent) return;
     game.resultSent = true;
 
+    // Derrota e saque já ficam registrados no painel da partida; não enviar mensagem extra.
+    if (type === 'cash' || type === 'loss') return;
+
     try {
         const channel = await client.channels.fetch(game.channelId).catch(() => null);
         if (!channel) return;
