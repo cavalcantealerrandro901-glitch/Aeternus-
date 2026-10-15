@@ -7,6 +7,8 @@ const abilities=require('./abilities');
 const FILE='class_advancement.json';
 /** Prazo para concluir a missão de avanço (7 dias) */
 const MISSION_DURATION_MS=7*24*60*60*1000;
+/** Penalidade ao falhar: 5% dos atributos e do XP atual */
+const FAIL_PENALTY_PCT=0.05;
 const RARITIES=[['comum','Comum'],['incomum','Incomum'],['rara','Rara'],['epica','Épica'],['lendaria','Lendária'],['mitica','Mítica']];
 function all(){return store.load(FILE,{})||{}}
 function save(d){store.save(FILE,d)}
@@ -45,12 +47,34 @@ function generateMission(userId,targetLevel){
     completed:false,
     claimed:false,
     expired:false,
+    penaltyApplied:false,
     createdAt:now,
     expiresAt:now+MISSION_DURATION_MS
   };
 }
 function getRaw(id){return all()[String(id)]||null}
-/** Expira missão vencida: libera XP e impede resgate. */
+/** Aplica -5% em cada atributo e no XP atual da barra. */
+function applyFailPenalty(userId){
+  const data=xp.all();
+  const cur=data[userId]||{xp:0,level:0,attrs:{},attrPoints:0};
+  if(!cur.attrs||typeof cur.attrs!=='object')cur.attrs={};
+  const attrLoss={};
+  for(const k of xp.ATTR_KEYS){
+    const base=xp.BASE_ATTR[k]||0;
+    const val=Math.max(0,Math.floor(Number(cur.attrs[k])||base));
+    const loss=Math.floor(val*FAIL_PENALTY_PCT);
+    const next=Math.max(base,val-loss);
+    attrLoss[k]=val-next;
+    cur.attrs[k]=next;
+  }
+  const oldXp=Math.max(0,Math.floor(Number(cur.xp)||0));
+  const xpLoss=Math.floor(oldXp*FAIL_PENALTY_PCT);
+  cur.xp=Math.max(0,oldXp-xpLoss);
+  data[userId]=cur;
+  store.save('xp.json',data);
+  return{attrLoss,xpLoss,xpAfter:cur.xp};
+}
+/** Expira missão vencida: penalidade 5%, libera XP e impede resgate. */
 function expireIfNeeded(id){
   const d=all(),k=String(id),m=d[k];
   if(!m||m.claimed||m.expired)return m||null;
@@ -62,6 +86,15 @@ function expireIfNeeded(id){
     m.claimed=true; // libera hasPending / XP
     m.expiredAt=Date.now();
     if(!m.expiresAt)m.expiresAt=deadline;
+    if(!m.penaltyApplied){
+      try{
+        m.penalty=applyFailPenalty(k);
+        m.penaltyApplied=true;
+      }catch(e){
+        console.error('[classAdvancement] penalty',k,e.message);
+        m.penaltyApplied=true;
+      }
+    }
     d[k]=m;
     save(d);
   }
@@ -139,7 +172,7 @@ function claim(id){
   expireIfNeeded(k);
   const m=d[k];
   if(!m)return{ok:false,error:'Nenhum avanço disponível.'};
-  if(m.expired)return{ok:false,error:'Esta missão de avanço **expirou**. O prazo era de 7 dias.'};
+  if(m.expired)return{ok:false,error:'Esta missão de avanço **expirou**. Você sofreu **−5%** nos atributos e no XP. O prazo era de 7 dias.'};
   if(!m.completed)return{ok:false,error:'A missão ainda não foi concluída.'};
   if(m.claimed)return{ok:false,error:'Este avanço já foi resgatado.'};
   const r=rewardFor(k,m);
@@ -152,9 +185,12 @@ function claim(id){
 }
 function missionText(m){
   if(!m)return'Nenhuma missão de avanço disponível.';
-  if(m.expired)return'🧬 **AVANÇO DE CLASSE · Nv.'+m.targetLevel+'**\n\n⏰ Esta missão **expirou** (prazo de 7 dias). O XP foi liberado, mas não há recompensa de avanço.';
+  if(m.expired){
+    const xpLost=m.penalty?.xpLoss??0;
+    return'🧬 **AVANÇO DE CLASSE · Nv.'+m.targetLevel+'**\n\n⏰ Esta missão **expirou** (prazo de 7 dias).\n💀 **Penalidade aplicada:** −5% em todos os atributos e −**'+xpLost+'** XP.\nO XP voltou a fluir, mas não há recompensa de avanço.';
+  }
   const left=formatLeft((Number(m.expiresAt)||0)-Date.now());
-  let t='🧬 **AVANÇO DE CLASSE · Nv.'+m.targetLevel+'**\nRaridade: **'+m.rarityName+'**\n\n'+m.description+'\n\nProgresso: **'+Math.min(m.progress||0,m.target)+'/'+m.target+'**\n⏰ Prazo: **'+left+'** restantes (máx. 7 dias)';
+  let t='🧬 **AVANÇO DE CLASSE · Nv.'+m.targetLevel+'**\nRaridade: **'+m.rarityName+'**\n\n'+m.description+'\n\nProgresso: **'+Math.min(m.progress||0,m.target)+'/'+m.target+'**\n⏰ Prazo: **'+left+'** restantes (máx. 7 dias)\n💀 Falhar: **−5%** atributos e XP';
   if(m.completed)t+='\n\n✅ **Missão concluída. Use O.avanco para resgatar.**';
   else t+='\n\n⚠️ **Você não ganha mais XP até concluir e resgatar esta missão.**';
   return t;
@@ -169,13 +205,13 @@ function onXpResult(client,id,res){
     if(!t)continue;
     const m=ensureForLevel(id,lv);
     if(!m||m.expired)continue;
-    const text=missionText(m)+'\n\n⚠️ **Seu ganho de XP foi congelado até você concluir e resgatar o avanço (prazo: 7 dias).**\nUse `O.avanco` para ver a missão.';
+    const text=missionText(m)+'\n\n⚠️ **Seu ganho de XP foi congelado até você concluir e resgatar o avanço (prazo: 7 dias).**\nSe não completar: **−5% atributos e XP**.\nUse `O.avanco` para ver a missão.';
     client.users.fetch(id).then(u=>u.send(text)).catch(()=>{});
   }
 }
 function notifyCommand(id){
   const m=get(id);
   if(!m||m.claimed||m.expired)return null;
-  return'🧬 **Avanço de classe disponível!** Você alcançou o **nível '+m.targetLevel+'**. '+(m.completed?'Sua missão foi concluída. Use O.avanco para resgatar.':'Complete sua Missão de Avanço em até **7 dias**. **XP congelado até resgatar.**');
+  return'🧬 **Avanço de classe disponível!** Você alcançou o **nível '+m.targetLevel+'**. '+(m.completed?'Sua missão foi concluída. Use O.avanco para resgatar.':'Complete em até **7 dias** ou sofre **−5% atributos e XP**. **XP congelado até resgatar.**');
 }
-module.exports={all,get,hasPending,ensureForLevel,generateMission,recordEvent,claim,missionText,onXpResult,notifyCommand,sources,MISSION_DURATION_MS};
+module.exports={all,get,hasPending,ensureForLevel,generateMission,recordEvent,claim,missionText,onXpResult,notifyCommand,sources,MISSION_DURATION_MS,FAIL_PENALTY_PCT};
