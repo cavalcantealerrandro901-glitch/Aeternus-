@@ -112,6 +112,7 @@ function addXp(userId, amount, meta) {
     const n = Math.floor(Number(amount) || 0);
     if (n === 0) return get(userId);
     const { data, cur } = loadCur(userId);
+    const oldLevel = cur.level;
     cur.xp = Math.max(0, cur.xp + n);
     let leveled = 0;
     while (cur.xp >= xpForLevel(cur.level + 1)) {
@@ -122,7 +123,13 @@ function addXp(userId, amount, meta) {
         if (cur.level > 500) break;
     }
     saveCur(data, userId, cur);
-    return { ...get(userId), leveled, gained: n };
+    return {
+        ...get(userId),
+        leveled,
+        levelsGained: leveled,
+        oldLevel,
+        gained: n
+    };
 }
 
 function setXp(userId, amount) {
