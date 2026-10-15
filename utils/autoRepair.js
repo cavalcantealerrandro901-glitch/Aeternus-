@@ -74,14 +74,14 @@ async function reportError({ source = 'system', error, context = '', tryReload =
     catch (e) { console.warn('[autoRepair] Canal de reparo indisponível: ' + e.message); return { ok: false, reason: 'channel_unavailable', error: e.message, fingerprint }; }
     const roleId = String(process.env.AUTO_REPAIR_ROLE_ID || '').trim();
     const mention = roleId ? '<@&' + roleId + '>' : '';
+    const shortError = String(stack.split('\n')[0] || 'Erro sem descrição').replace(/\s+/g, ' ').slice(0, 220);
     const report = [
-        mention, duplicate ? '# ERRO RECORRENTE · AETERNUS' : '# ERRO DETECTADO · AETERNUS', '',
-        '**Origem:** ' + String(source || 'sistema').slice(0, 80),
-        '**Comando:** ' + String(cmdName || 'não identificado').slice(0, 100),
-        '**Contexto:** ' + String(context || 'não informado').slice(0, 400),
-        '**Incidente:** ' + fingerprint,
-        duplicate ? 'Erro repetido recentemente; análise de IA omitida para evitar spam.' : 'A IA vai analisar o erro na próxima mensagem.',
-        '', '**Erro / stack:**', stack.slice(0, 2400)
+        mention, '⚠️ **AETERNUS · ERRO DETECTADO**',
+        '**Tipo:** ' + String(source || 'sistema').slice(0, 35),
+        '**Comando:** ' + String(cmdName || 'não identificado').slice(0, 65),
+        '**Resumo:** ' + shortError,
+        '**ID:** ' + fingerprint,
+        duplicate ? 'Erro repetido. Use **Testar** para gerar uma nova proposta.' : 'A equipe pode testar a correção pelos botões abaixo.'
     ].filter(Boolean).join('\n');
     try {
         repairWorkflow.registerIncident({
