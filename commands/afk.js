@@ -1,5 +1,8 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const afk = require('../utils/afk');
+
+const AETERNUS_PURPLE = 0x8B5CF6;
+const SAFE_MENTIONS = { parse: [], repliedUser: false };
 
 function fmtSince(ms) {
     const totalSeconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
@@ -21,33 +24,40 @@ function sanitizeReason(value) {
         .slice(0, 180);
 }
 
-const SAFE_MENTIONS = { parse: [], repliedUser: false };
-
 function createAfkMessage(user, reason) {
-    return [
-        '✦ **AETERNUS • CENTRAL DE PRESENÇA**',
-        '',
-        '💤 **MODO AUSENTE ATIVADO**',
-        `▸ **Usuário:** ${user}`,
-        `▸ **Motivo:** ${sanitizeReason(reason)}`,
-        '',
-        'Quem mencionar este usuário será avisado de que ele está ausente.',
-        '✧ *Aeternus • Sistema de utilidades*'
-    ].join('\\n');
+    return new EmbedBuilder()
+        .setColor(AETERNUS_PURPLE)
+        .setAuthor({
+            name: 'AETERNUS • CENTRAL DE PRESENÇA',
+            iconURL: user.displayAvatarURL?.({ size: 64 }) || undefined
+        })
+        .setTitle('💤 Modo ausente ativado')
+        .setDescription('Você está temporariamente indisponível. Quem mencionar você receberá um aviso de ausência.')
+        .addFields(
+            { name: '👤 Usuário', value: `${user}`, inline: true },
+            { name: '🌙 Status', value: 'Ausente', inline: true },
+            { name: '📝 Motivo da ausência', value: sanitizeReason(reason) }
+        )
+        .setFooter({ text: 'Aeternus • Sistema de utilidades' })
+        .setTimestamp();
 }
 
 function createWelcomeBackMessage(user, previous) {
     const duration = previous?.at ? fmtSince(Date.now() - previous.at) : 'Não disponível';
-    return [
-        '✦ **AETERNUS • CENTRAL DE PRESENÇA**',
-        '',
-        '✅ **MODO AUSENTE DESATIVADO**',
-        `👋 ${user}, você está de volta e seu status AFK foi removido.`,
-        `▸ **Tempo de ausência:** ${duration}`,
-        '',
-        '**Tudo certo!** Você voltará a receber as menções normalmente.',
-        '✧ *Aeternus • Sistema de utilidades*'
-    ].join('\\n');
+    return new EmbedBuilder()
+        .setColor(0xA78BFA)
+        .setAuthor({
+            name: 'AETERNUS • CENTRAL DE PRESENÇA',
+            iconURL: user.displayAvatarURL?.({ size: 64 }) || undefined
+        })
+        .setTitle('✅ Você está de volta!')
+        .setDescription(`${user}, seu status AFK foi removido e você voltou a receber menções normalmente.`)
+        .addFields(
+            { name: '🟣 Status', value: 'Online', inline: true },
+            { name: '⏱️ Tempo de ausência', value: duration, inline: true }
+        )
+        .setFooter({ text: 'Aeternus • Sistema de utilidades' })
+        .setTimestamp();
 }
 
 function getReason(args) {
@@ -74,7 +84,7 @@ module.exports = {
             const previous = afk.get(message.author.id);
             afk.clear(message.author.id);
             return message.reply({
-                content: createWelcomeBackMessage(message.author, previous),
+                embeds: [createWelcomeBackMessage(message.author, previous)],
                 allowedMentions: SAFE_MENTIONS
             });
         }
@@ -82,7 +92,7 @@ module.exports = {
         const reason = getReason(args);
         afk.set(message.author.id, reason);
         return message.reply({
-            content: createAfkMessage(message.author, reason),
+            embeds: [createAfkMessage(message.author, reason)],
             allowedMentions: SAFE_MENTIONS
         });
     },
@@ -92,7 +102,7 @@ module.exports = {
             const previous = afk.get(interaction.user.id);
             afk.clear(interaction.user.id);
             return interaction.reply({
-                content: createWelcomeBackMessage(interaction.user, previous),
+                embeds: [createWelcomeBackMessage(interaction.user, previous)],
                 allowedMentions: SAFE_MENTIONS
             });
         }
@@ -100,7 +110,7 @@ module.exports = {
         const reason = getReason([interaction.options.getString('motivo') || '']);
         afk.set(interaction.user.id, reason);
         return interaction.reply({
-            content: createAfkMessage(interaction.user, reason),
+            embeds: [createAfkMessage(interaction.user, reason)],
             allowedMentions: SAFE_MENTIONS
         });
     }
