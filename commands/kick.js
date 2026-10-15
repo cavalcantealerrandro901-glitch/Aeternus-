@@ -76,12 +76,17 @@ async function handleKickProcess(context, moderator, targetMember, reason, isSla
 module.exports = {
     name: 'kick',
     aliases: ['expulsar'],
-    description: 'Expulsar membro',
+    description: 'Expulsar server',
+    rootSlash: true,
     data: new SlashCommandBuilder()
         .setName('expulsar')
-        .setDescription('Expulsar membro')
-        .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
-        .addStringOption((o) => o.setName('motivo').setDescription('Motivo').setRequired(false))
+        .setDescription('Expulsar um membro do servidor')
+        .addSubcommand(sc => sc
+            .setName('server')
+            .setDescription('Expulsar um membro do servidor')
+            .addUserOption(o => o.setName('usuario').setDescription('Membro').setRequired(true))
+            .addStringOption(o => o.setName('motivo').setDescription('Motivo').setRequired(false))
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
 
     async execute(message, args) {
@@ -97,6 +102,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
+        if (i.options.getSubcommand(false) !== 'server') return i.reply({ content: 'Use /expulsar server para expulsar alguém.', ephemeral: true });
         if (!i.inGuild()) return i.reply({ content: '❌ Este comando só funciona em servidores.', ephemeral: true });
         const user = i.options.getUser('usuario', true);
         const reason = i.options.getString('motivo') || 'Sem motivo';
