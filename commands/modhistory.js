@@ -27,7 +27,7 @@ module.exports = {
     aliases: ['historicomod'],
     description: 'Consultar histórico de moderação',
     rootSlash: true,
-    data: new SlashCommandBuilder().setName('historico-mod').setDescription('Consultar registros recentes de moderação')
+    data: new SlashCommandBuilder().setName('historico').setDescription('Consultar registros recentes de moderação')
         .addUserOption(o => o.setName('usuario').setDescription('Filtrar por membro').setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
