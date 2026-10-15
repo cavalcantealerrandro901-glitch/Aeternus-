@@ -81,7 +81,7 @@ async function reportError({ source = 'system', error, context = '', tryReload =
         '**Comando:** ' + String(cmdName || 'não identificado').slice(0, 65),
         '**Resumo:** ' + shortError,
         '**ID:** ' + fingerprint,
-        duplicate ? 'Erro repetido. Use **Testar** para gerar uma nova proposta.' : 'A equipe pode testar a correção pelos botões abaixo.'
+        duplicate ? 'Erro repetido detectado; o autorreparo será iniciado automaticamente.' : 'A IA está preparando e testando uma correção automaticamente.'
     ].filter(Boolean).join('\n');
     try {
         repairWorkflow.registerIncident({
@@ -106,6 +106,8 @@ async function reportError({ source = 'system', error, context = '', tryReload =
             repairWorkflow.registerIncidentMessage(fingerprint, diagnosisMessage);
         } catch (e) { console.warn('[autoRepair] Falha ao enviar diagnóstico: ' + e.message); }
     }
+    // Inicia geração e testes em segundo plano; o alerta não espera a IA terminar.
+    repairWorkflow.autoTestIncident(fingerprint, channel).catch((e) => console.warn('[autoRepair] Autoteste falhou: ' + String(e.message || e)));
     return { ok: true, fingerprint, duplicate, tryReload: !!tryReload, fromCommand: !!fromCommand };
 }
 async function handleCommandError({ cmdName, error, context, message, interaction }) {
