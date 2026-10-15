@@ -4,6 +4,7 @@ const {
     ChannelType
 } = require('discord.js');
 const spamAllow = require('../utils/spamAllow');
+const { setSettings } = require('../utils/settings');
 
 function isMod(member) {
     if (!member) return false;
@@ -47,6 +48,16 @@ function nl() {
     return String.fromCharCode(10);
 }
 
+/** Liga anti-spam no servidor (settings) */
+function enableAntiSpam(guildId) {
+    setSettings(guildId, { automod: { enabled: true, antiSpam: true } });
+}
+
+/** Desliga anti-spam no servidor (settings) */
+function disableAntiSpam(guildId) {
+    setSettings(guildId, { automod: { enabled: false, antiSpam: false } });
+}
+
 module.exports = {
     name: 'spam',
     aliases: ['permitirspam', 'canallivre'],
@@ -83,11 +94,12 @@ module.exports = {
                 [
                     '**Uso do comando spam:**',
                     '',
-                    '`O.spam true` — libera spam em **todo o servidor**',
-                    '`O.spam false` — liga anti-spam em **todo o servidor**',
+                    '`O.spam true` — libera spam em **todo o servidor** (anti-spam **desligado**)',
+                    '`O.spam false` — **ativa** o anti-spam em **todo o servidor**',
                     '`O.spam true #canal` — libera so naquele canal',
                     '`O.spam false #canal` — bloqueia so naquele canal',
                     '',
+                    'Por padrao o anti-spam vem **desligado** em servidores novos.',
                     'Tambem aceita: `sim`, `ativar`, `on`, `1` / `nao`, `off`, `0`'
                 ].join(nl())
             );
@@ -102,6 +114,7 @@ module.exports = {
         if (!mentioned) {
             if (allow) {
                 spamAllow.addServerWide(message.guild.id);
+                disableAntiSpam(message.guild.id);
                 return message.reply(
                     [
                         '✅ Spam **permitido em todo o servidor** (`true`).',
@@ -114,10 +127,11 @@ module.exports = {
             for (var i = 0; i < list.length; i++) {
                 if (list[i] !== '*') spamAllow.remove(message.guild.id, list[i]);
             }
+            enableAntiSpam(message.guild.id);
             return message.reply(
                 [
-                    '🛡️ Spam **bloqueado em todo o servidor** (`false`).',
-                    'Anti-spam **ligado** de novo em todos os canais.'
+                    '🛡️ Anti-spam **ativado** em todo o servidor (`false`).',
+                    'Spam passa a ser bloqueado em todos os canais.'
                 ].join(nl())
             );
         }
@@ -137,10 +151,12 @@ module.exports = {
             );
         }
         spamAllow.remove(message.guild.id, ch.id);
+        // Canal bloqueado: garante que o anti-spam do servidor está ligado
+        enableAntiSpam(message.guild.id);
         return message.reply(
             [
                 '🛡️ Spam **bloqueado** em ' + ch.toString() + ' (`false`).',
-                'Anti-spam **ligado** de novo.'
+                'Anti-spam **ligado** de novo neste canal (e no servidor).'
             ].join(nl())
         );
     },
@@ -162,6 +178,7 @@ module.exports = {
         if (!ch) {
             if (allow) {
                 spamAllow.addServerWide(interaction.guild.id);
+                disableAntiSpam(interaction.guild.id);
                 return interaction.reply({
                     content: [
                         '✅ Spam **permitido em todo o servidor** (`true`).',
@@ -175,10 +192,11 @@ module.exports = {
             for (var j = 0; j < list2.length; j++) {
                 if (list2[j] !== '*') spamAllow.remove(interaction.guild.id, list2[j]);
             }
+            enableAntiSpam(interaction.guild.id);
             return interaction.reply({
                 content: [
-                    '🛡️ Spam **bloqueado em todo o servidor** (`false`).',
-                    'Anti-spam **ligado** de novo em todos os canais.'
+                    '🛡️ Anti-spam **ativado** em todo o servidor (`false`).',
+                    'Spam passa a ser bloqueado em todos os canais.'
                 ].join(nl()),
                 flags: 64
             });
@@ -199,10 +217,11 @@ module.exports = {
         }
 
         spamAllow.remove(interaction.guild.id, ch.id);
+        enableAntiSpam(interaction.guild.id);
         return interaction.reply({
             content: [
                 '🛡️ Spam **bloqueado** em ' + ch.toString() + ' (`false`).',
-                'Anti-spam **ligado** de novo.'
+                'Anti-spam **ligado** de novo neste canal (e no servidor).'
             ].join(nl()),
             flags: 64
         });
