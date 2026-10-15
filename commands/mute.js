@@ -55,29 +55,29 @@ async function handleMuteProcess(context, moderator, targetMember, durationMs, r
 
     collector.on('collect', async i => {
         const originalMessage = i.message || sentMsg;
-
         try {
-            // Confirma o botão sem editar a mensagem original; o resultado será enviado como resposta.
-            if (!i.deferred && !i.replied) {
-                await i.deferUpdate().catch(() => null);
-            }
-
-            if (!targetMember.moderatable) {
-                await originalMessage.reply({ content: '❌ Não consigo silenciar este membro (cargo mais alto).', allowedMentions: { repliedUser: false } }).catch(() => null);
-                return;
-            }
-
-            await targetMember.timeout(durationMs, reason + ' · por ' + moderator.tag);
-
+            await i.deferUpdate();
+            await sentMsg.edit({ components: [new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(normalBtnId).setLabel('Confirmar silêncio').setEmoji('✅').setStyle(ButtonStyle.Danger).setDisabled(true),
+                new ButtonBuilder().setCustomId(silentBtnId).setLabel('Confirmar em silêncio').setEmoji('🤫').setStyle(ButtonStyle.Secondary).setDisabled(true)
+            )] }).catch(() => {});
+            const currentModerator = await context.guild.members.fetch(moderator.id).catch(() => null);
+            const currentTarget = await context.guild.members.fetch(targetMember.id).catch(() => null);
+            const botMember = await context.guild.members.fetchMe().catch(() => null);
+            const safeMentions = { parse: [], repliedUser: false };
+            if (!currentModerator || !currentTarget || !botMember) return originalMessage.reply({ content: '❌ Não consegui verificar os cargos atuais. Nenhuma ação foi executada.', allowedMentions: safeMentions });
+            if (!currentModerator.permissions.has(PermissionFlagsBits.ModerateMembers)) return originalMessage.reply({ content: '❌ Você não tem mais a permissão **Moderar membros**.', allowedMentions: safeMentions });
+            if (!botMember.permissions.has(PermissionFlagsBits.ModerateMembers)) return originalMessage.reply({ content: '❌ Preciso da permissão **Moderar membros** para continuar.', allowedMentions: safeMentions });
+            if (currentTarget.id === currentModerator.id || currentTarget.id === botMember.id) return originalMessage.reply({ content: '❌ Não é permitido silenciar esse usuário.', allowedMentions: safeMentions });
+            if (context.guild.ownerId !== currentModerator.id && currentTarget.roles.highest.comparePositionTo(currentModerator.roles.highest) >= 0) return originalMessage.reply({ content: '❌ Seu cargo precisa estar acima do cargo do membro.', allowedMentions: safeMentions });
+            if (!currentTarget.moderatable) return originalMessage.reply({ content: '❌ Não consigo silenciar esse membro. Confira a hierarquia e minhas permissões.', allowedMentions: safeMentions });
+            await currentTarget.timeout(durationMs, String(reason || 'Sem motivo') + ' · por ' + currentModerator.user.tag);
             const isSilent = i.customId === silentBtnId;
-            const successText = isSilent
-                ? '---------- 🤫 O usuário <@' + targetMember.id + '> foi silenciado silenciosamente, mas quem manda quebrar las regras né!!'
-                : '---------- 🔇 O usuário <@' + targetMember.id + '> foi silenciado com sucesso, mas quem manda quebrar las regras né!!';
-
-            await originalMessage.reply({ content: successText, allowedMentions: { repliedUser: false } }).catch(() => null);
+            const successText = isSilent ? '🤫 <@' + currentTarget.id + '> foi silenciado. A confirmação foi processada em silêncio.' : '🔇 <@' + currentTarget.id + '> foi silenciado com sucesso.';
+            await originalMessage.reply({ content: successText + '\n📝 **Motivo:** ' + String(reason || 'Sem motivo').slice(0, 300), allowedMentions: safeMentions });
         } catch (e) {
             console.error('[mute] Erro ao processar confirmação:', e);
-            await originalMessage.reply({ content: '❌ Não consegui silenciar o usuário.', allowedMentions: { repliedUser: false } }).catch(() => null);
+            await originalMessage.reply({ content: '❌ Não consegui silenciar o usuário. Confira as permissões e a hierarquia.', allowedMentions: { parse: [], repliedUser: false } }).catch(() => null);
         }
     });
     collector.on('end', async (collected, reasonCollected) => {
@@ -102,14 +102,12 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async execute(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-            return message.reply('❌ Sem permissão.');
-        }
+        if (!message.member) return message.reply('❌ Não consegui verificar sua conta neste servidor.');
         const member = resolveMember(message, args);
         if (!member) return message.reply('❌ Mencione o membro ou informe o ID.');
         if (member.id === message.author.id) return message.reply('❌ Você não pode se mutar.');
         if (member.id === message.client.user.id) return message.reply('❌ Não posso me mutar.');
-        if (!member.moderatable) return message.reply('❌ Não consigo silenciar este membro (cargo mais alto).');
+        // As permissões e a hierarquia serão verificadas novamente ao confirmar.
 
         const hasMention = !!message.mentions.members.first();
         const timeArg = args[hasMention ? 1 : 1];
@@ -120,9 +118,7 @@ module.exports = {
     },
 
     async executeSlash(i) {
-        if (!i.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-            return i.reply({ content: '❌ Sem permissão.', ephemeral: true });
-        }
+        if (!i.inGuild()) return i.reply({ content: '❌ Este comando só funciona em servidores.', ephemeral: true });
         const user = i.options.getUser('usuario', true);
         const timeStr = i.options.getString('tempo');
         const reason = i.options.getString('motivo') || 'Sem motivo';
@@ -131,9 +127,7 @@ module.exports = {
         if (!member) return i.reply({ content: '❌ Membro não encontrado.', ephemeral: true });
         if (member.id === i.user.id) return i.reply({ content: '❌ Você não pode se mutar.', ephemeral: true });
         if (member.id === i.client.user.id) return i.reply({ content: '❌ Não posso me mutar.', ephemeral: true });
-        if (!member.moderatable) {
-            return i.reply({ content: '❌ Não consigo silenciar este membro (cargo mais alto).', ephemeral: true });
-        }
+        // As permissões e a hierarquia serão verificadas novamente ao confirmar.
 
         const durationMs = parseDuration(timeStr);
         await handleMuteProcess(i, i.user, member, durationMs, reason, true);
