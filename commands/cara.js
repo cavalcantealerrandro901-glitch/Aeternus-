@@ -85,7 +85,15 @@ module.exports = {
                 ...payload,
                 content: '<@' + ownerId + '> 🪙 **Nova rodada de cara ou coroa!**'
             });
-            await interaction.reply({ content: '✅ Nova rodada enviada! A mensagem anterior foi mantida.', ephemeral: true });
+            const disabledRows = interaction.message.components.map((row) =>
+                new ActionRowBuilder().addComponents(
+                    row.components.map((component) =>
+                        ButtonBuilder.from(component).setDisabled(true)
+                    )
+                )
+            );
+            await interaction.message.edit({ components: disabledRows });
+            await interaction.reply({ content: '✅ Nova rodada enviada! O botão da mensagem anterior foi desativado.', ephemeral: true });
             return sent;
         });
     },
