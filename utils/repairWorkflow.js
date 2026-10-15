@@ -21,7 +21,27 @@ function targetFromError(error) {
   return file;
 }
 function registerIncident(data) {
-  incidents.set(data.id, Object.assign({}, data, { targetPath: targetFromError(data.error), status: 'pending', tested: false, candidate: null }));
+  incidents.set(data.id, Object.assign({}, data, { messages: [], targetPath: targetFromError(data.error), status: 'pending', tested: false, candidate: null }));
+}
+function registerIncidentMessage(id, message) {
+  const item = incidents.get(id);
+  if (!item || !message) return;
+  item.messages.push({ channelId: String(message.channelId || message.channel?.id || ''), messageId: String(message.id || '') });
+}
+async function deleteIncidentMessages(item) {
+  const client = global.aeternusClient;
+  if (!client) return;
+  for (const ref of item.messages || []) {
+    if (!ref.channelId || !ref.messageId) continue;
+    try {
+      const channel = client.channels.cache.get(ref.channelId) || await client.channels.fetch(ref.channelId);
+      if (!channel?.messages?.fetch) continue;
+      const message = await channel.messages.fetch(ref.messageId);
+      if (message) await message.delete();
+    } catch (e) {
+      console.warn('[repairWorkflow] Não foi possível apagar mensagem do incidente ' + item.id + ': ' + String(e.message || e));
+    }
+  }
 }
 function canManage(i) {
   const owner = String(process.env.OWNER_ID || '');
@@ -115,8 +135,8 @@ async function handleComponent(i) {
       });
       if (!res.ok) throw new Error('GitHub recusou a gravação: HTTP ' + res.status);
       const data = await res.json(); item.status = 'approved';
-      await i.editReply({ content: '✅ Correção gravada no GitHub: ' + String(data.commit && data.commit.html_url || 'commit criado') }).catch(() => {});
-      await i.message.edit({ components: [createActionRow(id, true, true)] }).catch(() => {});
+      await deleteIncidentMessages(item);
+      await i.editReply({ content: '✅ Correção gravada no GitHub e mensagens deste incidente apagadas do canal. Commit: ' + String(data.commit && data.commit.html_url || 'criado') }).catch(() => {});
       return true;
     }
     if (action === 'reject') {
@@ -129,4 +149,4 @@ async function handleComponent(i) {
   } catch (e) { await i.editReply({ content: '⚠️ Não foi possível concluir: ' + String(e.message || e).slice(0, 1000) }).catch(() => {}); }
   return true;
 }
-module.exports = { registerIncident, createActionRow, handleComponent };
+module.exports = { registerIncident, registerIncidentMessage, createActionRow, handleComponent };
