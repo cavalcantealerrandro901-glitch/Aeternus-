@@ -78,7 +78,7 @@ module.exports = {
     aliases: ['expulsar'],
     description: 'Expulsar membro',
     data: new SlashCommandBuilder()
-        .setName('expulsar-membro')
+        .setName('expulsar')
         .setDescription('Expulsar membro')
         .addUserOption((o) => o.setName('usuario').setDescription('Membro').setRequired(true))
         .addStringOption((o) => o.setName('motivo').setDescription('Motivo').setRequired(false))
