@@ -174,6 +174,8 @@ const ITEMS = {
     livro_vida: { id: 'livro_vida', name: 'Livro de Vida', emoji: '📙', category: 'consumivel', rarity: 'raro', effects: {}, bookAttr: 'vida', consumable: true }
 };
 
+const store = require('./store');
+
 const COMMON_CLASS_ITEMS = require('./commonClassItems');
 for (const item of COMMON_CLASS_ITEMS) ITEMS[item.id] = item;
 
