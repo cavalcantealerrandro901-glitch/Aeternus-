@@ -217,6 +217,8 @@ async function autoTestIncident(id, channel) {
   const item = incidents.get(id);
   if (!item || item.status !== 'pending' || item.autoTesting) return;
   item.autoTesting = true;
+  item.channelId = String(channel?.id || item.channelId || '');
+  item.guildId = String(channel?.guild?.id || item.guildId || '');
   try {
     if (!item.targetPath) throw new Error('Não foi possível identificar o arquivo com segurança no erro.');
     const original = await githubFile(item.targetPath);
@@ -256,6 +258,46 @@ async function autoTestIncident(id, channel) {
     item.autoTesting = false;
   }
 }
+function normalizeRepairText(value) {
+  return String(value || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9\\s]/g, ' ').replace(/\\s+/g, ' ').trim();
+}
+function activeIncidentForChannel(channelId) {
+  const list = Array.from(incidents.values()).filter((item) => item.status === 'pending' && String(item.channelId || '') === String(channelId || ''));
+  return list.length ? list[list.length - 1] : null;
+}
+async function handleRepairChannelMessage(message) {
+  if (!message || !message.guild || !message.channel || message.author?.bot) return false;
+  const channelId = String(process.env.AUTO_REPAIR_CHANNEL_ID || '').trim();
+  if (!channelId || String(message.channel.id) !== channelId) return false;
+  const owner = String(process.env.OWNER_ID || '');
+  const role = String(process.env.AUTO_REPAIR_ROLE_ID || '');
+  const isOwner = owner && message.author.id === owner;
+  const memberRoles = message.member?.roles?.cache;
+  if (!(isOwner || (role && memberRoles?.has?.(role)))) return false;
+  const item = activeIncidentForChannel(message.channel.id);
+  if (!item) return false;
+  registerIncidentMessage(item.id, message);
+  const text = normalizeRepairText(message.content);
+  const commands = new Set(['qual o erro','qual foi o erro','explica o erro','detalhes do erro','detalhes','status','status do reparo','qual arquivo','arquivo','resumo','resumo da correcao','a correcao passou','testes','resultado dos testes','ajuda reparo','comandos reparo','qual a solucao','qual a causa']);
+  if (!commands.has(text)) return false;
+  const error = String(item.errorText || item.error?.stack || item.error?.message || item.error || 'Detalhes do erro não disponíveis.').slice(0, 1100);
+  const summary = item.candidate?.explanation || 'A IA ainda não preparou um resumo da correção.';
+  let response;
+  if (text.includes('status') || text.includes('testes') || text === 'a correcao passou' || text === 'resultado dos testes') {
+    response = '🧭 **Status do incidente ' + item.id + '**\n' + '• Estado: ' + (item.autoTesting ? 'IA analisando/testando' : item.tested ? 'correção testada, aguardando decisão' : 'aguardando análise ou testes') + '\n' + '• Arquivo: ' + String(item.targetPath || 'não identificado') + '\n' + '• Teste: ' + String(item.lastTest?.detail || (item.tested ? 'Aprovado' : 'Ainda não concluído')).slice(0, 500);
+  } else if (text === 'qual arquivo' || text === 'arquivo') {
+    response = '📄 **Arquivo relacionado:** ' + String(item.targetPath || 'não identificado com segurança');
+  } else if (text.includes('resumo') || text.includes('solucao')) {
+    response = '🛠️ **Resumo da correção proposta**\n' + summary + '\nA proposta só será gravada se passar nos testes e alguém autorizado aprovar.';
+  } else if (text.includes('ajuda') || text.includes('comandos')) {
+    response = '💬 **Perguntas disponíveis neste canal**\n`qual o erro` · `detalhes` · `status` · `qual arquivo` · `resumo da correção` · `testes` · `qual a causa` · `qual a solução`\nUse os botões **Aprovar** ou **Recusar** para decidir.';
+  } else {
+    response = '🧩 **Erro do incidente ' + item.id + '**\n' + error;
+  }
+  const sent = await message.channel.send({ content: response.slice(0, 1900), allowedMentions: { parse: [] } }).catch(() => null);
+  if (sent) registerIncidentMessage(item.id, sent);
+  return true;
+}
 async function handleComponent(i) {
   if (!String(i.customId || '').startsWith('repair:')) return false;
   if (!canManage(i)) { await i.reply({ content: '⛔ Somente a equipe autorizada pode usar estes botões.', ephemeral: true }).catch(() => {}); return true; }
@@ -285,12 +327,12 @@ async function handleComponent(i) {
     }
     if (action === 'reject') {
       item.status = 'rejected'; item.candidate = null; item.tested = false;
-      await i.editReply({ content: '❌ Proposta recusada. Nenhum código foi gravado no GitHub.' }).catch(() => {});
-      await i.message.edit({ components: [createActionRow(id, false, true)] }).catch(() => {});
+      await deleteIncidentMessages(item);
+      await i.editReply({ content: '❌ Proposta recusada. Nenhum código foi gravado. As mensagens do incidente, inclusive as enviadas pela equipe, foram apagadas do canal.' }).catch(() => {});
       return true;
     }
     await i.editReply({ content: 'Ação desconhecida.' }).catch(() => {});
   } catch (e) { await i.editReply({ content: '⚠️ Não foi possível concluir: ' + String(e.message || e).slice(0, 1000) }).catch(() => {}); }
   return true;
 }
-module.exports = { registerIncident, registerIncidentMessage, createActionRow, handleComponent, autoTestIncident };
+module.exports = { registerIncident, registerIncidentMessage, createActionRow, handleComponent, autoTestIncident, handleRepairChannelMessage };
