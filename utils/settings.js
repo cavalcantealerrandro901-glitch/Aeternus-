@@ -6,10 +6,11 @@ const DEFAULT = {
     welcome: { enabled: false, channelId: null, message: 'Bem-vindo {user} ao **{server}**!', embed: true },
     leave: { enabled: false, channelId: null, message: '{user} saiu de **{server}**.' },
     automod: {
-        enabled: true,
-        antiSpam: true,
+        // Desligado por padrão: só ativa quando o admin usar o comando (ex: O.spam false)
+        enabled: false,
+        antiSpam: false,
         antiLink: false,
-        antiInvite: true,
+        antiInvite: false,
         maxMessages: 6,
         windowMs: 5000,
         maxDuplicates: 3,
