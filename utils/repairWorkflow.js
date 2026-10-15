@@ -21,7 +21,8 @@ function targetFromError(error) {
   return file;
 }
 function registerIncident(data) {
-  incidents.set(data.id, Object.assign({}, data, { messages: [], targetPath: targetFromError(data.error), status: 'pending', tested: false, candidate: null }));
+  const previous = incidents.get(data.id);
+  incidents.set(data.id, Object.assign({}, data, { messages: previous && previous.status === 'pending' ? previous.messages : [], targetPath: targetFromError(data.error), status: 'pending', tested: false, candidate: null }));
 }
 function registerIncidentMessage(id, message) {
   const item = incidents.get(id);
