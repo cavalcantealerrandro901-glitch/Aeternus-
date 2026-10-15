@@ -115,11 +115,16 @@ async function handleBanProcess(context, moderator, targetMember, reason, isSlas
             const success = new EmbedBuilder()
                 .setColor(0x22C55E)
                 .setTitle('✅ Banimento concluído')
-                .setDescription(`<@${targetMember.id}> foi banido do servidor.`)
-                .addFields({ name: '📝 Motivo', value: reason.slice(0, 400) })
+                .setDescription('O banimento foi realizado com sucesso.')
+                .addFields(
+                    { name: '👮 Moderador', value: `${currentModerator.displayName} (<@${currentModerator.id}>)`, inline: true },
+                    { name: '⛔ Acusado', value: `<@${currentTarget.id}>`, inline: true },
+                    { name: '📝 Motivo', value: reason.slice(0, 400) }
+                )
                 .setFooter({ text: 'Aeternus • Registro de moderação' })
                 .setTimestamp();
 
+            // Responde à mensagem inicial, mantendo-a marcada como referência.
             await sentMsg.reply({ embeds: [success], allowedMentions: SAFE_MENTIONS });
         } catch (error) {
             console.error('[ban] Falha ao banir:', error?.message || error);
