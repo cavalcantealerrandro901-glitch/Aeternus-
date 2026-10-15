@@ -52,6 +52,7 @@ const CATEGORIES = {
             { name: 'unmute', desc: 'Remover silêncio', usage: 'unmute @user', example: 'O.unmute @user', about: 'Remove o timeout.' },
             { name: 'warn', desc: 'Advertir', usage: 'warn @user [motivo]', example: 'O.warn @user', about: 'Registra uma advertência.' },
             { name: 'warns', desc: 'Ver advertências', usage: 'warns [@user]', example: 'O.warns @user', about: 'Lista as advertências do membro.' },
+            { name: 'modhistory', desc: 'Histórico de moderação', usage: 'modhistory [@user]', example: 'O.modhistory @user', about: 'Consulta os últimos registros de moderação; requer permissão de moderar membros.' },
             { name: 'limpar', desc: 'Limpar mensagens', usage: 'limpar <1-100>', example: 'O.limpar 20', about: 'Apaga mensagens recentes do canal.' },
             { name: 'lock', desc: 'Trancar canal', usage: 'lock', example: 'O.lock', about: 'Impede @everyone de enviar mensagens.' },
             { name: 'unlock', desc: 'Destrancar canal', usage: 'unlock', example: 'O.unlock', about: 'Libera o envio de mensagens novamente.' },
