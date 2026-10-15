@@ -237,7 +237,7 @@ module.exports = {
                     '',
                     '**Tudo certo!** Você voltará a receber as menções normalmente.',
                     '✧ *Aeternus • Sistema de utilidades*'
-                ].join('\\n');
+                ].join('\n');
 
                 message.reply({
                     content: returnMessage,
