@@ -1,8 +1,12 @@
 const {
     EmbedBuilder,
+    ContainerBuilder,
+    TextDisplayBuilder,
+    SeparatorBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags
 } = require('discord.js');
 
 const eter = require('../utils/eter');
@@ -96,9 +100,9 @@ async function autoEnd(game, client) {
         const msg = ch ? await ch.messages.fetch(game.messageId).catch(() => null) : null;
         if (msg) {
             await msg.edit({
-                content: '<@' + game.userId + '>',
-                embeds: [panelEmbed(game)],
-                components: fullComponents(game, true)
+                
+                
+                components: panelComponents(game, true)
             }).catch(() => {});
         }
         const type = game.dead ? 'loss' : game.cashed ? 'cash' : null;
@@ -161,7 +165,7 @@ async function sendResult(game, client, type = null) {
         }
 
         const result = await channel.send({
-            content: '<@' + game.userId + '>',
+            
             reply: game.messageId
                 ? { messageReference: game.messageId, failIfNotExists: false }
                 : undefined,
@@ -180,49 +184,52 @@ async function sendResult(game, client, type = null) {
     } catch (_) {}
 }
 
-function panelEmbed(game) {
+function panelText(game) {
     const opened = game.opened.size;
     const bombs = game.bombCount;
     const safeTotal = TOTAL - bombs;
     const remaining = Math.max(0, safeTotal - opened);
     const currentMult = multAt(opened, bombs);
     const nextMult = opened < safeTotal ? multAt(opened + 1, bombs) : currentMult;
-    const nextGain =
-        opened < safeTotal
-            ? potentialAt(game.amount, opened + 1, bombs)
-            : potentialAt(game.amount, opened, bombs);
+    const nextGain = opened < safeTotal
+        ? potentialAt(game.amount, opened + 1, bombs)
+        : potentialAt(game.amount, opened, bombs);
 
-    const boardText = Array.from({ length: ROWS }, (_, y) =>
-        Array.from({ length: COLS }, (_, x) => {
-            const i = y * COLS + x;
-            if (game.opened.has(i)) return '💎';
-            if ((game.dead || game.cashed) && game.bombs.has(i)) return '💣';
-            return '🟦';
-        }).join(' ')
-    ).join('\n');
+    return [
+        '# ✦ AETERNUS • MINES' + (game.testMode ? ' • TESTE' : ''),
+        game.testMode ? '🧪 **MODO TESTE** — nenhum Éter será cobrado ou creditado.' : 'Abra casas seguras e saque antes de encontrar uma mina.',
+        '',
+        '**Informações da partida**',
+        'Aposta: ' + fmt(game.amount) + ' ✨',
+        'Bombas: 💣 ' + bombs + '  •  Casas seguras restantes: ' + remaining + '/' + safeTotal,
+        'Multiplicador atual: **' + currentMult.toFixed(2) + 'x**',
+        'Próximo: **' + nextMult.toFixed(2) + 'x**  •  ' + fmt(nextGain) + ' ✨',
+        '',
+        '**Tabuleiro interativo** — toque em uma casa abaixo.',
+        '💎 Casa segura aberta  •  💣 Mina  •  Botões numerados = casas fechadas',
+        '',
+        '🎲 **Aleatório** — abre uma casa escolhida automaticamente.',
+        '🔄 **Atualizar** — atualiza as informações da partida.',
+        game.dead ? '❌ **Partida encerrada: mina encontrada.**' : '',
+        game.cashed ? '✅ **Partida encerrada.**' : '',
+        '',
+        '-# Partida #' + String(game.partida).padStart(4, '0') + ' • Éter ✨ • AFK 7 min • ' + betFooter()
+    ].filter(Boolean).join('\n');
+}
 
-    const description = [
-        '**Tabuleiro**',
-        boardText,
-        '',
-        ...(game.testMode ? ['🧪 MODO TESTE — nenhum Éter será cobrado ou creditado.', ''] : []),
-        'Aposta: ' + fmt(game.amount) + ' ✨', 
-        'Casas: 💣 ' + bombs + '  •  ' + remaining + '/' + safeTotal,
-        'Multiplicador atual: ' + currentMult.toFixed(2) + 'x',
-        'Prox multi: ' + nextMult.toFixed(2) + 'x  •  ' + fmt(nextGain) + ' ✨',
-        '',
-        '**Controles**',
-        '🎲 **Aleatório** — abre uma casa livre ao acaso.',
-        '🔄 **Atualizar** — atualiza o tabuleiro e as informações.',
-        '',
-        'Partida #' + String(game.partida).padStart(4, '0')
-    ];
+function panelComponents(game, reveal = false) {
+    const container = new ContainerBuilder()
+        .setAccentColor(game.dead ? 0xED4245 : game.cashed ? 0x57F287 : 0x5865F2)
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(panelText(game)))
+        .addSeparatorComponents(new SeparatorBuilder());
 
-    return new EmbedBuilder()
-        .setColor(game.dead ? 0xED4245 : game.cashed ? 0x57F287 : 0x5865F2)
-        .setTitle(game.testMode ? '✦ AETERNUS • MINES • TESTE' : '✦ AETERNUS • MINES')
-        .setDescription(description.join('\n'))
-        .setFooter({ text: 'Éter ✨ · AFK 7 min · ' + betFooter() });
+    for (const row of boardRows(game, reveal)) container.addActionRowComponents(row);
+
+    container
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addActionRowComponents(controlsRow(game));
+
+    return [container];
 }
 
 function boardRows(game, reveal = false) {
@@ -250,7 +257,7 @@ function boardRows(game, reveal = false) {
             }
             row.addComponents(
                 new ButtonBuilder()
-                    .setCustomId('minas:cell:' + game.id + ':' + i)
+                    .setCustomId('minas-teste:cell:' + game.id + ':' + i)
                     .setLabel(label)
                     .setStyle(style)
                     .setDisabled(ended || opened)
@@ -267,7 +274,7 @@ function controlsRow(game) {
     if (ended) {
         return new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('minas:again:' + game.id)
+                .setCustomId('minas-teste:again:' + game.id)
                 .setLabel('Novamente')
                 .setStyle(ButtonStyle.Primary)
         );
@@ -278,17 +285,17 @@ function controlsRow(game) {
 
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-            .setCustomId('minas:random:' + game.id)
+            .setCustomId('minas-teste:random:' + game.id)
             .setLabel('Aleatório')
             .setStyle(ButtonStyle.Primary)
             .setDisabled(ended),
         new ButtonBuilder()
-            .setCustomId('minas:refresh:' + game.id)
+            .setCustomId('minas-teste:refresh:' + game.id)
             .setLabel('Atualizar')
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(ended),
         new ButtonBuilder()
-            .setCustomId('minas:cash:' + game.id)
+            .setCustomId('minas-teste:cash:' + game.id)
             .setLabel(game.fun ? 'Encerrar' : 'Sacar • ' + fmt(value) + ' ✨')
             .setStyle(ButtonStyle.Success)
             .setDisabled(ended || opened <= 0)
@@ -374,9 +381,9 @@ function pickRandom(game) {
 function endPayload(game) {
     clearTimer(game);
     return {
-        content: '<@' + game.userId + '>',
-        embeds: [panelEmbed(game)],
-        components: fullComponents(game, true)
+        
+        
+        components: panelComponents(game, true)
     };
 }
 
@@ -420,9 +427,10 @@ module.exports = {
         }
 
         const msg = await message.reply({
-            content: '<@' + message.author.id + '>',
-            embeds: [panelEmbed(game)],
-            components: fullComponents(game),
+            
+            
+            flags: MessageFlags.IsComponentsV2,
+            components: panelComponents(game),
             allowedMentions: { users: [message.author.id] }
         });
 
@@ -508,9 +516,9 @@ module.exports = {
 
                 await interaction
                     .update({
-                        content: '<@' + game.userId + '>',
-                        embeds: [panelEmbed(game)],
-                        components: boardRows(game, true)
+                        
+                        
+                        components: panelComponents(game, true)
                     })
                     .catch(() => {});
 
@@ -530,14 +538,15 @@ module.exports = {
 
                 const msg = await channel
                     .send({
-                        content: '<@' + newGame.userId + '>',
+                        
                         reply: {
                             messageReference: interaction.message.id,
                             failIfNotExists: false
                         },
                         allowedMentions: { users: [newGame.userId] },
-                        embeds: [panelEmbed(newGame)],
-                        components: fullComponents(newGame)
+                        
+                        flags: MessageFlags.IsComponentsV2,
+                        components: panelComponents(newGame)
                     })
                     .catch(() => null);
 
@@ -553,8 +562,8 @@ module.exports = {
             if (action === 'refresh') {
                 return interaction
                     .update({
-                        embeds: [panelEmbed(game)],
-                        components: fullComponents(game, game.dead || game.cashed)
+                        
+                        components: panelComponents(game, game.dead || game.cashed)
                     })
                     .catch(() => {});
             }
@@ -573,7 +582,7 @@ module.exports = {
                     return;
                 }
                 return interaction
-                    .update({ embeds: [panelEmbed(game)], components: fullComponents(game) })
+                    .update({  components: panelComponents(game) })
                     .catch(() => {});
             }
 
@@ -633,7 +642,7 @@ module.exports = {
                     return;
                 }
                 return interaction
-                    .update({ embeds: [panelEmbed(game)], components: fullComponents(game) })
+                    .update({  components: panelComponents(game) })
                     .catch(() => {});
             }
         } finally {
