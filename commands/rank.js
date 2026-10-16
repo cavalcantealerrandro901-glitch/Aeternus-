@@ -285,8 +285,9 @@ async function sendRank(ctx, mode, page = 0) {
     // Só a imagem: o bot escreve nome/id/xp|saldo e coloca as fotos no card
     const rows = [];
     for (const e of slice) {
-        let u = ctx.client.users.cache.get(e.id) || null;
-        if (!u) u = await ctx.client.users.fetch(e.id).catch(() => null);
+        // Não consulta a API do Discord para cada usuário ao trocar de página.
+        // Usa o cache disponível e renderiza um avatar genérico quando não estiver em cache.
+        const u = ctx.client.users.cache.get(e.id) || null;
         if (u?.bot) continue;
         rows.push({
             name: u ? (u.globalName || u.username) : ('usuário-' + String(e.id).slice(-4)),
@@ -333,6 +334,33 @@ async function sendRank(ctx, mode, page = 0) {
         // A interação de botão atualiza a mesma mensagem; o anexo é substituído pelo card da página nova.
         attachments: []
     };
+}
+
+
+async function editRankMessage(interaction, payload, action) {
+    // deferUpdate já reconheceu o clique; tenta editar a resposta da interação,
+    // com fallback para a mensagem original e uma nova tentativa em erros transitórios.
+    const attempts = [
+        () => interaction.editReply(payload),
+        () => interaction.message.edit(payload),
+        () => interaction.message.edit(payload)
+    ];
+    let lastError;
+    for (let i = 0; i < attempts.length; i++) {
+        try {
+            return await attempts[i]();
+        } catch (err) {
+            lastError = err;
+            const transient = err?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+                err?.code === 'ETIMEDOUT' ||
+                err?.code === 'ECONNRESET' ||
+                err?.status === 502 || err?.status === 503 || err?.status === 504;
+            if (!transient || i === attempts.length - 1) break;
+            await new Promise(resolve => setTimeout(resolve, 700 * (i + 1)));
+        }
+    }
+    console.error('[rank] Falha ao ' + action + ':', lastError?.message || lastError);
+    return null;
 }
 
 module.exports = {
@@ -395,9 +423,7 @@ module.exports = {
 
             const myPage = Math.floor((mine.rank - 1) / PAGE_SIZE);
             const payload = await sendRank(interaction, mode, myPage);
-            return interaction.message.edit(payload).catch((err) => {
-                console.error('[rank] Falha ao abrir página do usuário:', err.message);
-            });
+            return editRankMessage(interaction, payload, 'abrir página do usuário');
         }
 
         if (action === 'prev') page = Math.max(0, page - 1);
@@ -407,8 +433,6 @@ module.exports = {
         await interaction.deferUpdate().catch(() => {});
         if (interaction.replied) return;
         const payload = await sendRank(interaction, mode, page);
-        return interaction.message.edit(payload).catch((err) => {
-            console.error('[rank] Falha ao editar página do card:', err.message);
-        });
+        return editRankMessage(interaction, payload, 'editar página do card');
     }
 };
