@@ -39,20 +39,31 @@ function multAt(opened, bombs) {
         Math.min(Number(bombs) || 1, TOTAL - 1)
     );
 
+    // Curva de teste calibrada para 1 bomba: 7 casas seguras = 1.98x.
+    // Mantém uma progressão crescente e usa a fórmula clássica para outros
+    // números de bombas, aplicando um fator de ajuste para a curva de teste.
     let m = 1;
-
     for (let i = 0; i < o; i++) {
         const tilesLeft = TOTAL - i;
         const safeLeft = TOTAL - b - i;
-
         if (safeLeft <= 0 || tilesLeft <= 0) break;
-
         m *= tilesLeft / safeLeft;
     }
 
     m *= HOUSE;
-    m = Math.min(m, MAX_MULT);
 
+    if (b === 1) {
+        const sevenHouseClassic = 0.96;
+        let classicAtSeven = 1;
+        for (let i = 0; i < 7; i++) {
+            classicAtSeven *= (TOTAL - i) / (TOTAL - 1 - i);
+        }
+        classicAtSeven *= sevenHouseClassic;
+        const calibration = 1.98 / classicAtSeven;
+        m *= Math.pow(calibration, Math.min(o, 7) / 7);
+    }
+
+    m = Math.min(m, MAX_MULT);
     return Number(Math.max(1, m).toFixed(2));
 }
 
