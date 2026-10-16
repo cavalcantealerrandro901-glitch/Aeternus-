@@ -244,16 +244,24 @@ function panelComponents(game, reveal = false) {
 
     for (const row of boardRows(game, reveal)) container.addActionRowComponents(row);
 
-    // O Container do Discord aceita no máximo 10 componentes filhos.
-    // Removemos o separador extra para caber grade, rodapé e controles.
-    container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(panelFooter(game))
-    );
-
     const rows = controlsRows(game);
-    if (game.dead || game.cashed || reveal) {
-        for (const row of rows) container.addActionRowComponents(row);
+
+    // Ordem: tabuleiro → Aleatório/Atualizar → aviso e partida → Sacar.
+    // O aviso e o número da partida compartilham um TextDisplay para respeitar
+    // o limite de 10 componentes filhos do Container V2.
+    if (rows.length === 2) {
+        container.addActionRowComponents(rows[0]);
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                '-# Quanto mais casas de éter você encontrar, mais éter você ganhará! Mas não seja guloso, se uma mina for encontrada, você sairá sem nada!\n' +
+                panelFooter(game).replace('EXPEDIÇÃO #', 'Partida #')
+            )
+        );
+        container.addActionRowComponents(rows[1]);
     } else {
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(panelFooter(game).replace('EXPEDIÇÃO #', 'Partida #'))
+        );
         for (const row of rows) container.addActionRowComponents(row);
     }
 
