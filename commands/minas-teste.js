@@ -220,9 +220,11 @@ function panelComponents(game, reveal = false) {
 
     for (const row of boardRows(game, reveal)) container.addActionRowComponents(row);
 
-    container
-        .addSeparatorComponents(new SeparatorBuilder())
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(panelFooter(game)));
+    // O Container do Discord aceita no máximo 10 componentes filhos.
+    // Removemos o separador extra para caber grade, rodapé e controles.
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(panelFooter(game))
+    );
 
     const rows = controlsRows(game);
     if (game.dead || game.cashed || reveal) {
