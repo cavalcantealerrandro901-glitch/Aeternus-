@@ -200,20 +200,16 @@ function panelText(game) {
         '',
         '**Informações da partida**',
         'Aposta: ' + fmt(game.amount) + ' ✨',
-        'Bombas: 💣 ' + bombs + '  •  Casas seguras restantes: ' + remaining + '/' + safeTotal,
+        'Bombas: 💣 ' + bombs + ' • Seguras: ' + remaining + '/' + safeTotal,
         'Multiplicador atual: **' + currentMult.toFixed(2) + 'x**',
-        'Próximo: **' + nextMult.toFixed(2) + 'x**  •  ' + fmt(nextGain) + ' ✨',
-        '',
-        '**Tabuleiro interativo** — toque em uma casa abaixo.',
-        '💎 Casa segura aberta  •  💣 Mina  •  Botões numerados = casas fechadas',
-        '',
-        '🎲 **Aleatório** — abre uma casa escolhida automaticamente.',
-        '🔄 **Atualizar** — atualiza as informações da partida.',
+        'Próximo: **' + nextMult.toFixed(2) + 'x** • ' + fmt(nextGain) + ' ✨',
         game.dead ? '❌ **Partida encerrada: mina encontrada.**' : '',
-        game.cashed ? '✅ **Partida encerrada.**' : '',
-        '',
-        '-# Partida #' + String(game.partida).padStart(4, '0') + ' • Éter ✨ • AFK 7 min • ' + betFooter()
-    ].filter(Boolean).join('\n');
+        game.cashed ? '✅ **Partida encerrada.**' : ''
+    ].filter(Boolean).join('\\n');
+}
+
+function panelFooter(game) {
+    return '-# Partida #' + String(game.partida).padStart(4, '0') + ' • Éter ✨ • AFK 7 min • ' + betFooter();
 }
 
 function panelComponents(game, reveal = false) {
@@ -224,7 +220,9 @@ function panelComponents(game, reveal = false) {
 
     for (const row of boardRows(game, reveal)) container.addActionRowComponents(row);
 
-    container.addSeparatorComponents(new SeparatorBuilder());
+    container
+        .addSeparatorComponents(new SeparatorBuilder())
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(panelFooter(game)));
 
     const rows = controlsRows(game);
     if (game.dead || game.cashed || reveal) {
