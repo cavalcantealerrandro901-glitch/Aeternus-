@@ -204,7 +204,7 @@ function panelText(game) {
 
     return [
         '# ✦ AETERNUS • MINES' + (game.testMode ? ' • TESTE' : ''),
-        game.testMode ? '🧪 **MODO TESTE** — nenhum Éter será cobrado ou creditado.' : 'Abra casas seguras e saque antes de encontrar uma mina.',
+        game.testMode ? '🧪 **MODO TESTE** — nenhum Éter será cobrado ou creditado.' : '',
         '',
         '**Informações da partida**',
         'Aposta: ' + fmt(game.amount) + ' ✨',
@@ -217,7 +217,7 @@ function panelText(game) {
 }
 
 function panelFooter(game) {
-    return '-# Partida #' + String(game.partida).padStart(4, '0') + ' • Éter ✨ • AFK 7 min • ' + betFooter();
+    return '-# Partida #' + String(game.partida).padStart(4, '0');
 }
 
 function panelComponents(game, reveal = false) {
@@ -238,12 +238,7 @@ function panelComponents(game, reveal = false) {
     if (game.dead || game.cashed || reveal) {
         for (const row of rows) container.addActionRowComponents(row);
     } else {
-        container
-            .addActionRowComponents(rows[0])
-            .addTextDisplayComponents(
-                new TextDisplayBuilder().setContent('💡 **Dica:** abra as casas com atenção e saque quando quiser garantir o valor acumulado.')
-            )
-            .addActionRowComponents(rows[1]);
+        for (const row of rows) container.addActionRowComponents(row);
     }
 
     return [container];
