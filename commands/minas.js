@@ -78,7 +78,7 @@ function touch(game, client) {
 async function autoEnd(game, client) {
     if (!games.has(game.id) || game.dead || game.cashed) return;
 
-    if (game.opened.size > 0 && !game.fun && game.amount > 0) {
+    if (game.opened.size > 0 && !game.fun && !game.testMode && game.amount > 0) {
         const win = potentialAt(game.amount, game.opened.size, game.bombCount);
         game.cashed = true;
         game._lastWin = win;
@@ -108,6 +108,10 @@ async function autoEnd(game, client) {
 
 async function sendResult(game, client, type = null) {
     if (game.resultSent) return;
+    if (game.testMode) {
+        game.resultSent = true;
+        return;
+    }
     game.resultSent = true;
 
     // Derrota e saque já ficam registrados no painel da partida; não enviar mensagem extra.
@@ -189,7 +193,8 @@ function panelEmbed(game) {
             : potentialAt(game.amount, opened, bombs);
 
     const description = [
-        'Aposta: ' + fmt(game.amount) + ' ✨',
+        ...(game.testMode ? ['🧪 MODO TESTE — nenhum Éter será cobrado ou creditado.', ''] : []),
+        'Aposta: ' + fmt(game.amount) + ' ✨', 
         'Casas: 💣 ' + bombs + '  •  ' + remaining + '/' + safeTotal,
         'Multiplicador atual: ' + currentMult.toFixed(2) + 'x',
         'Prox multi: ' + nextMult.toFixed(2) + 'x  •  ' + fmt(nextGain) + ' ✨',
@@ -201,7 +206,7 @@ function panelEmbed(game) {
 
     return new EmbedBuilder()
         .setColor(game.dead ? 0xED4245 : game.cashed ? 0x57F287 : 0x5865F2)
-        .setTitle('✦ AETERNUS • MINES')
+        .setTitle(game.testMode ? '✦ AETERNUS • MINES • TESTE' : '✦ AETERNUS • MINES')
         .setDescription(description.join('\n'))
         .setFooter({ text: 'Éter ✨ · AFK 7 min · ' + betFooter() });
 }
@@ -291,8 +296,9 @@ function makeGame(userId, amount, bombCount, fun, meta = {}) {
         id,
         partida: ++matchCounter,
         userId,
-        amount: fun ? 0 : amount,
+        amount: fun && !meta.testMode ? 0 : amount,
         fun: !!fun,
+        testMode: !!meta.testMode,
         bombCount: maxBombs,
         bombs,
         opened: new Set(),
@@ -324,7 +330,7 @@ function openCell(game, idx) {
         game.cashed = true;
         clearTimer(game);
         let win = 0;
-        if (!game.fun && game.amount > 0) {
+        if (!game.fun && !game.testMode && game.amount > 0) {
             win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
             eter.add(game.userId, win, { reason: 'mines clear' });
@@ -365,7 +371,8 @@ module.exports = {
     aliases: ['mines', 'mine', 'campo'],
     description: 'Mines 4×4 em Éter ✨',
 
-    async execute(message, args, client) {
+    async execute(message, args, client, options = {}) {
+        const testMode = options.testMode === true;
         const bombsRaw = parseInt(args[0], 10);
         if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
             return message.reply(
@@ -385,17 +392,17 @@ module.exports = {
 
         let game;
         if (args[1] == null || args[1] === '') {
-            game = makeGame(message.author.id, 0, bombsRaw, true);
+            game = makeGame(message.author.id, 0, bombsRaw, true, { testMode });
         } else {
-            const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
+            const bet = resolveBet(args[1], testMode ? Number.MAX_SAFE_INTEGER : eter.get(message.author.id), { label: '✨' });
             if (!bet.ok) return message.reply('❌ ' + bet.error);
             if (bet.amount < MIN_BET || bet.amount > MAX_BET) {
                 return message.reply(
                     '❌ Aposta entre ' + fmt(MIN_BET) + ' e ' + fmt(MAX_BET) + ' ✨.'
                 );
             }
-            eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
-            game = makeGame(message.author.id, bet.amount, bombsRaw, false);
+            if (!testMode) eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
+            game = makeGame(message.author.id, bet.amount, bombsRaw, false, { testMode });
         }
 
         const msg = await message.reply({
@@ -408,6 +415,10 @@ module.exports = {
         game.channelId = msg.channel.id;
         game.messageId = msg.id;
         touch(game, client || message.client);
+    },
+
+    async executeTest(message, args, client) {
+        return module.exports.execute(message, args, client, { testMode: true });
     },
 
     async handleComponent(interaction) {
@@ -465,7 +476,7 @@ module.exports = {
                     } catch (_) {}
                 }
 
-                if (!game.fun) {
+                if (!game.fun && !game.testMode) {
                     const balance = eter.get(game.userId);
                     if (balance < game.amount) {
                         return interaction
@@ -500,7 +511,7 @@ module.exports = {
                     game.amount,
                     game.bombCount,
                     game.fun,
-                    { channelId: channel.id }
+                    { channelId: channel.id, testMode: game.testMode }
                 );
 
                 const msg = await channel
@@ -567,7 +578,7 @@ module.exports = {
 
                 game.cashed = true;
                 const win = potentialAt(game.amount, opened, game.bombCount);
-                if (win <= 0 && !game.fun) {
+                if (win <= 0 && !game.fun && !game.testMode) {
                     game.cashed = false;
                     return interaction
                         .reply({ content: 'Valor de saque inválido.', ephemeral: true })
@@ -577,7 +588,7 @@ module.exports = {
                 game._lastWin = win;
                 clearTimer(game);
 
-                if (!game.fun && win > 0) {
+                if (!game.fun && !game.testMode && win > 0) {
                     try {
                         eter.add(game.userId, win, { reason: 'mines cash' });
                     } catch (e) {
