@@ -8,7 +8,6 @@ const antispam = require('../utils/antispam');
 const cmdLock = require('../utils/cmdLock');
 const pending = require('../utils/converterPending');
 const { rerollDrop } = require('../systems/drops');
-const autoRepair = require('../utils/autoRepair');
 const { announceLevel } = require('../systems/guildModules');
 const dmPhoto = require('../utils/dmPhoto');
 const aeternusCore = require('../systems/aeternusCore');
@@ -76,13 +75,6 @@ module.exports = {
     name: 'messageCreate',
     async execute(message, client) {
         if (message.author.bot) return;
-
-        // Comandos conversacionais da equipe no canal de autorreparo.
-        try {
-            if (await require('../utils/repairWorkflow').handleRepairChannelMessage(message)) return;
-        } catch (e) {
-            console.error('[repairWorkflow chat]', e.message);
-        }
 
         // ── Aeternus Core: IA pública; gestão/GitHub só admin ────────────────
         try {
@@ -397,18 +389,8 @@ module.exports = {
             }
             await cmd.execute(message, args, client);
         } catch (e) {
-            await autoRepair.handleCommandError({
-                cmdName: cmd.name || name,
-                error: e,
-                context:
-                    'prefix · ' +
-                    (message.guild && message.guild.name ? message.guild.name : '?') +
-                    ' · #' +
-                    (message.channel && message.channel.name
-                        ? message.channel.name
-                        : message.channelId),
-                message
-            });
+            console.error('[prefix ' + (cmd.name || name) + ']', e);
+            await message.reply('❌ Ocorreu um erro ao executar este comando.').catch(() => {});
         }
     }
 };
