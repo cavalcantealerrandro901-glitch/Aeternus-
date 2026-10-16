@@ -201,43 +201,72 @@ function panelText(game) {
     const nextGain = opened < safeTotal
         ? potentialAt(game.amount, opened + 1, bombs)
         : potentialAt(game.amount, opened, bombs);
+    const win = game._lastWin || potentialAt(game.amount, opened, bombs);
+    const profit = win - game.amount;
 
-    return [
-        '# ✦ AETERNUS • MINES' + (game.testMode ? ' • TESTE' : ''),
-        game.testMode ? '🧪 **MODO TESTE** — nenhum Éter será cobrado ou creditado.' : '',
+    const lines = [
+        '# ✦ A E T E R N U S',
+        '## MINES  ·  A CAVERNA DO ÉTER',
+        game.testMode ? '> 🧪 **SIMULAÇÃO** — nenhum saldo será alterado.' : '',
+        game.fun && !game.testMode ? '> ✧ **Modo livre** — explore sem apostar Éter.' : '',
         '',
-        '**Informações da partida**',
-        'Aposta: ' + fmt(game.amount) + ' ✨',
-        'Bombas: 💣 ' + bombs + ' • Seguras: ' + remaining + '/' + safeTotal,
-        'Multiplicador atual: **' + currentMult.toFixed(2) + 'x**',
-        'Próximo: **' + nextMult.toFixed(2) + 'x** • ' + fmt(nextGain) + ' ✨',
-        game.dead ? '❌ **Partida encerrada: mina encontrada.**' : '',
-        game.cashed ? '✅ **Partida encerrada.**' : ''
-    ].filter(Boolean).join('\n');
-}
+        '### ✧ Estado da expedição',
+        `> ✨ **Aposta:** ${fmt(game.amount)} Éter`,
+        `> 💣 **Minas:** ${bombs}  ·  💎 **Cristais encontrados:** ${opened}`,
+        `> 🛡️ **Casas seguras restantes:** ${remaining}`,
+        '',
+        game.dead ? '### ☠️ A caverna venceu desta vez' : '',
+        game.dead ? '> Uma mina encerrou sua expedição. Reúna forças e tente novamente.' : '',
+        game.dead && !game.fun && !game.testMode
+            ? `> 💸 **Éter ganho:** +0 Éter\n> 📉 **Lucro:** −${fmt(game.amount)} Éter`
+            : '',
+        game.cashed ? '### ✦ Extração concluída' : '',
+        game.cashed && game.fun && !game.testMode ? '> Você encerrou a exploração no modo livre.' : '',
+        game.cashed && game.testMode ? '> Simulação encerrada; o saldo real não foi alterado.' : '',
+        game.cashed && !game.fun && !game.testMode
+            ? '> ⚜ O éter reconheceu seu valor. Sua expedição foi um sucesso!'
+            : '',
+        game.cashed && !game.fun && !game.testMode
+            ? `> 💰 **Éter ganho:** +${fmt(win)} Éter\n> 📈 **Lucro:** ${profit >= 0 ? '+' : '−'}${fmt(Math.abs(profit))} Éter`
+            : '',
+        !game.dead && !game.cashed ? '### ✧ A fortuna está em suas mãos' : '',
+        !game.dead && !game.cashed ? `> 📈 **Multiplicador atual:** ${currentMult.toFixed(2)}x` : '',
+        !game.dead && !game.cashed ? `> ⏫ **Próxima casa:** ${nextMult.toFixed(2)}x  ·  ${fmt(nextGain)} Éter` : '',
+        !game.dead && !game.cashed ? '> Escolha uma casa segura ou saque antes de encontrar uma mina.' : ''
+    ];
 
+    return lines.filter(Boolean).join('\n');
+}
 function panelFooter(game) {
-    return '-# Partida #' + String(game.partida).padStart(4, '0');
+    return '-# ✦ AETERNUS  ·  MINES  ·  EXPEDIÇÃO #' + String(game.partida).padStart(4, '0');
 }
 
 function panelComponents(game, reveal = false) {
     const container = new ContainerBuilder()
-        .setAccentColor(game.dead ? 0xED4245 : game.cashed ? 0x57F287 : 0x5865F2)
+        .setAccentColor(game.dead ? 0xF43F5E : game.cashed ? 0x34D399 : 0xA78BFA)
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(panelText(game)))
         .addSeparatorComponents(new SeparatorBuilder());
 
     for (const row of boardRows(game, reveal)) container.addActionRowComponents(row);
 
-    // O Container do Discord aceita no máximo 10 componentes filhos.
-    // Removemos o separador extra para caber grade, rodapé e controles.
-    container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(panelFooter(game))
-    );
-
     const rows = controlsRows(game);
-    if (game.dead || game.cashed || reveal) {
-        for (const row of rows) container.addActionRowComponents(row);
+
+    // Ordem: tabuleiro → Aleatório/Atualizar → aviso e partida → Sacar.
+    // O aviso e o número da partida compartilham um TextDisplay para respeitar
+    // o limite de 10 componentes filhos do Container V2.
+    if (rows.length === 2) {
+        container.addActionRowComponents(rows[0]);
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+                '-# Quanto mais casas de éter você encontrar, mais éter você ganhará! Mas não seja guloso, se uma mina for encontrada, você sairá sem nada!\n' +
+                panelFooter(game).replace('EXPEDIÇÃO #', 'Partida #')
+            )
+        );
+        container.addActionRowComponents(rows[1]);
     } else {
+        container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(panelFooter(game).replace('EXPEDIÇÃO #', 'Partida #'))
+        );
         for (const row of rows) container.addActionRowComponents(row);
     }
 
@@ -253,7 +282,8 @@ function boardRows(game, reveal = false) {
             const i = y * COLS + x;
             const opened = game.opened.has(i);
             const bomb = game.bombs.has(i);
-            let label = String(i + 1);
+            // Numeração com largura visual consistente para alinhar a grade.
+            let label = String(i + 1).padStart(2, '0');
             let style = ButtonStyle.Secondary;
             if (ended) {
                 if (bomb) {
@@ -287,7 +317,7 @@ function controlsRows(game) {
         return [new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('minas:again:' + game.id)
-                .setLabel('Novamente')
+                .setLabel('Nova expedição')
                 .setStyle(ButtonStyle.Primary)
         )];
     }
@@ -298,11 +328,11 @@ function controlsRows(game) {
     const navigationRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:random:' + game.id)
-            .setLabel('Aleatório')
+            .setLabel('Escolha aleatória')
             .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId('minas:refresh:' + game.id)
-            .setLabel('Atualizar')
+            .setLabel('Atualizar painel')
             .setStyle(ButtonStyle.Secondary)
     );
 
@@ -404,7 +434,7 @@ function endPayload(game) {
 module.exports = {
     name: 'minas',
     aliases: ['mines', 'mine', 'campo'],
-    description: 'Mines 4×4 em Éter ✨',
+    description: 'Explore a caverna do Éter no Mines do Aeternus.',
 
     async execute(message, args, client, options = {}) {
         const testMode = options.testMode === true;

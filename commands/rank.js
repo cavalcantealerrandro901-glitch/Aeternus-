@@ -3,7 +3,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    AttachmentBuilder
+    AttachmentBuilder,
+    MessageFlags
 } = require('discord.js');
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
@@ -139,9 +140,10 @@ async function buildList(mode, guild, client) {
         const eterData = eter.all() || {};
         let entries = Object.entries(data).map(([id, v]) => ({
             id: String(id),
-            value: Number(v?.xp || 0),
+            // xp.json guarda o XP restante do nível atual; o ranking precisa do XP acumulado total.
+            value: xp.totalXpForLevel(Number(v?.level || 0)) + Math.max(0, Number(v?.xp || 0)),
             level: Number(v?.level || 0),
-            xp: Number(v?.xp || 0),
+            xp: xp.totalXpForLevel(Number(v?.level || 0)) + Math.max(0, Number(v?.xp || 0)),
             eter: Number(eterData[id] || 0)
         }));
 
@@ -283,12 +285,14 @@ async function sendRank(ctx, mode, page = 0) {
     // Só a imagem: o bot escreve nome/id/xp|saldo e coloca as fotos no card
     const rows = [];
     for (const e of slice) {
-        let u = ctx.client.users.cache.get(e.id) || null;
-        if (!u) u = await ctx.client.users.fetch(e.id).catch(() => null);
+        // Não consulta a API do Discord para cada usuário ao trocar de página.
+        // Usa o cache disponível e renderiza um avatar genérico quando não estiver em cache.
+        const u = ctx.client.users.cache.get(e.id) || null;
         if (u?.bot) continue;
         rows.push({
             name: u ? (u.globalName || u.username) : ('usuário-' + String(e.id).slice(-4)),
             id: e.id,
+            rank: start + rows.length + 1,
             value: e.value,
             level: e.level,
             avatarURL: u ? u.displayAvatarURL({ size: 128, extension: 'png' }) : null
@@ -313,7 +317,7 @@ async function sendRank(ctx, mode, page = 0) {
         console.warn('[rank] card image:', err.message);
     }
 
-    // Sem embed de texto — apenas a imagem + navegação
+    // Apenas o card anexado e os botões em uma linha separada, sem embed ou cabeçalho extra.
     if (!files.length) {
         return {
             content: '_Não foi possível gerar o card do ranking._',
@@ -324,11 +328,39 @@ async function sendRank(ctx, mode, page = 0) {
     }
 
     return {
-        content: '',
-        embeds: [],
+        files,
         components: [navRow(mode, p, totalPages)],
-        files
+        embeds: [],
+        // A interação de botão atualiza a mesma mensagem; o anexo é substituído pelo card da página nova.
+        attachments: []
     };
+}
+
+
+async function editRankMessage(interaction, payload, action) {
+    // deferUpdate já reconheceu o clique; tenta editar a resposta da interação,
+    // com fallback para a mensagem original e uma nova tentativa em erros transitórios.
+    const attempts = [
+        () => interaction.editReply(payload),
+        () => interaction.message.edit(payload),
+        () => interaction.message.edit(payload)
+    ];
+    let lastError;
+    for (let i = 0; i < attempts.length; i++) {
+        try {
+            return await attempts[i]();
+        } catch (err) {
+            lastError = err;
+            const transient = err?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+                err?.code === 'ETIMEDOUT' ||
+                err?.code === 'ECONNRESET' ||
+                err?.status === 502 || err?.status === 503 || err?.status === 504;
+            if (!transient || i === attempts.length - 1) break;
+            await new Promise(resolve => setTimeout(resolve, 700 * (i + 1)));
+        }
+    }
+    console.error('[rank] Falha ao ' + action + ':', lastError?.message || lastError);
+    return null;
 }
 
 module.exports = {
@@ -367,43 +399,40 @@ module.exports = {
         }
 
         if (action === 'me') {
+            // Reconhece o clique imediatamente e leva o card até a página do usuário.
+            await interaction.deferUpdate().catch(() => {});
+            if (interaction.replied) return;
+
             const guild = interaction.guild;
             if ((mode === 'local' || mode === 'xp') && !guild) {
-                return interaction.reply({
-                    content: '❌ Ranking local só funciona em servidor.'
+                return interaction.followUp({
+                    content: '❌ Ranking local só funciona em servidor.',
+                    ephemeral: true
                 }).catch(() => {});
             }
 
             const list = await buildList(mode, guild, interaction.client);
             const mine = findMyRank(list, interaction.user.id);
-            const meta = modeMeta(mode);
-            const foot = 'Aeternus Bot · ' + (guild?.name || 'Global') + ' · ' + clockNow();
 
             if (!mine.rank) {
-                return interaction.reply({
-                    content: '<@' + interaction.user.id + '> ainda não aparece no ranking. Ganhe éter/XP para entrar!',
+                return interaction.followUp({
+                    content: 'Você ainda não aparece neste ranking. Ganhe éter/XP para entrar!',
                     ephemeral: true
                 }).catch(() => {});
             }
 
-            const entry = list[mine.rank - 1] || {};
-            const xpVal = entry.xp != null ? entry.xp : (meta.economy ? 0 : mine.value);
-            const saldo = entry.eter != null ? entry.eter : (meta.economy ? mine.value : 0);
-            const nivel = entry.level != null ? entry.level : mine.level;
-            let line = '📍 **#' + mine.rank + '** · ' + (interaction.user.globalName || interaction.user.username);
-            if (meta.economy) line += ' · ✨ **' + fmt(saldo) + '** éter';
-            else line += ' · ⭐ **' + fmt(xpVal) + '** XP' + (nivel ? ' · Nv. **' + nivel + '**' : '');
-
-            return interaction.reply({
-                content: line,
-                ephemeral: true
-            }).catch(() => {});
+            const myPage = Math.floor((mine.rank - 1) / PAGE_SIZE);
+            const payload = await sendRank(interaction, mode, myPage);
+            return editRankMessage(interaction, payload, 'abrir página do usuário');
         }
 
         if (action === 'prev') page = Math.max(0, page - 1);
         if (action === 'next') page = page + 1;
 
+        // O card precisa buscar avatares e renderizar uma imagem; deferUpdate evita o timeout.
+        await interaction.deferUpdate().catch(() => {});
+        if (interaction.replied) return;
         const payload = await sendRank(interaction, mode, page);
-        return interaction.update(payload).catch(() => {});
+        return editRankMessage(interaction, payload, 'editar página do card');
     }
 };
