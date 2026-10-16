@@ -55,8 +55,8 @@ function buildSvg(opts, avatars) {
       ${av ? `<image href="${av}" x="93" y="${y+16}" width="52" height="52" clip-path="url(#${clipId})" preserveAspectRatio="xMidYMid slice"/>` :
         `<circle cx="119" cy="${y+42}" r="26" fill="#211536"/><path d="M107 ${y+43} l12 -14 l12 14 l-12 12 Z" fill="none" stroke="#b9a0ff" stroke-width="1.2"/>`}
       <circle cx="119" cy="${y+42}" r="26" fill="none" stroke="#a78bfa" stroke-opacity=".85" stroke-width="1.5"/>
-      <text x="163" y="${y+34}" font-family="${FONT}" font-size="17" font-weight="700" fill="#f5f0ff">${esc(r.name).slice(0,27)}</text>
-      <text x="163" y="${y+54}" font-family="${FONT}" font-size="11" fill="#a99bbd" letter-spacing=".6">ID · ${esc(r.id)}</text>
+      <text x="163" y="${y+34}" font-family="${FONT}" font-size="16" font-weight="700" fill="#f5f0ff">${esc(r.name).slice(0,24)}</text>
+      <text x="163" y="${y+54}" font-family="${FONT}" font-size="11" fill="#c4b5d8" letter-spacing=".6">ID · ${esc(r.id)}</text>
       <text x="${W-48}" y="${y+34}" text-anchor="end" font-family="${FONT}" font-size="19" font-weight="800" fill="${accent}">${esc(metric)}</text>
       <text x="${W-48}" y="${y+52}" text-anchor="end" font-family="${FONT}" font-size="9" font-weight="700" fill="#817394" letter-spacing="2">VALOR TOTAL</text>
       <rect x="163" y="${y+67}" width="${W-214}" height="3" rx="1.5" fill="#2a203b"/>
