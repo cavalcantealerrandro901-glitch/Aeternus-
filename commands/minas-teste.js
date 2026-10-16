@@ -100,8 +100,7 @@ async function autoEnd(game, client) {
         const msg = ch ? await ch.messages.fetch(game.messageId).catch(() => null) : null;
         if (msg) {
             await msg.edit({
-                
-                
+                flags: MessageFlags.IsComponentsV2,
                 components: panelComponents(game, true)
             }).catch(() => {});
         }
@@ -381,8 +380,7 @@ function pickRandom(game) {
 function endPayload(game) {
     clearTimer(game);
     return {
-        
-        
+        flags: MessageFlags.IsComponentsV2,
         components: panelComponents(game, true)
     };
 }
@@ -516,8 +514,7 @@ module.exports = {
 
                 await interaction
                     .update({
-                        
-                        
+                        flags: MessageFlags.IsComponentsV2,
                         components: panelComponents(game, true)
                     })
                     .catch(() => {});
@@ -562,7 +559,7 @@ module.exports = {
             if (action === 'refresh') {
                 return interaction
                     .update({
-                        
+                        flags: MessageFlags.IsComponentsV2,
                         components: panelComponents(game, game.dead || game.cashed)
                     })
                     .catch(() => {});
@@ -642,7 +639,7 @@ module.exports = {
                     return;
                 }
                 return interaction
-                    .update({  components: panelComponents(game) })
+                    .update({ flags: MessageFlags.IsComponentsV2, components: panelComponents(game) })
                     .catch(() => {});
             }
         } finally {
