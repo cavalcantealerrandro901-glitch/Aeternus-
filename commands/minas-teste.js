@@ -39,9 +39,19 @@ function multAt(opened, bombs) {
         Math.min(Number(bombs) || 1, TOTAL - 1)
     );
 
-    // Curva de teste calibrada para 1 bomba: 7 casas seguras = 1.98x.
-    // Mantém uma progressão crescente e usa a fórmula clássica para outros
-    // números de bombas, aplicando um fator de ajuste para a curva de teste.
+    // Multiplicadores definidos para o modo de teste com 1 bomba.
+    // O ganho potencial é calculado a partir deste mesmo multiplicador.
+    const oneBombMultipliers = [
+        1.08, 1.17, 1.28, 1.43, 1.59, 1.77, 1.98,
+        2.14, 2.26, 2.60, 2.89, 3.50, 3.55
+    ];
+
+    if (b === 1 && o <= oneBombMultipliers.length) {
+        return oneBombMultipliers[o - 1];
+    }
+
+    // Para outros números de bombas (e casas além da tabela),
+    // mantém o cálculo clássico com a margem configurada.
     let m = 1;
     for (let i = 0; i < o; i++) {
         const tilesLeft = TOTAL - i;
@@ -51,22 +61,9 @@ function multAt(opened, bombs) {
     }
 
     m *= HOUSE;
-
-    if (b === 1) {
-        const sevenHouseClassic = 0.96;
-        let classicAtSeven = 1;
-        for (let i = 0; i < 7; i++) {
-            classicAtSeven *= (TOTAL - i) / (TOTAL - 1 - i);
-        }
-        classicAtSeven *= sevenHouseClassic;
-        const calibration = 1.98 / classicAtSeven;
-        m *= Math.pow(calibration, Math.min(o, 7) / 7);
-    }
-
     m = Math.min(m, MAX_MULT);
     return Number(Math.max(1, m).toFixed(2));
 }
-
 function potentialAt(amount, opened, bombs) {
     const amt = Math.floor(Number(amount) || 0);
     const o = Math.floor(Number(opened) || 0);
