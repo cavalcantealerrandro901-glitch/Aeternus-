@@ -1,116 +1,73 @@
 /**
- * Renderização nativa dos cards de ranking Aeternus (SVG convertido para PNG por sharp).
- * Inclui posição, nome, ID e valor, com identidade arcana/cósmica.
+ * Card de ranking Aeternus. SVG leve como padrão; sharp/PNG é opcional.
+ * Limita dimensões, linhas e downloads para evitar picos de memória.
  */
 function esc(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
-async function fetchDataUri(url) {
-  if (!url) return null;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length > 1500000) return null;
-    let mime = (res.headers.get('content-type') || 'image/png').split(';')[0].trim();
-    if (!mime.startsWith('image/') || mime === 'image/svg+xml') return null;
-    return `data:${mime};base64,${buf.toString('base64')}`;
-  } catch (_) { return null; }
-}
 const FONT = 'DejaVu Sans,Arial,Helvetica,sans-serif';
-const W = 1080, ROW_H = 128, HEADER = 200, FOOTER = 86;
-function medalColor(i) {
-  return ['#f2d18b', '#d5d9e8', '#c58a69'][i] || '#a78bfa';
-}
-function buildSigil() {
-  return `<g transform="translate(930 88)" opacity=".85">
-    <circle r="49" fill="none" stroke="#8b5cf6" stroke-width="1.2"/>
-    <circle r="39" fill="none" stroke="#c4b5fd" stroke-width=".8" stroke-dasharray="2 5"/>
-    <circle r="26" fill="none" stroke="#a78bfa"/>
-    <path d="M0 -56 L8 -8 L48 0 L8 8 L0 56 L-8 8 L-48 0 L-8 -8 Z" fill="none" stroke="#b9a0ff"/>
-    <path d="M-34 -34 L34 34 M34 -34 L-34 34" stroke="#7c3aed" stroke-width=".8"/>
-    <circle r="7" fill="#c4b5fd" fill-opacity=".22" stroke="#ddd6fe"/>
-    <circle cy="-49" r="2.5" fill="#e9d5ff"/><circle cx="49" r="2.5" fill="#e9d5ff"/>
-    <circle cy="49" r="2.5" fill="#e9d5ff"/><circle cx="-49" r="2.5" fill="#e9d5ff"/>
-  </g>`;
-}
-function buildSvg(opts, avatars) {
-  const { title, subtitle, rows, economy, page, totalPages, tip } = opts;
-  const H = HEADER + rows.length * ROW_H + FOOTER + 20;
-  const rowSvg = rows.map((r, i) => {
-    const y = HEADER + i * ROW_H, av = avatars[i], clipId = 'avatarClip' + i;
-    const accent = medalColor(i), top = i < 3;
+const W = 900, ROW_H = 104, HEADER = 160, FOOTER = 56;
+const MAX_ROWS = 5;
+function medalColor(i) { return ['#f2d18b', '#d5d9e8', '#c58a69'][i] || '#a78bfa'; }
+function buildSvg(opts, rows) {
+  const { title, subtitle, economy, page, totalPages, tip } = opts;
+  const H = HEADER + rows.length * ROW_H + FOOTER;
+  let rowSvg = '';
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i], y = HEADER + i * ROW_H;
+    const accent = medalColor(i);
     const max = Math.max(1, Number(rows[0]?.value || 1));
-    const fill = Math.max(3, Math.round((Number(r.value || 0) / max) * 300));
+    const fill = Math.max(3, Math.round((Number(r.value || 0) / max) * 220));
     const metric = `${fmt(r.value)} ${economy ? 'ÉTER' : 'XP'}`;
-    return `<g>
-      <rect x="27" y="${y}" width="${W-54}" height="114" rx="13" fill="url(#rowBg)" stroke="${top ? accent : '#5b4380'}" stroke-opacity="${top ? '.68' : '.42'}" stroke-width="${top ? '1.35' : '.8'}"/>
-      <path d="M42 ${y+8} h30 M42 ${y+8} v16 M${W-42} ${y+60} v16 h-30" fill="none" stroke="${accent}" stroke-opacity=".6"/>
-      <circle cx="82" cy="${y+57}" r="25" fill="${accent}" fill-opacity=".16" stroke="${accent}" stroke-width="2"/>
-      <circle cx="82" cy="${y+57}" r="20" fill="#10091a" stroke="${accent}" stroke-opacity=".55" stroke-width=".8"/>
-      <text x="82" y="${y+64}" text-anchor="middle" font-family="Arial,DejaVu Sans,sans-serif" font-size="24" font-weight="900" fill="#ffffff" stroke="#10091a" stroke-width=".35" paint-order="stroke">${r.rank || (i+1)}</text>
-      <defs><clipPath id="${clipId}"><circle cx="150" cy="${y+57}" r="34"/></clipPath></defs>
-      ${av ? `<image href="${av}" x="116" y="${y+23}" width="68" height="68" clip-path="url(#${clipId})" preserveAspectRatio="xMidYMid slice"/>` :
-        `<circle cx="150" cy="${y+57}" r="34" fill="#211536"/><path d="M107 ${y+43} l12 -14 l12 14 l-12 12 Z" fill="none" stroke="#b9a0ff" stroke-width="1.2"/>`}
-      <circle cx="150" cy="${y+57}" r="34" fill="none" stroke="#a78bfa" stroke-opacity=".85" stroke-width="1.5"/>
-      <text x="205" y="${y+47}" font-family="${FONT}" font-size="24" font-weight="700" fill="#f5f0ff">${esc(r.name).slice(0,24)}</text>
-      <text x="205" y="${y+77}" font-family="${FONT}" font-size="14" fill="#c4b5d8" letter-spacing=".6">ID · ${esc(r.id)}</text>
-      <text x="${W-48}" y="${y+48}" text-anchor="end" font-family="${FONT}" font-size="28" font-weight="800" fill="${accent}">${esc(metric)}</text>
-      <text x="${W-48}" y="${y+78}" text-anchor="end" font-family="${FONT}" font-size="14" font-weight="700" fill="#c4b5d8" letter-spacing="1">${economy ? "VALOR TOTAL" : "NÍVEL " + fmt(r.level || 0)}</text>
-      <rect x="205" y="${y+99}" width="${W-256}" height="5" rx="1.5" fill="#2a203b"/>
-      <rect x="205" y="${y+99}" width="${Math.min(W-256,fill)}" height="5" rx="1.5" fill="${accent}"/>
+    rowSvg += `<g>
+      <rect x="22" y="${y}" width="${W-44}" height="92" rx="10" fill="#120d1c" stroke="${accent}" stroke-opacity=".45"/>
+      <circle cx="58" cy="${y+35}" r="20" fill="${accent}" fill-opacity=".15" stroke="${accent}"/>
+      <text x="58" y="${y+41}" text-anchor="middle" font-family="Arial,sans-serif" font-size="19" font-weight="700" fill="#fff">${Number(r.rank || i+1)}</text>
+      <circle cx="112" cy="${y+35}" r="24" fill="#211536" stroke="#a78bfa"/>
+      <path d="M100 ${y+35} l8 -9 l8 9 l-8 9 Z" fill="none" stroke="#b9a0ff"/>
+      <text x="150" y="${y+30}" font-family="${FONT}" font-size="19" font-weight="700" fill="#f5f0ff">${esc(r.name).slice(0,22)}</text>
+      <text x="150" y="${y+53}" font-family="${FONT}" font-size="12" fill="#c4b5d8">ID · ${esc(r.id)}</text>
+      <text x="${W-38}" y="${y+34}" text-anchor="end" font-family="${FONT}" font-size="20" font-weight="800" fill="${accent}">${esc(metric)}</text>
+      <text x="${W-38}" y="${y+56}" text-anchor="end" font-family="${FONT}" font-size="11" fill="#c4b5d8">${economy ? 'VALOR TOTAL' : 'NÍVEL ' + fmt(r.level || 0)}</text>
+      <rect x="150" y="${y+72}" width="${W-210}" height="4" rx="2" fill="#2a203b"/>
+      <rect x="150" y="${y+72}" width="${Math.min(W-210,fill)}" height="4" rx="2" fill="${accent}"/>
     </g>`;
-  }).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-<defs>
-  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#07050d"/><stop offset="48%" stop-color="#130a20"/><stop offset="100%" stop-color="#090610"/></linearGradient>
-  <linearGradient id="titleG" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f1e5ff"/><stop offset="52%" stop-color="#b99aff"/><stop offset="100%" stop-color="#8060c8"/></linearGradient>
-  <linearGradient id="rowBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#171021"/><stop offset="100%" stop-color="#0d0915"/></linearGradient>
-  <radialGradient id="nebula"><stop offset="0%" stop-color="#7c3aed" stop-opacity=".26"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/></radialGradient>
-</defs>
-<rect width="${W}" height="${H}" fill="url(#bg)"/>
-<ellipse cx="70" cy="38" rx="220" ry="150" fill="url(#nebula)"/><ellipse cx="700" cy="${H-80}" rx="180" ry="150" fill="url(#nebula)"/>
-<g fill="#d8c8ff" opacity=".55"><circle cx="190" cy="28" r="1.2"/><circle cx="280" cy="58" r=".9"/><circle cx="370" cy="22" r="1.1"/><circle cx="470" cy="76" r=".8"/><circle cx="540" cy="30" r="1.2"/><circle cx="710" cy="142" r=".9"/><circle cx="37" cy="135" r=".8"/><circle cx="725" cy="240" r="1"/></g>
-<path d="M28 142 H${W-28}" stroke="#8b5cf6" stroke-opacity=".5"/><path d="M28 146 H180" stroke="#d8b4fe" stroke-opacity=".7" stroke-width="2"/>
-<text x="38" y="34" font-family="${FONT}" font-size="10" font-weight="700" fill="#a78bfa" letter-spacing="3">OS REGISTROS DO ÉTER</text>
-<text x="36" y="82" font-family="${FONT}" font-size="36" font-weight="900" fill="url(#titleG)">RANK AETERNUS</text>
-<text x="39" y="111" font-family="${FONT}" font-size="18" font-weight="800" fill="#f5f0ff" letter-spacing="2">${esc(subtitle || (economy ? 'RANKING DE ÉTER' : 'RANKING DE XP')).toUpperCase()}</text>
-<text x="39" y="130" font-family="${FONT}" font-size="10" fill="#9f8db8" letter-spacing="1.3">${esc(title || 'COLISEU DOS AVENTUREIROS').toUpperCase().slice(0,54)}</text>
-${buildSigil()}
-<text x="${W-35}" y="153" text-anchor="end" font-family="${FONT}" font-size="10" fill="#9380ac" letter-spacing="1.5">PÁGINA ${page} / ${totalPages}</text>
-${rowSvg}
-<path d="M28 ${H-58} H${W-28}" stroke="#8b5cf6" stroke-opacity=".38"/>
-<text x="${W/2}" y="${H-37}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="#a99bbd">${esc(tip || 'O éter registra cada conquista.')}</text>
-<text x="${W/2}" y="${H-16}" text-anchor="middle" font-family="${FONT}" font-size="9" font-weight="700" fill="#a78bfa" letter-spacing="3">✦ A E T E R N U S ✦</text>
-</svg>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#07050d"/><stop offset="1" stop-color="#130a20"/></linearGradient></defs>
+  <rect width="${W}" height="${H}" fill="url(#bg)"/>
+  <text x="28" y="28" font-family="${FONT}" font-size="10" fill="#a78bfa" letter-spacing="2">OS REGISTROS DO ÉTER</text>
+  <text x="26" y="62" font-family="${FONT}" font-size="29" font-weight="900" fill="#d8c4ff">RANK AETERNUS</text>
+  <text x="28" y="88" font-family="${FONT}" font-size="15" font-weight="700" fill="#f5f0ff">${esc(subtitle || (economy ? 'RANKING DE ÉTER' : 'RANKING DE XP')).toUpperCase()}</text>
+  <text x="28" y="109" font-family="${FONT}" font-size="10" fill="#9f8db8">${esc(title || 'COLISEU DOS AVENTUREIROS').toUpperCase().slice(0,48)}</text>
+  <circle cx="830" cy="58" r="29" fill="none" stroke="#8b5cf6"/><path d="M830 25 L836 52 L863 58 L836 64 L830 91 L824 64 L797 58 L824 52 Z" fill="none" stroke="#b9a0ff"/>
+  <text x="${W-24}" y="128" text-anchor="end" font-family="${FONT}" font-size="10" fill="#9380ac">PÁGINA ${Number(page || 1)} / ${Number(totalPages || 1)}</text>
+  ${rowSvg}
+  <path d="M22 ${H-35} H${W-22}" stroke="#8b5cf6" stroke-opacity=".38"/>
+  <text x="${W/2}" y="${H-15}" text-anchor="middle" font-family="${FONT}" font-size="10" fill="#a99bbd">${esc(tip || 'O éter registra cada conquista.').slice(0,100)}</text>
+  </svg>`;
 }
-async function render(opts) {
-  const rows = (opts.rows || []).slice(0, 10);
-  const avatars = await Promise.all(rows.map(r => fetchDataUri(r.avatarURL)));
-  const svgBuf = Buffer.from(buildSvg({ ...opts, rows }, avatars), 'utf8');
+async function render(opts = {}) {
+  // Não baixa avatares remotos nem cria data URIs/base64: isso reduz rede e cópias em memória.
+  const rows = Array.isArray(opts.rows) ? opts.rows.slice(0, MAX_ROWS) : [];
+  const svg = buildSvg(opts, rows);
+  const svgBuf = Buffer.from(svg, 'utf8');
 
-  // O SVG é sempre um fallback válido; a conversão para PNG é opcional.
+  // SVG consome muito menos memória que a rasterização 1080px via sharp.
+  // PNG só é ativado explicitamente, para manter o padrão seguro em hosts pequenos.
+  if (process.env.RANK_CARD_PNG !== '1') {
+    return { buffer: svgBuf, name: 'aeternus-rank.svg' };
+  }
   try {
     const sharpModule = require('sharp');
     const sharp = typeof sharpModule === 'function' ? sharpModule : sharpModule?.default;
-    if (typeof sharp !== 'function') {
-      throw new TypeError('O módulo sharp não exportou uma função válida. Reinstale as dependências.');
-    }
-    const pipeline = sharp(svgBuf, { density: 190 });
-    if (!pipeline || typeof pipeline.png !== 'function') {
-      throw new TypeError('A instalação do sharp não retornou um pipeline válido.');
-    }
-    const output = pipeline.png();
-    if (!output || typeof output.toBuffer !== 'function') {
-      throw new TypeError('O pipeline do sharp não disponibilizou toBuffer().');
-    }
-    const png = await output.toBuffer();
+    if (typeof sharp !== 'function') throw new TypeError('Exportação do sharp inválida');
+    const png = await sharp(svgBuf, { density: 96, limitInputPixels: 2000000 }).png({ compressionLevel: 9, palette: true }).toBuffer();
     return { buffer: png, name: 'aeternus-rank.png' };
-  } catch (e) {
-    console.warn('[rankCard] sharp falhou; usando SVG de fallback:', e?.stack || e?.message || e);
+  } catch (err) {
+    console.warn('[rankCard] PNG indisponível; usando SVG:', err?.message || err);
     return { buffer: svgBuf, name: 'aeternus-rank.svg' };
   }
 }
