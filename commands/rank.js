@@ -314,7 +314,7 @@ async function sendRank(ctx, mode, page = 0) {
         console.warn('[rank] card image:', err.message);
     }
 
-    // Sem embed de texto — apenas a imagem + navegação
+    // Apenas o card anexado e os botões em uma linha separada, sem embed ou cabeçalho extra.
     if (!files.length) {
         return {
             content: '_Não foi possível gerar o card do ranking._',
@@ -324,32 +324,10 @@ async function sendRank(ctx, mode, page = 0) {
         };
     }
 
-    // Components V2: imagem dentro de um Container, com navegação em Action Row.
-    // Não enviar content/embeds junto com IsComponentsV2.
     return {
-        flags: MessageFlags.IsComponentsV2,
-        components: [
-            {
-                type: 17,
-                accent_color: meta.color,
-                components: [
-                    {
-                        type: 10,
-                        content: '# RANK AETERNUS\\n' +
-                            '### ' + (meta.economy ? 'Ranking de Éter' : 'Ranking de XP') + '\\n' +
-                            'Página **' + (p + 1) + '** de **' + totalPages + '**'
-                    },
-                    { type: 14, divider: true, spacing: 1 },
-                    {
-                        type: 12,
-                        items: [{ media: { url: 'attachment://' + (files[0].name || 'rank.png') } }]
-                    },
-                    { type: 14, divider: true, spacing: 1 },
-                    { type: 1, components: navRow(mode, p, totalPages).toJSON().components }
-                ]
-            }
-        ],
-        files
+        files,
+        components: [navRow(mode, p, totalPages)],
+        embeds: []
     };
 }
 
