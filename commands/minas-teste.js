@@ -582,7 +582,7 @@ module.exports = {
                     return;
                 }
                 return interaction
-                    .update({  components: panelComponents(game) })
+                    .update({ flags: MessageFlags.IsComponentsV2, components: panelComponents(game) })
                     .catch(() => {});
             }
 
