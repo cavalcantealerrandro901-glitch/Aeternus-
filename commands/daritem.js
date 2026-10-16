@@ -7,13 +7,12 @@ const {
 const player = require('../utils/player');
 const items = require('../utils/items');
 const xp = require('../utils/xp');
-const autoRepair = require('../utils/autoRepair');
 
 /** @type {Map<string, object>} */
 const pending = new Map();
 
 function isOwner(user, client) {
-    const owners = typeof autoRepair.ownerIds === 'function' ? autoRepair.ownerIds() : [];
+    const owners = String(process.env.OWNER_ID || '').split(/[\\s,;]+/).filter(Boolean);
     if (owners.includes(user.id)) return true;
     if (user.id === client.application?.owner?.id) return true;
     try {
