@@ -235,7 +235,7 @@ function panelText(game) {
         !game.dead && !game.cashed ? '> Escolha uma casa segura ou saque antes de encontrar uma mina.' : ''
     ];
 
-    return lines.filter(Boolean).join('\\n');
+    return lines.filter(Boolean).join('\n');
 }
 function panelFooter(game) {
     return '-# ✦ AETERNUS  ·  MINES  ·  EXPEDIÇÃO #' + String(game.partida).padStart(4, '0');
