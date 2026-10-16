@@ -369,38 +369,33 @@ module.exports = {
         }
 
         if (action === 'me') {
-            // Reconhece a interação antes de consultar dados, evitando o timeout de 3 segundos.
-            await interaction.deferReply({ ephemeral: true }).catch(() => {});
+            // Reconhece o clique imediatamente e leva o card até a página do usuário.
+            await interaction.deferUpdate().catch(() => {});
             if (interaction.replied) return;
+
             const guild = interaction.guild;
             if ((mode === 'local' || mode === 'xp') && !guild) {
-                return interaction.editReply({
-                    content: '❌ Ranking local só funciona em servidor.'
+                return interaction.followUp({
+                    content: '❌ Ranking local só funciona em servidor.',
+                    ephemeral: true
                 }).catch(() => {});
             }
 
             const list = await buildList(mode, guild, interaction.client);
             const mine = findMyRank(list, interaction.user.id);
-            const meta = modeMeta(mode);
-            const foot = 'Aeternus Bot · ' + (guild?.name || 'Global') + ' · ' + clockNow();
 
             if (!mine.rank) {
-                return interaction.editReply({
-                    content: '<@' + interaction.user.id + '> ainda não aparece no ranking. Ganhe éter/XP para entrar!'
+                return interaction.followUp({
+                    content: 'Você ainda não aparece neste ranking. Ganhe éter/XP para entrar!',
+                    ephemeral: true
                 }).catch(() => {});
             }
 
-            const entry = list[mine.rank - 1] || {};
-            const xpVal = entry.xp != null ? entry.xp : (meta.economy ? 0 : mine.value);
-            const saldo = entry.eter != null ? entry.eter : (meta.economy ? mine.value : 0);
-            const nivel = entry.level != null ? entry.level : mine.level;
-            let line = '📍 **#' + mine.rank + '** · ' + (interaction.user.globalName || interaction.user.username);
-            if (meta.economy) line += ' · ✨ **' + fmt(saldo) + '** éter';
-            else line += ' · ⭐ **' + fmt(xpVal) + '** XP' + (nivel ? ' · Nv. **' + nivel + '**' : '');
-
-            return interaction.editReply({
-                content: line
-            }).catch(() => {});
+            const myPage = Math.floor((mine.rank - 1) / PAGE_SIZE);
+            const payload = await sendRank(interaction, mode, myPage);
+            return interaction.editReply(payload).catch((err) => {
+                console.error('[rank] Falha ao abrir página do usuário:', err.message);
+            });
         }
 
         if (action === 'prev') page = Math.max(0, page - 1);
