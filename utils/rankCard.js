@@ -58,7 +58,7 @@ function buildSvg(opts, avatars) {
       <text x="205" y="${y+45}" font-family="${FONT}" font-size="18" font-weight="700" fill="#f5f0ff">${esc(r.name).slice(0,24)}</text>
       <text x="205" y="${y+69}" font-family="${FONT}" font-size="11" fill="#c4b5d8" letter-spacing=".6">ID · ${esc(r.id)}</text>
       <text x="${W-48}" y="${y+45}" text-anchor="end" font-family="${FONT}" font-size="22" font-weight="800" fill="${accent}">${esc(metric)}</text>
-      <text x="${W-48}" y="${y+69}" text-anchor="end" font-family="${FONT}" font-size="9" font-weight="700" fill="#817394" letter-spacing="2">VALOR TOTAL</text>
+      <text x="${W-48}" y="${y+69}" text-anchor="end" font-family="${FONT}" font-size="11" font-weight="700" fill="#c4b5d8" letter-spacing="1">${economy ? "VALOR TOTAL" : "NÍVEL " + fmt(r.level || 0)}</text>
       <rect x="205" y="${y+94}" width="${W-256}" height="3" rx="1.5" fill="#2a203b"/>
       <rect x="205" y="${y+94}" width="${Math.min(W-256,fill)}" height="3" rx="1.5" fill="${accent}"/>
     </g>`;
