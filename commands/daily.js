@@ -12,9 +12,15 @@ const {
 const daily = require('../utils/daily');
 const eter = require('../utils/eter');
 
+// O Discord não renderiza SVG de forma consistente na galeria do Components V2.
+// O wsrv converte os SVGs do repositório para PNG antes de entregá-los ao Discord.
 const IMAGE_BASE = 'https://raw.githubusercontent.com/cavalcantealerrandro901-glitch/Aeternus-/main/public/images/';
-const PARTNER_THANKS_IMAGE = IMAGE_BASE + 'partner-thanks.svg';
-const STREAK_IMAGES = Array.from({ length: 7 }, (_, i) => IMAGE_BASE + `daily-streak-${i + 1}.svg`);
+function pngImage(path) {
+  const source = encodeURIComponent(IMAGE_BASE + path);
+  return `https://wsrv.nl/?url=${source}&output=png`;
+}
+const PARTNER_THANKS_IMAGE = pngImage('partner-thanks.svg');
+const STREAK_IMAGES = Array.from({ length: 7 }, (_, i) => pngImage(`daily-streak-${i + 1}.svg`));
 
 function fmt(n) {
   if (typeof eter.formatPlain === 'function') return eter.formatPlain(n);
