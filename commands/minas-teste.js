@@ -205,7 +205,7 @@ function panelText(game) {
         'Próximo: **' + nextMult.toFixed(2) + 'x** • ' + fmt(nextGain) + ' ✨',
         game.dead ? '❌ **Partida encerrada: mina encontrada.**' : '',
         game.cashed ? '✅ **Partida encerrada.**' : ''
-    ].filter(Boolean).join('\\n');
+    ].filter(Boolean).join('\n');
 }
 
 function panelFooter(game) {
