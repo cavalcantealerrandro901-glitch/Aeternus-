@@ -13,14 +13,15 @@
     "postinstall": "node inject.js"
   },
   "dependencies": {
+    "@img/sharp-wasm32": "^0.35.5",
     "axios": "^1.7.7",
     "cookie-parser": "^1.4.6",
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.1",
     "express": "^4.18.2",
     "mongoose": "^8.1.1",
-    "ws": "^8.18.0",
-    "shoukaku": "^4.3.0"
+    "shoukaku": "^4.3.0",
+    "ws": "^8.18.0"
   },
   "engines": {
     "node": ">=18"
