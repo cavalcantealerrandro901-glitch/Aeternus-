@@ -48,8 +48,9 @@ function buildSvg(opts, avatars) {
     return `<g>
       <rect x="27" y="${y}" width="${W-54}" height="84" rx="13" fill="url(#rowBg)" stroke="${top ? accent : '#5b4380'}" stroke-opacity="${top ? '.68' : '.42'}" stroke-width="${top ? '1.35' : '.8'}"/>
       <path d="M42 ${y+8} h30 M42 ${y+8} v16 M${W-42} ${y+60} v16 h-30" fill="none" stroke="${accent}" stroke-opacity=".6"/>
-      <circle cx="67" cy="${y+42}" r="22" fill="#110b20" stroke="${accent}" stroke-width="1.5"/>
-      <text x="67" y="${y+47}" text-anchor="middle" font-family="${FONT}" font-size="14" font-weight="800" fill="${accent}">${String(i+1).padStart(2,'0')}</text>
+      <circle cx="67" cy="${y+42}" r="22" fill="${accent}" fill-opacity=".16" stroke="${accent}" stroke-width="2"/>
+      <circle cx="67" cy="${y+42}" r="17" fill="#10091a" stroke="${accent}" stroke-opacity=".55" stroke-width=".8"/>
+      <text x="67" y="${y+49}" text-anchor="middle" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" font-weight="900" fill="#ffffff" stroke="#10091a" stroke-width=".35" paint-order="stroke">${i+1}</text>
       <defs><clipPath id="${clipId}"><circle cx="119" cy="${y+42}" r="26"/></clipPath></defs>
       ${av ? `<image href="${av}" x="93" y="${y+16}" width="52" height="52" clip-path="url(#${clipId})" preserveAspectRatio="xMidYMid slice"/>` :
         `<circle cx="119" cy="${y+42}" r="26" fill="#211536"/><path d="M107 ${y+43} l12 -14 l12 14 l-12 12 Z" fill="none" stroke="#b9a0ff" stroke-width="1.2"/>`}
