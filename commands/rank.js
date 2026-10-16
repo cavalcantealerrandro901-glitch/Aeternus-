@@ -327,7 +327,9 @@ async function sendRank(ctx, mode, page = 0) {
     return {
         files,
         components: [navRow(mode, p, totalPages)],
-        embeds: []
+        embeds: [],
+        // A interação de botão atualiza a mesma mensagem; o anexo é substituído pelo card da página nova.
+        attachments: []
     };
 }
 
