@@ -269,7 +269,8 @@ function boardRows(game, reveal = false) {
             const i = y * COLS + x;
             const opened = game.opened.has(i);
             const bomb = game.bombs.has(i);
-            let label = String(i + 1);
+            // Numeração com largura visual consistente para alinhar a grade.
+            let label = String(i + 1).padStart(2, '0');
             let style = ButtonStyle.Secondary;
             if (ended) {
                 if (bomb) {
