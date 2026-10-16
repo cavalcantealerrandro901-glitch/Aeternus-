@@ -3,8 +3,7 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    AttachmentBuilder,
-    MessageFlags
+    AttachmentBuilder
 } = require('discord.js');
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
@@ -12,268 +11,97 @@ const rankCard = require('../utils/rankCard');
 
 const PAGE_SIZE = 5;
 
-function fmt(n) {
-    return Number(n || 0).toLocaleString('pt-BR');
-}
-
-function medal(i) {
-    return ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i] || `**#${i + 1}**`;
-}
-
-function progressBar(value, max, size = 10) {
-    const m = Math.max(1, Number(max) || 1);
-    const v = Math.max(0, Number(value) || 0);
-    const filled = Math.round(Math.min(1, v / m) * size);
-    return '█'.repeat(filled) + '░'.repeat(Math.max(0, size - filled));
-}
-
-function clockNow() {
-    return new Date().toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'America/Sao_Paulo'
-    });
-}
+function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
 function parseMode(args) {
-    const a = String(args?.[0] || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim();
-    const b = String(args?.[1] || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim();
+    const a = String(args?.[0] || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const b = String(args?.[1] || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const joined = `${a} ${b}`.trim();
-
-    if (
-        a === 'xpglobal' ||
-        a === 'rankxp' ||
-        a === 'topxp' ||
-        joined === 'xp global' ||
-        joined === 'xp mundo' ||
-        joined === 'xp all' ||
-        joined === 'global xp' ||
-        (a === 'xp' && (b === 'global' || b === 'mundo' || b === 'all'))
-    ) {
-        return 'xpglobal';
-    }
-
-    if (a === 'xp' || a === 'nivel' || a === 'level' || a === 'exp') return 'xp';
-
-    if (
-        a === 'local' ||
-        a === 'servidor' ||
-        a === 'server' ||
-        a === 'eterlocal' ||
-        (a === 'eter' && (b === 'local' || b === 'servidor' || b === 'server'))
-    ) {
-        return 'local';
-    }
-
-    if (
-        a === 'global' ||
-        a === 'mundo' ||
-        a === 'all' ||
-        a === 'geral' ||
-        a === 'eter' ||
-        a === 'economia' ||
-        a === 'saldo' ||
-        !a
-    ) {
-        return 'global';
-    }
-
+    if (['xpglobal','rankxp','topxp'].includes(a) || ['xp global','xp mundo','xp all','global xp'].includes(joined) || (a === 'xp' && ['global','mundo','all'].includes(b))) return 'xpglobal';
+    if (['xp','nivel','level','exp'].includes(a)) return 'xp';
+    if (['local','servidor','server','eterlocal'].includes(a) || (a === 'eter' && ['local','servidor','server'].includes(b))) return 'local';
     return 'global';
 }
 
 function modeMeta(mode) {
-    if (mode === 'xpglobal') {
-        return {
-            title: '👑 COLISEU AETERNUS · RANK XP GLOBAL',
-            emoji: '⭐',
-            unit: 'XP',
-            color: 0xc9a227,
-            scope: 'global',
-            economy: false,
-            tip: 'Continue batalhando e evoluindo para subir no ranking global de XP!'
-        };
-    }
-    if (mode === 'xp') {
-        return {
-            title: '👑 COLISEU AETERNUS · RANK XP',
-            emoji: '⭐',
-            unit: 'XP',
-            color: 0xa78bfa,
-            scope: 'local',
-            economy: false,
-            tip: 'Continue conversando e interagindo para subir no ranking de XP!'
-        };
-    }
-    if (mode === 'local') {
-        return {
-            title: '✨ AETERNUS · RANK ÉTER (SERVIDOR)',
-            emoji: '✨',
-            unit: 'éter',
-            color: 0xa78bfa,
-            scope: 'local',
-            economy: true,
-            tip: 'Trabalhe, craft e complete missões para acumular éter neste servidor!'
-        };
-    }
-    return {
-        title: '✨ AETERNUS · RANK GERAL',
-        emoji: '✨',
-        unit: 'éter',
-        color: 0xc9a227,
-        scope: 'global',
-        economy: true,
-        tip: 'Acumule éter em todos os servidores para dominar o ranking geral!'
-    };
-}
-
-async function buildList(mode, guild, client) {
-    if (mode === 'xp' || mode === 'xpglobal') {
-        const data = xp.all() || {};
-        const eterData = eter.all() || {};
-        let entries = Object.entries(data).map(([id, v]) => ({
-            id: String(id),
-            // xp.json guarda o XP restante do nível atual; o ranking precisa do XP acumulado total.
-            value: xp.totalXpForLevel(Number(v?.level || 0)) + Math.max(0, Number(v?.xp || 0)),
-            level: Number(v?.level || 0),
-            xp: xp.totalXpForLevel(Number(v?.level || 0)) + Math.max(0, Number(v?.xp || 0)),
-            eter: Number(eterData[id] || 0)
-        }));
-
-        if (mode === 'xp' && guild) {
-            const memberIds = new Set();
-            guild.members.cache.forEach((m) => {
-                if (m.user && !m.user.bot) memberIds.add(m.id);
-            });
-            if (memberIds.size < 5) {
-                try {
-                    const members = await guild.members.fetch().catch(() => null);
-                    if (members) {
-                        members.forEach((m) => {
-                            if (m.user && !m.user.bot) memberIds.add(m.id);
-                        });
-                    }
-                } catch (_) {}
-            }
-            if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
-        }
-
-        return entries
-            .filter((e) => e.value > 0 && !isKnownBot(client, e.id))
-            .sort((a, b) => b.value - a.value || b.level - a.level);
-    }
-
-    const data = eter.all() || {};
-    const xpData = xp.all() || {};
-    let entries = Object.entries(data).map(([id, v]) => {
-        const st = xpData[id] || {};
-        return {
-            id: String(id),
-            value: Number(v || 0),
-            eter: Number(v || 0),
-            xp: Number(st.xp || 0),
-            level: Number(st.level || 0)
-        };
-    });
-
-    if (mode === 'local' && guild) {
-        const memberIds = new Set();
-        guild.members.cache.forEach((m) => {
-            if (m.user && !m.user.bot) memberIds.add(m.id);
-        });
-        if (memberIds.size < 5) {
-            try {
-                const members = await guild.members.fetch().catch(() => null);
-                if (members) {
-                    members.forEach((m) => {
-                        if (m.user && !m.user.bot) memberIds.add(m.id);
-                    });
-                }
-            } catch (_) {}
-        }
-        if (memberIds.size) entries = entries.filter((e) => memberIds.has(e.id));
-    }
-
-    return entries
-        .filter((e) => e.value > 0 && !isKnownBot(client, e.id))
-        .sort((a, b) => b.value - a.value);
+    if (mode === 'xpglobal') return { title: 'COLISEU AETERNUS · RANK XP GLOBAL', economy: false, color: 0xc9a227, tip: 'Continue evoluindo para subir no ranking global de XP!' };
+    if (mode === 'xp') return { title: 'COLISEU AETERNUS · RANK XP', economy: false, color: 0xa78bfa, tip: 'Continue interagindo para subir no ranking de XP!' };
+    if (mode === 'local') return { title: 'AETERNUS · RANK ÉTER (SERVIDOR)', economy: true, color: 0xa78bfa, tip: 'Acumule éter neste servidor!' };
+    return { title: 'AETERNUS · RANK GERAL', economy: true, color: 0xc9a227, tip: 'Acumule éter para dominar o ranking geral!' };
 }
 
 function isKnownBot(client, id) {
-    const u = client?.users?.cache?.get(String(id));
-    return Boolean(u?.bot);
+    return Boolean(client?.users?.cache?.get(String(id))?.bot);
+}
+
+async function buildList(mode, guild, client) {
+    let entries;
+    if (mode === 'xp' || mode === 'xpglobal') {
+        const data = xp.all() || {};
+        entries = Object.entries(data).map(([id, v]) => {
+            const level = Number(v?.level || 0);
+            const value = xp.totalXpForLevel(level) + Math.max(0, Number(v?.xp || 0));
+            return { id: String(id), value, level };
+        });
+    } else {
+        const data = eter.all() || {};
+        const xpData = xp.all() || {};
+        entries = Object.entries(data).map(([id, v]) => ({
+            id: String(id), value: Number(v || 0), level: Number(xpData[id]?.level || 0)
+        }));
+    }
+
+    if ((mode === 'local' || mode === 'xp') && guild) {
+        const memberIds = new Set();
+        guild.members.cache.forEach(m => { if (m.user && !m.user.bot) memberIds.add(m.id); });
+        // Não busca todos os membros da API: isso pode gerar uso alto de memória/rede.
+        if (memberIds.size) entries = entries.filter(e => memberIds.has(e.id));
+    }
+
+    return entries.filter(e => e.value > 0 && !isKnownBot(client, e.id))
+        .sort((a, b) => b.value - a.value || b.level - a.level);
 }
 
 function findMyRank(list, userId) {
-    const idx = list.findIndex((e) => e.id === String(userId));
-    if (idx < 0) return { rank: null, value: 0, level: 0 };
-    return {
-        rank: idx + 1,
-        value: list[idx].value,
-        level: list[idx].level || 0
-    };
+    const idx = list.findIndex(e => e.id === String(userId));
+    return idx < 0 ? { rank: null, value: 0, level: 0 } : { rank: idx + 1, value: list[idx].value, level: list[idx].level || 0 };
 }
 
 function helpEmbed() {
-    return new EmbedBuilder()
-        .setColor(0xc9a227)
-        .setTitle('👑 COMANDO RANK · AETERNUS')
-        .setDescription(
-            [
-                'Veja o ranking dos aventureiros mais ativos!',
-                '',
-                '**📖 Como usar**',
-                '`O.rank` — rank geral de **éter**',
-                '`O.rank local` — éter **deste servidor**',
-                '`O.rank xp` — XP **deste servidor**',
-                '`O.rank xp global` — XP **global**',
-                '',
-                '**Exemplo:** `O.rank xp`',
-                '',
-                '⬅️ Voltar · 👤 Meu rank · ➡️ Próximo'
-            ].join('\n')
-        )
+    return new EmbedBuilder().setColor(0xc9a227).setTitle('👑 COMANDO RANK · AETERNUS')
+        .setDescription(['Veja o ranking dos aventureiros mais ativos!', '', '**Como usar**',
+            '`O.rank` — rank geral de éter', '`O.rank local` — éter deste servidor',
+            '`O.rank xp` — XP deste servidor', '`O.rank xp global` — XP global',
+            '', '⬅️ Voltar · 👤 Meu rank · ➡️ Próximo'].join('\n'))
         .setFooter({ text: 'Aeternus Bot · Rank' });
 }
 
 function navRow(mode, page, totalPages) {
     const maxPage = Math.max(0, totalPages - 1);
     return new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`rank:prev:${mode}:${page}`)
-            .setLabel('Voltar')
-            .setEmoji('⬅️')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page <= 0),
-        new ButtonBuilder()
-            .setCustomId(`rank:me:${mode}:${page}`)
-            .setLabel('Meu rank')
-            .setEmoji('👤')
-            .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId(`rank:next:${mode}:${page}`)
-            .setLabel('Próximo')
-            .setEmoji('➡️')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page >= maxPage)
+        new ButtonBuilder().setCustomId(`rank:prev:${mode}:${page}`).setLabel('Voltar').setEmoji('⬅️').setStyle(ButtonStyle.Secondary).setDisabled(page <= 0),
+        new ButtonBuilder().setCustomId(`rank:me:${mode}:${page}`).setLabel('Meu rank').setEmoji('👤').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`rank:next:${mode}:${page}`).setLabel('Próximo').setEmoji('➡️').setStyle(ButtonStyle.Secondary).setDisabled(page >= maxPage)
     );
+}
+
+function buildTextEmbed(meta, rows, page, totalPages, total) {
+    const description = rows.length ? rows.map((r, i) => {
+        const medal = ['🥇', '🥈', '🥉', '🏅', '🏅'][i] || '▫️';
+        const barSize = 10;
+        const filled = Math.max(0, Math.min(barSize, Math.round((r.value / Math.max(1, rows[0].value)) * barSize)));
+        const bar = '▰'.repeat(filled) + '▱'.repeat(barSize - filled);
+        return `${medal} **#${r.rank} · ${r.name}**\n└ ${meta.economy ? '✨ Éter' : '⭐ XP'}: **${fmt(r.value)}** · Nível **${r.level}**\n└ ${bar}`;
+    }).join('\n\n') : '_Ainda não há registros neste ranking._';
+    return new EmbedBuilder().setColor(meta.color).setTitle(meta.title)
+        .setDescription(description)
+        .addFields({ name: 'Página', value: `${page + 1}/${totalPages}`, inline: true }, { name: 'Participantes', value: fmt(total), inline: true })
+        .setFooter({ text: meta.tip });
 }
 
 async function sendRank(ctx, mode, page = 0) {
     const guild = ctx.guild;
-    if ((mode === 'local' || mode === 'xp') && !guild) {
-        return {
-            content: '❌ Este ranking é por servidor. Use em um servidor.',
-            ephemeral: true
-        };
-    }
+    if ((mode === 'local' || mode === 'xp') && !guild) return { content: '❌ Este ranking é por servidor. Use em um servidor.', ephemeral: true };
 
     const list = await buildList(mode, guild, ctx.client);
     const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
@@ -282,81 +110,35 @@ async function sendRank(ctx, mode, page = 0) {
     const start = p * PAGE_SIZE;
     const slice = list.slice(start, start + PAGE_SIZE);
 
-    // Só a imagem: o bot escreve nome/id/xp|saldo e coloca as fotos no card
-    const rows = [];
-    for (const e of slice) {
-        // Não consulta a API do Discord para cada usuário ao trocar de página.
-        // Usa o cache disponível e renderiza um avatar genérico quando não estiver em cache.
-        const u = ctx.client.users.cache.get(e.id) || null;
-        if (u?.bot) continue;
-        rows.push({
-            name: u ? (u.globalName || u.username) : ('usuário-' + String(e.id).slice(-4)),
-            id: e.id,
-            rank: start + rows.length + 1,
-            value: e.value,
-            level: e.level,
-            avatarURL: u ? u.displayAvatarURL({ size: 128, extension: 'png' }) : null
-        });
-    }
+    const rows = slice.map((e, i) => {
+        const user = ctx.client.users.cache.get(e.id);
+        return { id: e.id, name: user ? (user.globalName || user.username) : ('Aventureiro ' + e.id.slice(-4)), rank: start + i + 1, value: e.value, level: e.level || 0 };
+    });
 
-    let files = [];
+    // O comando sempre tem uma saída legível. SVG não é exibido como imagem pelo Discord;
+    // só anexamos cards PNG. Se o sharp falhar, usamos o embed do ranking no próprio comando.
     try {
-        const card = await rankCard.render({
-            title: meta.title,
-            subtitle: meta.economy ? 'Ranking de éter' : 'Ranking de XP',
-            rows,
-            economy: !!meta.economy,
-            page: p + 1,
-            totalPages,
-            tip: meta.tip
-        });
-        if (card?.buffer) {
-            files = [new AttachmentBuilder(card.buffer, { name: card.name || 'rank.png' })];
+        const card = await rankCard.render({ title: meta.title, subtitle: meta.economy ? 'Ranking de éter' : 'Ranking de XP', rows, economy: meta.economy, page: p + 1, totalPages, tip: meta.tip });
+        if (card?.buffer && /\.png$/i.test(card.name || '')) {
+            return { files: [new AttachmentBuilder(card.buffer, { name: 'aeternus-rank.png' })], embeds: [], components: [navRow(mode, p, totalPages)], attachments: [] };
         }
     } catch (err) {
-        console.warn('[rank] card image:', err.message);
+        console.warn('[rank] Falha ao gerar imagem; usando embed:', err?.message || err);
     }
 
-    // Apenas o card anexado e os botões em uma linha separada, sem embed ou cabeçalho extra.
-    if (!files.length) {
-        return {
-            content: '_Não foi possível gerar o card do ranking._',
-            components: [navRow(mode, p, totalPages)],
-            embeds: [],
-            files: []
-        };
-    }
-
-    return {
-        files,
-        components: [navRow(mode, p, totalPages)],
-        embeds: [],
-        // A interação de botão atualiza a mesma mensagem; o anexo é substituído pelo card da página nova.
-        attachments: []
-    };
+    return { embeds: [buildTextEmbed(meta, rows, p, totalPages, list.length)], components: [navRow(mode, p, totalPages)] };
 }
 
-
 async function editRankMessage(interaction, payload, action) {
-    // deferUpdate já reconheceu o clique; tenta editar a resposta da interação,
-    // com fallback para a mensagem original e uma nova tentativa em erros transitórios.
-    const attempts = [
-        () => interaction.editReply(payload),
-        () => interaction.message.edit(payload),
-        () => interaction.message.edit(payload)
-    ];
+    const attempts = [() => interaction.editReply(payload), () => interaction.message.edit(payload)];
     let lastError;
     for (let i = 0; i < attempts.length; i++) {
-        try {
-            return await attempts[i]();
-        } catch (err) {
+        try { return await attempts[i](); }
+        catch (err) {
             lastError = err;
-            const transient = err?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-                err?.code === 'ETIMEDOUT' ||
-                err?.code === 'ECONNRESET' ||
-                err?.status === 502 || err?.status === 503 || err?.status === 504;
+            const transient = ['UND_ERR_CONNECT_TIMEOUT', 'ETIMEDOUT', 'ECONNRESET'].includes(err?.code) || [502,503,504].includes(err?.status);
             if (!transient || i === attempts.length - 1) break;
-            await new Promise(resolve => setTimeout(resolve, 700 * (i + 1)));
+            await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
         }
     }
     console.error('[rank] Falha ao ' + action + ':', lastError?.message || lastError);
@@ -367,72 +149,33 @@ module.exports = {
     name: 'rank',
     aliases: ['top', 'leaderboard', 'lb', 'ranking', 'rankxp', 'topxp', 'xpglobal'],
     description: 'Ranking de economia (éter) e XP',
-
     async execute(message, args) {
-        if (['ajuda', 'help', '?'].includes(String(args[0] || '').toLowerCase())) {
-            return message.reply({ embeds: [helpEmbed()] });
-        }
+        if (['ajuda', 'help', '?'].includes(String(args[0] || '').toLowerCase())) return message.reply({ embeds: [helpEmbed()] });
         let mode = parseMode(args);
-        const invoked = String(message.content || '')
-            .trim()
-            .split(/\s+/)[0]
-            .toLowerCase()
-            .replace(/^[oO]\./, '')
-            .replace(/^!/, '');
-        if (['topxp', 'rankxp', 'xpglobal'].includes(invoked) && !args[0]) {
-            mode = 'xpglobal';
-        }
-        const payload = await sendRank(message, mode, 0);
-        return message.reply(payload);
+        const invoked = String(message.content || '').trim().split(/\s+/)[0].toLowerCase().replace(/^[oO]\./, '').replace(/^!/, '');
+        if (['topxp', 'rankxp', 'xpglobal'].includes(invoked) && !args[0]) mode = 'xpglobal';
+        return message.reply(await sendRank(message, mode, 0));
     },
-
     async handleComponent(interaction) {
         if (!String(interaction.customId || '').startsWith('rank:')) return;
-
-        const parts = interaction.customId.split(':');
-        const action = parts[1];
-        const mode = parts[2] || 'global';
-        let page = parseInt(parts[3], 10) || 0;
-
-        if (!['global', 'local', 'xp', 'xpglobal'].includes(mode)) {
-            return interaction.reply({ content: 'Modo inválido.' }).catch(() => {});
-        }
-
-        if (action === 'me') {
-            // Reconhece o clique imediatamente e leva o card até a página do usuário.
-            await interaction.deferUpdate().catch(() => {});
-            if (interaction.replied) return;
-
-            const guild = interaction.guild;
-            if ((mode === 'local' || mode === 'xp') && !guild) {
-                return interaction.followUp({
-                    content: '❌ Ranking local só funciona em servidor.',
-                    ephemeral: true
-                }).catch(() => {});
-            }
-
-            const list = await buildList(mode, guild, interaction.client);
-            const mine = findMyRank(list, interaction.user.id);
-
-            if (!mine.rank) {
-                return interaction.followUp({
-                    content: 'Você ainda não aparece neste ranking. Ganhe éter/XP para entrar!',
-                    ephemeral: true
-                }).catch(() => {});
-            }
-
-            const myPage = Math.floor((mine.rank - 1) / PAGE_SIZE);
-            const payload = await sendRank(interaction, mode, myPage);
-            return editRankMessage(interaction, payload, 'abrir página do usuário');
-        }
-
-        if (action === 'prev') page = Math.max(0, page - 1);
-        if (action === 'next') page = page + 1;
-
-        // O card precisa buscar avatares e renderizar uma imagem; deferUpdate evita o timeout.
+        const [, action, mode = 'global', rawPage] = interaction.customId.split(':');
+        let page = parseInt(rawPage, 10) || 0;
+        if (!['global', 'local', 'xp', 'xpglobal'].includes(mode)) return interaction.reply({ content: 'Modo inválido.' }).catch(() => {});
         await interaction.deferUpdate().catch(() => {});
         if (interaction.replied) return;
+
+        const guild = interaction.guild;
+        if (action === 'me') {
+            if ((mode === 'local' || mode === 'xp') && !guild) return interaction.followUp({ content: '❌ Ranking local só funciona em servidor.', ephemeral: true }).catch(() => {});
+            const list = await buildList(mode, guild, interaction.client);
+            const mine = findMyRank(list, interaction.user.id);
+            if (!mine.rank) return interaction.followUp({ content: 'Você ainda não aparece neste ranking. Ganhe éter/XP para entrar!', ephemeral: true }).catch(() => {});
+            page = Math.floor((mine.rank - 1) / PAGE_SIZE);
+        } else if (action === 'prev') page = Math.max(0, page - 1);
+        else if (action === 'next') page += 1;
+        else return;
+
         const payload = await sendRank(interaction, mode, page);
-        return editRankMessage(interaction, payload, 'editar página do card');
+        return editRankMessage(interaction, payload, 'atualizar ranking');
     }
 };
