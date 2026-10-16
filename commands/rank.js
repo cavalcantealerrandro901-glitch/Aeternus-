@@ -369,9 +369,12 @@ module.exports = {
         }
 
         if (action === 'me') {
+            // Reconhece a interação antes de consultar dados, evitando o timeout de 3 segundos.
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
+            if (interaction.replied) return;
             const guild = interaction.guild;
             if ((mode === 'local' || mode === 'xp') && !guild) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ Ranking local só funciona em servidor.'
                 }).catch(() => {});
             }
@@ -382,9 +385,8 @@ module.exports = {
             const foot = 'Aeternus Bot · ' + (guild?.name || 'Global') + ' · ' + clockNow();
 
             if (!mine.rank) {
-                return interaction.reply({
-                    content: '<@' + interaction.user.id + '> ainda não aparece no ranking. Ganhe éter/XP para entrar!',
-                    ephemeral: true
+                return interaction.editReply({
+                    content: '<@' + interaction.user.id + '> ainda não aparece no ranking. Ganhe éter/XP para entrar!'
                 }).catch(() => {});
             }
 
@@ -396,16 +398,20 @@ module.exports = {
             if (meta.economy) line += ' · ✨ **' + fmt(saldo) + '** éter';
             else line += ' · ⭐ **' + fmt(xpVal) + '** XP' + (nivel ? ' · Nv. **' + nivel + '**' : '');
 
-            return interaction.reply({
-                content: line,
-                ephemeral: true
+            return interaction.editReply({
+                content: line
             }).catch(() => {});
         }
 
         if (action === 'prev') page = Math.max(0, page - 1);
         if (action === 'next') page = page + 1;
 
+        // O card precisa buscar avatares e renderizar uma imagem; deferUpdate evita o timeout.
+        await interaction.deferUpdate().catch(() => {});
+        if (interaction.replied) return;
         const payload = await sendRank(interaction, mode, page);
-        return interaction.update(payload).catch(() => {});
+        return interaction.editReply(payload).catch((err) => {
+            console.error('[rank] Falha ao editar página do card:', err.message);
+        });
     }
 };
