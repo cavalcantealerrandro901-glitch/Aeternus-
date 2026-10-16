@@ -42,7 +42,11 @@ module.exports = {
         }
 
         const normalized = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const command = client.commands.get(nome) ||
+        const testName = ['minas', 'mines', 'mine', 'campo', 'minas-teste', 'minasteste'].includes(normalized)
+            ? 'minas-teste'
+            : normalized;
+        const command = client.commands.get(testName) ||
+            client.commands.get(nome) ||
             client.commands.get(normalized) ||
             [...client.commands.values()].find((cmd) =>
                 cmd?.name === normalized ||
