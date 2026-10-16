@@ -140,9 +140,10 @@ async function buildList(mode, guild, client) {
         const eterData = eter.all() || {};
         let entries = Object.entries(data).map(([id, v]) => ({
             id: String(id),
-            value: Number(v?.xp || 0),
+            // xp.json guarda o XP restante do nível atual; o ranking precisa do XP acumulado total.
+            value: xp.totalXpForLevel(Number(v?.level || 0)) + Math.max(0, Number(v?.xp || 0)),
             level: Number(v?.level || 0),
-            xp: Number(v?.xp || 0),
+            xp: xp.totalXpForLevel(Number(v?.level || 0)) + Math.max(0, Number(v?.xp || 0)),
             eter: Number(eterData[id] || 0)
         }));
 
@@ -290,6 +291,7 @@ async function sendRank(ctx, mode, page = 0) {
         rows.push({
             name: u ? (u.globalName || u.username) : ('usuário-' + String(e.id).slice(-4)),
             id: e.id,
+            rank: start + rows.length + 1,
             value: e.value,
             level: e.level,
             avatarURL: u ? u.displayAvatarURL({ size: 128, extension: 'png' }) : null
@@ -393,7 +395,7 @@ module.exports = {
 
             const myPage = Math.floor((mine.rank - 1) / PAGE_SIZE);
             const payload = await sendRank(interaction, mode, myPage);
-            return interaction.editReply(payload).catch((err) => {
+            return interaction.message.edit(payload).catch((err) => {
                 console.error('[rank] Falha ao abrir página do usuário:', err.message);
             });
         }
@@ -405,7 +407,7 @@ module.exports = {
         await interaction.deferUpdate().catch(() => {});
         if (interaction.replied) return;
         const payload = await sendRank(interaction, mode, page);
-        return interaction.editReply(payload).catch((err) => {
+        return interaction.message.edit(payload).catch((err) => {
             console.error('[rank] Falha ao editar página do card:', err.message);
         });
     }
