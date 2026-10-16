@@ -224,9 +224,19 @@ function panelComponents(game, reveal = false) {
 
     for (const row of boardRows(game, reveal)) container.addActionRowComponents(row);
 
-    container
-        .addSeparatorComponents(new SeparatorBuilder())
-        .addActionRowComponents(controlsRow(game));
+    container.addSeparatorComponents(new SeparatorBuilder());
+
+    const rows = controlsRows(game);
+    if (game.dead || game.cashed || reveal) {
+        for (const row of rows) container.addActionRowComponents(row);
+    } else {
+        container
+            .addActionRowComponents(rows[0])
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent('💡 **Dica:** abra as casas com atenção e saque quando quiser garantir o valor acumulado.')
+            )
+            .addActionRowComponents(rows[1]);
+    }
 
     return [container];
 }
@@ -267,43 +277,46 @@ function boardRows(game, reveal = false) {
     return rows;
 }
 
-function controlsRow(game) {
+function controlsRows(game) {
     const ended = game.dead || game.cashed;
 
     if (ended) {
-        return new ActionRowBuilder().addComponents(
+        return [new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('minas-teste:again:' + game.id)
                 .setLabel('Novamente')
                 .setStyle(ButtonStyle.Primary)
-        );
+        )];
     }
 
     const opened = game.opened.size;
     const value = opened > 0 ? potentialAt(game.amount, opened, game.bombCount) : 0;
 
-    return new ActionRowBuilder().addComponents(
+    const navigationRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas-teste:random:' + game.id)
             .setLabel('Aleatório')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(ended),
+            .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId('minas-teste:refresh:' + game.id)
             .setLabel('Atualizar')
             .setStyle(ButtonStyle.Secondary)
-            .setDisabled(ended),
+    );
+
+    const cashRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas-teste:cash:' + game.id)
             .setLabel(game.fun ? 'Encerrar' : 'Sacar • ' + fmt(value) + ' ✨')
             .setStyle(ButtonStyle.Success)
-            .setDisabled(ended || opened <= 0)
+            .setDisabled(opened <= 0)
     );
+
+    return [navigationRow, cashRow];
 }
 
 function fullComponents(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
-    return [...boardRows(game, ended), controlsRow(game)];
+    return [...boardRows(game, ended), ...controlsRows(game)];
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
