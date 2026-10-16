@@ -91,12 +91,26 @@ async function render(opts) {
   const rows = (opts.rows || []).slice(0, 10);
   const avatars = await Promise.all(rows.map(r => fetchDataUri(r.avatarURL)));
   const svgBuf = Buffer.from(buildSvg({ ...opts, rows }, avatars), 'utf8');
+
+  // O SVG é sempre um fallback válido; a conversão para PNG é opcional.
   try {
-    const sharp = require('sharp');
-    const png = await sharp(svgBuf, { density: 190 }).png({ quality: 92 }).toBuffer();
+    const sharpModule = require('sharp');
+    const sharp = typeof sharpModule === 'function' ? sharpModule : sharpModule?.default;
+    if (typeof sharp !== 'function') {
+      throw new TypeError('O módulo sharp não exportou uma função válida. Reinstale as dependências.');
+    }
+    const pipeline = sharp(svgBuf, { density: 190 });
+    if (!pipeline || typeof pipeline.png !== 'function') {
+      throw new TypeError('A instalação do sharp não retornou um pipeline válido.');
+    }
+    const output = pipeline.png();
+    if (!output || typeof output.toBuffer !== 'function') {
+      throw new TypeError('O pipeline do sharp não disponibilizou toBuffer().');
+    }
+    const png = await output.toBuffer();
     return { buffer: png, name: 'aeternus-rank.png' };
   } catch (e) {
-    console.warn('[rankCard] sharp falhou:', e.message);
+    console.warn('[rankCard] sharp falhou; usando SVG de fallback:', e?.stack || e?.message || e);
     return { buffer: svgBuf, name: 'aeternus-rank.svg' };
   }
 }
