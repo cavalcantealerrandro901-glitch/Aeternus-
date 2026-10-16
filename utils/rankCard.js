@@ -76,7 +76,7 @@ function buildSvg(opts, avatars) {
 <g fill="#d8c8ff" opacity=".55"><circle cx="190" cy="28" r="1.2"/><circle cx="280" cy="58" r=".9"/><circle cx="370" cy="22" r="1.1"/><circle cx="470" cy="76" r=".8"/><circle cx="540" cy="30" r="1.2"/><circle cx="710" cy="142" r=".9"/><circle cx="37" cy="135" r=".8"/><circle cx="725" cy="240" r="1"/></g>
 <path d="M28 142 H${W-28}" stroke="#8b5cf6" stroke-opacity=".5"/><path d="M28 146 H180" stroke="#d8b4fe" stroke-opacity=".7" stroke-width="2"/>
 <text x="38" y="34" font-family="${FONT}" font-size="10" font-weight="700" fill="#a78bfa" letter-spacing="3">OS REGISTROS DO ÉTER</text>
-<text x="36" y="82" font-family="${FONT}" font-size="37" font-weight="900" fill="url(#titleG)">AETERNUS</text>
+<text x="36" y="82" font-family="${FONT}" font-size="29" font-weight="900" fill="url(#titleG)">RANK AETERNUS</text>
 <text x="39" y="111" font-family="${FONT}" font-size="18" font-weight="800" fill="#f5f0ff" letter-spacing="2">${esc(subtitle || (economy ? 'RANKING DE ÉTER' : 'RANKING DE XP')).toUpperCase()}</text>
 <text x="39" y="130" font-family="${FONT}" font-size="10" fill="#9f8db8" letter-spacing="1.3">${esc(title || 'COLISEU DOS AVENTUREIROS').toUpperCase().slice(0,54)}</text>
 ${buildSigil()}
