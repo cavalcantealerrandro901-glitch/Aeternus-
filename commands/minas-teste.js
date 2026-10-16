@@ -211,7 +211,9 @@ function panelEmbed(game) {
         'Multiplicador atual: ' + currentMult.toFixed(2) + 'x',
         'Prox multi: ' + nextMult.toFixed(2) + 'x  •  ' + fmt(nextGain) + ' ✨',
         '',
-        'Aleatório abre uma casa livre ao acaso. Atualizar recarrega o painel da partida.',
+        '**Controles**',
+        '🎲 **Aleatório** — abre uma casa livre ao acaso.',
+        '🔄 **Atualizar** — atualiza o tabuleiro e as informações.',
         '',
         'Partida #' + String(game.partida).padStart(4, '0')
     ];
