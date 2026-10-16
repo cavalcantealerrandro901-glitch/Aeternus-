@@ -3,7 +3,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    AttachmentBuilder
+    AttachmentBuilder,
+    MessageFlags
 } = require('discord.js');
 const eter = require('../utils/eter');
 const xp = require('../utils/xp');
@@ -323,10 +324,31 @@ async function sendRank(ctx, mode, page = 0) {
         };
     }
 
+    // Components V2: imagem dentro de um Container, com navegação em Action Row.
+    // Não enviar content/embeds junto com IsComponentsV2.
     return {
-        content: '',
-        embeds: [],
-        components: [navRow(mode, p, totalPages)],
+        flags: MessageFlags.IsComponentsV2,
+        components: [
+            {
+                type: 17,
+                accent_color: meta.color,
+                components: [
+                    {
+                        type: 10,
+                        content: '# RANK AETERNUS\\n' +
+                            '### ' + (meta.economy ? 'Ranking de Éter' : 'Ranking de XP') + '\\n' +
+                            'Página **' + (p + 1) + '** de **' + totalPages + '**'
+                    },
+                    { type: 14, divider: true, spacing: 1 },
+                    {
+                        type: 12,
+                        items: [{ media: { url: 'attachment://' + (files[0].name || 'rank.png') } }]
+                    },
+                    { type: 14, divider: true, spacing: 1 },
+                    { type: 1, components: navRow(mode, p, totalPages).toJSON().components }
+                ]
+            }
+        ],
         files
     };
 }
