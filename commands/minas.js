@@ -83,7 +83,7 @@ async function autoEnd(game, client) {
         game.cashed = true;
         game._lastWin = win;
         eter.add(game.userId, win, { reason: 'mines auto' });
-    } else if (game.opened.size > 0 && game.fun) {
+    } else if (game.opened.size > 0 && (game.fun || game.testMode)) {
         game.cashed = true;
     } else {
         game.dead = true;
