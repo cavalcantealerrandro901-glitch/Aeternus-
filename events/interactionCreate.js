@@ -1,5 +1,4 @@
 const classAdvancement = require('../utils/classAdvancement');
-const autoRepair = require('../utils/autoRepair');
 const { Collection } = require('discord.js');
 
 async function bridgeSlashToPrefix(interaction, cmd, client) {
@@ -91,11 +90,10 @@ module.exports = {
                         } catch (_) {}
                     } catch (err) {
                         if (err && (err.code === 10062 || err.code === 40060)) return;
-                        await autoRepair.handleCommandError({
-                            cmdName: name, error: err,
-                            context: 'slash /' + name + ' · ' + (interaction.guild?.name || 'DM') + ' · user ' + interaction.user?.id,
-                            interaction
-                        });
+                        console.error('[slash /' + name + ']', err);
+                        const reply = { content: '❌ Ocorreu um erro ao executar este comando.' };
+                        if (interaction.deferred || interaction.replied) await interaction.followUp({ ...reply, ephemeral: true }).catch(() => {});
+                        else await interaction.reply({ ...reply, ephemeral: true }).catch(() => {});
                     }
                     return;
                 }
@@ -110,11 +108,8 @@ module.exports = {
                         } catch (_) {}
                     } catch (err) {
                         if (err && (err.code === 10062 || err.code === 40060)) return;
-                        await autoRepair.handleCommandError({
-                            cmdName: name, error: err,
-                            context: 'slash-bridge /' + name + ' · ' + (interaction.guild?.name || 'DM'),
-                            interaction
-                        });
+                        console.error('[slash-bridge /' + name + ']', err);
+                        await interaction.followUp({ content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true }).catch(() => {});
                     }
                     return;
                 }
@@ -147,12 +142,8 @@ module.exports = {
             }
         } catch (e) {
             if (e && (e.code === 10062 || e.code === 40060)) return;
-            const id = interaction.customId || interaction.commandName || '?';
-            await autoRepair.handleCommandError({
-                cmdName: String(id).split(':')[0], error: e,
-                context: 'interaction · ' + (interaction.guild?.name || 'DM') + ' · ' + interaction.type,
-                interaction
-            });
+            console.error('[interaction ' + (interaction.customId || interaction.commandName || '?') + ']', e);
+            if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Ocorreu um erro ao processar esta interação.', ephemeral: true }).catch(() => {});
         }
     }
 };

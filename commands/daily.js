@@ -1,4 +1,14 @@
-const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags
+} = require('discord.js');
 const daily = require('../utils/daily');
 const eter = require('../utils/eter');
 
@@ -16,63 +26,78 @@ function row(disabled = false) {
       .setEmoji('🎁').setStyle(ButtonStyle.Primary).setDisabled(disabled)
   );
 }
-function buildEmbed(user, st, result = null, already = false) {
+function buildComponents(user, st, result = null, already = false) {
   const streak = Math.max(1, result?.streak ?? (st?.claimed ? st.streak : st?.nextStreak ?? st?.streak ?? 1));
   const balance = result?.balance ?? st?.balance ?? eter.get(user.id);
-  const embed = new EmbedBuilder()
-    .setColor(result ? 0x36d9ff : 0x2878ff)
-    .setAuthor({ name: 'AETERNUS • ECONOMY', iconURL: 'https://cdn.discordapp.com/embed/avatars/5.png' })
-    .setTitle('🎁 Recompensa diária')
-    .setDescription(result
-      ? `Parabéns, <@${user.id}>! Sua recompensa diária foi creditada.`
-      : already
-        ? `Olá, <@${user.id}>! Você já resgatou sua recompensa de hoje.`
-        : `Olá, <@${user.id}>! Resgate seu daily e continue sua sequência.`)
-    .addFields(
-      { name: '✨ Éter ganho', value: result ? `**+${fmt(result.amount)} éter**` : 'Resgate para revelar sua recompensa.', inline: true },
-      { name: '🔥 Sequência', value: `**${streak} dia(s)**`, inline: true },
-      { name: '💰 Saldo atual', value: `**${fmt(balance)} éter**`, inline: true }
+  const description = result
+    ? `Parabéns, <@${user.id}>! Sua recompensa diária foi creditada.`
+    : already
+      ? `Olá, <@${user.id}>! Você já resgatou sua recompensa de hoje.`
+      : `Olá, <@${user.id}>! Resgate seu daily e continue sua sequência.`;
+
+  const lines = [
+    '# 🎁 AETERNUS • RECOMPENSA DIÁRIA',
+    description,
+    '',
+    '**✨ Éter ganho**',
+    result ? `**+${fmt(result.amount)} éter**` : 'Resgate para revelar sua recompensa.',
+    '',
+    `**🔥 Sequência:** ${streak} dia(s)`,
+    `**💰 Saldo atual:** ${fmt(balance)} éter`
+  ];
+
+  if (result?.levelMultiplier && result.levelMultiplier !== 1) {
+    lines.push('', `**⭐ Bônus de nível:** ×${Number(result.levelMultiplier).toFixed(2)}`);
+  }
+  if (result?.partner) {
+    lines.push('', '**🤝 Bônus de parceria:** ×2 aplicado nesta recompensa!');
+  } else if (!result && st?.partner && !already) {
+    lines.push('', '**🤝 Servidor parceiro:** o bônus ×2 será aplicado à recompensa.');
+  }
+
+  lines.push(
+    '',
+    '**📅 Próximo resgate**',
+    already ? 'Volte após a meia-noite de Brasília.' : 'Resgate uma vez por dia para manter sua sequência.'
+  );
+
+  const container = new ContainerBuilder()
+    .setAccentColor(result ? 0x36d9ff : 0x2878ff)
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
+    .addSeparatorComponents(new SeparatorBuilder())
+    .addMediaGalleryComponents(
+      new MediaGalleryBuilder().addItems(
+        new MediaGalleryItemBuilder().setURL(PARTNER_THANKS_IMAGE),
+        new MediaGalleryItemBuilder().setURL(STREAK_IMAGES[Math.min(streak, 7) - 1])
+      )
     )
-    .setImage(PARTNER_THANKS_IMAGE)
-    .setThumbnail(STREAK_IMAGES[Math.min(streak, 7) - 1])
-    .setFooter({ text: 'Obrigado aos servidores parceiros por fortalecerem a comunidade Aeternus.' })
-    .setTimestamp();
+    .addActionRowComponents(row(Boolean(already || result)));
 
-  if (result?.levelMultiplier && result.levelMultiplier !== 1)
-    embed.addFields({ name: '⭐ Bônus de nível', value: `×${Number(result.levelMultiplier).toFixed(2)}`, inline: true });
-  if (result?.partner)
-    embed.addFields({ name: '🤝 Bônus de parceria', value: '**×2 aplicado nesta recompensa!**', inline: true });
-  else if (!result && st?.partner && !already)
-    embed.addFields({ name: '🤝 Servidor parceiro', value: 'O bônus ×2 será aplicado à recompensa.', inline: true });
-
-  embed.addFields({
-    name: '📅 Próximo resgate',
-    value: already ? 'Volte após a meia-noite de Brasília.' : 'Resgate uma vez por dia para manter sua sequência.'
-  });
-  return embed;
-}
-function render(user, st, result = null, already = false) {
-  return { embeds: [buildEmbed(user, st, result, already)], components: [row(Boolean(already || result))] };
+  return {
+    flags: MessageFlags.IsComponentsV2,
+    components: [container],
+    allowedMentions: { users: [user.id] }
+  };
 }
 async function run(user, guildId) {
   const st = daily.status(user.id, guildId);
-  return render(user, st, null, st.claimed);
+  return buildComponents(user, st, null, st.claimed);
 }
 async function handleComponent(interaction) {
   if (interaction.customId !== 'daily:claim') return;
   const guildId = interaction.guild?.id;
   const st = daily.status(interaction.user.id, guildId);
-  if (st.claimed) return interaction.update(render(interaction.user, st, null, true));
+  if (st.claimed) return interaction.update(buildComponents(interaction.user, st, null, true));
   const result = daily.claim(interaction.user.id, guildId);
   if (!result?.ok) {
     const again = daily.status(interaction.user.id, guildId);
-    return interaction.update(render(interaction.user, again, null, true));
+    return interaction.update(buildComponents(interaction.user, again, null, true));
   }
-  return interaction.update(render(interaction.user, result, result, false));
+  return interaction.update(buildComponents(interaction.user, result, result, false));
 }
 module.exports = {
   name: 'daily', aliases: ['diario'], description: 'Mostra e resgata a recompensa diária de éter',
-  data: new SlashCommandBuilder().setName('daily').setDescription('Mostra e resgata a recompensa diária de éter'),
+  data: new (require('discord.js').SlashCommandBuilder)().setName('daily').setDescription('Mostra e resgata a recompensa diária de éter'),
   async execute(message) { return message.reply(await run(message.author, message.guild?.id)); },
   async executeSlash(interaction) { return interaction.reply(await run(interaction.user, interaction.guild?.id)); },
   handleComponent

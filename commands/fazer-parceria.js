@@ -209,15 +209,7 @@ module.exports = {
 
             return reply(i, true, '❌ Subcomando desconhecido. Use `/parceria fazer`.');
         } catch (err) {
-            try {
-                const autoRepair = require('../utils/autoRepair');
-                await autoRepair.handleCommandError({
-                    cmdName: 'parceria',
-                    error: err,
-                    context: 'slash /parceria · guild ' + (i.guild?.id || '?') + ' · user ' + (i.user?.id || '?'),
-                    interaction: i
-                });
-            } catch (_) {}
+            console.error('[parceria]', err);
             const msg = '❌ Erro ao registrar parceria: `' + String(err?.message || err).slice(0, 200) + '`';
             try {
                 if (i.deferred || i.replied) return await i.editReply({ content: msg });

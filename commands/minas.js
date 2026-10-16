@@ -1,8 +1,12 @@
 const {
     EmbedBuilder,
+    ContainerBuilder,
+    TextDisplayBuilder,
+    SeparatorBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags
 } = require('discord.js');
 
 const eter = require('../utils/eter');
@@ -35,23 +39,31 @@ function multAt(opened, bombs) {
         Math.min(Number(bombs) || 1, TOTAL - 1)
     );
 
-    let m = 1;
+    // Multiplicadores definidos para o modo de teste com 1 bomba.
+    // O ganho potencial é calculado a partir deste mesmo multiplicador.
+    const oneBombMultipliers = [
+        1.08, 1.17, 1.28, 1.43, 1.59, 1.77, 1.98,
+        2.14, 2.26, 2.60, 2.89, 3.50, 3.55
+    ];
 
+    if (b === 1 && o <= oneBombMultipliers.length) {
+        return oneBombMultipliers[o - 1];
+    }
+
+    // Para outros números de bombas (e casas além da tabela),
+    // mantém o cálculo clássico com a margem configurada.
+    let m = 1;
     for (let i = 0; i < o; i++) {
         const tilesLeft = TOTAL - i;
         const safeLeft = TOTAL - b - i;
-
         if (safeLeft <= 0 || tilesLeft <= 0) break;
-
         m *= tilesLeft / safeLeft;
     }
 
     m *= HOUSE;
     m = Math.min(m, MAX_MULT);
-
     return Number(Math.max(1, m).toFixed(2));
 }
-
 function potentialAt(amount, opened, bombs) {
     const amt = Math.floor(Number(amount) || 0);
     const o = Math.floor(Number(opened) || 0);
@@ -78,12 +90,12 @@ function touch(game, client) {
 async function autoEnd(game, client) {
     if (!games.has(game.id) || game.dead || game.cashed) return;
 
-    if (game.opened.size > 0 && !game.fun && game.amount > 0) {
+    if (game.opened.size > 0 && !game.fun && !game.testMode && game.amount > 0) {
         const win = potentialAt(game.amount, game.opened.size, game.bombCount);
         game.cashed = true;
         game._lastWin = win;
         eter.add(game.userId, win, { reason: 'mines auto' });
-    } else if (game.opened.size > 0 && game.fun) {
+    } else if (game.opened.size > 0 && (game.fun || game.testMode)) {
         game.cashed = true;
     } else {
         game.dead = true;
@@ -96,9 +108,8 @@ async function autoEnd(game, client) {
         const msg = ch ? await ch.messages.fetch(game.messageId).catch(() => null) : null;
         if (msg) {
             await msg.edit({
-                content: '<@' + game.userId + '>',
-                embeds: [panelEmbed(game)],
-                components: fullComponents(game, true)
+                flags: MessageFlags.IsComponentsV2,
+                components: panelComponents(game, true)
             }).catch(() => {});
         }
         const type = game.dead ? 'loss' : game.cashed ? 'cash' : null;
@@ -108,7 +119,14 @@ async function autoEnd(game, client) {
 
 async function sendResult(game, client, type = null) {
     if (game.resultSent) return;
+    if (game.testMode) {
+        game.resultSent = true;
+        return;
+    }
     game.resultSent = true;
+
+    // Derrota e saque já ficam registrados no painel da partida; não enviar mensagem extra.
+    if (type === 'cash' || type === 'loss') return;
 
     try {
         const channel = await client.channels.fetch(game.channelId).catch(() => null);
@@ -154,7 +172,11 @@ async function sendResult(game, client, type = null) {
         }
 
         const result = await channel.send({
-            content: '<@' + game.userId + '>',
+            
+            reply: game.messageId
+                ? { messageReference: game.messageId, failIfNotExists: false }
+                : undefined,
+            allowedMentions: { users: [game.userId] },
             embeds: [
                 new EmbedBuilder()
                     .setColor(color)
@@ -169,34 +191,57 @@ async function sendResult(game, client, type = null) {
     } catch (_) {}
 }
 
-function panelEmbed(game) {
+function panelText(game) {
     const opened = game.opened.size;
     const bombs = game.bombCount;
     const safeTotal = TOTAL - bombs;
     const remaining = Math.max(0, safeTotal - opened);
     const currentMult = multAt(opened, bombs);
     const nextMult = opened < safeTotal ? multAt(opened + 1, bombs) : currentMult;
-    const nextGain =
-        opened < safeTotal
-            ? potentialAt(game.amount, opened + 1, bombs)
-            : potentialAt(game.amount, opened, bombs);
+    const nextGain = opened < safeTotal
+        ? potentialAt(game.amount, opened + 1, bombs)
+        : potentialAt(game.amount, opened, bombs);
 
-    const description = [
+    return [
+        '# ✦ AETERNUS • MINES' + (game.testMode ? ' • TESTE' : ''),
+        game.testMode ? '🧪 **MODO TESTE** — nenhum Éter será cobrado ou creditado.' : '',
+        '',
+        '**Informações da partida**',
         'Aposta: ' + fmt(game.amount) + ' ✨',
-        'Casas: 💣 ' + bombs + '  •  ' + remaining + '/' + safeTotal,
-        'Multiplicador atual: ' + currentMult.toFixed(2) + 'x',
-        'Prox multi: ' + nextMult.toFixed(2) + 'x  •  ' + fmt(nextGain) + ' ✨',
-        '',
-        'Aleatório abre uma casa livre ao acaso. Atualizar recarrega o painel da partida.',
-        '',
-        'Partida #' + String(game.partida).padStart(4, '0')
-    ];
+        'Bombas: 💣 ' + bombs + ' • Seguras: ' + remaining + '/' + safeTotal,
+        'Multiplicador atual: **' + currentMult.toFixed(2) + 'x**',
+        'Próximo: **' + nextMult.toFixed(2) + 'x** • ' + fmt(nextGain) + ' ✨',
+        game.dead ? '❌ **Partida encerrada: mina encontrada.**' : '',
+        game.cashed ? '✅ **Partida encerrada.**' : ''
+    ].filter(Boolean).join('\n');
+}
 
-    return new EmbedBuilder()
-        .setColor(game.dead ? 0xED4245 : game.cashed ? 0x57F287 : 0x5865F2)
-        .setTitle('✦ AETERNUS • MINES')
-        .setDescription(description.join('\n'))
-        .setFooter({ text: 'Éter ✨ · AFK 7 min · ' + betFooter() });
+function panelFooter(game) {
+    return '-# Partida #' + String(game.partida).padStart(4, '0');
+}
+
+function panelComponents(game, reveal = false) {
+    const container = new ContainerBuilder()
+        .setAccentColor(game.dead ? 0xED4245 : game.cashed ? 0x57F287 : 0x5865F2)
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(panelText(game)))
+        .addSeparatorComponents(new SeparatorBuilder());
+
+    for (const row of boardRows(game, reveal)) container.addActionRowComponents(row);
+
+    // O Container do Discord aceita no máximo 10 componentes filhos.
+    // Removemos o separador extra para caber grade, rodapé e controles.
+    container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(panelFooter(game))
+    );
+
+    const rows = controlsRows(game);
+    if (game.dead || game.cashed || reveal) {
+        for (const row of rows) container.addActionRowComponents(row);
+    } else {
+        for (const row of rows) container.addActionRowComponents(row);
+    }
+
+    return [container];
 }
 
 function boardRows(game, reveal = false) {
@@ -235,43 +280,46 @@ function boardRows(game, reveal = false) {
     return rows;
 }
 
-function controlsRow(game) {
+function controlsRows(game) {
     const ended = game.dead || game.cashed;
 
     if (ended) {
-        return new ActionRowBuilder().addComponents(
+        return [new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('minas:again:' + game.id)
                 .setLabel('Novamente')
                 .setStyle(ButtonStyle.Primary)
-        );
+        )];
     }
 
     const opened = game.opened.size;
     const value = opened > 0 ? potentialAt(game.amount, opened, game.bombCount) : 0;
 
-    return new ActionRowBuilder().addComponents(
+    const navigationRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:random:' + game.id)
             .setLabel('Aleatório')
-            .setStyle(ButtonStyle.Primary)
-            .setDisabled(ended),
+            .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
             .setCustomId('minas:refresh:' + game.id)
             .setLabel('Atualizar')
             .setStyle(ButtonStyle.Secondary)
-            .setDisabled(ended),
+    );
+
+    const cashRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
             .setCustomId('minas:cash:' + game.id)
             .setLabel(game.fun ? 'Encerrar' : 'Sacar • ' + fmt(value) + ' ✨')
             .setStyle(ButtonStyle.Success)
-            .setDisabled(ended || opened <= 0)
+            .setDisabled(opened <= 0)
     );
+
+    return [navigationRow, cashRow];
 }
 
 function fullComponents(game, reveal = false) {
     const ended = game.dead || game.cashed || reveal;
-    return [...boardRows(game, ended), controlsRow(game)];
+    return [...boardRows(game, ended), ...controlsRows(game)];
 }
 
 function makeGame(userId, amount, bombCount, fun, meta = {}) {
@@ -284,8 +332,9 @@ function makeGame(userId, amount, bombCount, fun, meta = {}) {
         id,
         partida: ++matchCounter,
         userId,
-        amount: fun ? 0 : amount,
+        amount: fun && !meta.testMode ? 0 : amount,
         fun: !!fun,
+        testMode: !!meta.testMode,
         bombCount: maxBombs,
         bombs,
         opened: new Set(),
@@ -317,7 +366,7 @@ function openCell(game, idx) {
         game.cashed = true;
         clearTimer(game);
         let win = 0;
-        if (!game.fun && game.amount > 0) {
+        if (!game.fun && !game.testMode && game.amount > 0) {
             win = potentialAt(game.amount, game.opened.size, game.bombCount);
             game._lastWin = win;
             eter.add(game.userId, win, { reason: 'mines clear' });
@@ -347,9 +396,8 @@ function pickRandom(game) {
 function endPayload(game) {
     clearTimer(game);
     return {
-        content: '<@' + game.userId + '>',
-        embeds: [panelEmbed(game)],
-        components: fullComponents(game, true)
+        flags: MessageFlags.IsComponentsV2,
+        components: panelComponents(game, true)
     };
 }
 
@@ -358,7 +406,8 @@ module.exports = {
     aliases: ['mines', 'mine', 'campo'],
     description: 'Mines 4×4 em Éter ✨',
 
-    async execute(message, args, client) {
+    async execute(message, args, client, options = {}) {
+        const testMode = options.testMode === true;
         const bombsRaw = parseInt(args[0], 10);
         if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
             return message.reply(
@@ -378,27 +427,33 @@ module.exports = {
 
         let game;
         if (args[1] == null || args[1] === '') {
-            game = makeGame(message.author.id, 0, bombsRaw, true);
+            game = makeGame(message.author.id, 0, bombsRaw, true, { testMode });
         } else {
-            const bet = resolveBet(args[1], eter.get(message.author.id), { label: '✨' });
+            const bet = resolveBet(args[1], testMode ? Number.MAX_SAFE_INTEGER : eter.get(message.author.id), { label: '✨' });
             if (!bet.ok) return message.reply('❌ ' + bet.error);
             if (bet.amount < MIN_BET || bet.amount > MAX_BET) {
                 return message.reply(
                     '❌ Aposta entre ' + fmt(MIN_BET) + ' e ' + fmt(MAX_BET) + ' ✨.'
                 );
             }
-            eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
-            game = makeGame(message.author.id, bet.amount, bombsRaw, false);
+            if (!testMode) eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
+            game = makeGame(message.author.id, bet.amount, bombsRaw, false, { testMode });
         }
 
         const msg = await message.reply({
-            embeds: [panelEmbed(game)],
-            components: fullComponents(game)
+
+            flags: MessageFlags.IsComponentsV2,
+            components: panelComponents(game),
+            allowedMentions: { users: [message.author.id] }
         });
 
         game.channelId = msg.channel.id;
         game.messageId = msg.id;
         touch(game, client || message.client);
+    },
+
+    async executeTest(message, args, client) {
+        return module.exports.execute(message, args, client, { testMode: true });
     },
 
     async handleComponent(interaction) {
@@ -456,7 +511,7 @@ module.exports = {
                     } catch (_) {}
                 }
 
-                if (!game.fun) {
+                if (!game.fun && !game.testMode) {
                     const balance = eter.get(game.userId);
                     if (balance < game.amount) {
                         return interaction
@@ -474,9 +529,8 @@ module.exports = {
 
                 await interaction
                     .update({
-                        content: '<@' + game.userId + '>',
-                        embeds: [panelEmbed(game)],
-                        components: boardRows(game, true)
+                        flags: MessageFlags.IsComponentsV2,
+                        components: panelComponents(game, true)
                     })
                     .catch(() => {});
 
@@ -491,14 +545,20 @@ module.exports = {
                     game.amount,
                     game.bombCount,
                     game.fun,
-                    { channelId: channel.id }
+                    { channelId: channel.id, testMode: game.testMode }
                 );
 
                 const msg = await channel
                     .send({
-                        content: '<@' + newGame.userId + '>',
-                        embeds: [panelEmbed(newGame)],
-                        components: fullComponents(newGame)
+
+                        reply: {
+                            messageReference: interaction.message.id,
+                            failIfNotExists: false
+                        },
+                        allowedMentions: { users: [newGame.userId] },
+
+                        flags: MessageFlags.IsComponentsV2,
+                        components: panelComponents(newGame)
                     })
                     .catch(() => null);
 
@@ -514,8 +574,8 @@ module.exports = {
             if (action === 'refresh') {
                 return interaction
                     .update({
-                        embeds: [panelEmbed(game)],
-                        components: fullComponents(game, game.dead || game.cashed)
+                        flags: MessageFlags.IsComponentsV2,
+                        components: panelComponents(game, game.dead || game.cashed)
                     })
                     .catch(() => {});
             }
@@ -534,7 +594,7 @@ module.exports = {
                     return;
                 }
                 return interaction
-                    .update({ embeds: [panelEmbed(game)], components: fullComponents(game) })
+                    .update({ flags: MessageFlags.IsComponentsV2, components: panelComponents(game) })
                     .catch(() => {});
             }
 
@@ -553,7 +613,7 @@ module.exports = {
 
                 game.cashed = true;
                 const win = potentialAt(game.amount, opened, game.bombCount);
-                if (win <= 0 && !game.fun) {
+                if (win <= 0 && !game.fun && !game.testMode) {
                     game.cashed = false;
                     return interaction
                         .reply({ content: 'Valor de saque inválido.', ephemeral: true })
@@ -563,7 +623,7 @@ module.exports = {
                 game._lastWin = win;
                 clearTimer(game);
 
-                if (!game.fun && win > 0) {
+                if (!game.fun && !game.testMode && win > 0) {
                     try {
                         eter.add(game.userId, win, { reason: 'mines cash' });
                     } catch (e) {
@@ -594,7 +654,7 @@ module.exports = {
                     return;
                 }
                 return interaction
-                    .update({ embeds: [panelEmbed(game)], components: fullComponents(game) })
+                    .update({ flags: MessageFlags.IsComponentsV2, components: panelComponents(game) })
                     .catch(() => {});
             }
         } finally {

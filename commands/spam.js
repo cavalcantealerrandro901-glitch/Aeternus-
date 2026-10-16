@@ -4,6 +4,7 @@ const {
     ChannelType
 } = require('discord.js');
 const spamAllow = require('../utils/spamAllow');
+const { setSettings } = require('../utils/settings');
 
 function isMod(member) {
     if (!member) return false;
@@ -14,92 +15,214 @@ function isMod(member) {
     );
 }
 
+function clean(s) {
+    return String(s || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+}
+
+const TRUE_VALS = new Set([
+    'true', '1', 'on', 'sim', 'ativar', 'yes', 's', 'ligar', 'permitir', 'liberar'
+]);
+const FALSE_VALS = new Set([
+    'false', '0', 'off', 'nao', 'desativar', 'no', 'n', 'desligar', 'bloquear'
+]);
+
+function parseAllow(args) {
+    const list = Array.isArray(args) ? args : [args];
+    for (const a of list) {
+        const c = clean(a);
+        if (TRUE_VALS.has(c)) return true;
+        if (FALSE_VALS.has(c)) return false;
+    }
+    const joined = clean(list.join(' '));
+    if (TRUE_VALS.has(joined)) return true;
+    if (FALSE_VALS.has(joined)) return false;
+    return null;
+}
+
+function nl() {
+    return String.fromCharCode(10);
+}
+
+/** Liga anti-spam no servidor (settings) */
+function enableAntiSpam(guildId) {
+    setSettings(guildId, { automod: { enabled: true, antiSpam: true } });
+}
+
+/** Desliga anti-spam no servidor (settings) */
+function disableAntiSpam(guildId) {
+    setSettings(guildId, { automod: { enabled: false, antiSpam: false } });
+}
+
 module.exports = {
     name: 'spam',
     aliases: ['permitirspam', 'canallivre'],
-    description: 'Permitir ou bloquear spam em um canal',
+    description: 'Permitir ou bloquear spam no servidor ou em um canal',
     data: new SlashCommandBuilder()
         .setName('spam')
-        .setDescription('true = canal livre (spam ok) · false = anti-spam ligado')
-        .addBooleanOption((o) =>
-            o
+        .setDescription('true = spam liberado · false = anti-spam ligado (servidor ou canal)')
+        .addBooleanOption(function (o) {
+            return o
                 .setName('permitir')
                 .setDescription('true = spam permitido · false = spam bloqueado')
-                .setRequired(true)
-        )
-        .addChannelOption((o) =>
-            o
+                .setRequired(true);
+        })
+        .addChannelOption(function (o) {
+            return o
                 .setName('canal')
-                .setDescription('Canal (opcional: usa o atual)')
+                .setDescription('Canal especifico (opcional). Sem canal = servidor inteiro')
                 .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
-                .setRequired(false)
-        )
+                .setRequired(false);
+        })
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .setDMPermission(false),
 
     async execute(message, args) {
         if (!isMod(message.member)) {
-            return message.reply('Sem permissão (**Gerenciar Servidor**).');
+            return message.reply('Sem permissao (**Gerenciar Servidor**).');
         }
 
-        const raw = (args[0] || '').toLowerCase();
-        const trueVals = ['true', '1', 'on', 'sim', 'ativar', 'yes', 's'];
-        const falseVals = ['false', '0', 'off', 'nao', 'não', 'desativar', 'no', 'n'];
+        const allow = parseAllow(args);
 
-        if (!trueVals.includes(raw) && !falseVals.includes(raw)) {
+        if (allow === null) {
+            console.log('[spam] args recebidos:', JSON.stringify(args), '| content:', message.content);
             return message.reply(
-                'Uso: `O.spam true [#canal]` · `O.spam false [#canal]`\n' +
-                    '**true** = spam permitido · **false** = anti-spam ligado'
+                [
+                    '**Uso do comando spam:**',
+                    '',
+                    '`O.spam true` — libera spam em **todo o servidor** (anti-spam **desligado**)',
+                    '`O.spam false` — **ativa** o anti-spam em **todo o servidor**',
+                    '`O.spam true #canal` — libera so naquele canal',
+                    '`O.spam false #canal` — bloqueia so naquele canal',
+                    '',
+                    'Por padrao o anti-spam vem **desligado** em servidores novos.',
+                    'Tambem aceita: `sim`, `ativar`, `on`, `1` / `nao`, `off`, `0`'
+                ].join(nl())
             );
         }
 
-        const allow = trueVals.includes(raw);
-        const ch =
+        var mentioned =
             message.mentions.channels.first() ||
-            message.guild.channels.cache.get(args[1]) ||
-            message.channel;
+            (Array.isArray(args) && args[1]
+                ? message.guild.channels.cache.get(String(args[1]).replace(/[<#>]/g, ''))
+                : null);
+
+        if (!mentioned) {
+            if (allow) {
+                spamAllow.addServerWide(message.guild.id);
+                disableAntiSpam(message.guild.id);
+                return message.reply(
+                    [
+                        '✅ Spam **permitido em todo o servidor** (`true`).',
+                        'Anti-spam **desligado** em todos os canais.'
+                    ].join(nl())
+                );
+            }
+            spamAllow.removeServerWide(message.guild.id);
+            var list = spamAllow.list(message.guild.id);
+            for (var i = 0; i < list.length; i++) {
+                if (list[i] !== '*') spamAllow.remove(message.guild.id, list[i]);
+            }
+            enableAntiSpam(message.guild.id);
+            return message.reply(
+                [
+                    '🛡️ Anti-spam **ativado** em todo o servidor (`false`).',
+                    'Spam passa a ser bloqueado em todos os canais.'
+                ].join(nl())
+            );
+        }
+
+        var ch = mentioned;
 
         if (allow) {
+            if (spamAllow.isServerWide(message.guild.id)) {
+                spamAllow.removeServerWide(message.guild.id);
+            }
             spamAllow.add(message.guild.id, ch.id);
             return message.reply(
-                `✅ Spam **permitido** em ${ch} (\`true\`).\nAnti-spam **desligado** neste chat.`
+                [
+                    '✅ Spam **permitido** em ' + ch.toString() + ' (`true`).',
+                    'Anti-spam **desligado** neste chat.'
+                ].join(nl())
             );
         }
         spamAllow.remove(message.guild.id, ch.id);
+        // Canal bloqueado: garante que o anti-spam do servidor está ligado
+        enableAntiSpam(message.guild.id);
         return message.reply(
-            `🛡️ Spam **bloqueado** em ${ch} (\`false\`).\nAnti-spam **ligado** de novo.`
+            [
+                '🛡️ Spam **bloqueado** em ' + ch.toString() + ' (`false`).',
+                'Anti-spam **ligado** de novo neste canal (e no servidor).'
+            ].join(nl())
         );
     },
 
-    async executeSlash(i) {
-        if (!i.inGuild()) {
-            return i.reply({ content: 'Este comando só funciona em servidores.', flags: 64 });
+    async executeSlash(interaction) {
+        if (!interaction.inGuild()) {
+            return interaction.reply({ content: 'Este comando so funciona em servidores.', flags: 64 });
         }
-        if (!isMod(i.member)) {
-            return i.reply({
-                content: 'Sem permissão (**Gerenciar Servidor**).',
+        if (!isMod(interaction.member)) {
+            return interaction.reply({
+                content: 'Sem permissao (**Gerenciar Servidor**).',
                 flags: 64
             });
         }
 
-        const allow = i.options.getBoolean('permitir', true);
-        const ch = i.options.getChannel('canal') || i.channel;
+        var allow = interaction.options.getBoolean('permitir', true);
+        var ch = interaction.options.getChannel('canal');
+
+        if (!ch) {
+            if (allow) {
+                spamAllow.addServerWide(interaction.guild.id);
+                disableAntiSpam(interaction.guild.id);
+                return interaction.reply({
+                    content: [
+                        '✅ Spam **permitido em todo o servidor** (`true`).',
+                        'Anti-spam **desligado** em todos os canais.'
+                    ].join(nl()),
+                    flags: 64
+                });
+            }
+            spamAllow.removeServerWide(interaction.guild.id);
+            var list2 = spamAllow.list(interaction.guild.id);
+            for (var j = 0; j < list2.length; j++) {
+                if (list2[j] !== '*') spamAllow.remove(interaction.guild.id, list2[j]);
+            }
+            enableAntiSpam(interaction.guild.id);
+            return interaction.reply({
+                content: [
+                    '🛡️ Anti-spam **ativado** em todo o servidor (`false`).',
+                    'Spam passa a ser bloqueado em todos os canais.'
+                ].join(nl()),
+                flags: 64
+            });
+        }
 
         if (allow) {
-            spamAllow.add(i.guild.id, ch.id);
-            return i.reply({
-                content:
-                    `✅ Spam **permitido** em ${ch} (\`true\`).\n` +
-                    `Anti-spam **desligado** neste chat.`,
+            if (spamAllow.isServerWide(interaction.guild.id)) {
+                spamAllow.removeServerWide(interaction.guild.id);
+            }
+            spamAllow.add(interaction.guild.id, ch.id);
+            return interaction.reply({
+                content: [
+                    '✅ Spam **permitido** em ' + ch.toString() + ' (`true`).',
+                    'Anti-spam **desligado** neste chat.'
+                ].join(nl()),
                 flags: 64
             });
         }
 
-        spamAllow.remove(i.guild.id, ch.id);
-        return i.reply({
-            content:
-                `🛡️ Spam **bloqueado** em ${ch} (\`false\`).\n` +
-                `Anti-spam **ligado** de novo.`,
+        spamAllow.remove(interaction.guild.id, ch.id);
+        enableAntiSpam(interaction.guild.id);
+        return interaction.reply({
+            content: [
+                '🛡️ Spam **bloqueado** em ' + ch.toString() + ' (`false`).',
+                'Anti-spam **ligado** de novo neste canal (e no servidor).'
+            ].join(nl()),
             flags: 64
         });
     }

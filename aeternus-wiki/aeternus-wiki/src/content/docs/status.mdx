@@ -1,0 +1,23 @@
+---
+title: Status
+description: Como saber se o bot e os serviços estão no ar.
+---
+
+# Status dos serviços
+
+Quando algo “não responde”, quase sempre é uma destas três coisas: o processo do bot caiu, o MongoDB ficou inacessível, ou o Discord limitou o token.
+
+## O que checar na ordem
+
+1. **No Discord** — o Aeternus aparece online na lista de membros? Se estiver offline, o processo no Render/VPS precisa ser reiniciado.
+2. **Comando simples** — `O.ping` ou `O.ajuda`. Se o bot reage, a conexão com o Discord está ok.
+3. **Economia / perfil** — se só esses comandos falham, o problema costuma ser o MongoDB (URI, IP liberado no Atlas, ou `REQUIRE_MONGO=1` sem conexão).
+4. **Painel web** — `/health` no mesmo domínio do bot deve responder se o serviço HTTP subiu.
+
+## O que a equipe monitora
+
+- Processo Node do bot e do painel
+- Conexão com MongoDB Atlas
+- Erros não tratados (vão para o dono configurado em `OWNER_ID` quando possível)
+
+Se o servidor inteiro está com o bot online e só *um* canal falha, olhe permissões daquele canal (ler mensagens, enviar mensagens, embeds) antes de abrir ticket.

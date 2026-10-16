@@ -50,10 +50,12 @@ async function ensureRoles(guild) {
             null;
         if (!role) {
             try {
-                const color = Number(COLORS[Number(rank.id)] != null ? COLORS[Number(rank.id)] : 0x99aab5);
+                const idx = Number(rank.id);
+                const raw = Number.isFinite(idx) && COLORS[idx] != null ? COLORS[idx] : 0x99aab5;
+                const color = Number.isFinite(Number(raw)) ? Number(raw) : 0x99aab5;
                 role = await guild.roles.create({
                     name: name,
-                    color: Number.isFinite(color) ? color : 0x99aab5,
+                    color: color,
                     hoist: false,
                     mentionable: false,
                     reason: 'Cargo automatico do sistema de trabalho (Aeternus)'

@@ -48,171 +48,58 @@ function ensureAttrs(d) {
 function get(userId) {
     const raw = all()[userId] || { xp: 0, level: 0 };
     const attrs = ensureAttrs({ attrs: raw.attrs });
-    const totalXp = Math.max(0, Math.floor(Number(raw.xp || 0)));
-    const level = levelFromXp(totalXp);
     return {
-        xp: totalXp,
-        level,
+        xp: Math.max(0, Math.floor(Number(raw.xp) || 0)),
+        level: Math.max(0, Math.floor(Number(raw.level) || 0)),
         attrs,
-        attrPoints: Math.max(0, Math.floor(Number(raw.attrPoints || 0)))
+        attrPoints: Math.max(0, Math.floor(Number(raw.attrPoints) || 0))
     };
-}
-
-const XP_PER_LEVEL = 1000;
-
-function xpForLevel(level) {
-    return XP_PER_LEVEL;
-}
-
-function totalXpForLevel(level) {
-    const lv = Math.max(0, Math.floor(Number(level) || 0));
-    return lv * XP_PER_LEVEL;
-}
-
-function levelFromXp(totalXp) {
-    const xp = Math.max(0, Math.floor(Number(totalXp) || 0));
-    return Math.min(10000, Math.floor(xp / XP_PER_LEVEL));
 }
 
 function progress(userId) {
-    const { xp, level, attrs } = get(userId);
-    const total = Math.max(0, Math.floor(Number(xp) || 0));
-    const current = total % XP_PER_LEVEL;
-    const need = XP_PER_LEVEL;
-    const pct = Math.min(100, Math.floor((current / need) * 100));
-    return {
-        totalXp: total,
-        level,
-        current,
-        need,
-        pct,
-        toNext: Math.max(0, need - current),
-        nextLevelTotal: totalXpForLevel(level + 1),
-        mult: dailyMultiplier(level),
-        attrs
-    };
+    const cur = get(userId);
+    const need = xpForLevel(cur.level + 1);
+    return { ...cur, need, pct: need > 0 ? Math.min(100, Math.floor((cur.xp / need) * 100)) : 100 };
 }
 
-function dailyMultiplier(level) {
-    return 1 + Math.min(2, Number(level || 0) * 0.04);
-}
-
-function rollAttrGain(double = false) {
-    const key = ATTR_KEYS[Math.floor(Math.random() * ATTR_KEYS.length)];
-    let amount = 1 + Math.floor(Math.random() * 3);
-    if (double) amount *= 2;
-    return { key, amount, label: ATTR_LABEL[key] };
-}
-
-function addXp(userId, amount) {
-    const data = all();
-    const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR } };
-    ensureAttrs(cur);
-    const before = levelFromXp(cur.xp || 0);
-    const n = Math.floor(Number(amount) || 0);
-    cur.xp = Math.max(0, Math.floor(Number(cur.xp || 0)) + n);
-    const after = levelFromXp(cur.xp);
-    cur.level = after;
-    const levelsGained = Math.max(0, after - before);
-    const gains = [];
-    if (levelsGained > 0) {
-        cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
-        cur.attrPoints += levelsGained * 5;
-        for (let i = 0; i < levelsGained; i++) {
-            const g = rollAttrGain(false);
-            cur.attrs[g.key] = (cur.attrs[g.key] || 0) + g.amount;
-            gains.push(g);
-        }
+function levelFromXp(totalXp) {
+    let xp = Math.max(0, Math.floor(Number(totalXp) || 0));
+    let level = 0;
+    while (xp >= xpForLevel(level + 1)) {
+        xp -= xpForLevel(level + 1);
+        level++;
+        if (level > 500) break;
     }
-    data[userId] = cur;
-    store.save('xp.json', data);
-    return {
-        xp: cur.xp,
-        level: cur.level,
-        attrs: { ...cur.attrs },
-        attrPoints: cur.attrPoints || 0,
-        levelsGained,
-        attrGains: gains,
-        oldLevel: before,
-        progress: progress(userId)
-    };
+    return { level, xp };
 }
 
-function getAttrs(userId) {
-    return get(userId).attrs;
+function totalXpForLevel(level) {
+    let total = 0;
+    for (let i = 1; i <= level; i++) total += xpForLevel(i);
+    return total;
 }
 
-function maxHp(userId) {
-    const a = getAttrs(userId);
-    return 50 + Number(a.vida || 0) * 8 + Number(a.resistencia || 0) * 2;
+function xpForLevel(level) {
+    const lv = Math.max(1, Math.floor(Number(level) || 1));
+    return Math.floor(50 + lv * 25 + Math.pow(lv, 1.4) * 8);
 }
 
-function maxMana(userId) {
-    const a = getAttrs(userId);
-    const level = get(userId).level;
-    let base = 20 + level * 4 + Number(a.inteligencia || 0) * 3;
-    try {
-        const player = require('./player');
-        const profile = player.get(userId);
-        if (typeof player.maxManaFromLevel === 'function') {
-            base = Math.max(
-                base,
-                player.maxManaFromLevel(level, profile?.classId || 'guerreiro') +
-                    Number(a.inteligencia || 0) * 2
-            );
-        }
-    } catch (_) {}
-    return Math.floor(base);
+function dailyMultiplier() {
+    return 1;
 }
 
-function leaderboard(limit = 10) {
-    const data = all();
-    return Object.entries(data)
-        .map(([id, v]) => ({
-            userId: id,
-            xp: Number(v.xp || 0),
-            level: Number(v.level || levelFromXp(v.xp || 0))
-        }))
-        .sort((a, b) => b.xp - a.xp || b.level - a.level)
-        .slice(0, Math.max(1, Math.min(25, limit)));
-}
-
-function rankOf(userId) {
-    const data = all();
-    const list = Object.entries(data)
-        .map(([id, v]) => ({ userId: id, xp: Number(v.xp || 0) }))
-        .sort((a, b) => b.xp - a.xp);
-    const idx = list.findIndex((x) => x.userId === userId);
-    if (idx < 0) return { rank: list.length + 1, total: list.length || 1 };
-    return { rank: idx + 1, total: list.length };
-}
-
-function setXp(userId, amount) {
-    const data = all();
-    const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR } };
-    ensureAttrs(cur);
-    cur.xp = Math.max(0, Math.floor(Number(amount) || 0));
-    cur.level = levelFromXp(cur.xp);
-    data[userId] = cur;
-    store.save('xp.json', data);
-    return {
-        xp: cur.xp,
-        level: cur.level,
-        attrs: { ...cur.attrs },
-        progress: progress(userId)
-    };
-}
-
-function removeXp(userId, amount) {
-    const n = Math.max(0, Math.floor(Number(amount) || 0));
-    return addXp(userId, -n);
+function rollAttrGain() {
+    // Cada ponto gasto concede entre 3 e 5 no atributo escolhido
+    return 3 + Math.floor(Math.random() * 3);
 }
 
 function loadCur(userId) {
     const data = all();
     const cur = data[userId] || { xp: 0, level: 0, attrs: { ...BASE_ATTR }, attrPoints: 0 };
     ensureAttrs(cur);
-    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
+    cur.xp = Math.max(0, Math.floor(Number(cur.xp) || 0));
+    cur.level = Math.max(0, Math.floor(Number(cur.level) || 0));
+    cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints) || 0));
     return { data, cur };
 }
 
@@ -221,191 +108,156 @@ function saveCur(data, userId, cur) {
     store.save('xp.json', data);
 }
 
+function addXp(userId, amount, meta) {
+    const n = Math.floor(Number(amount) || 0);
+    if (n === 0) return get(userId);
+    const { data, cur } = loadCur(userId);
+    const oldLevel = cur.level;
+    cur.xp = Math.max(0, cur.xp + n);
+    let leveled = 0;
+    while (cur.xp >= xpForLevel(cur.level + 1)) {
+        cur.xp -= xpForLevel(cur.level + 1);
+        cur.level++;
+        cur.attrPoints = (cur.attrPoints || 0) + 3;
+        leveled++;
+        if (cur.level > 500) break;
+    }
+    saveCur(data, userId, cur);
+    return {
+        ...get(userId),
+        leveled,
+        levelsGained: leveled,
+        oldLevel,
+        gained: n
+    };
+}
+
+function setXp(userId, amount) {
+    const { data, cur } = loadCur(userId);
+    cur.xp = Math.max(0, Math.floor(Number(amount) || 0));
+    saveCur(data, userId, cur);
+    return get(userId);
+}
+
+function removeXp(userId, amount) {
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    const { data, cur } = loadCur(userId);
+    cur.xp = Math.max(0, cur.xp - n);
+    saveCur(data, userId, cur);
+    return get(userId);
+}
+
+function getAttrs(userId) {
+    return get(userId).attrs;
+}
+
+function maxHp(userId) {
+    const st = get(userId);
+    return 50 + st.level * 10 + (st.attrs.vida || 0) * 5;
+}
+
+function maxMana(userId) {
+    const st = get(userId);
+    return 20 + st.level * 4 + (st.attrs.inteligencia || 0) * 2;
+}
+
+function leaderboard(limit = 10) {
+    const data = all();
+    return Object.entries(data)
+        .map(([id, v]) => ({ id, level: Number(v.level) || 0, xp: Number(v.xp) || 0 }))
+        .sort((a, b) => b.level - a.level || b.xp - a.xp)
+        .slice(0, limit);
+}
+
+function rankOf(userId) {
+    const board = leaderboard(10000);
+    const idx = board.findIndex((x) => String(x.id) === String(userId));
+    return idx >= 0 ? idx + 1 : null;
+}
+
+function spendAttrPoint(userId, attrKey) {
+    return spendAttrPoints(userId, attrKey, 1);
+}
+
 function addAttrPoints(userId, amount) {
     const n = Math.max(0, Math.floor(Number(amount) || 0));
     if (n <= 0) return { ok: false, error: 'Quantidade inválida.', added: 0 };
-
     const { data, cur } = loadCur(userId);
     cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + n;
     saveCur(data, userId, cur);
-
-    return {
-        ok: true,
-        added: n,
-        attrPoints: cur.attrPoints
-    };
+    return { ok: true, added: n, attrPoints: cur.attrPoints };
 }
 
-function spendAttrPoint(userId, key) {
-    return spendAttrPoints(userId, key, 1);
-}
-
-function spendAttrPoints(userId, key, amount) {
-    const k = String(key || '').toLowerCase();
-    if (!ATTR_KEYS.includes(k)) {
-        return { ok: false, error: 'Atributo inválido.' };
-    }
+function spendAttrPoints(userId, attrKey, amount) {
+    const key = String(attrKey || '').toLowerCase();
+    if (!ATTR_KEYS.includes(key)) return { ok: false, error: 'Atributo inválido.' };
     const n = Math.max(0, Math.floor(Number(amount) || 0));
     if (n <= 0) return { ok: false, error: 'Quantidade inválida.' };
-
     const { data, cur } = loadCur(userId);
-    if (cur.attrPoints < n) {
-        return {
-            ok: false,
-            error: 'Pontos insuficientes. Você tem **' + cur.attrPoints + '**.'
-        };
-    }
-    cur.attrPoints -= n;
-
-    // Cada ponto investido gera entre +3 e +5 no atributo escolhido.
-    // Assim, 1 ponto = +3 a +5; quantidades maiores acumulam o mesmo ganho por ponto.
+    const pts = Math.max(0, Math.floor(Number(cur.attrPoints || 0)));
+    if (pts < n) return { ok: false, error: 'Pontos insuficientes.' };
+    ensureAttrs(cur);
     let gained = 0;
+    const rolls = [];
     for (let i = 0; i < n; i++) {
-        gained += 3 + Math.floor(Math.random() * 3);
+        const roll = rollAttrGain(); // 3–5 por ponto gasto
+        rolls.push(roll);
+        gained += roll;
     }
-
-    cur.attrs[k] = Math.max(0, Math.floor(Number(cur.attrs[k] || 0)) + gained);
-
-    // Mantém um registro separado do que foi investido manualmente.
-    // Isso permite redistribuir somente os pontos gastos pelo jogador,
-    // sem devolver atributos ganhos por nível, classe ou equipamento.
-    cur.attrInvested = cur.attrInvested && typeof cur.attrInvested === 'object' ? cur.attrInvested : {};
-    cur.attrManualGain = cur.attrManualGain && typeof cur.attrManualGain === 'object' ? cur.attrManualGain : {};
-    cur.attrInvested[k] = Math.max(0, Math.floor(Number(cur.attrInvested[k] || 0))) + n;
-    cur.attrManualGain[k] = Math.max(0, Math.floor(Number(cur.attrManualGain[k] || 0))) + gained;
-
+    cur.attrs[key] = (cur.attrs[key] || 0) + gained;
+    cur.attrPoints = pts - n;
     saveCur(data, userId, cur);
-    return {
-        ok: true,
-        spent: n,
-        gained,
-        minGained: n * 3,
-        maxGained: n * 5,
-        key: k,
-        attrs: { ...cur.attrs },
-        attrPoints: cur.attrPoints
-    };
+    return { ok: true, gained, spent: n, rolls, attrs: cur.attrs, attrPoints: cur.attrPoints };
 }
 
 function redistribuirAttrs(userId) {
     const { data, cur } = loadCur(userId);
-    const invested = cur.attrInvested && typeof cur.attrInvested === 'object' ? cur.attrInvested : {};
-    const manualGain = cur.attrManualGain && typeof cur.attrManualGain === 'object' ? cur.attrManualGain : {};
-
-    // Devolve somente os pontos realmente gastos pelo jogador.
-    // Não usa a diferença entre atributo atual e atributo base, pois essa
-    // diferença também pode conter ganhos de nível, classe ou equipamento.
+    ensureAttrs(cur);
     let refund = 0;
     for (const k of ATTR_KEYS) {
-        const spent = Math.max(0, Math.floor(Number(invested[k] || 0)));
-        const gained = Math.max(0, Math.floor(Number(manualGain[k] || 0)));
-
-        refund += spent;
-
-        if (gained > 0) {
-            const current = Math.max(0, Math.floor(Number(cur.attrs[k] || 0)));
-            cur.attrs[k] = Math.max(0, current - gained);
+        const base = BASE_ATTR[k] || 0;
+        const val = Number(cur.attrs[k] || 0);
+        if (val > base) {
+            refund += val - base;
+            cur.attrs[k] = base;
         }
-
-        invested[k] = 0;
-        manualGain[k] = 0;
     }
-
-    cur.attrInvested = invested;
-    cur.attrManualGain = manualGain;
     cur.attrPoints = Math.max(0, Math.floor(Number(cur.attrPoints || 0))) + refund;
-
     saveCur(data, userId, cur);
-    return {
-        ok: true,
-        refund,
-        attrs: { ...cur.attrs },
-        attrPoints: cur.attrPoints
-    };
+    return { ok: true, refund, attrPoints: cur.attrPoints, attrs: cur.attrs };
 }
 
 function transferAttrPoints(fromId, toId, amount) {
     const n = Math.max(0, Math.floor(Number(amount) || 0));
     if (n <= 0) return { ok: false, error: 'Quantidade inválida.' };
     const a = loadCur(fromId);
-    if (a.cur.attrPoints < n) {
-        return { ok: false, error: 'Pontos insuficientes para transferir.' };
-    }
+    if ((a.cur.attrPoints || 0) < n) return { ok: false, error: 'Pontos insuficientes.' };
     a.cur.attrPoints -= n;
     saveCur(a.data, fromId, a.cur);
     const b = loadCur(toId);
-    b.cur.attrPoints = Math.max(0, Math.floor(Number(b.cur.attrPoints || 0))) + n;
+    b.cur.attrPoints = (b.cur.attrPoints || 0) + n;
     saveCur(b.data, toId, b.cur);
-    return { ok: true, amount: n, from: fromId, to: toId };
+    return { ok: true, amount: n };
 }
 
 function scanInvalidAttrs(userId) {
-    const data = all();
-    const raw = data[userId] || {};
-    const attrs = raw.attrs && typeof raw.attrs === 'object' ? { ...raw.attrs } : {};
-    let orphan = 0;
-    const orphanKeys = [];
-    for (const [k, v] of Object.entries(attrs)) {
-        if (!ATTR_KEYS.includes(k)) {
-            const n = Math.floor(Number(v) || 0);
-            if (n !== 0) {
-                orphan += Math.abs(n);
-                orphanKeys.push(k);
-            }
-        }
-    }
-    let negative = 0;
-    for (const k of ATTR_KEYS) {
-        const n = Math.floor(Number(attrs[k] || 0));
-        if (n < 0) negative += Math.abs(n);
-    }
-    const apRaw = raw.attrPoints;
-    const apNum = Number(apRaw);
-    const apBroken =
-        apRaw != null &&
-        apRaw !== '' &&
-        (!Number.isFinite(apNum) || apNum < 0 || !Number.isInteger(apNum));
-    let recoverable = orphan + negative;
-    if (apBroken && Number.isFinite(apNum) && apNum < 0) {
-        recoverable += Math.abs(Math.floor(apNum));
-    }
-    return {
-        hasInvalid: recoverable > 0 || apBroken,
-        recoverable,
-        orphan,
-        negative,
-        orphanKeys,
-        apBroken,
-        currentValidPoints: Math.max(0, Math.floor(Number.isFinite(apNum) ? apNum : 0))
-    };
+    const cur = get(userId);
+    const orphanKeys = Object.keys(cur.attrs || {}).filter((k) => !ATTR_KEYS.includes(k));
+    let recoverable = 0;
+    for (const k of orphanKeys) recoverable += Math.max(0, Math.floor(Number(cur.attrs[k]) || 0));
+    return { hasInvalid: orphanKeys.length > 0, orphanKeys, recoverable };
 }
 
 function convertInvalidAttrs(userId) {
     const scan = scanInvalidAttrs(userId);
-    if (!scan.hasInvalid) {
-        return { ok: false, error: 'Nenhum ponto inválido encontrado.', converted: 0 };
-    }
+    if (!scan.hasInvalid) return { ok: false, error: 'Nada a converter.' };
     const { data, cur } = loadCur(userId);
-    const attrs = cur.attrs && typeof cur.attrs === 'object' ? { ...cur.attrs } : {};
+    ensureAttrs(cur);
     let gained = 0;
-    for (const k of Object.keys(attrs)) {
-        if (!ATTR_KEYS.includes(k)) {
-            const n = Math.floor(Number(attrs[k]) || 0);
-            gained += Math.abs(n);
-            delete attrs[k];
-        }
+    for (const k of scan.orphanKeys) {
+        gained += Math.max(0, Math.floor(Number(cur.attrs[k]) || 0));
+        delete cur.attrs[k];
     }
-    for (const k of ATTR_KEYS) {
-        const n = Math.floor(Number(attrs[k] || 0));
-        if (n < 0) {
-            gained += Math.abs(n);
-            attrs[k] = BASE_ATTR[k] ?? 0;
-        } else {
-            attrs[k] = n;
-        }
-    }
-    ensureAttrs({ attrs });
-    cur.attrs = attrs;
     let ap = Number(cur.attrPoints);
     if (!Number.isFinite(ap) || ap < 0) ap = 0;
     ap = Math.floor(ap);
@@ -419,8 +271,17 @@ function convertInvalidAttrs(userId) {
     };
 }
 
+function remove(userId) {
+    const data = all();
+    if (!data[userId]) return false;
+    delete data[userId];
+    store.save('xp.json', data);
+    return true;
+}
+
 module.exports = {
     all,
+    remove,
     get,
     progress,
     addXp,

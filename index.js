@@ -56,6 +56,11 @@ async function main() {
     });
     try { client.setMaxListeners(25); } catch (_) {}
 
+    // Registra erros de runtime nos logs, sem sistema de autorreparo.
+    client.on('error', (error) => console.error('[Discord client]', error));
+    client.on('shardError', (error, shardId) => console.error('[Discord shard ' + shardId + ']', error));
+    process.on('warning', (warning) => console.warn('[Node warning]', warning));
+
     client.commands = new Collection();
     client.slash = new Collection();
     client.prefixDefault = 'O.';
@@ -94,26 +99,8 @@ main().catch((e) => {
 });
 
 process.on('unhandledRejection', (err) => {
-    try {
-        const ar = require('./utils/autoRepair');
-        ar.reportError({
-            source: 'unhandledRejection',
-            error: err,
-            context: 'index fallback'
-        }).catch(() => {});
-    } catch (_) {
-        console.error('[unhandledRejection]', err);
-    }
+    console.error('[unhandledRejection]', err);
 });
 process.on('uncaughtException', (err) => {
-    try {
-        const ar = require('./utils/autoRepair');
-        ar.reportError({
-            source: 'uncaughtException',
-            error: err,
-            context: 'index fallback'
-        }).catch(() => {});
-    } catch (_) {
-        console.error('[uncaughtException]', err);
-    }
+    console.error('[uncaughtException]', err);
 });

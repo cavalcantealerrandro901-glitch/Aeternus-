@@ -8,7 +8,6 @@ const antispam = require('../utils/antispam');
 const cmdLock = require('../utils/cmdLock');
 const pending = require('../utils/converterPending');
 const { rerollDrop } = require('../systems/drops');
-const autoRepair = require('../utils/autoRepair');
 const { announceLevel } = require('../systems/guildModules');
 const dmPhoto = require('../utils/dmPhoto');
 const aeternusCore = require('../systems/aeternusCore');
@@ -230,7 +229,7 @@ module.exports = {
                     '',
                     '**Tudo certo!** Você voltará a receber as menções normalmente.',
                     '✧ *Aeternus • Sistema de utilidades*'
-                ].join('\\n');
+                ].join('\n');
 
                 message.reply({
                     content: returnMessage,
@@ -257,23 +256,24 @@ module.exports = {
                     .replace(/@everyone/gi, '@ everyone')
                     .replace(/@here/gi, '@ here')
                     .slice(0, 180);
-                const notice = [
-                    '✦ **AETERNUS • AVISO DE AUSÊNCIA**',
-                    '',
-                    `💤 <@${id}> está temporariamente ausente.`,
-                    `▸ **Motivo:** ${reason}`,
-                    `▸ **Ausente há:** ${duration}`,
-                    '',
-                    '**Orientações:**',
-                    '• Evite repetir a menção ou enviar várias mensagens cobrando resposta.',
-                    '• Respeite a ausência; a pessoa responderá quando puder.',
-                    '• Se for urgente, procure outro moderador ou membro disponível.',
-                    '',
-                    '✧ *Aviso automático • Aeternus*'
-                ].join('\n');
+                const notice = new EmbedBuilder()
+                    .setColor(0x8B5CF6)
+                    .setAuthor({
+                        name: 'AETERNUS • CENTRAL DE PRESENÇA',
+                        iconURL: message.client.user.displayAvatarURL({ size: 64 })
+                    })
+                    .setTitle('💤 Aviso de ausência')
+                    .setDescription(`<@${id}> está temporariamente ausente.`)
+                    .addFields(
+                        { name: '📝 Motivo', value: reason || 'Não informado' },
+                        { name: '⏱️ Ausente há', value: duration, inline: true },
+                        { name: '🛡️ Orientações', value: 'Evite repetir a menção ou cobrar resposta. Respeite a ausência; a pessoa responderá quando puder. Se for urgente, procure outro moderador ou membro disponível.' }
+                    )
+                    .setFooter({ text: 'Aviso automático • Aeternus' })
+                    .setTimestamp();
 
                 const sent = await message.reply({
-                    content: notice,
+                    embeds: [notice],
                     allowedMentions: { parse: [], repliedUser: false }
                 }).catch(() => null);
                 if (sent) {
@@ -389,18 +389,8 @@ module.exports = {
             }
             await cmd.execute(message, args, client);
         } catch (e) {
-            await autoRepair.handleCommandError({
-                cmdName: cmd.name || name,
-                error: e,
-                context:
-                    'prefix · ' +
-                    (message.guild && message.guild.name ? message.guild.name : '?') +
-                    ' · #' +
-                    (message.channel && message.channel.name
-                        ? message.channel.name
-                        : message.channelId),
-                message
-            });
+            console.error('[prefix ' + (cmd.name || name) + ']', e);
+            await message.reply('❌ Ocorreu um erro ao executar este comando.').catch(() => {});
         }
     }
 };

@@ -6,7 +6,7 @@ const SLASH_NAME_MAP = {
     addmoney: 'adicionar-eter',
     removemoney: 'remover-eter',
     afk: 'ausente',
-    ban: 'banir-membro',
+    ban: 'banir',
     kick: 'expulsar-membro',
     mute: 'silenciar',
     unmute: 'dessilenciar',
@@ -181,18 +181,6 @@ function loadCommandFile(client, file, { quiet = false } = {}) {
         return { ok: true, name: mainName, slash: cmd.data?.name || null };
     } catch (e) {
         console.error(`Erro comando ${path.basename(full)}:`, e.message);
-        // Registra falhas de sintaxe/importação durante a inicialização para a central de reparo.
-        try {
-            const autoRepair = require(path.join(__dirname, '..', 'utils', 'autoRepair.js'));
-            const commandName = path.basename(full, '.js');
-            Promise.resolve(autoRepair.handleCommandError({
-                cmdName: commandName,
-                error: e,
-                context: 'falha ao carregar comando ' + path.relative(path.join(__dirname, '..'), full).split(path.sep).join('/')
-            })).catch((reportError) => console.warn('[autoRepair:loader]', reportError?.message || reportError));
-        } catch (reportError) {
-            console.warn('[autoRepair:loader] Não foi possível registrar a falha:', reportError?.message || reportError);
-        }
         return { ok: false, error: e.message };
     }
 }

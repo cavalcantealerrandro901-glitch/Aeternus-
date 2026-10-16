@@ -5,27 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Administração — Aeternus</title>
 <link rel="stylesheet" href="/dashboard.css">
+<link rel="stylesheet" href="/admin-menu.css">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
+<div id="admin-menu-overlay" class="admin-menu-overlay" aria-hidden="true"></div>
+
 <header class="header">
   <nav class="navbar">
     <div class="admin-top-menu">
       <button id="admin-menu-btn" class="admin-menu-btn" type="button" aria-expanded="false" aria-controls="admin-menu-panel">☰ <span>Menu</span></button>
-      <div id="admin-menu-panel" class="admin-menu-panel" aria-hidden="true">
-        <div class="admin-menu-title">ADMINISTRAÇÃO</div>
-        <nav class="admin-category-menu" aria-label="Categorias de administração">
-          <a class="active" href="#visao-geral">⌂ <span>Visão geral</span></a>
-          <a href="#geral">⚙️ <span>Geral</span></a>
-          <a href="#economia">🎁 <span>Economia</span></a>
-          <a href="#drops">🎉 <span>Drops & Sorteios</span></a>
-          <a href="#atividade">🏅 <span>Atividade</span></a>
-          <a href="#loja">🛒 <span>Loja</span></a>
-          <a href="#moderacao">🛡️ <span>Moderação</span></a>
-          <a href="#seguranca">🔐 <span>Segurança</span></a>
-          <a href="#configuracoes">📋 <span>Configurações</span></a>
-        </nav>
-      </div>
     </div>
     <div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
     <div class="admin-nav">
@@ -34,6 +23,69 @@
     </div>
   </nav>
 </header>
+
+<aside id="admin-menu-panel" class="admin-menu-panel" aria-hidden="true">
+  <div class="admin-menu-header">
+    <div class="admin-menu-title">SISTEMAS</div>
+    <button type="button" id="admin-menu-close" class="admin-menu-close" aria-label="Fechar menu">✕</button>
+  </div>
+  <p class="admin-menu-hint">Clique no menu ou arraste da esquerda para a direita</p>
+  <nav class="admin-category-menu" aria-label="Sistemas por categoria">
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">⌂ Visão geral</div>
+      <a class="active" href="#" data-panel="visao" data-system="visao">Resumo do servidor</a>
+    </div>
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">⚙️ Geral</div>
+      <a href="#" data-panel="geral" data-system="geral">Informações do servidor</a>
+      <a href="#" data-panel="geral" data-system="prefixo">Prefixo e idioma</a>
+    </div>
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">🎁 Economia</div>
+      <a href="#" data-panel="economia" data-system="daily">Daily (recompensa diária)</a>
+    </div>
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">🎉 Drops & Sorteios</div>
+      <a href="#" data-panel="drops" data-system="drop-ativacao">Ativação e publicação</a>
+      <a href="#" data-panel="drops" data-system="drop-req">Requisitos de participação</a>
+      <a href="#" data-panel="drops" data-system="drop-entries">Entradas extras por cargo</a>
+      <a href="#" data-panel="drops" data-system="drop-templates">Modelos de drop</a>
+      <a href="#" data-panel="drops" data-system="drop-result">Resultado e vencedores</a>
+    </div>
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">🏅 Atividade</div>
+      <a href="#" data-panel="atividade" data-system="msg-roles">Cargos por mensagens</a>
+    </div>
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">🛒 Loja</div>
+      <a href="#" data-panel="loja" data-system="loja">Ativar / desativar loja</a>
+      <a href="#" data-panel="loja" data-system="vips">VIPs cadastrados</a>
+    </div>
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">🛡️ Moderação</div>
+      <a href="#" data-panel="moderacao" data-system="mod">Ban / kick / mute / avisos</a>
+      <a href="#" data-panel="moderacao" data-system="antispam">Anti-spam</a>
+    </div>
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">🔐 Segurança</div>
+      <a href="#" data-panel="seguranca" data-system="security">Proteção do servidor</a>
+    </div>
+
+    <div class="menu-cat">
+      <div class="menu-cat-title">📋 Configurações</div>
+      <a href="#" data-panel="configuracoes" data-system="config">Configurações avançadas</a>
+    </div>
+
+  </nav>
+</aside>
 
 <main class="admin-container">
   <section class="admin-main">
@@ -53,14 +105,14 @@
     </section>
 
     <section id="admin-content" class="hidden">
-      <div class="server-info-grid">
+      <div id="panel-visao" class="system-panel server-info-grid" data-panel="visao">
         <article class="admin-card server-info-card"><span>👥</span><small>Membros</small><strong id="server-members">—</strong></article>
         <article class="admin-card server-info-card"><span>💬</span><small>Canais</small><strong id="server-channels">—</strong></article>
         <article class="admin-card server-info-card"><span>🎭</span><small>Cargos</small><strong id="server-roles">—</strong></article>
         <article class="admin-card server-info-card"><span>🚀</span><small>Nível de impulsos</small><strong id="server-boost">—</strong></article>
       </div>
 
-      <section id="geral" class="admin-section">
+      <section id="geral" class="admin-section system-panel hidden" data-panel="geral">
         <div class="section-heading"><span>⚙️</span><div><h2>Geral</h2><p>Informações principais do servidor selecionado.</p></div></div>
         <div class="server-details-grid">
           <div><small>Nome</small><strong id="detail-name">—</strong></div>
@@ -72,7 +124,7 @@
         </div>
       </section>
 
-      <section id="economia" class="admin-section">
+      <section id="economia" class="admin-section system-panel hidden" data-panel="economia">
         <div class="section-heading"><span>🎁</span><div><h2>Economia</h2><p>Configure a recompensa diária de éter.</p></div></div>
         <div class="admin-settings-grid">
           <article class="admin-card admin-setting-card">
@@ -84,7 +136,7 @@
         </div>
       </section>
 
-      <section id="drops" class="admin-section">
+      <section id="drops" class="admin-section system-panel hidden" data-panel="drops">
         <div class="section-heading"><span>🎉</span><div><h2>Drops & Sorteios</h2><p>Controle completo dos drops, participantes, modelos e resultados do servidor.</p></div></div>
 
         <article class="admin-card drop-config-card">
@@ -132,12 +184,12 @@
         <article class="admin-card drop-config-card">
           <div class="config-header"><div><strong>Resultado e vencedores</strong><p>Personalize a mensagem final, a entrega aos vencedores e o reroll.</p></div></div>
           <div class="form-grid">
-            <label>Título do resultado<input id="drop-winner-title" maxlength="256" placeholder="🎉 Resultado do drop"></label>
+            <label>Título do resultado<input id="drop-winner-title" maxlength="256" placeholder="Resultado do drop"></label>
             <label>Cor do resultado<input id="drop-winner-result-color" type="color" value="#8B5CF6"><small>Usa a cor principal se não for alterada.</small></label>
             <label>Imagem do resultado<input id="drop-winner-image" maxlength="1000" placeholder="https://..."><small>URL opcional da imagem.</small></label>
             <label>Banner do resultado<input id="drop-winner-banner" maxlength="1000" placeholder="https://..."><small>URL opcional do banner.</small></label>
           </div>
-          <label>Mensagem de vitória<textarea id="drop-winner-message" rows="4" maxlength="1000" placeholder="🏆 Parabéns {winners}! Você venceu o drop de **{prize}**."></textarea><small>Variáveis: <code>{winners}</code>, <code>{winners_count}</code>, <code>{prize}</code>, <code>{participants}</code>, <code>{tickets}</code>, <code>{reroll}</code>.</small></label>
+          <label>Mensagem de vitória<textarea id="drop-winner-message" rows="4" maxlength="1000" placeholder="Parabens {winners}! Voce venceu o drop de **{prize}**."></textarea><small>Variáveis: <code>{winners}</code>, <code>{winners_count}</code>, <code>{prize}</code>, <code>{participants}</code>, <code>{tickets}</code>, <code>{reroll}</code>.</small></label>
           <div class="role-config-grid">
             <label class="switch-line"><input id="drop-winner-mention" type="checkbox"><span>Marcar vencedor(es) na mensagem</span></label>
             <label class="switch-line"><input id="drop-winner-dm" type="checkbox"><span>Enviar resultado por DM para cada vencedor</span></label>
@@ -148,38 +200,38 @@
           </div>
           <div class="form-grid">
             <label>Máximo de rerolls<input id="drop-max-rerolls" type="number" min="0" max="20" value="3"><small>0 desativa novas rodadas.</small></label>
-            <label>Falha na entrega<textarea id="drop-delivery-failure" rows="2" maxlength="1000" placeholder="⚠️ Não foi possível entregar automaticamente o prêmio."></textarea></label>
+            <label>Falha na entrega<textarea id="drop-delivery-failure" rows="2" maxlength="1000" placeholder="Nao foi possivel entregar automaticamente o premio."></textarea></label>
           </div>
         </article>
 
         <div class="drop-save-bar"><span id="drop-status" class="setting-status"></span><button id="save-drops" class="btn btn-primary">Salvar configurações de Drops</button></div>
       </section>
 
-      <section id="atividade" class="admin-section">
+      <section id="atividade" class="admin-section system-panel hidden" data-panel="atividade">
         <div class="section-heading"><span>🏅</span><div><h2>Atividade</h2><p>Categoria reservada para os sistemas de atividade do Aeternus.</p></div></div>
         <article class="admin-card placeholder-card"><strong>Cargos por mensagens</strong><span>Configure metas, cargos e notificações de atividade.</span><em>Em configuração</em></article>
       </section>
 
-      <section id="loja" class="admin-section">
+      <section id="loja" class="admin-section system-panel hidden" data-panel="loja">
         <div class="section-heading"><span>🛒</span><div><h2>Loja</h2><p>Controle a disponibilidade da loja deste servidor.</p></div></div>
         <article class="admin-card admin-setting-card">
           <div class="shop-summary"><strong id="shop-status">Carregando...</strong><span id="shop-vips">0 VIP(s) cadastrados</span></div>
-          <div class="shop-actions"><button id="toggle-shop" class="btn btn-secondary">Alterar loja</button><a id="open-shop-panel" href="/itens" class="btn btn-primary">🛒 Abrir loja</a></div>
+          <div class="shop-actions"><button id="toggle-shop" class="btn btn-secondary">Alterar loja</button><a id="open-shop-panel" href="/itens" class="btn btn-primary">Abrir loja</a></div>
           <span id="shop-feedback" class="setting-status"></span>
         </article>
       </section>
 
-      <section id="moderacao" class="admin-section">
+      <section id="moderacao" class="admin-section system-panel hidden" data-panel="moderacao">
         <div class="section-heading"><span>🛡️</span><div><h2>Moderação</h2><p>Categoria reservada para as ferramentas de moderação.</p></div></div>
         <article class="admin-card placeholder-card"><strong>Moderação do servidor</strong><span>Banimentos, expulsões, silenciamento, avisos e controle de canais.</span><em>Em configuração</em></article>
       </section>
 
-      <section id="seguranca" class="admin-section">
+      <section id="seguranca" class="admin-section system-panel hidden" data-panel="seguranca">
         <div class="section-heading"><span>🔐</span><div><h2>Segurança</h2><p>Categoria reservada para proteção e permissões.</p></div></div>
         <article class="admin-card placeholder-card"><strong>Proteção do servidor</strong><span>Recursos de segurança e controle de acesso.</span><em>Em configuração</em></article>
       </section>
 
-      <section id="configuracoes" class="admin-section">
+      <section id="configuracoes" class="admin-section system-panel hidden" data-panel="configuracoes">
         <div class="section-heading"><span>📋</span><div><h2>Configurações</h2><p>Dados gerais usados pelo Aeternus neste servidor.</p></div></div>
         <article class="admin-card placeholder-card"><strong>Configurações avançadas</strong><span>Mais opções administrativas serão adicionadas aqui.</span><em>Em configuração</em></article>
       </section>
@@ -192,18 +244,120 @@
     </section>
   </section>
 </main>
+
 <script>
-const adminMenuBtn=document.getElementById('admin-menu-btn');
-const adminMenuPanel=document.getElementById('admin-menu-panel');
-adminMenuBtn.addEventListener('click',()=>{const open=adminMenuBtn.getAttribute('aria-expanded')==='true';adminMenuBtn.setAttribute('aria-expanded',String(!open));adminMenuPanel.classList.toggle('open',!open);adminMenuPanel.setAttribute('aria-hidden',String(open));});
-document.addEventListener('click',e=>{if(!e.target.closest('.admin-top-menu')){adminMenuBtn.setAttribute('aria-expanded','false');adminMenuPanel.classList.remove('open');adminMenuPanel.setAttribute('aria-hidden','true');}});
-document.querySelectorAll('.admin-category-menu a').forEach(link=>link.addEventListener('click',()=>{document.querySelectorAll('.admin-category-menu a').forEach(i=>i.classList.remove('active'));link.classList.add('active');adminMenuBtn.setAttribute('aria-expanded','false');adminMenuPanel.classList.remove('open');adminMenuPanel.setAttribute('aria-hidden','true');}));
+(function () {
+  var btn = document.getElementById('admin-menu-btn');
+  var panel = document.getElementById('admin-menu-panel');
+  var overlay = document.getElementById('admin-menu-overlay');
+  var closeBtn = document.getElementById('admin-menu-close');
+
+  function openMenu() {
+    btn.setAttribute('aria-expanded', 'true');
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('admin-menu-open');
+  }
+
+  function closeMenu() {
+    btn.setAttribute('aria-expanded', 'false');
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('admin-menu-open');
+  }
+
+  function toggleMenu() {
+    if (panel.classList.contains('open')) closeMenu();
+    else openMenu();
+  }
+
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    toggleMenu();
+  });
+  closeBtn.addEventListener('click', closeMenu);
+  overlay.addEventListener('click', closeMenu);
+
+  function showPanel(panelId) {
+    document.querySelectorAll('.system-panel').forEach(function (el) {
+      el.classList.add('hidden');
+    });
+    var target = document.querySelector('.system-panel[data-panel="' + panelId + '"]');
+    if (target) target.classList.remove('hidden');
+    document.querySelectorAll('.admin-category-menu a').forEach(function (i) {
+      i.classList.toggle('active', i.getAttribute('data-panel') === panelId);
+    });
+  }
+
+  document.querySelectorAll('.admin-category-menu a').forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      var panelId = link.getAttribute('data-panel') || 'visao';
+      showPanel(panelId);
+      closeMenu();
+    });
+  });
+
+  // default: só informações do servidor
+  showPanel('visao');
+
+  var startX = 0;
+  var startY = 0;
+  var tracking = false;
+  var edgeZone = 28;
+
+  document.addEventListener('touchstart', function (e) {
+    if (!e.touches || !e.touches[0]) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', function (e) {
+    if (!tracking || !e.changedTouches || !e.changedTouches[0]) return;
+    tracking = false;
+    var endX = e.changedTouches[0].clientX;
+    var endY = e.changedTouches[0].clientY;
+    var dx = endX - startX;
+    var dy = Math.abs(endY - startY);
+    if (dy > 80) return;
+
+    if (!panel.classList.contains('open') && startX <= edgeZone && dx > 60) {
+      openMenu();
+      return;
+    }
+    if (panel.classList.contains('open') && dx < -60) {
+      closeMenu();
+    }
+  }, { passive: true });
+
+  var mouseDown = false;
+  document.addEventListener('mousedown', function (e) {
+    startX = e.clientX;
+    startY = e.clientY;
+    mouseDown = true;
+  });
+  document.addEventListener('mouseup', function (e) {
+    if (!mouseDown) return;
+    mouseDown = false;
+    var dx = e.clientX - startX;
+    var dy = Math.abs(e.clientY - startY);
+    if (dy > 80) return;
+    if (!panel.classList.contains('open') && startX <= edgeZone && dx > 80) {
+      openMenu();
+      return;
+    }
+    if (panel.classList.contains('open') && dx < -80) {
+      closeMenu();
+    }
+  });
+})();
 </script>
-<<<<<<< HEAD
-<script src="admin-panel.js"></script>
-    <script src="dashboard-app.js"></script>
-=======
 <script src="/admin-panel.js"></script>
->>>>>>> 8eec11c4c99aa5d6974be110d09140c9631b9d48
+    <script src="dashboard-app.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
@@ -27,14 +27,23 @@ async function run(userId, side, amountRaw, reply) {
         embeds: [
             new EmbedBuilder()
                 .setColor(win ? 0x22c55e : 0xef4444)
-                .setTitle(win ? '🪙 AETERNUS • VITÓRIA' : '🪙 AETERNUS • DERROTA')
+                .setTitle(win ? '🏆 AETERNUS • VITÓRIA' : '💔 AETERNUS • DERROTA')
                 .setDescription(
                     `🪙 Resultado: **${result.toUpperCase()}**\n🎯 Escolha: **${s.toUpperCase()}**\n${
                         win
                             ? '✨ **+' + fmt(bet.amount) + '**'
                             : '✨ **-' + fmt(bet.amount) + '**'
-                    }\nSaldo: ✨ **${fmt(eter.get(userId))}**`
+                    }\nSaldo: ✨ **${fmt(eter.get(userId))}**\n\n${win ? '🏆 A sorte sorriu para você nesta rodada!' : '💔 Desta vez não deu certo; fica para a próxima.'}`
                 )
+        ],
+        components: [
+            new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`cara:girar:${userId}:${s}:${bet.amount}`)
+                    .setLabel('Girar moeda')
+                    .setEmoji('🪙')
+                    .setStyle(ButtonStyle.Primary)
+            )
         ]
     });
 }
@@ -57,6 +66,42 @@ module.exports = {
             o.setName('valor').setDescription('Valor (1k a 35m)').setRequired(true)
         ),
 
+
+    async handleComponent(interaction) {
+        const parts = String(interaction.customId || '').split(':');
+        if (parts[0] !== 'cara' || parts[1] !== 'girar') return;
+        const [, , ownerId, side, amountRaw] = parts;
+        if (interaction.user.id !== ownerId) {
+            return interaction.reply({
+                content: '❌ Esse botão pertence a outra pessoa. Use seu próprio comando!',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+        await interaction.deferUpdate();
+        await run(ownerId, side, amountRaw, async (payload) => {
+            if (typeof payload === 'string') {
+                return interaction.followUp({ content: payload, flags: MessageFlags.Ephemeral });
+            }
+            const sent = await interaction.channel.send({
+                ...payload,
+                content: '<@' + ownerId + '> 🪙 **Nova rodada de cara ou coroa!**',
+                reply: {
+                    messageReference: interaction.message.id,
+                    failIfNotExists: false
+                }
+            });
+            const disabledRows = interaction.message.components.map((row) =>
+                new ActionRowBuilder().addComponents(
+                    row.components.map((component) =>
+                        ButtonBuilder.from(component).setDisabled(true)
+                    )
+                )
+            );
+            await interaction.message.edit({ components: disabledRows });
+            return sent;
+        });
+    },
+
     async execute(message, args) {
         await run(message.author.id, args[0], args[1], (p) => message.reply(p));
     },
@@ -67,7 +112,7 @@ module.exports = {
             i.options.getString('valor', true),
             (p) =>
                 typeof p === 'string'
-                    ? i.reply({ content: p, ephemeral: true })
+                    ? i.reply({ content: p, flags: MessageFlags.Ephemeral })
                     : i.reply(p)
         );
     }

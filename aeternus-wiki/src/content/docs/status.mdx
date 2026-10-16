@@ -1,22 +1,23 @@
 ---
-title: Status dos Serviços
-description: Monitorização em tempo real da infraestrutura do Aeternus.
+title: Status
+description: Como saber se o bot e os serviços estão no ar.
 ---
 
-import SystemStatusGrid from '../../components/SystemStatusGrid.astro';
+# Status dos serviços
 
-# ✦ STATUS DO AETERNUS
+Quando algo “não responde”, quase sempre é uma destas três coisas: o processo do bot caiu, o MongoDB ficou inacessível, ou o Discord limitou o token.
 
-<SystemStatusGrid 
-  services={[
-    { name: '🤖 Bot Core (Gateway)', status: 'online' },
-    { name: '💰 Sistema de Economia', status: 'online' },
-    { name: '🎵 Player de Música', status: 'online' },
-    { name: '🛡️ Módulo de Moderação', status: 'degraded' },
-    { name: '🌐 API Externa', status: 'online' }
-  ]}
-/>
+## O que checar na ordem
 
-:::note[Atualização de Infraestrutura]
-O módulo de moderação está a passar por otimizações. Pode ocorrer um pequeno atraso no registo de advertências.
-:::
+1. **No Discord** — o Aeternus aparece online na lista de membros? Se estiver offline, o processo no Render/VPS precisa ser reiniciado.
+2. **Comando simples** — `O.ping` ou `O.ajuda`. Se o bot reage, a conexão com o Discord está ok.
+3. **Economia / perfil** — se só esses comandos falham, o problema costuma ser o MongoDB (URI, IP liberado no Atlas, ou `REQUIRE_MONGO=1` sem conexão).
+4. **Painel web** — `/health` no mesmo domínio do bot deve responder se o serviço HTTP subiu.
+
+## O que a equipe monitora
+
+- Processo Node do bot e do painel
+- Conexão com MongoDB Atlas
+- Erros não tratados (vão para o dono configurado em `OWNER_ID` quando possível)
+
+Se o servidor inteiro está com o bot online e só *um* canal falha, olhe permissões daquele canal (ler mensagens, enviar mensagens, embeds) antes de abrir ticket.

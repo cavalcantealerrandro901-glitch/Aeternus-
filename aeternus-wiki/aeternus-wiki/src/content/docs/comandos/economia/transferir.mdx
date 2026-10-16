@@ -1,6 +1,6 @@
 ---
-title: /transferir
-description: Documentação do comando de transferência do Aeternus.
+title: Transferir
+description: Enviar éter para outro membro com segurança.
 ---
 
 import StatusBadge from '../../../../components/StatusBadge.astro';
@@ -9,34 +9,36 @@ import DiscordMessage from '../../../../components/DiscordMessage.astro';
 
 <StatusBadge status="available" />
 
-O comando `/transferir` permite enviar moedas da tua conta para outro utilizador com total segurança e confirmação imediata.
+Use este comando quando quiser mandar éter da sua carteira para outra pessoa no servidor. Não passa pelo banco: o valor sai do saldo disponível e entra no do destinatário.
 
-### 📋 Atalho Rápido
+### Atalho
 
-<CopyButton command="/transferir usuario:@utilizador quantia:100" />
+<CopyButton command="O.pay @usuario 100" />
 
-### ⚙️ Parâmetros
+No slash, o equivalente costuma seguir o mesmo sentido (`usuario` + `quantia`). Prefixo padrão: `O.`
+
+### Parâmetros
 
 | Parâmetro | Tipo | Obrigatório | Descrição |
 | :--- | :--- | :--- | :--- |
-| `usuario` | Menção | **Sim** | O membro que receberá os coins. |
-| `quantia` | Número | **Sim** | O valor exato a ser enviado (Mínimo: 1). |
+| usuário | menção | sim | Quem recebe o éter |
+| quantia | número | sim | Valor a enviar (mínimo 1). Aceita `1k`, `2.5k`, `all`, `half` |
 
 ---
 
-### 💡 Exemplo Visual no Discord
+### Como aparece no Discord
 
-<DiscordMessage 
-  userCommand="/transferir usuario:@Maria quantia:500"
-  botTitle="💸 Transferência Realizada"
-  botDescription="Enviaste **500 coins** para **@Maria** com sucesso!"
+<DiscordMessage
+  userCommand="O.pay @Maria 500"
+  botTitle="Transferência feita"
+  botDescription="Você enviou **500 éter** para **@Maria**."
   color="#00FF7F"
   fields={[
-    { name: 'Taxa', value: '0 coins' },
-    { name: 'Novo Saldo', value: '1.250 coins' }
+    { name: 'Taxa', value: '0' },
+    { name: 'Seu saldo agora', value: '1.250 éter' }
   ]}
 />
 
-:::tip[Dica de Segurança]
-As transferências são irreversíveis! Verifica sempre duas vezes o utilizador antes de confirmar.
+:::tip[Antes de confirmar]
+Não há estorno automático. Confira o @ e o valor. Se o servidor tiver anti-roubo ou limites de economia, o bot avisa na hora em vez de completar a transferência.
 :::
