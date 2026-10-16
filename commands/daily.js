@@ -63,7 +63,7 @@ function buildComponents(user, st, result = null, already = false) {
 
   const container = new ContainerBuilder()
     .setAccentColor(result ? 0x36d9ff : 0x2878ff)
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\\n')))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')))
     .addSeparatorComponents(new SeparatorBuilder())
     .addMediaGalleryComponents(
       new MediaGalleryBuilder().addItems(
