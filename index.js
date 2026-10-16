@@ -56,51 +56,10 @@ async function main() {
     });
     try { client.setMaxListeners(25); } catch (_) {}
 
-    // Centraliza também erros emitidos diretamente pelo cliente Discord e pelo Node.
-    const forwardRuntimeError = (source, error, context = '') => {
-        try {
-            const autoRepair = require('./utils/autoRepair');
-            Promise.resolve(autoRepair.reportError({
-                source,
-                error,
-                context,
-                client
-            })).catch((reportErr) => {
-                console.warn('[autoRepair monitor]', reportErr?.message || reportErr);
-            });
-        } catch (reportErr) {
-            console.warn('[autoRepair monitor]', reportErr?.message || reportErr);
-        }
-    };
-    client.on('error', (error) => forwardRuntimeError('discord-client', error, 'Evento error do cliente Discord'));
-    client.on('shardError', (error, shardId) => forwardRuntimeError('discord-shard', error, 'Falha no shard ' + shardId));
-    process.on('warning', (warning) => forwardRuntimeError('node-warning', warning, 'Aviso emitido pelo runtime Node.js'));
-
-    // Cliente global para que o monitor de erros consiga avisar o canal de reparo.
-    global.aeternusClient = client;
-
-    // Encaminha console.error de qualquer sistema para o canal central.
-    // O próprio autoRepair usa console.warn para evitar recursão.
-    const originalConsoleError = console.error.bind(console);
-    console.error = (...args) => {
-        originalConsoleError(...args);
-        try {
-            const autoRepair = require('./utils/autoRepair');
-            const detail = args.map((value) => {
-                if (value instanceof Error) return value.stack || (value.name + ': ' + value.message);
-                if (typeof value === 'string') return value;
-                try { return JSON.stringify(value); } catch (_) { return String(value); }
-            }).join(' ').slice(0, 5500);
-            autoRepair.reportError({
-                source: 'console.error',
-                error: detail || 'console.error chamado sem detalhes',
-                context: 'Erro registrado por console.error',
-                client
-            }).catch((reportErr) => originalConsoleError('[autoRepair monitor]', reportErr));
-        } catch (e) {
-            originalConsoleError('[autoRepair monitor]', e);
-        }
-    };
+    // Registra erros de runtime nos logs, sem sistema de autorreparo.
+    client.on('error', (error) => console.error('[Discord client]', error));
+    client.on('shardError', (error, shardId) => console.error('[Discord shard ' + shardId + ']', error));
+    process.on('warning', (warning) => console.warn('[Node warning]', warning));
 
     client.commands = new Collection();
     client.slash = new Collection();
@@ -140,26 +99,8 @@ main().catch((e) => {
 });
 
 process.on('unhandledRejection', (err) => {
-    try {
-        const ar = require('./utils/autoRepair');
-        ar.reportError({
-            source: 'unhandledRejection',
-            error: err,
-            context: 'index fallback'
-        }).catch(() => {});
-    } catch (_) {
-        console.error('[unhandledRejection]', err);
-    }
+    console.error('[unhandledRejection]', err);
 });
 process.on('uncaughtException', (err) => {
-    try {
-        const ar = require('./utils/autoRepair');
-        ar.reportError({
-            source: 'uncaughtException',
-            error: err,
-            context: 'index fallback'
-        }).catch(() => {});
-    } catch (_) {
-        console.error('[uncaughtException]', err);
-    }
+    console.error('[uncaughtException]', err);
 });
