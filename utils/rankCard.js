@@ -1,6 +1,6 @@
 /**
- * Card de ranking Aeternus. SVG leve como padrão; sharp/PNG é opcional.
- * Limita dimensões, linhas e downloads para evitar picos de memória.
+ * Card de ranking Aeternus. Rasterização reduzida e sem downloads de avatares.
+ * Limita dimensões e linhas para reduzir picos de memória no host.
  */
 function esc(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -8,16 +8,14 @@ function esc(value) {
 }
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 const FONT = 'DejaVu Sans,Arial,Helvetica,sans-serif';
-const W = 900, ROW_H = 104, HEADER = 160, FOOTER = 56;
-const MAX_ROWS = 5;
+const W = 900, ROW_H = 104, HEADER = 160, FOOTER = 56, MAX_ROWS = 5;
 function medalColor(i) { return ['#f2d18b', '#d5d9e8', '#c58a69'][i] || '#a78bfa'; }
 function buildSvg(opts, rows) {
   const { title, subtitle, economy, page, totalPages, tip } = opts;
   const H = HEADER + rows.length * ROW_H + FOOTER;
   let rowSvg = '';
   for (let i = 0; i < rows.length; i++) {
-    const r = rows[i], y = HEADER + i * ROW_H;
-    const accent = medalColor(i);
+    const r = rows[i], y = HEADER + i * ROW_H, accent = medalColor(i);
     const max = Math.max(1, Number(rows[0]?.value || 1));
     const fill = Math.max(3, Math.round((Number(r.value || 0) / max) * 220));
     const metric = `${fmt(r.value)} ${economy ? 'ÉTER' : 'XP'}`;
@@ -50,21 +48,16 @@ function buildSvg(opts, rows) {
   </svg>`;
 }
 async function render(opts = {}) {
-  // Não baixa avatares remotos nem cria data URIs/base64: isso reduz rede e cópias em memória.
+  // Não baixa avatares remotos nem converte imagens em data URI/base64.
   const rows = Array.isArray(opts.rows) ? opts.rows.slice(0, MAX_ROWS) : [];
-  const svg = buildSvg(opts, rows);
-  const svgBuf = Buffer.from(svg, 'utf8');
-
-  // SVG consome muito menos memória que a rasterização 1080px via sharp.
-  // PNG só é ativado explicitamente, para manter o padrão seguro em hosts pequenos.
-  if (process.env.RANK_CARD_PNG !== '1') {
-    return { buffer: svgBuf, name: 'aeternus-rank.svg' };
-  }
+  const svgBuf = Buffer.from(buildSvg(opts, rows), 'utf8');
   try {
-    const sharpModule = require('sharp');
-    const sharp = typeof sharpModule === 'function' ? sharpModule : sharpModule?.default;
+    const mod = require('sharp');
+    const sharp = typeof mod === 'function' ? mod : mod?.default;
     if (typeof sharp !== 'function') throw new TypeError('Exportação do sharp inválida');
-    const png = await sharp(svgBuf, { density: 96, limitInputPixels: 2000000 }).png({ compressionLevel: 9, palette: true }).toBuffer();
+    // 96 DPI em vez de 190 reduz fortemente os pixels temporários e o uso de RAM.
+    const pipeline = sharp(svgBuf, { density: 96, limitInputPixels: 1000000 });
+    const png = await pipeline.png({ compressionLevel: 9, palette: true }).toBuffer();
     return { buffer: png, name: 'aeternus-rank.png' };
   } catch (err) {
     console.warn('[rankCard] PNG indisponível; usando SVG:', err?.message || err);
