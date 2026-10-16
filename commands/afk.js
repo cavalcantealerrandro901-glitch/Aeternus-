@@ -47,8 +47,8 @@ function createAfkMessage(user, reason) {
         .setDescription('Você está temporariamente indisponível. Quem mencionar você receberá um aviso de ausência.')
         .addFields(
             { name: '👤 Usuário', value: `${user}`, inline: true },
-            { name: '🌙 Status', value: 'Ausente', inline: true },
-            { name: '📝 Motivo da ausência', value: sanitizeReason(reason) }
+            { name: '🌙 Status', value: **'Ausente'**, inline: true },
+            { name: '📝 Motivo da ausência', value: **sanitizeReason(reason)** }
         )
         .setFooter({ text: 'Aeternus • Sistema de utilidades' })
         .setTimestamp();
