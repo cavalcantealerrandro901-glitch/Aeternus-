@@ -35,6 +35,19 @@ function multAt(opened, bombs) {
         Math.min(Number(bombs) || 1, TOTAL - 1)
     );
 
+    // Tabela solicitada para partidas com 1 bomba.
+    // potentialAt usa este multiplicador para calcular o valor total do saque.
+    const oneBombMultipliers = [
+        1.08, 1.17, 1.28, 1.43, 1.59, 1.77, 1.98,
+        2.14, 2.26, 2.60, 2.89, 3.50, 3.55
+    ];
+
+    if (b === 1 && o <= oneBombMultipliers.length) {
+        return oneBombMultipliers[o - 1];
+    }
+
+    // Mantém a fórmula existente para quantidades diferentes de bombas
+    // e para casas além da tabela personalizada.
     let m = 1;
 
     for (let i = 0; i < o; i++) {
@@ -51,7 +64,6 @@ function multAt(opened, bombs) {
 
     return Number(Math.max(1, m).toFixed(2));
 }
-
 function potentialAt(amount, opened, bombs) {
     const amt = Math.floor(Number(amount) || 0);
     const o = Math.floor(Number(opened) || 0);
