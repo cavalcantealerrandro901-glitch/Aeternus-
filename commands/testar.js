@@ -9,7 +9,7 @@ module.exports = {
 
     async execute(message, args, client) {
         const ownerIds = String(process.env.OWNER_ID || '')
-            .split(/[,\\s]+/)
+            .split(/[,\s]+/)
             .map((id) => id.trim())
             .filter(Boolean);
 
@@ -38,16 +38,16 @@ module.exports = {
                 'Exemplo: `O.testar comando mines 1 1k`',
                 '',
                 'Os testes só funcionam para comandos que possuem modo de teste isolado. Nesse modo, efeitos reais como cobranças e pagamentos devem ficar desativados.'
-            ].join('\\n'));
+            ].join('\n'));
         }
 
-        const normalized = nome.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+        const normalized = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const command = client.commands.get(nome) ||
             client.commands.get(normalized) ||
             [...client.commands.values()].find((cmd) =>
                 cmd?.name === normalized ||
                 (Array.isArray(cmd?.aliases) && cmd.aliases.some((alias) =>
-                    String(alias).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '') === normalized
+                    String(alias).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === normalized
                 ))
             );
 
