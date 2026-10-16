@@ -201,6 +201,8 @@ function panelText(game) {
     const nextGain = opened < safeTotal
         ? potentialAt(game.amount, opened + 1, bombs)
         : potentialAt(game.amount, opened, bombs);
+    const win = game._lastWin || potentialAt(game.amount, opened, bombs);
+    const profit = win - game.amount;
 
     const lines = [
         '# ✦ A E T E R N U S',
@@ -215,14 +217,17 @@ function panelText(game) {
         '',
         game.dead ? '### ☠️ A caverna venceu desta vez' : '',
         game.dead ? '> Uma mina encerrou sua expedição. Reúna forças e tente novamente.' : '',
+        game.dead && !game.fun && !game.testMode
+            ? `> 💸 **Éter ganho:** +0 Éter\n> 📉 **Lucro:** −${fmt(game.amount)} Éter`
+            : '',
         game.cashed ? '### ✦ Extração concluída' : '',
         game.cashed && game.fun && !game.testMode ? '> Você encerrou a exploração no modo livre.' : '',
         game.cashed && game.testMode ? '> Simulação encerrada; o saldo real não foi alterado.' : '',
         game.cashed && !game.fun && !game.testMode
-            ? `> 💰 **Resgate:** ${fmt(game._lastWin || potentialAt(game.amount, opened, bombs))} Éter`
+            ? '> ⚜ O éter reconheceu seu valor. Sua expedição foi um sucesso!'
             : '',
         game.cashed && !game.fun && !game.testMode
-            ? `> 📈 **Lucro líquido:** ${(game._lastWin || potentialAt(game.amount, opened, bombs)) - game.amount >= 0 ? '+' : '−'}${fmt(Math.abs((game._lastWin || potentialAt(game.amount, opened, bombs)) - game.amount))} Éter`
+            ? `> 💰 **Éter ganho:** +${fmt(win)} Éter\n> 📈 **Lucro:** ${profit >= 0 ? '+' : '−'}${fmt(Math.abs(profit))} Éter`
             : '',
         !game.dead && !game.cashed ? '### ✧ A fortuna está em suas mãos' : '',
         !game.dead && !game.cashed ? `> 📈 **Multiplicador atual:** ${currentMult.toFixed(2)}x` : '',
@@ -230,7 +235,7 @@ function panelText(game) {
         !game.dead && !game.cashed ? '> Escolha uma casa segura ou saque antes de encontrar uma mina.' : ''
     ];
 
-    return lines.filter(Boolean).join('\n');
+    return lines.filter(Boolean).join('\\n');
 }
 function panelFooter(game) {
     return '-# ✦ AETERNUS  ·  MINES  ·  EXPEDIÇÃO #' + String(game.partida).padStart(4, '0');
