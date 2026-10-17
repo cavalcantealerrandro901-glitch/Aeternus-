@@ -15,6 +15,34 @@ const gerenciar = require('../commands/gerenciar');
 
 const xpCd = new Map();
 const pendingPing = new Map();
+const afkNoticeCooldown = new Map();
+const AFK_NOTICE_COOLDOWN_MS = 30_000;
+const AFK_NOTICE_MAX_USERS = 5;
+
+function formatAfkDuration(at) {
+    const totalMinutes = Math.floor(Math.max(0, Date.now() - Number(at || Date.now())) / 60_000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0) return minutes ? hours + 'h ' + minutes + 'min' : hours + 'h';
+    return totalMinutes > 0 ? totalMinutes + ' min' : 'menos de 1 min';
+}
+
+function safeAfkReason(value) {
+    return String(value || 'Não informado')
+        .replace(/@everyone/gi, '@\u200beveryone')
+        .replace(/@here/gi, '@\u200bhere')
+        .replace(/<@!?\d+>/g, '@usuário')
+        .replace(/<@&\d+>/g, '@cargo')
+        .replace(/<#\d+>/g, '#canal')
+        .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 180) || 'Não informado';
+}
+
+function afkNoticeKey(guildId, channelId, senderId, targetId) {
+    return [guildId, channelId, senderId, targetId].join(':');
+}
 
 function stripAccents(s) {
     return String(s || '')
@@ -208,81 +236,94 @@ module.exports = {
         } catch (_) {}
 
         try {
-            if (afk.has(message.author.id)) {
+            const prefixMatchForAfk = resolvePrefixMatch(message, client);
+            const invokedName = prefixMatchForAfk
+                ? stripAccents(prefixMatchForAfk.rest.trim().split(/\s+/, 1)[0] || '')
+                : '';
+            const isAfkToggleCommand = invokedName === 'afk' || invokedName === 'ausente';
+
+            // Mensagem comum encerra a ausência. O comando AFK mantém seu toggle explícito.
+            if (afk.has(message.author.id) && !isAfkToggleCommand) {
                 const previousAfk = afk.get(message.author.id);
-                afk.clear(message.author.id);
+                if (afk.clear(message.author.id)) {
+                    const duration = formatAfkDuration(previousAfk?.at);
+                    const returnEmbed = new EmbedBuilder()
+                        .setColor(0xA78BFA)
+                        .setAuthor({
+                            name: 'AETERNUS • CENTRAL DE PRESENÇA',
+                            iconURL: client.user.displayAvatarURL({ size: 64 })
+                        })
+                        .setTitle('✅ Modo ausente desativado')
+                        .setDescription(String(message.author) + ', seu status AFK foi removido.')
+                        .addFields({ name: '⏱️ Tempo de ausência', value: duration, inline: true })
+                        .setFooter({ text: 'AETERNUS • AFK' })
+                        .setTimestamp();
 
-                const totalMs = Math.max(0, Date.now() - Number(previousAfk?.at || Date.now()));
-                const totalMinutes = Math.floor(totalMs / 60000);
-                const hours = Math.floor(totalMinutes / 60);
-                const minutes = totalMinutes % 60;
-                const duration = hours > 0
-                    ? (minutes ? `${hours}h ${minutes}min` : `${hours}h`)
-                    : (totalMinutes > 0 ? `${totalMinutes} min` : 'menos de 1 min');
-
-                const returnMessage = [
-                    '✦ **AETERNUS • CENTRAL DE PRESENÇA**',
-                    '',
-                    '✅ **MODO AUSENTE DESATIVADO**',
-                    `👋 ${message.author}, você está de volta e seu status AFK foi removido.`,
-                    `▸ **Tempo de ausência:** ${duration}`,
-                    '',
-                    '**Tudo certo!** Você voltará a receber as menções normalmente.',
-                    '✧ *Aeternus • Sistema de utilidades*'
-                ].join('\n');
-
-                message.reply({
-                    content: returnMessage,
-                    allowedMentions: { parse: [], repliedUser: false }
-                }).catch(() => {});
+                    message.reply({
+                        embeds: [returnEmbed],
+                        allowedMentions: { parse: [], repliedUser: false }
+                    }).catch(() => {});
+                }
             }
+
+            // Um aviso simples reúne até cinco ausências por mensagem, sem gerar ping.
+            const now = Date.now();
+            const mentionedAfk = [];
+            const seenAfk = new Set();
+
             for (const [id] of message.mentions.users) {
-                if (id === message.author.id || !afk.has(id)) continue;
+                if (id === message.author.id || seenAfk.has(id)) continue;
+                seenAfk.add(id);
 
-                const d = afk.get(id);
-                const ms = Math.max(0, Date.now() - Number(d.at || Date.now()));
-                const totalMin = Math.floor(ms / 60000);
-                const hours = Math.floor(totalMin / 60);
-                const mins = totalMin % 60;
-                let duration;
-                if (hours <= 0) {
-                    duration = mins <= 0 ? 'menos de 1 min' : `${mins} min`;
-                } else {
-                    duration = mins === 0 ? `${hours}h` : `${hours}h ${mins}min`;
+                const record = afk.get(id);
+                if (!record) continue;
+
+                const key = afkNoticeKey(message.guild.id, message.channel.id, message.author.id, id);
+                if ((afkNoticeCooldown.get(key) || 0) > now) continue;
+
+                mentionedAfk.push({
+                    id,
+                    key,
+                    reason: safeAfkReason(record.reason),
+                    duration: formatAfkDuration(record.at)
+                });
+            }
+
+            if (mentionedAfk.length > 0) {
+                const shown = mentionedAfk.slice(0, AFK_NOTICE_MAX_USERS);
+                const lines = shown.map((entry) =>
+                    '💤 <@' + entry.id + '> está ausente.\n> **Motivo:** ' + entry.reason +
+                    '\n> **Ausente há:** ' + entry.duration
+                );
+                if (mentionedAfk.length > shown.length) {
+                    lines.push('… e mais ' + (mentionedAfk.length - shown.length) + ' pessoa(s) ausente(s).');
                 }
 
-                // Impede que um motivo de AFK provoque menções ou notificações em massa.
-                const reason = String(d.reason || 'Não informado')
-                    .replace(/@everyone/gi, '@ everyone')
-                    .replace(/@here/gi, '@ here')
-                    .slice(0, 180);
-                const notice = new EmbedBuilder()
-                    .setColor(0x8B5CF6)
-                    .setAuthor({
-                        name: 'AETERNUS • CENTRAL DE PRESENÇA',
-                        iconURL: message.client.user.displayAvatarURL({ size: 64 })
-                    })
-                    .setTitle('💤 Aviso de ausência')
-                    .setDescription(`<@${id}> está temporariamente ausente.`)
-                    .addFields(
-                        { name: '📝 Motivo', value: reason || 'Não informado' },
-                        { name: '⏱️ Ausente há', value: duration, inline: true },
-                        { name: '🛡️ Orientações', value: 'Evite repetir a menção ou cobrar resposta. Respeite a ausência; a pessoa responderá quando puder. Se for urgente, procure outro moderador ou membro disponível.' }
-                    )
-                    .setFooter({ text: 'Aviso automático • Aeternus' })
-                    .setTimestamp();
-
-                const sent = await message.reply({
-                    embeds: [notice],
-                    allowedMentions: { parse: [], repliedUser: false }
+                const notice = await message.reply({
+                    content: lines.join('\n\n'),
+                    allowedMentions: { parse: [], users: [], roles: [], repliedUser: false }
                 }).catch(() => null);
-                if (sent) {
-                    setTimeout(() => {
-                        sent.delete().catch(() => {});
-                    }, 10000);
+
+                if (notice) {
+                    const nextAllowedAt = Date.now() + AFK_NOTICE_COOLDOWN_MS;
+                    for (const entry of mentionedAfk) afkNoticeCooldown.set(entry.key, nextAllowedAt);
+
+                    if (afkNoticeCooldown.size > 2000) {
+                        const cleanupTime = Date.now();
+                        for (const [key, expiresAt] of afkNoticeCooldown) {
+                            if (expiresAt <= cleanupTime) afkNoticeCooldown.delete(key);
+                        }
+                        while (afkNoticeCooldown.size > 5000) {
+                            afkNoticeCooldown.delete(afkNoticeCooldown.keys().next().value);
+                        }
+                    }
+
+                    setTimeout(() => notice.delete().catch(() => {}), 10_000);
                 }
             }
-        } catch (_) {}
+        } catch (error) {
+            console.error('[messageCreate] AFK:', error?.message || error);
+        }
 
         try {
             const botMentioned =
