@@ -64,28 +64,30 @@
 
 <main class="admin-container">
   <section class="admin-main">
-    <section id="visao-geral" class="admin-hero admin-hero-left">
-      <div class="server-heading">
-        <img id="server-icon" class="server-large-icon hidden" alt="Ícone do servidor">
-        <div>
-          <span class="admin-badge">ADMINISTRAÇÃO • SERVIDOR SELECIONADO</span>
-          <h1 id="selected-server-name">Carregando servidor...</h1>
-          <p id="selected-server-description">Carregando informações...</p>
-        </div>
-      </div>
-    </section>
+
 
     <section id="loading-state" class="admin-card">
       <div class="loader"></div><p>Carregando informações do servidor...</p>
     </section>
 
     <section id="admin-content" class="hidden">
-      <div id="panel-visao" class="system-panel server-info-grid" data-panel="visao">
+      <section id="panel-visao" class="system-panel" data-panel="visao">
+        <section id="visao-geral" class="admin-hero admin-hero-left">
+          <div class="server-heading">
+            <img id="server-icon" class="server-large-icon hidden" alt="Ícone do servidor">
+            <div>
+              <span class="admin-badge">ADMINISTRAÇÃO • SERVIDOR SELECIONADO</span>
+              <h1 id="selected-server-name">Carregando servidor...</h1>
+              <p id="selected-server-description">Carregando informações...</p>
+            </div>
+          </div>
+        </section>
         <article class="admin-card server-info-card"><span>👥</span><small>Membros</small><strong id="server-members">—</strong></article>
         <article class="admin-card server-info-card"><span>💬</span><small>Canais</small><strong id="server-channels">—</strong></article>
         <article class="admin-card server-info-card"><span>🎭</span><small>Cargos</small><strong id="server-roles">—</strong></article>
         <article class="admin-card server-info-card"><span>🚀</span><small>Nível de impulsos</small><strong id="server-boost">—</strong></article>
       </div>
+      </section>
 
       <section id="geral" class="admin-section system-panel hidden" data-panel="geral">
         <div class="section-heading"><span>⚙️</span><div><h2>Prefixo e idioma</h2><p>Personalize como você conversa com o Aeternus neste servidor.</p></div></div>
