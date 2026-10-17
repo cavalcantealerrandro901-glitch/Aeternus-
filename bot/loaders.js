@@ -124,9 +124,14 @@ function unloadCommand(client, cmd) {
 }
 
 function loadCommandFile(client, file, { quiet = false } = {}) {
-    const full = path.isAbsolute(file) ? file : path.join(COMMANDS_DIR, file);
-    if (!full.endsWith('.js') || !fs.existsSync(full)) {
-        return { ok: false, error: 'arquivo não encontrado' };
+    // Só aceita arquivos .js diretamente dentro de commands/; bloqueia caminhos absolutos e traversal.
+    const requested = String(file || '');
+    if (!requested || path.isAbsolute(requested) || requested !== path.basename(requested) || !/^[a-zA-Z0-9_-]+\.js$/.test(requested)) {
+        return { ok: false, error: 'caminho não autorizado' };
+    }
+    const full = path.resolve(COMMANDS_DIR, requested);
+    if (path.dirname(full) !== path.resolve(COMMANDS_DIR) || !full.endsWith('.js') || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+        return { ok: false, error: 'arquivo não encontrado ou não autorizado' };
     }
 
     try {
@@ -225,9 +230,14 @@ function destroySystem(fileBase) {
 }
 
 function loadSystemFile(client, file, { quiet = false } = {}) {
-    const full = path.isAbsolute(file) ? file : path.join(SYSTEMS_DIR, file);
+    // Só aceita arquivos .js diretamente dentro de systems/; bloqueia caminhos absolutos e traversal.
+    const requested = String(file || '');
+    if (!requested || path.isAbsolute(requested) || requested !== path.basename(requested) || !/^[a-zA-Z0-9_-]+\.js$/.test(requested)) {
+        return { ok: false, error: 'caminho não autorizado' };
+    }
+    const full = path.resolve(SYSTEMS_DIR, requested);
     const base = path.basename(full);
-    if (!full.endsWith('.js') || !fs.existsSync(full)) return { ok: false, error: 'arquivo não encontrado' };
+    if (path.dirname(full) !== path.resolve(SYSTEMS_DIR) || !full.endsWith('.js') || !fs.existsSync(full) || !fs.statSync(full).isFile()) return { ok: false, error: 'arquivo não encontrado ou não autorizado' };
     if (base === 'hotReload.js') return { ok: false, error: 'hotReload não se auto-recarrega' };
 
     try {
