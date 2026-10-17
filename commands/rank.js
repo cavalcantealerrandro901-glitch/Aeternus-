@@ -88,9 +88,25 @@ async function buildList(mode, guild, client) {
 
     if ((mode === 'local' || mode === 'xp') && guild) {
         const memberIds = new Set();
-        guild.members.cache.forEach(m => { if (m.user && !m.user.bot) memberIds.add(m.id); });
-        // Não busca todos os membros da API: isso pode gerar uso alto de memória/rede.
-        if (memberIds.size) entries = entries.filter(e => memberIds.has(e.id));
+
+        // O cache pode conter apenas parte dos membros do servidor.
+        // Busca os membros do servidor antes de filtrar para não omitir quem não está no cache.
+        try {
+            await guild.members.fetch();
+        } catch (err) {
+            console.warn('[rank] Não foi possível buscar todos os membros do servidor:', err?.message || err);
+        }
+
+        guild.members.cache.forEach(member => {
+            if (member.user && !member.user.bot) memberIds.add(member.id);
+        });
+
+        // Se a busca falhar e o cache estiver vazio, não filtra a lista inteira por engano.
+        if (memberIds.size > 0) {
+            entries = entries.filter(entry => memberIds.has(entry.id));
+        } else {
+            console.warn('[rank] Nenhum membro disponível no cache; mantendo os registros para evitar um ranking vazio.');
+        }
     }
 
     return entries.filter(e => e.value > 0 && !isKnownBot(client, e.id))
