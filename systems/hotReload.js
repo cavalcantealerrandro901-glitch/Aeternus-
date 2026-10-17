@@ -15,8 +15,8 @@ const {
 const ROOT_DIR = path.join(__dirname, '..');
 // O hot-reload só observa comandos e sistemas que já existiam na inicialização.
 // Não executa automaticamente novos arquivos nem limpa o cache de módulos arbitrários.
-const TRUSTED_COMMAND_FILES = new Set(fs.existsSync(COMMANDS_DIR) ? fs.readdirSync(COMMANDS_DIR).filter(f => /^[a-zA-Z0-9_-]+\\.js$/.test(f)) : []);
-const TRUSTED_SYSTEM_FILES = new Set(fs.existsSync(SYSTEMS_DIR) ? fs.readdirSync(SYSTEMS_DIR).filter(f => /^[a-zA-Z0-9_-]+\\.js$/.test(f)) : []);
+const TRUSTED_COMMAND_FILES = new Set(fs.existsSync(COMMANDS_DIR) ? fs.readdirSync(COMMANDS_DIR).filter(f => /^[a-zA-Z0-9_-]+\.js$/.test(f)) : []);
+const TRUSTED_SYSTEM_FILES = new Set(fs.existsSync(SYSTEMS_DIR) ? fs.readdirSync(SYSTEMS_DIR).filter(f => /^[a-zA-Z0-9_-]+\.js$/.test(f)) : []);
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'data', 'public', '.cache', '.npm']);
 
 const DEBOUNCE_MS = 400;
@@ -40,7 +40,7 @@ function debounce(key, fn) {
 }
 
 function handleFileChange(client, dir, filename) {
-    if (!filename || !/^[a-zA-Z0-9_-]+\\.js$/.test(filename) || filename === 'hotReload.js') return;
+    if (!filename || !/^[a-zA-Z0-9_-]+\.js$/.test(filename) || filename === 'hotReload.js') return;
 
     const fullPath = path.resolve(dir, filename);
     if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) return;
