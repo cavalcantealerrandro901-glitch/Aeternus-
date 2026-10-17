@@ -162,3 +162,17 @@
 .inline-editor-actions .btn{cursor:pointer}
 .language-note{max-width:210px;color:var(--text-secondary,#9494a8);font-size:.8rem;line-height:1.5}
 @media(max-width:520px){.editable-setting-card{gap:10px;padding:17px}.editable-setting-card>.btn{padding:.65rem .9rem}.language-note{max-width:130px;font-size:.74rem}}
+
+
+/* Preferências de idioma */
+.language-settings-card{margin-top:28px;padding:22px}
+.language-card-heading{margin-bottom:8px}
+.language-card-heading h3{font-size:1.08rem;margin-bottom:8px}
+.language-card-heading p,.language-setting-row p{color:var(--text-secondary,#9494a8);font-size:.9rem;line-height:1.55;margin-top:6px}
+.language-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,.7fr);gap:20px;padding:20px 0;border-top:1px solid rgba(255,255,255,.07)}
+.language-setting-row strong{display:block}
+.language-edit-control{display:flex;flex-direction:column;gap:8px}
+.language-edit-control label{font-size:.8rem;color:#bda0ff;font-weight:700}
+.language-edit-control select{width:100%;padding:12px;border:1px solid rgba(139,61,255,.35);border-radius:10px;background:#101019;color:#fff;font:inherit}
+.language-save-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)}
+@media(max-width:560px){.language-settings-card{padding:17px}.language-setting-row{grid-template-columns:1fr;gap:12px;padding:17px 0}.language-save-row{align-items:stretch;flex-direction:column}.language-save-row .btn{width:100%}}
