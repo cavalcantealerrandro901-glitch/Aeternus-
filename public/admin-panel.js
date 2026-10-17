@@ -80,6 +80,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       $('detail-owner').textContent = guild.ownerTag || guild.ownerId || '—';
       $('detail-created').textContent = formatDate(guild.createdAt);
       $('detail-prefix').textContent = guild.prefix || 'O.';
+      $('prefix-value').textContent = guild.prefix || 'O.';
+      $('prefix-input').value = guild.prefix || 'O.';
       $('detail-locale').textContent = guild.preferredLocale || '—';
 
       if (guild.icon) {
@@ -111,6 +113,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       errors.classList.remove('hidden');
     }
   }
+
+  $('prefix-edit').addEventListener('click', () => {
+    $('prefix-input').value = $('prefix-value').textContent || 'O.';
+    $('prefix-editor').classList.remove('hidden');
+    $('prefix-value').classList.add('hidden');
+    $('prefix-edit').classList.add('hidden');
+    $('prefix-feedback').textContent = '';
+    $('prefix-input').focus();
+    $('prefix-input').select();
+  });
+
+  $('prefix-cancel').addEventListener('click', () => {
+    $('prefix-editor').classList.add('hidden');
+    $('prefix-value').classList.remove('hidden');
+    $('prefix-edit').classList.remove('hidden');
+    $('prefix-input').value = $('prefix-value').textContent || 'O.';
+    $('prefix-feedback').textContent = '';
+  });
+
+  $('prefix-save').addEventListener('click', () => {
+    const value = $('prefix-input').value.trim();
+    if (!value) {
+      $('prefix-feedback').textContent = 'Digite um prefixo antes de salvar.';
+      $('prefix-input').focus();
+      return;
+    }
+    $('prefix-feedback').textContent = 'O campo está pronto, mas a gravação permanente precisa ser conectada à configuração do bot.';
+  });
 
   $('save-daily').addEventListener('click', async () => {
     try {
