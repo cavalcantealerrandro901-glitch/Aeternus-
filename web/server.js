@@ -38,6 +38,9 @@ function startWeb(client) {
                 try { supplied = new URL(referer).origin; } catch (_) { supplied = 'invalid'; }
             }
             const host = String(req.get('host') || '');
+            if (req.path.startsWith('/api/') && !supplied) {
+                return res.status(403).json({ ok: false, error: 'origem_obrigatoria' });
+            }
             if (supplied && supplied !== 'http://' + host && supplied !== 'https://' + host) {
                 return res.status(403).json({ ok: false, error: 'origem_nao_permitida' });
             }
