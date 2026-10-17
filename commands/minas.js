@@ -442,15 +442,22 @@ module.exports = {
         if (!Number.isFinite(bombsRaw) || bombsRaw < 1 || bombsRaw > MAX_BOMBS) {
             return message.reply(
                 [
-                    'Mines 4×4',
+                    '✦ AETERNUS • MINES',
+                    'Explore a caverna do Éter em uma grade 4×4.',
                     '',
-                    'Diversão: `O.minas <bombas>`',
-                    'Aposta: `O.minas <bombas> <valor>`',
+                    '**Como jogar**',
+                    '• Modo livre: `O.minas <bombas>`',
+                    '• Com aposta: `O.minas <bombas> <valor>`',
                     '',
-                    'Bombas: 1 a 11',
-                    'Aposta: 100 a 10.000.000 ✨',
-                    'Grade: 4×4',
-                    'Moeda: ✨ Éter'
+                    '**Regras**',
+                    '• Bombas: de 1 a 11',
+                    '• Aposta: de ' + fmt(MIN_BET) + ' a ' + fmt(MAX_BET) + ' ✨',
+                    '• Abra cristais para aumentar o valor potencial.',
+                    '• Saque antes de encontrar uma mina para garantir o valor acumulado.',
+                    '',
+                    '**Exemplos**',
+                    '• `O.minas 3` — modo livre com 3 minas',
+                    '• `O.minas 3 1.000` — aposta de 1.000 Éter'
                 ].join('\n')
             );
         }
@@ -460,7 +467,7 @@ module.exports = {
             game = makeGame(message.author.id, 0, bombsRaw, true, { testMode });
         } else {
             const bet = resolveBet(args[1], testMode ? Number.MAX_SAFE_INTEGER : eter.get(message.author.id), { label: '✨' });
-            if (!bet.ok) return message.reply('❌ ' + bet.error);
+            if (!bet.ok) return message.reply('❌ **Aposta inválida.** ' + bet.error + '\nUse `O.minas <bombas> <valor>` e escolha uma aposta entre ' + fmt(MIN_BET) + ' e ' + fmt(MAX_BET) + ' ✨.');
             if (bet.amount < MIN_BET || bet.amount > MAX_BET) {
                 return message.reply(
                     '❌ Aposta entre ' + fmt(MIN_BET) + ' e ' + fmt(MAX_BET) + ' ✨.'
@@ -495,13 +502,13 @@ module.exports = {
 
         if (!game) {
             return interaction
-                .reply({ content: 'Jogo expirado. Use `O.minas` novamente.', ephemeral: true })
+                .reply({ content: 'Esta expedição expirou ou não está mais disponível. Inicie outra com `O.minas <bombas> [valor]`.', ephemeral: true })
                 .catch(() => {});
         }
 
         if (interaction.user.id !== game.userId) {
             return interaction
-                .reply({ content: 'Não é o seu Mines.', ephemeral: true })
+                .reply({ content: 'Esta expedição pertence a outra pessoa. Inicie sua própria partida com `O.minas <bombas> [valor]`.', ephemeral: true })
                 .catch(() => {});
         }
 
@@ -514,7 +521,7 @@ module.exports = {
         try {
             if ((game.dead || game.cashed) && action !== 'refresh' && action !== 'again') {
                 return interaction
-                    .reply({ content: 'Jogo já encerrado.', ephemeral: true })
+                    .reply({ content: 'Esta expedição já terminou. Use **Nova expedição** para jogar novamente.', ephemeral: true })
                     .catch(() => {});
             }
 
@@ -523,7 +530,7 @@ module.exports = {
             if (action === 'again') {
                 if (!game.dead && !game.cashed) {
                     return interaction
-                        .reply({ content: 'A partida ainda está em andamento.', ephemeral: true })
+                        .reply({ content: 'Sua expedição ainda está ativa. Termine a partida antes de iniciar outra.', ephemeral: true })
                         .catch(() => {});
                 }
 
@@ -546,7 +553,7 @@ module.exports = {
                     if (balance < game.amount) {
                         return interaction
                             .reply({
-                                content: '❌ Você não possui éter suficiente para iniciar novamente.',
+                                content: '❌ **Éter insuficiente.** Você precisa de ' + fmt(game.amount) + ' ✨ para iniciar outra expedição com esta aposta.',
                                 ephemeral: true
                             })
                             .catch(() => {});
@@ -614,7 +621,7 @@ module.exports = {
                 const idx = pickRandom(game);
                 if (idx == null) {
                     return interaction
-                        .reply({ content: 'Nenhuma casa livre.', ephemeral: true })
+                        .reply({ content: 'Não há casas disponíveis para abrir nesta expedição.', ephemeral: true })
                         .catch(() => {});
                 }
                 const res = openCell(game, idx);
@@ -632,7 +639,7 @@ module.exports = {
                 const opened = game.opened.size;
                 if (opened <= 0) {
                     return interaction
-                        .reply({ content: 'Abra pelo menos uma casa antes de sacar.', ephemeral: true })
+                        .reply({ content: '🔒 **Saque indisponível.** Abra pelo menos um cristal antes de encerrar a expedição.', ephemeral: true })
                         .catch(() => {});
                 }
                 if (game.cashed) {
@@ -646,7 +653,7 @@ module.exports = {
                 if (win <= 0 && !game.fun && !game.testMode) {
                     game.cashed = false;
                     return interaction
-                        .reply({ content: 'Valor de saque inválido.', ephemeral: true })
+                        .reply({ content: '❌ **Saque indisponível.** O valor calculado não é válido. Atualize o painel ou tente novamente.', ephemeral: true })
                         .catch(() => {});
                 }
 
@@ -660,7 +667,7 @@ module.exports = {
                         game.cashed = false;
                         game._lastWin = 0;
                         return interaction
-                            .reply({ content: 'Erro ao creditar o saque.', ephemeral: true })
+                            .reply({ content: '❌ **Não foi possível concluir o saque.** O Éter não foi confirmado como creditado; tente novamente e avise a equipe se o erro continuar.', ephemeral: true })
                             .catch(() => {});
                     }
                 }
@@ -674,7 +681,7 @@ module.exports = {
                 const idx = parseInt(parts[3], 10);
                 if (Number.isNaN(idx) || idx < 0 || idx >= TOTAL) {
                     return interaction
-                        .reply({ content: 'Casa inválida.', ephemeral: true })
+                        .reply({ content: 'Essa casa não é válida. Escolha uma das 16 casas numeradas no tabuleiro.', ephemeral: true })
                         .catch(() => {});
                 }
                 const res = openCell(game, idx);
