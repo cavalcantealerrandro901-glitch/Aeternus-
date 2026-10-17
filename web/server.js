@@ -267,14 +267,13 @@ function startWeb(client) {
         if (body.languages && typeof body.languages === 'object') {
             const current = getSettings(req.params.id).languages || {};
             const commands = body.languages.commands === undefined ? (current.commands || 'pt-BR') : String(body.languages.commands);
-            const server = body.languages.server === undefined ? (current.server || 'pt-BR') : String(body.languages.server);
-            if (!allowed.has(commands) || !allowed.has(server)) {
+            if (!allowed.has(commands)) {
                 return res.status(400).json({ ok: false, error: 'Idioma não suportado.' });
             }
-            patch.languages = { commands, server };
+            patch.languages = { commands };
         }
         const saved = setSettings(req.params.id, patch);
-        return res.json({ ok: true, languages: saved.languages || { commands: 'pt-BR', server: 'pt-BR' } });
+        return res.json({ ok: true, languages: saved.languages || { commands: 'pt-BR' } });
     });
 
     // Limite simples de requisições por sessão/IP para APIs de jogo.
