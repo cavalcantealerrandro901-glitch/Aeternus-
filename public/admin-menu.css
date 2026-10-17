@@ -67,12 +67,23 @@
   margin-bottom: 1rem;
 }
 .menu-cat-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #8b8ba3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 10px;
+  margin: 0 0 10px;
+  border: 1px solid rgba(167, 139, 250, 0.38);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(139, 61, 255, 0.20), rgba(91, 33, 182, 0.10));
+  box-shadow: 0 0 16px rgba(139, 61, 255, 0.10);
+  color: #e3d5ff;
+  font-size: 0.95rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0 0 0.35rem 0.35rem;
+  letter-spacing: 0.08em;
 }
 .admin-category-menu a {
   display: block;
