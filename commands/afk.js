@@ -18,10 +18,16 @@ function fmtSince(ms) {
 
 // Neutraliza menções em massa no motivo e limita a interpretação de menções pelo Discord.
 function sanitizeReason(value) {
-    return String(value || 'Não informado')
-        .replace(/@everyone/gi, '@ everyone')
-        .replace(/@here/gi, '@ here')
-        .slice(0, 180);
+    return String(value || '')
+        .replace(/@everyone/gi, '@\u200beveryone')
+        .replace(/@here/gi, '@\u200bhere')
+        .replace(/<@!?\d+>/g, '@usuário')
+        .replace(/<@&\d+>/g, '@cargo')
+        .replace(/<#\d+>/g, '#canal')
+        .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 180) || 'Não informado';
 }
 
 function createAfkMessage(user, reason) {
@@ -32,13 +38,13 @@ function createAfkMessage(user, reason) {
             iconURL: user.displayAvatarURL?.({ size: 64 }) || undefined
         })
         .setTitle('💤 Modo ausente ativado')
-        .setDescription('Você está temporariamente indisponível. Quem mencionar você receberá um aviso de ausência.')
+        .setDescription('Seu status de ausência está ativo. Quem mencionar você receberá um aviso temporário.')
         .addFields(
             { name: '👤 Usuário', value: `${user}`, inline: true },
             { name: '🌙 Status', value: 'Ausente', inline: true },
             { name: '📝 Motivo da ausência', value: sanitizeReason(reason) }
         )
-        .setFooter({ text: 'Aeternus • Sistema de utilidades' })
+        .setFooter({ text: 'AETERNUS • AFK' })
         .setTimestamp();
 }
 
@@ -56,7 +62,7 @@ function createWelcomeBackMessage(user, previous) {
             { name: '🟣 Status', value: 'Online', inline: true },
             { name: '⏱️ Tempo de ausência', value: duration, inline: true }
         )
-        .setFooter({ text: 'Aeternus • Sistema de utilidades' })
+        .setFooter({ text: 'AETERNUS • AFK' })
         .setTimestamp();
 }
 
@@ -82,7 +88,12 @@ module.exports = {
     async execute(message, args) {
         if (afk.has(message.author.id)) {
             const previous = afk.get(message.author.id);
-            afk.clear(message.author.id);
+            if (!afk.clear(message.author.id)) {
+                return message.reply({
+                    content: 'Não foi possível atualizar seu status AFK. Tente novamente.',
+                    allowedMentions: SAFE_MENTIONS
+                });
+            }
             return message.reply({
                 embeds: [createWelcomeBackMessage(message.author, previous)],
                 allowedMentions: SAFE_MENTIONS
@@ -90,7 +101,12 @@ module.exports = {
         }
 
         const reason = getReason(args);
-        afk.set(message.author.id, reason);
+        if (!afk.set(message.author.id, reason)) {
+            return message.reply({
+                content: 'Não foi possível ativar seu status AFK. Tente novamente.',
+                allowedMentions: SAFE_MENTIONS
+            });
+        }
         return message.reply({
             embeds: [createAfkMessage(message.author, reason)],
             allowedMentions: SAFE_MENTIONS
@@ -100,7 +116,12 @@ module.exports = {
     async executeSlash(interaction) {
         if (afk.has(interaction.user.id)) {
             const previous = afk.get(interaction.user.id);
-            afk.clear(interaction.user.id);
+            if (!afk.clear(interaction.user.id)) {
+                return interaction.reply({
+                    content: 'Não foi possível atualizar seu status AFK. Tente novamente.',
+                    allowedMentions: SAFE_MENTIONS
+                });
+            }
             return interaction.reply({
                 embeds: [createWelcomeBackMessage(interaction.user, previous)],
                 allowedMentions: SAFE_MENTIONS
@@ -108,7 +129,12 @@ module.exports = {
         }
 
         const reason = getReason([interaction.options.getString('motivo') || '']);
-        afk.set(interaction.user.id, reason);
+        if (!afk.set(interaction.user.id, reason)) {
+            return interaction.reply({
+                content: 'Não foi possível ativar seu status AFK. Tente novamente.',
+                allowedMentions: SAFE_MENTIONS
+            });
+        }
         return interaction.reply({
             embeds: [createAfkMessage(interaction.user, reason)],
             allowedMentions: SAFE_MENTIONS
