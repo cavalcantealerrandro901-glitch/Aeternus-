@@ -143,3 +143,22 @@
 .menu-server-icon{width:38px;height:38px;flex:0 0 38px;object-fit:cover;border-radius:12px;background:rgba(139,92,246,.14);border:1px solid rgba(139,92,246,.35)}
 #menu-server-select{display:block;min-width:0;width:100%;padding:10px 32px 10px 12px;border-radius:10px;border:1px solid rgba(139,92,246,.35);background:var(--admin-card,#171421);color:inherit;font:inherit;cursor:pointer}
 #menu-server-select:disabled{opacity:.65;cursor:wait}
+
+
+/* Cartões de Prefixo e idioma */
+.settings-intro-card{padding:24px;margin-bottom:16px;background:radial-gradient(ellipse at top right,rgba(139,61,255,.16),transparent 58%),var(--bg-card,#13131f);border-color:rgba(139,61,255,.24)}
+.settings-card-icon{display:grid;place-items:center;width:42px;height:42px;margin-bottom:14px;border-radius:13px;background:rgba(139,61,255,.16);color:#c4b5fd;font-size:1.35rem}
+.settings-intro-card h3,.editable-setting-card h3{font-size:1.08rem;margin-bottom:8px}
+.settings-intro-card p,.editable-setting-card p{color:var(--text-secondary,#9494a8);line-height:1.6;font-size:.92rem}
+.editable-setting-card{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px;margin-bottom:14px}
+.editable-setting-copy{min-width:0;flex:1}
+.setting-eyebrow{display:block;color:#bda0ff;font-size:.7rem;font-weight:800;letter-spacing:.12em;margin-bottom:9px}
+.setting-current-value{display:inline-block;margin-top:14px;padding:8px 14px;border-radius:10px;border:1px solid rgba(139,61,255,.3);background:rgba(139,61,255,.12);font-size:1.15rem;color:#d8c5ff;overflow-wrap:anywhere}
+.editable-setting-card>.btn{flex-shrink:0;cursor:pointer}
+.inline-editor{margin-top:14px;max-width:420px}
+.inline-editor input{width:100%;padding:12px 14px;border:1px solid rgba(139,61,255,.55);border-radius:10px;background:#0b0b12;color:#fff;font:inherit;outline:none}
+.inline-editor input:focus{box-shadow:0 0 0 3px rgba(139,61,255,.18)}
+.inline-editor-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}
+.inline-editor-actions .btn{cursor:pointer}
+.language-note{max-width:210px;color:var(--text-secondary,#9494a8);font-size:.8rem;line-height:1.5}
+@media(max-width:520px){.editable-setting-card{gap:10px;padding:17px}.editable-setting-card>.btn{padding:.65rem .9rem}.language-note{max-width:130px;font-size:.74rem}}
