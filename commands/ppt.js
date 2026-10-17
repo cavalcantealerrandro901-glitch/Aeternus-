@@ -58,7 +58,7 @@ function gameButtons(game, disabled = false) {
 }
 
 async function startGame({ challenger, opponent, channel, bet = 0 }) {
-    if (!opponent || opponent.bot) return { error: 'Mencione uma pessoa válida que não seja um bot.' };
+    if (!opponent) return { error: 'Mencione uma pessoa válida para desafiar.' };
     if (challenger.id === opponent.id) return { error: 'Você não pode jogar contra si mesmo.' };
     if (bet > 0) {
         if (eter.get(challenger.id) < bet) return { error: 'Você não tem éter suficiente para essa aposta.' };
@@ -72,6 +72,11 @@ async function startGame({ challenger, opponent, channel, bet = 0 }) {
         opponentName: opponent.globalName || opponent.username,
         choices: {}, bet, channel, done: false
     };
+    // Bots escolhem automaticamente uma jogada aleatória.
+    if (opponent.bot) {
+        const options = Object.keys(CHOICES);
+        game.choices[opponent.id] = options[Math.floor(Math.random() * options.length)];
+    }
     games.set(id, game);
     game.timeout = setTimeout(async () => {
         if (game.done) return;
@@ -128,11 +133,11 @@ async function settle(game) {
 module.exports = {
     name: 'ppt',
     aliases: ['jokenpo', 'rps'],
-    description: 'Pedra, papel e tesoura contra outra pessoa',
+    description: 'Pedra, papel e tesoura contra pessoas ou bots',
     data: new SlashCommandBuilder()
         .setName('jokenpo')
-        .setDescription('Desafie alguém para pedra, papel e tesoura')
-        .addUserOption(o => o.setName('adversario').setDescription('Pessoa que você quer desafiar').setRequired(true))
+        .setDescription('Desafie uma pessoa ou bot para pedra, papel e tesoura')
+        .addUserOption(o => o.setName('adversario').setDescription('Pessoa ou bot que você quer desafiar').setRequired(true))
         .addStringOption(o => o.setName('valor').setDescription('Aposta em éter (opcional; vazio = diversão)').setRequired(false)),
 
     async execute(message, args) {
