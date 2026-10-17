@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           img.classList.add('hidden');
           return;
         }
-        const imageUrl = /^https?:\\/\\//i.test(hash)
+        const imageUrl = /^https?:\/\//i.test(hash)
           ? hash
           : 'https://cdn.discordapp.com/icons/' + encodeURIComponent(guildId) + '/' + encodeURIComponent(hash) + '.png?size=128';
         img.src = imageUrl;
