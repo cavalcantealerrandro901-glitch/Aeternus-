@@ -79,14 +79,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       $('server-channels').textContent = guild.channelCount ?? '—';
       $('server-roles').textContent = guild.roleCount ?? '—';
       $('server-boost').textContent = guild.premiumTierLabel || 'Nenhum';
-      $('detail-name').textContent = guild.name;
-      $('detail-id').textContent = guild.id;
-      $('detail-owner').textContent = guild.ownerTag || guild.ownerId || '—';
-      $('detail-created').textContent = formatDate(guild.createdAt);
-      $('detail-prefix').textContent = guild.prefix || 'O.';
       $('prefix-value').textContent = guild.prefix || 'O.';
       $('prefix-input').value = guild.prefix || 'O.';
-      $('detail-locale').textContent = guild.preferredLocale || '—';
       const savedLanguages = guild.settings?.languages || {};
       $('command-language').value = savedLanguages.commands || 'pt-BR';
       $('server-language').value = savedLanguages.server || guild.preferredLocale || 'pt-BR';
@@ -131,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const guild = await api('/api/guild/' + encodeURIComponent(id));
       const savedPrefix = String(guild.prefix || 'O.');
       $('prefix-value').textContent = savedPrefix;
-      $('detail-prefix').textContent = savedPrefix;
       $('prefix-input').value = savedPrefix;
       $('prefix-editor').classList.remove('hidden');
       $('prefix-value').classList.add('hidden');
@@ -180,7 +173,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         body: JSON.stringify({ prefix: value })
       });
       $('prefix-value').textContent = result.prefix;
-      $('detail-prefix').textContent = result.prefix;
       closePrefixEditor();
       feedback.textContent = 'Prefixo salvo com sucesso.';
     } catch (e) {
