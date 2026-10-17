@@ -77,14 +77,44 @@
       </div>
 
       <section id="geral" class="admin-section system-panel hidden" data-panel="geral">
-        <div class="section-heading"><span>⚙️</span><div><h2>Geral</h2><p>Informações principais do servidor selecionado.</p></div></div>
-        <div class="server-details-grid">
+        <div class="section-heading"><span>⚙️</span><div><h2>Prefixo e idioma</h2><p>Personalize como você conversa com o Aeternus neste servidor.</p></div></div>
+        <article class="admin-card settings-intro-card">
+          <span class="settings-card-icon">✦</span>
+          <h3>Deixe o Aeternus do seu jeito</h3>
+          <p>Configure o prefixo dos comandos e, em seguida, escolha o idioma que deseja usar no servidor.</p>
+        </article>
+        <article class="admin-card editable-setting-card">
+          <div class="editable-setting-copy">
+            <span class="setting-eyebrow">COMANDOS</span>
+            <h3>Prefixo do bot</h3>
+            <p>Use este símbolo antes dos comandos por mensagem.</p>
+            <strong id="prefix-value" class="setting-current-value">O.</strong>
+            <div id="prefix-editor" class="inline-editor hidden">
+              <input id="prefix-input" type="text" maxlength="5" autocomplete="off" aria-label="Novo prefixo" placeholder="Ex.: O.">
+              <div class="inline-editor-actions">
+                <button id="prefix-save" type="button" class="btn btn-primary">Salvar</button>
+                <button id="prefix-cancel" type="button" class="btn btn-secondary">Cancelar</button>
+              </div>
+            </div>
+            <p id="prefix-feedback" class="setting-status" aria-live="polite"></p>
+          </div>
+          <button id="prefix-edit" type="button" class="btn btn-secondary">Editar</button>
+        </article>
+        <article class="admin-card editable-setting-card">
+          <div class="editable-setting-copy">
+            <span class="setting-eyebrow">IDIOMA</span>
+            <h3>Idioma do servidor</h3>
+            <p>Idioma atualmente informado para este servidor.</p>
+            <strong id="detail-locale" class="setting-current-value">—</strong>
+          </div>
+          <span class="language-note">Disponibilidade de edição do idioma será conectada à configuração do bot.</span>
+        </article>
+        <div class="server-details-grid hidden" aria-hidden="true">
           <div><small>Nome</small><strong id="detail-name">—</strong></div>
           <div><small>ID do servidor</small><strong id="detail-id">—</strong></div>
           <div><small>Proprietário</small><strong id="detail-owner">—</strong></div>
           <div><small>Criado em</small><strong id="detail-created">—</strong></div>
           <div><small>Prefixo</small><strong id="detail-prefix">O.</strong></div>
-          <div><small>Idioma do servidor</small><strong id="detail-locale">—</strong></div>
         </div>
       </section>
 
