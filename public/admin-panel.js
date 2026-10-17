@@ -114,32 +114,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  $('prefix-edit').addEventListener('click', () => {
-    $('prefix-input').value = $('prefix-value').textContent || 'O.';
-    $('prefix-editor').classList.remove('hidden');
-    $('prefix-value').classList.add('hidden');
-    $('prefix-edit').classList.add('hidden');
-    $('prefix-feedback').textContent = '';
-    $('prefix-input').focus();
-    $('prefix-input').select();
-  });
+  async function openPrefixEditor() {
+    const button = $('prefix-edit');
+    button.disabled = true;
+    $('prefix-feedback').textContent = 'Carregando prefixo salvo...';
+    try {
+      const guild = await api('/api/guild/' + encodeURIComponent(id));
+      const savedPrefix = String(guild.prefix || 'O.');
+      $('prefix-value').textContent = savedPrefix;
+      $('detail-prefix').textContent = savedPrefix;
+      $('prefix-input').value = savedPrefix;
+      $('prefix-editor').classList.remove('hidden');
+      $('prefix-value').classList.add('hidden');
+      button.classList.add('hidden');
+      $('prefix-feedback').textContent = '';
+      $('prefix-input').focus();
+      $('prefix-input').select();
+    } catch (e) {
+      $('prefix-feedback').textContent = 'Não foi possível carregar o prefixo: ' + e.message;
+    } finally {
+      button.disabled = false;
+    }
+  }
 
-  $('prefix-cancel').addEventListener('click', () => {
+  function closePrefixEditor() {
     $('prefix-editor').classList.add('hidden');
     $('prefix-value').classList.remove('hidden');
     $('prefix-edit').classList.remove('hidden');
     $('prefix-input').value = $('prefix-value').textContent || 'O.';
     $('prefix-feedback').textContent = '';
-  });
+  }
 
-  $('prefix-save').addEventListener('click', () => {
+  $('prefix-edit').addEventListener('click', openPrefixEditor);
+  $('prefix-cancel').addEventListener('click', closePrefixEditor);
+
+  $('prefix-save').addEventListener('click', async () => {
     const value = $('prefix-input').value.trim();
+    const feedback = $('prefix-feedback');
     if (!value) {
-      $('prefix-feedback').textContent = 'Digite um prefixo antes de salvar.';
+      feedback.textContent = 'Digite um prefixo antes de salvar.';
       $('prefix-input').focus();
       return;
     }
-    $('prefix-feedback').textContent = 'O campo está pronto, mas a gravação permanente precisa ser conectada à configuração do bot.';
+    if (/\\s/.test(value)) {
+      feedback.textContent = 'O prefixo não pode conter espaços.';
+      $('prefix-input').focus();
+      return;
+    }
+    const button = $('prefix-save');
+    button.disabled = true;
+    feedback.textContent = 'Salvando prefixo...';
+    try {
+      const result = await api('/api/guild/' + encodeURIComponent(id) + '/prefix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefix: value })
+      });
+      $('prefix-value').textContent = result.prefix;
+      $('detail-prefix').textContent = result.prefix;
+      closePrefixEditor();
+      feedback.textContent = 'Prefixo salvo com sucesso.';
+    } catch (e) {
+      feedback.textContent = 'Não foi possível salvar: ' + e.message;
+    } finally {
+      button.disabled = false;
+    }
   });
 
   $('save-daily').addEventListener('click', async () => {
