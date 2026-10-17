@@ -112,7 +112,7 @@ async function sendRank(ctx, mode, page = 0) {
 
     const rows = slice.map((e, i) => {
         const user = ctx.client.users.cache.get(e.id);
-        return { id: e.id, name: user ? (user.globalName || user.username) : ('Aventureiro ' + e.id.slice(-4)), rank: start + i + 1, value: e.value, level: e.level || 0 };
+        return { id: e.id, name: user ? (user.globalName || user.username) : ('Aventureiro ' + e.id.slice(-4)), avatarURL: user ? user.displayAvatarURL({ extension: 'png', size: 64 }) : null, rank: start + i + 1, value: e.value, level: e.level || 0 };
     });
 
     // O modelo Aeternus é rasterizado para PNG e exibido dentro do embed do Discord.
