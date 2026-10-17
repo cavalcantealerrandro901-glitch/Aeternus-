@@ -34,7 +34,13 @@ function rowMarkup(r, i, y, opts, maxValue) {
   const economy = opts.economy !== false;
   const barWidth = 1088;
   const fill = Math.max(0, Math.min(barWidth, Math.round((Math.max(0, Number(r.value) || 0) / Math.max(1, maxValue)) * barWidth)));
-  const name = esc(String(r.name || 'Aventureiro').slice(0, 28));
+  // Normaliza alfabetos Unicode estilizados (ex.: letras matemáticas) e remove símbolos
+  // que frequentemente não existem na fonte usada pelo renderizador SVG.
+  const rawName = String(r.name || 'Aventureiro').normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[^\p{L}\p{N}\p{M}\p{P}\p{Zs}]/gu, '')
+    .trim();
+  const name = esc((rawName || 'Aventureiro').slice(0, 28));
   const id = esc(String(r.id || '—').slice(0, 22));
   const avatar = r.avatarData || '';
   const value = esc(fmt(r.value));
