@@ -385,56 +385,104 @@
   var categories = document.getElementById('logs-categories');
   if (!master || !categories) return;
   var names = ['saida', 'punicao', 'perfil', 'mensagens'];
+  var labels = {saida:'Saída de membros',punicao:'Punições',perfil:'Edições de perfil',mensagens:'Mensagens'};
+  var variables = ['{user}', '{user.id}', '{user.tag}', '{user.username}', '{user.mention}', '{server}', '{server.name}', '{server.id}', '{channel}', '{channel.name}', '{channel.id}', '{timestamp}', '{reason}', '{moderator}', '{moderator.mention}', '{message}', '{message.id}', '{message.content}', '{old}', '{new}', '{count}'];
+
+  function editorMarkup(name) {
+    return '<div class="logs-editor-fields">' +
+      '<section class="logs-config-card"><h4>Canal e duração</h4>' +
+      '<label>Canal onde o bot vai enviar<select id="logs-'+name+'-channel"><option value="">Selecione um canal (a integração com o Discord será conectada depois)</option></select></label>' +
+      '<p class="logs-muted-help">As mensagens deste tipo de evento serão enviadas para o canal selecionado.</p>' +
+      '<label class="logs-retention-row"><input type="checkbox" id="logs-'+name+'-retention"> Ativar duração do registro</label>' +
+      '<p class="logs-muted-help">Quando ativado, o registro terá uma duração configurável antes de ser removido, se o bot e as permissões permitirem.</p>' +
+      '<div class="logs-retention-options hidden" id="logs-'+name+'-retention-options"><label>Duração<select id="logs-'+name+'-duration"><option value="1">1 dia</option><option value="7" selected>7 dias</option><option value="14">14 dias</option><option value="30">30 dias</option><option value="90">90 dias</option></select></label></div>' +
+      '</section>' +
+      '<section class="logs-config-card"><h4>Personalizar mensagem</h4>' +
+      '<label>Mensagem em texto<textarea id="logs-'+name+'-message" rows="3" maxlength="2000">📋 Registro: '+labels[name]+'</textarea></label>' +
+      '<p class="logs-muted-help">Você pode usar as variáveis abaixo. Algumas só têm valor quando o evento fornece essa informação.</p>' +
+      '<div class="logs-variable-list">'+variables.map(function(v){return '<button type="button" class="logs-variable" data-insert-variable="'+name+'" data-value="'+v+'">'+v+'</button>';}).join('')+'</div>' +
+      '<h4>Embed (opcional)</h4>' +
+      '<div class="logs-form-grid"><label>Título<input id="logs-'+name+'-title" maxlength="256" value="'+labels[name]+'"></label><label>Cor<input id="logs-'+name+'-color" type="color" value="#8B5CF6"></label>' +
+      '<label>Autor<input id="logs-'+name+'-author" maxlength="256" placeholder="Nome do autor"></label><label>URL do autor<input id="logs-'+name+'-author-url" type="url" placeholder="https://..."></label>' +
+      '<label>Link 1 — texto<input id="logs-'+name+'-link1-label" maxlength="80" placeholder="Abrir detalhes"></label><label>Link 1 — URL<input id="logs-'+name+'-link1-url" type="url" placeholder="https://..."></label>' +
+      '<label>Link 2 — texto<input id="logs-'+name+'-link2-label" maxlength="80" placeholder="Ver perfil"></label><label>Link 2 — URL<input id="logs-'+name+'-link2-url" type="url" placeholder="https://..."></label></div>' +
+      '<label>Descrição<textarea id="logs-'+name+'-description" rows="4" maxlength="4000" placeholder="Descreva o evento...">{user} — evento registrado em {server.name}.</textarea></label>' +
+      '<label>Rodapé<input id="logs-'+name+'-footer" maxlength="2048" placeholder="Aeternus • Logs"></label>' +
+      '<label>URL da imagem<input id="logs-'+name+'-image" type="url" placeholder="https://..."></label>' +
+      '<label>URL da miniatura<input id="logs-'+name+'-thumbnail" type="url" placeholder="https://..."></label>' +
+      '<div class="logs-preview-wrap"><h4>Prévia em tempo real</h4><div id="logs-'+name+'-preview" class="logs-live-preview"><div class="logs-preview-author"></div><strong class="logs-preview-title">'+labels[name]+'</strong><p class="logs-preview-description"></p><div class="logs-preview-image hidden"></div><small class="logs-preview-footer"></small><div class="logs-preview-links"></div></div></div>' +
+      '<div class="logs-editor-actions"><button type="button" class="btn btn-primary logs-save-btn" data-save-log="'+name+'">Salvar configuração</button><span class="setting-status" id="logs-'+name+'-feedback" aria-live="polite"></span></div>' +
+      '</section></div>';
+  }
+
+  names.forEach(function(name){
+    var editor = document.getElementById('logs-editor-'+name);
+    if (editor) editor.innerHTML = editorMarkup(name);
+  });
+
+  function updatePreview(name) {
+    var get = function(suffix){var el=document.getElementById('logs-'+name+'-'+suffix);return el?el.value:'';};
+    var preview = document.getElementById('logs-'+name+'-preview');
+    if (!preview) return;
+    preview.style.borderLeftColor = get('color') || '#8B5CF6';
+    preview.querySelector('.logs-preview-author').textContent = get('author');
+    preview.querySelector('.logs-preview-title').textContent = get('title') || labels[name];
+    preview.querySelector('.logs-preview-description').textContent = get('description') || get('message') || 'A prévia da mensagem aparecerá aqui.';
+    preview.querySelector('.logs-preview-footer').textContent = get('footer');
+    var image = preview.querySelector('.logs-preview-image');
+    if (get('image')) { image.classList.remove('hidden'); image.textContent = 'Imagem: '+get('image'); } else { image.classList.add('hidden'); image.textContent=''; }
+    var links = preview.querySelector('.logs-preview-links');
+    links.innerHTML = '';
+    [1,2].forEach(function(n){var label=get('link'+n+'-label'),url=get('link'+n+'-url');if(label&&url){var a=document.createElement('span');a.textContent=label+' ↗';links.appendChild(a);}});
+  }
 
   function updateMasterState() {
     var enabled = master.checked;
     masterLabel.textContent = enabled ? 'Ativado' : 'Desativado';
     categories.classList.toggle('is-disabled', !enabled);
-    names.forEach(function (name) {
-      var toggle = document.getElementById('logs-' + name + '-toggle');
-      var edit = document.querySelector('[data-edit-log="' + name + '"]');
-      var select = document.getElementById('logs-' + name + '-channel');
-      var save = document.querySelector('[data-save-log="' + name + '"]');
-      toggle.disabled = !enabled;
-      edit.disabled = !enabled;
-      edit.classList.toggle('hidden', !enabled);
-      select.disabled = !enabled;
-      save.disabled = !enabled;
-      if (!enabled) {
-        document.getElementById('logs-editor-' + name).classList.add('hidden');
-        toggle.checked = false;
+    names.forEach(function(name){
+      var toggle=document.getElementById('logs-'+name+'-toggle');
+      var edit=document.querySelector('[data-edit-log="'+name+'"]');
+      toggle.disabled=!enabled; edit.disabled=!enabled;
+      edit.classList.toggle('hidden',!enabled);
+      if(!enabled){document.getElementById('logs-editor-'+name).classList.add('hidden');toggle.checked=false;}
+    });
+    document.getElementById('logs-system-feedback').textContent = enabled ? 'Sistema ativado na interface. Configure cada categoria em Editar.' : 'Sistema de logs desativado.';
+  }
+  master.addEventListener('change',updateMasterState);
+
+  names.forEach(function(name){
+    var toggle=document.getElementById('logs-'+name+'-toggle');
+    var edit=document.querySelector('[data-edit-log="'+name+'"]');
+    var editor=document.getElementById('logs-editor-'+name);
+    toggle.addEventListener('change',function(){
+      edit.disabled=!master.checked;
+      document.getElementById('logs-'+name+'-feedback').textContent=toggle.checked?'Categoria ativada na interface.':'Categoria desativada.';
+      if(!toggle.checked) editor.classList.add('hidden');
+    });
+    edit.addEventListener('click',function(){
+      if(!master.checked)return;
+      editor.classList.toggle('hidden');
+      if(!editor.classList.contains('hidden')) editor.querySelectorAll('input,textarea').forEach(function(el){el.addEventListener('input',function(){updatePreview(name);});});
+      updatePreview(name);
+    });
+    var retention=document.getElementById('logs-'+name+'-retention');
+    retention.addEventListener('change',function(){document.getElementById('logs-'+name+'-retention-options').classList.toggle('hidden',!retention.checked);});
+    editor.addEventListener('click',function(e){
+      var variable=e.target.closest('[data-insert-variable="'+name+'"]');
+      if(variable){
+        var field=document.getElementById('logs-'+name+'-message');
+        var token=variable.getAttribute('data-value');
+        var a=field.selectionStart,b=field.selectionEnd;
+        field.value=field.value.slice(0,a)+token+field.value.slice(b);
+        field.focus();field.selectionStart=field.selectionEnd=a+token.length;updatePreview(name);
       }
     });
-    document.getElementById('logs-system-feedback').textContent = enabled
-      ? 'Sistema ativado nesta interface. Configure cada categoria no botão Editar.'
-      : 'Sistema de logs desativado.';
-  }
-
-  master.addEventListener('change', updateMasterState);
-  names.forEach(function (name) {
-    var toggle = document.getElementById('logs-' + name + '-toggle');
-    var edit = document.querySelector('[data-edit-log="' + name + '"]');
-    var editor = document.getElementById('logs-editor-' + name);
-    var save = document.querySelector('[data-save-log="' + name + '"]');
-    var feedback = document.getElementById('logs-' + name + '-feedback');
-    edit.classList.add('hidden');
-    toggle.addEventListener('change', function () {
-      edit.disabled = !master.checked;
-      feedback.textContent = toggle.checked
-        ? 'Categoria selecionada. Use Editar para configurar o canal.'
-        : 'Categoria desativada.';
-      if (!toggle.checked) editor.classList.add('hidden');
+    editor.querySelector('[data-save-log="'+name+'"]').addEventListener('click',function(){
+      var channel=document.getElementById('logs-'+name+'-channel');
+      document.getElementById('logs-'+name+'-feedback').textContent=channel.value?'Configuração preparada na interface; a gravação real será ligada ao backend.':'Selecione um canal. A lista de canais será conectada ao Discord na próxima etapa.';
     });
-    edit.addEventListener('click', function () {
-      if (!master.checked) return;
-      editor.classList.toggle('hidden');
-    });
-    save.addEventListener('click', function () {
-      var channel = document.getElementById('logs-' + name + '-channel');
-      feedback.textContent = channel.value
-        ? 'Canal selecionado na interface. A gravação no servidor será ligada ao backend na próxima etapa.'
-        : 'Selecione um canal antes de salvar.';
-    });
+    updatePreview(name);
   });
   updateMasterState();
 })();
