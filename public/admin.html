@@ -398,14 +398,14 @@
       '<div class="logs-retention-options hidden" id="logs-'+name+'-retention-options"><label>Duração<select id="logs-'+name+'-duration"><option value="1">1 dia</option><option value="7" selected>7 dias</option><option value="14">14 dias</option><option value="30">30 dias</option><option value="90">90 dias</option></select></label></div>' +
       '</section>' +
       '<section class="logs-config-card"><h4>Personalizar mensagem</h4>' +
-      '<label>Mensagem em texto<textarea id="logs-'+name+'-message" rows="3" maxlength="2000">📋 Registro: '+labels[name]+'</textarea></label>' +
+      '<label>Mensagem em texto<textarea id="logs-'+name+'-message" rows="3" maxlength="2000">📋 Registro: '+labels[name]+'</textarea></label>' + (name==='perfil' ? '<label>Nome antes<input id="logs-'+name+'-before-name" value="{old.name}" placeholder="Nome anterior"></label><label>Nome depois<input id="logs-'+name+'-after-name" value="{new.name}" placeholder="Nome atualizado"></label>' : '') + (name==='mensagens' ? '<label>Mensagem anterior<textarea id="logs-'+name+'-before-message" rows="3" placeholder="{old}">{old}</textarea></label><label>Mensagem editada<textarea id="logs-'+name+'-after-message" rows="3" placeholder="{new}">{new}</textarea></label>' : '') +
       '<p class="logs-muted-help">Você pode usar as variáveis abaixo. Algumas só têm valor quando o evento fornece essa informação.</p>' +
       '<div class="logs-variable-list">'+variables.map(function(v){return '<button type="button" class="logs-variable" data-insert-variable="'+name+'" data-value="'+v+'">'+v+'</button>';}).join('')+'</div>' +
       '<h4>Embed (opcional)</h4>' +
       '<div class="logs-form-grid"><label>Título<input id="logs-'+name+'-title" maxlength="256" value="'+labels[name]+'"></label><label>Cor<input id="logs-'+name+'-color" type="color" value="#8B5CF6"></label>' +
       '<label>Autor<input id="logs-'+name+'-author" maxlength="256" placeholder="Nome do autor"></label><label>URL do autor<input id="logs-'+name+'-author-url" type="url" placeholder="https://..."></label>' +
       '<label>Link 1 — texto<input id="logs-'+name+'-link1-label" maxlength="80" placeholder="Abrir detalhes"></label><label>Link 1 — URL<input id="logs-'+name+'-link1-url" type="url" placeholder="https://..."></label>' +
-      '<label>Link 2 — texto<input id="logs-'+name+'-link2-label" maxlength="80" placeholder="Ver perfil"></label><label>Link 2 — URL<input id="logs-'+name+'-link2-url" type="url" placeholder="https://..."></label></div>' +
+      '</div>' +
       '<label>Descrição<textarea id="logs-'+name+'-description" rows="4" maxlength="4000" placeholder="Descreva o evento...">{user} — evento registrado em {server.name}.</textarea></label>' +
       '<label>Rodapé<input id="logs-'+name+'-footer" maxlength="2048" placeholder="Aeternus • Logs"></label>' +
       '<label>URL da imagem<input id="logs-'+name+'-image" type="url" placeholder="https://..."></label>' +
@@ -415,10 +415,30 @@
       '</section></div>';
   }
 
+  var overlay = document.createElement('div');
+  overlay.id = 'logs-editor-screen';
+  overlay.className = 'logs-editor-screen hidden';
+  overlay.innerHTML = '<header class="logs-editor-screen-head"><button type="button" id="logs-editor-back" class="btn btn-secondary">← Voltar aos logs</button><div><span class="setting-eyebrow">AETERNUS • CONFIGURAÇÃO</span><h2 id="logs-screen-title">Editar log</h2></div></header><div id="logs-editor-screen-body"></div>';
+  document.body.appendChild(overlay);
+  var editorHome = {};
   names.forEach(function(name){
     var editor = document.getElementById('logs-editor-'+name);
-    if (editor) editor.innerHTML = editorMarkup(name);
+    if (editor) {
+      editor.innerHTML = editorMarkup(name);
+      editorHome[name] = editor.parentNode;
+    }
   });
+  function closeEditorScreen() {
+    overlay.classList.add('hidden');
+    names.forEach(function(name){
+      var editor=document.getElementById('logs-editor-'+name);
+      var home=editorHome[name];
+      if(editor&&home) home.appendChild(editor);
+      if(editor) editor.classList.add('hidden');
+    });
+  }
+  document.getElementById('logs-editor-back').addEventListener('click',closeEditorScreen);
+
 
   function updatePreview(name) {
     var get = function(suffix){var el=document.getElementById('logs-'+name+'-'+suffix);return el?el.value:'';};
@@ -462,8 +482,11 @@
     });
     edit.addEventListener('click',function(){
       if(!master.checked)return;
-      editor.classList.toggle('hidden');
-      if(!editor.classList.contains('hidden')) editor.querySelectorAll('input,textarea').forEach(function(el){el.addEventListener('input',function(){updatePreview(name);});});
+      document.getElementById('logs-screen-title').textContent='Editar • '+labels[name];
+      overlay.querySelector('#logs-editor-screen-body').appendChild(editor);
+      editor.classList.remove('hidden');
+      overlay.classList.remove('hidden');
+      editor.querySelectorAll('input,textarea,select').forEach(function(el){el.oninput=function(){updatePreview(name);};});
       updatePreview(name);
     });
     var retention=document.getElementById('logs-'+name+'-retention');
