@@ -12,6 +12,8 @@ function esc(value) {
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 const MAX_ROWS = 5;
 const TEMPLATE_PATH = path.join(__dirname, '..', 'assets', 'rank', 'rank-template.svg');
+const OUTPUT_DIR = path.join(__dirname, '..', 'assets', 'rank');
+const OUTPUT_PATH = path.join(OUTPUT_DIR, 'rank-card.png');
 const FALLBACK_COLORS = ['#ffdf35', '#e7eaff', '#ffad63', '#e7a3ff', '#c65aff'];
 
 function rowMarkup(r, i, y, opts, maxValue) {
@@ -68,17 +70,28 @@ async function render(opts = {}) {
     template = '<svg xmlns="http://www.w3.org/2000/svg" width="1383" height="1100" viewBox="0 0 1383 1100"><rect width="1383" height="1100" fill="#030207"/><text x="40" y="80" fill="#e9a8ff" font-size="42">RANK AETERNUS</text></svg>';
   }
   const svgBuf = Buffer.from(buildSvg(opts, rows, template), 'utf8');
+  let sharp;
   try {
     const mod = require('sharp');
-    const sharp = typeof mod === 'function' ? mod : mod?.default;
+    sharp = typeof mod === 'function' ? mod : mod?.default;
     if (typeof sharp !== 'function') throw new TypeError('Exportação do sharp inválida');
+  } catch (err) {
+    // PNG é obrigatório para este card: não devolve SVG como anexo silenciosamente.
+    throw new Error('Não foi possível carregar sharp para gerar o PNG do ranking: ' + (err?.message || err));
+  }
+
+  // O PNG-base vazio é criado/atualizado no arquivo do projeto; o card dinâmico
+  // é renderizado a partir do mesmo modelo sem gravar dados pessoais no arquivo-base.
+  try {
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     const png = await sharp(svgBuf, { density: 72, limitInputPixels: 1600000 })
       .resize({ width: 1100, withoutEnlargement: true })
-      .png({ compressionLevel: 9, palette: true }).toBuffer();
-    return { buffer: png, name: 'aeternus-rank.png' };
+      .png({ compressionLevel: 9, palette: true })
+      .toBuffer();
+    fs.writeFileSync(OUTPUT_PATH, png);
+    return { buffer: png, name: 'aeternus-rank.png', path: OUTPUT_PATH };
   } catch (err) {
-    console.warn('[rankCard] PNG indisponível; usando SVG:', err?.message || err);
-    return { buffer: svgBuf, name: 'aeternus-rank.svg' };
+    throw new Error('Falha ao criar/salvar assets/rank/rank-card.png: ' + (err?.message || err));
   }
 }
 module.exports = { render };
