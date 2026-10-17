@@ -54,13 +54,13 @@ function rowMarkup(r, i, y, opts, maxValue) {
   const cardH = i === 4 ? 126 : 151;
   const barY = y + cardH - 21;
   return `<g>
-    <text x="99" y="${circleY + 9}" text-anchor="middle" font-family="DejaVu Sans,Arial,sans-serif" font-size="30" font-weight="800" fill="#fff">${rank}</text>
+    <text x="99" y="${circleY + 9}" text-anchor="middle" font-family="DejaVu Sans, Noto Sans Symbols 2, Symbola, Noto Color Emoji, Arial, sans-serif" font-size="30" font-weight="800" fill="#fff">${rank}</text>
     <circle cx="190" cy="${circleY}" r="${avatarR-3}" fill="#130a20" stroke="${color}" stroke-opacity=".75" stroke-width="1.5"/>
     ${avatar ? `<clipPath id="avatarClip${i}"><circle cx="190" cy="${circleY}" r="${avatarR-4}"/></clipPath><image href="${avatar}" x="${190-(avatarR-4)}" y="${circleY-(avatarR-4)}" width="${(avatarR-4)*2}" height="${(avatarR-4)*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatarClip${i})"/>` : `<path d="M190 ${circleY-18} l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5 Z" fill="none" stroke="#e7a3ff" stroke-opacity=".9"/>`}
-    <text x="262" y="${y+65}" font-family="DejaVu Sans,Arial,sans-serif" font-size="30" font-weight="800" fill="#f8f3ff">${name}</text>
-    <text x="262" y="${y+103}" font-family="DejaVu Sans,Arial,sans-serif" font-size="19" letter-spacing=".6" fill="#dca9ef">ID · ${id}</text>
-    <text x="1355" y="${y+64}" text-anchor="end" font-family="DejaVu Sans,Arial,sans-serif" font-size="37" font-weight="900" fill="${color}">${value} ${economy ? 'ÉTER' : 'XP'}</text>
-    <text x="1355" y="${y+104}" text-anchor="end" font-family="DejaVu Sans,Arial,sans-serif" font-size="18" font-weight="800" letter-spacing="1" fill="#e9b8ff">${economy ? 'VALOR TOTAL' : 'NÍVEL ' + fmt(level)}</text>
+    <text x="262" y="${y+65}" font-family="DejaVu Sans, Noto Sans Symbols 2, Symbola, Noto Color Emoji, Arial, sans-serif" font-size="30" font-weight="800" fill="#f8f3ff">${name}</text>
+    <text x="262" y="${y+103}" font-family="DejaVu Sans, Noto Sans Symbols 2, Symbola, Noto Color Emoji, Arial, sans-serif" font-size="19" letter-spacing=".6" fill="#dca9ef">ID · ${id}</text>
+    <text x="1355" y="${y+64}" text-anchor="end" font-family="DejaVu Sans, Noto Sans Symbols 2, Symbola, Noto Color Emoji, Arial, sans-serif" font-size="37" font-weight="900" fill="${color}">${value} ${economy ? 'ÉTER' : 'XP'}</text>
+    <text x="1355" y="${y+104}" text-anchor="end" font-family="DejaVu Sans, Noto Sans Symbols 2, Symbola, Noto Color Emoji, Arial, sans-serif" font-size="18" font-weight="800" letter-spacing="1" fill="#e9b8ff">${economy ? 'VALOR TOTAL' : 'NÍVEL ' + fmt(level)}</text>
     <path d="M262 ${barY} H1350" stroke="#10063b" stroke-width="6" stroke-linecap="round"/>
     <path d="M262 ${barY} H${262 + fill}" stroke="${color}" stroke-width="6" stroke-linecap="round"/>
   </g>`;
