@@ -31,18 +31,6 @@ function sanitizeReason(value) {
 }
 
 function createAfkMessage(user, reason) {
-<<<<<<< HEAD
-    return [
-        '✦ **AETERNUS • CENTRAL DE PRESENÇA**',
-        '',
-        '💤 **MODO AUSENTE ATIVADO**',
-        `▸ **Usuário:** ${user}`,
-        `▸ **Motivo:** **${String(reason** || **'Não informado'**).slice(0, 180)}`,
-        '',
-        'Quem mencionar este usuário será avisado de que ele está ausente.',
-        '✧ *Aeternus • Sistema de utilidades*'
-    ].join('\n');
-=======
     return new EmbedBuilder()
         .setColor(AETERNUS_PURPLE)
         .setAuthor({
@@ -53,12 +41,11 @@ function createAfkMessage(user, reason) {
         .setDescription('Seu status de ausência está ativo. Quem mencionar você receberá um aviso temporário.')
         .addFields(
             { name: '👤 Usuário', value: `${user}`, inline: true },
-            { name: '🌙 Status', value: **'Ausente'**, inline: true },
-            { name: '📝 Motivo da ausência', value: **sanitizeReason(reason)** }
+            { name: '🌙 Status', value: 'Ausente', inline: true },
+            { name: '📝 Motivo da ausência', value: sanitizeReason(reason) }
         )
         .setFooter({ text: 'AETERNUS • AFK' })
         .setTimestamp();
->>>>>>> 11167d330b1c4b5934d4b3e25c332672864090d9
 }
 
 function createWelcomeBackMessage(user, previous) {
