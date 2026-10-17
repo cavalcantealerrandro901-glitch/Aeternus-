@@ -119,7 +119,7 @@ async function sendRank(ctx, mode, page = 0) {
     // SVG puro não é anexado como imagem, pois o Discord não o pré-visualiza consistentemente.
     try {
         const card = await rankCard.render({ title: meta.title, subtitle: meta.economy ? 'Ranking de éter' : 'Ranking de XP', rows, economy: meta.economy, page: p + 1, totalPages, tip: meta.tip });
-        if (card?.buffer && /\\.png$/i.test(card.name || '')) {
+        if (card?.buffer && /\.png$/i.test(card.name || '')) {
             const filename = 'aeternus-rank.png';
             const imageEmbed = new EmbedBuilder().setColor(meta.color).setImage(`attachment://${filename}`);
             return {
