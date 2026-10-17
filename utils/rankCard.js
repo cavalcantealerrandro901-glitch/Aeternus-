@@ -93,8 +93,10 @@ async function render(opts = {}) {
     throw new Error('Não foi possível carregar sharp para gerar o PNG do ranking: ' + (err?.message || err));
   }
 
-  // Busca somente até cinco avatares pequenos para compor o card.
-  for (const row of rows) row.avatarData = await avatarData(row.avatarURL, sharp);
+  // Converte os avatares em paralelo para evitar que uma foto lenta atrase as demais.
+  await Promise.all(rows.map(async row => {
+    row.avatarData = await avatarData(row.avatarURL, sharp);
+  }));
   const svgBuf = Buffer.from(buildSvg(opts, rows, template), 'utf8');
 
   // Salva o último card renderizado em arquivo e envia o mesmo buffer ao Discord.
