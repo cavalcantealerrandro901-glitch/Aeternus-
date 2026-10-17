@@ -16,6 +16,7 @@
     <div class="admin-top-menu">
       <button id="admin-menu-btn" class="admin-menu-btn" type="button" aria-expanded="false" aria-controls="admin-menu-panel">☰ <span>Menu</span></button>
     </div>
+    <button id="settings-corner-btn" class="settings-corner-btn" type="button" aria-label="Abrir sistema de prefixo e idioma" title="Prefixo e idioma">⚙️ <span>Prefixo e idioma</span></button>
     <div class="logo"><a href="/"><span class="logo-accent">AET</span>ERNUS</a></div>
     <div class="admin-nav">
       <span id="admin-user" class="admin-user">Carregando...</span>
@@ -45,7 +46,7 @@
 
     <div class="menu-cat">
       <div class="menu-cat-title">⚙️ Geral</div>
-      <a href="#" data-panel="geral" data-system="prefixo">Prefixo e idioma</a>
+      <a href="#" data-panel="geral" data-system="prefixo">⚙️ Prefixo e idioma</a>
     </div>
 
   </nav>
@@ -291,6 +292,16 @@
       closeMenu();
     });
   });
+
+  var settingsCornerBtn = document.getElementById('settings-corner-btn');
+  if (settingsCornerBtn) {
+    settingsCornerBtn.addEventListener('click', function () {
+      showPanel('geral');
+      document.querySelectorAll('.admin-category-menu a').forEach(function (link) {
+        link.classList.toggle('active', link.getAttribute('data-panel') === 'geral');
+      });
+    });
+  }
 
   // default: só informações do servidor
   showPanel('visao');
