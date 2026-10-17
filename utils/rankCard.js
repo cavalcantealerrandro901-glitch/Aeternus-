@@ -11,6 +11,15 @@ function esc(value) {
 }
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
+function truncateGraphemes(value, limit) {
+  const text = String(value ?? '');
+  if (typeof Intl.Segmenter === 'function') {
+    return Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text))
+      .slice(0, limit).map(part => part.segment).join('');
+  }
+  return Array.from(text).slice(0, limit).join('');
+}
+
 async function avatarData(url, sharp) {
   if (!url) return '';
   try {
@@ -39,10 +48,10 @@ function rowMarkup(r, i, y, opts, maxValue) {
   // a fonte DejaVu Sans cobre boa parte dos símbolos e o SVG mantém os caracteres.
   const rawName = String(r.name || 'Aventureiro')
     .normalize('NFKC')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\u200B\uFEFF]/g, '')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
     .trim();
-  const name = esc((rawName || 'Aventureiro').slice(0, 28));
+  const name = esc(truncateGraphemes(rawName || 'Aventureiro', 28));
   const id = esc(String(r.id || '—').slice(0, 22));
   const avatar = r.avatarData || '';
   const value = esc(fmt(r.value));
