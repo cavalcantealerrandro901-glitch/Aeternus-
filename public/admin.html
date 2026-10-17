@@ -133,8 +133,30 @@
       </section>
 
       <section id="logs-servidor" class="admin-section system-panel hidden" data-panel="logs-servidor">
-        <div class="section-heading"><span>📜</span><div><h2>Logs do servidor</h2><p>Escolha onde registrar eventos importantes do servidor.</p></div></div>
-        <article class="admin-card placeholder-card"><strong>Configuração de logs</strong><span>Área reservada para selecionar o canal de logs e os eventos que o Aeternus deve registrar.</span><em>Em configuração</em></article>
+        <div class="section-heading"><span>📜</span><div><h2>Logs do servidor</h2><p>Ative os registros que deseja acompanhar. Cada categoria pode ser configurada separadamente.</p></div></div>
+        <article class="admin-card logs-master-card">
+          <div class="logs-master-copy"><span class="setting-eyebrow">CONTROLE GERAL</span><h3>Sistema de logs</h3><p>Ative ou desative o registro de eventos do servidor.</p></div>
+          <label class="logs-switch" for="logs-master-toggle"><input id="logs-master-toggle" type="checkbox"><span class="logs-switch-track" aria-hidden="true"></span><span id="logs-master-label">Desativado</span></label>
+        </article>
+        <div id="logs-categories" class="logs-categories is-disabled" aria-live="polite">
+          <article class="admin-card logs-category-card" data-log-category="saida">
+            <div class="logs-category-icon">🚪</div><div class="logs-category-copy"><h3>Saída de membros</h3><p>Registre quando membros saírem ou forem removidos do servidor.</p><div class="logs-category-actions"><label class="logs-switch" for="logs-saida-toggle"><input id="logs-saida-toggle" type="checkbox" disabled><span class="logs-switch-track" aria-hidden="true"></span><span>Ativar categoria</span></label><button type="button" class="btn btn-secondary logs-edit-btn" data-edit-log="saida" disabled>Editar</button></div></div>
+            <div class="logs-editor hidden" id="logs-editor-saida"><label for="logs-saida-channel">Canal de registro<select id="logs-saida-channel" disabled><option value="">Selecione um canal</option></select></label><p>Selecione o canal onde os eventos de saída serão publicados.</p><button type="button" class="btn btn-primary logs-save-btn" data-save-log="saida" disabled>Salvar</button><span class="setting-status" id="logs-saida-feedback" aria-live="polite"></span></div>
+          </article>
+          <article class="admin-card logs-category-card" data-log-category="punicao">
+            <div class="logs-category-icon">🛡️</div><div class="logs-category-copy"><h3>Punições</h3><p>Registre punições e ações de moderação realizadas no servidor.</p><div class="logs-category-actions"><label class="logs-switch" for="logs-punicao-toggle"><input id="logs-punicao-toggle" type="checkbox" disabled><span class="logs-switch-track" aria-hidden="true"></span><span>Ativar categoria</span></label><button type="button" class="btn btn-secondary logs-edit-btn" data-edit-log="punicao" disabled>Editar</button></div></div>
+            <div class="logs-editor hidden" id="logs-editor-punicao"><label for="logs-punicao-channel">Canal de registro<select id="logs-punicao-channel" disabled><option value="">Selecione um canal</option></select></label><p>Selecione o canal onde as punições serão publicadas.</p><button type="button" class="btn btn-primary logs-save-btn" data-save-log="punicao" disabled>Salvar</button><span class="setting-status" id="logs-punicao-feedback" aria-live="polite"></span></div>
+          </article>
+          <article class="admin-card logs-category-card" data-log-category="perfil">
+            <div class="logs-category-icon">🪪</div><div class="logs-category-copy"><h3>Edições de perfil</h3><p>Registre alterações no apelido e em informações visíveis dos membros, quando disponíveis.</p><div class="logs-category-actions"><label class="logs-switch" for="logs-perfil-toggle"><input id="logs-perfil-toggle" type="checkbox" disabled><span class="logs-switch-track" aria-hidden="true"></span><span>Ativar categoria</span></label><button type="button" class="btn btn-secondary logs-edit-btn" data-edit-log="perfil" disabled>Editar</button></div></div>
+            <div class="logs-editor hidden" id="logs-editor-perfil"><label for="logs-perfil-channel">Canal de registro<select id="logs-perfil-channel" disabled><option value="">Selecione um canal</option></select></label><p>Selecione o canal onde as alterações de perfil serão publicadas.</p><button type="button" class="btn btn-primary logs-save-btn" data-save-log="perfil" disabled>Salvar</button><span class="setting-status" id="logs-perfil-feedback" aria-live="polite"></span></div>
+          </article>
+          <article class="admin-card logs-category-card" data-log-category="mensagens">
+            <div class="logs-category-icon">💬</div><div class="logs-category-copy"><h3>Mensagens</h3><p>Registre eventos de edição e exclusão de mensagens, respeitando as permissões e os dados disponíveis.</p><div class="logs-category-actions"><label class="logs-switch" for="logs-mensagens-toggle"><input id="logs-mensagens-toggle" type="checkbox" disabled><span class="logs-switch-track" aria-hidden="true"></span><span>Ativar categoria</span></label><button type="button" class="btn btn-secondary logs-edit-btn" data-edit-log="mensagens" disabled>Editar</button></div></div>
+            <div class="logs-editor hidden" id="logs-editor-mensagens"><label for="logs-mensagens-channel">Canal de registro<select id="logs-mensagens-channel" disabled><option value="">Selecione um canal</option></select></label><p>Selecione o canal onde as edições e exclusões serão publicadas.</p><button type="button" class="btn btn-primary logs-save-btn" data-save-log="mensagens" disabled>Salvar</button><span class="setting-status" id="logs-mensagens-feedback" aria-live="polite"></span></div>
+          </article>
+        </div>
+        <p id="logs-system-feedback" class="setting-status" aria-live="polite"></p>
       </section>
 
       <section id="economia" class="admin-section system-panel hidden" data-panel="economia">
