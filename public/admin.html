@@ -378,6 +378,67 @@
   });
 })();
 </script>
+<script>
+(function () {
+  var master = document.getElementById('logs-master-toggle');
+  var masterLabel = document.getElementById('logs-master-label');
+  var categories = document.getElementById('logs-categories');
+  if (!master || !categories) return;
+  var names = ['saida', 'punicao', 'perfil', 'mensagens'];
+
+  function updateMasterState() {
+    var enabled = master.checked;
+    masterLabel.textContent = enabled ? 'Ativado' : 'Desativado';
+    categories.classList.toggle('is-disabled', !enabled);
+    names.forEach(function (name) {
+      var toggle = document.getElementById('logs-' + name + '-toggle');
+      var edit = document.querySelector('[data-edit-log="' + name + '"]');
+      var select = document.getElementById('logs-' + name + '-channel');
+      var save = document.querySelector('[data-save-log="' + name + '"]');
+      toggle.disabled = !enabled;
+      edit.disabled = !enabled;
+      edit.classList.toggle('hidden', !enabled);
+      select.disabled = !enabled;
+      save.disabled = !enabled;
+      if (!enabled) {
+        document.getElementById('logs-editor-' + name).classList.add('hidden');
+        toggle.checked = false;
+      }
+    });
+    document.getElementById('logs-system-feedback').textContent = enabled
+      ? 'Sistema ativado nesta interface. Configure cada categoria no botão Editar.'
+      : 'Sistema de logs desativado.';
+  }
+
+  master.addEventListener('change', updateMasterState);
+  names.forEach(function (name) {
+    var toggle = document.getElementById('logs-' + name + '-toggle');
+    var edit = document.querySelector('[data-edit-log="' + name + '"]');
+    var editor = document.getElementById('logs-editor-' + name);
+    var save = document.querySelector('[data-save-log="' + name + '"]');
+    var feedback = document.getElementById('logs-' + name + '-feedback');
+    edit.classList.add('hidden');
+    toggle.addEventListener('change', function () {
+      edit.disabled = !master.checked;
+      feedback.textContent = toggle.checked
+        ? 'Categoria selecionada. Use Editar para configurar o canal.'
+        : 'Categoria desativada.';
+      if (!toggle.checked) editor.classList.add('hidden');
+    });
+    edit.addEventListener('click', function () {
+      if (!master.checked) return;
+      editor.classList.toggle('hidden');
+    });
+    save.addEventListener('click', function () {
+      var channel = document.getElementById('logs-' + name + '-channel');
+      feedback.textContent = channel.value
+        ? 'Canal selecionado na interface. A gravação no servidor será ligada ao backend na próxima etapa.'
+        : 'Selecione um canal antes de salvar.';
+    });
+  });
+  updateMasterState();
+})();
+</script>
 <script src="/admin-panel.js"></script>
 <script src="dashboard-app.js"></script>
 </body>
