@@ -10,6 +10,7 @@ const xp = require('../utils/xp');
 const rankCard = require('../utils/rankCard');
 
 const PAGE_SIZE = 5;
+const USER_FETCH_CONCURRENCY = 8;
 
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
@@ -32,6 +33,22 @@ function modeMeta(mode) {
 
 function isKnownBot(client, id) {
     return Boolean(client?.users?.cache?.get(String(id))?.bot);
+}
+
+async function resolveUsers(client, entries) {
+    // Busca usuários fora do cache em pequenos lotes; não existe garantia de que
+    // o Discord retorne contas removidas/indisponíveis, mas tentamos resolver todas.
+    const uniqueIds = [...new Set(entries.map(e => String(e.id)))];
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(USER_FETCH_CONCURRENCY, uniqueIds.length) }, async () => {
+        while (cursor < uniqueIds.length) {
+            const id = uniqueIds[cursor++];
+            if (client.users.cache.has(id)) continue;
+            try { await client.users.fetch(id); }
+            catch (err) { console.warn('[rank] Não foi possível buscar usuário ' + id + ':', err?.message || err); }
+        }
+    });
+    await Promise.all(workers);
 }
 
 async function buildList(mode, guild, client) {
