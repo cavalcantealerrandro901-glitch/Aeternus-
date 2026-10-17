@@ -12,6 +12,8 @@ function esc(value) {
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 const MAX_ROWS = 5;
 const TEMPLATE_PATH = path.join(__dirname, '..', 'assets', 'rank', 'rank-template.svg');
+const OUTPUT_DIR = path.join(__dirname, '..', 'assets', 'rank');
+const OUTPUT_PATH = path.join(OUTPUT_DIR, 'rank-card.png');
 const FALLBACK_COLORS = ['#ffdf35', '#e7eaff', '#ffad63', '#e7a3ff', '#c65aff'];
 
 function rowMarkup(r, i, y, opts, maxValue) {
@@ -78,15 +80,18 @@ async function render(opts = {}) {
     throw new Error('Não foi possível carregar sharp para gerar o PNG do ranking: ' + (err?.message || err));
   }
 
-  // Renderiza apenas em memória: não grava dados de usuários em arquivos do projeto.
+  // Salva o último card renderizado em arquivo e envia o mesmo buffer ao Discord.
+  // O SVG-base continua preservado; o arquivo PNG é atualizado a cada chamada.
   try {
     const png = await sharp(svgBuf, { density: 72, limitInputPixels: 1600000 })
       .resize({ width: 1100, withoutEnlargement: true })
       .png({ compressionLevel: 9, palette: true })
       .toBuffer();
-    return { buffer: png, name: 'aeternus-rank.png' };
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+    fs.writeFileSync(OUTPUT_PATH, png);
+    return { buffer: png, name: 'aeternus-rank.png', path: OUTPUT_PATH };
   } catch (err) {
-    throw new Error('Falha ao renderizar o PNG do ranking: ' + (err?.message || err));
+    throw new Error('Falha ao renderizar/salvar assets/rank/rank-card.png: ' + (err?.message || err));
   }
 }
 module.exports = { render };
