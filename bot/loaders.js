@@ -41,7 +41,6 @@ const SLASH_NAME_MAP = {
     msg: 'mensagens',
     invites: 'convites',
     ranking: 'ranking-servidor',
-    resgatar: 'resgatar-codigo',
     calc: 'calculadora',
     j: 'jogador',
     lockdown: 'bloqueio',
