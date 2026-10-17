@@ -459,15 +459,22 @@
   function updateMasterState() {
     var enabled = master.checked;
     masterLabel.textContent = enabled ? 'Ativado' : 'Desativado';
+    categories.classList.toggle('hidden', !enabled);
     categories.classList.toggle('is-disabled', !enabled);
     names.forEach(function(name){
       var toggle=document.getElementById('logs-'+name+'-toggle');
       var edit=document.querySelector('[data-edit-log="'+name+'"]');
-      toggle.disabled=!enabled; edit.disabled=!enabled;
+      toggle.disabled=!enabled;
+      edit.disabled=!enabled;
       edit.classList.toggle('hidden',!enabled);
-      if(!enabled){document.getElementById('logs-editor-'+name).classList.add('hidden');toggle.checked=false;}
+      if(!enabled){
+        document.getElementById('logs-editor-'+name).classList.add('hidden');
+        toggle.checked=false;
+      }
     });
-    document.getElementById('logs-system-feedback').textContent = enabled ? 'Sistema ativado na interface. Configure cada categoria em Editar.' : 'Sistema de logs desativado.';
+    document.getElementById('logs-system-feedback').textContent = enabled
+      ? 'Sistema ativado na interface. Configure cada categoria em Editar.'
+      : 'Ative o sistema de logs para exibir as categorias.';
   }
   master.addEventListener('change',updateMasterState);
 
