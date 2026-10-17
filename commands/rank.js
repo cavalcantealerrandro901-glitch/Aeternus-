@@ -11,7 +11,6 @@ const rankCard = require('../utils/rankCard');
 
 const PAGE_SIZE = 5;
 const USER_FETCH_CONCURRENCY = 5;
-const USER_FETCH_TIMEOUT_MS = 4500;
 const USER_RESOLVE_CACHE_TTL_MS = 5 * 60 * 1000;
 const resolvedUsers = new Map();
 const pendingUserFetches = new Map();
@@ -55,11 +54,7 @@ async function resolveUsers(client, entries) {
             }
             const request = (async () => {
                 try {
-                    const user = client.users.cache.get(id) || await client.users.fetch(id, {
-                        cache: true,
-                        force: false,
-                        time: USER_FETCH_TIMEOUT_MS
-                    });
+                    const user = client.users.cache.get(id) || await client.users.fetch(id, { cache: true, force: false });
                     if (user) resolvedUsers.set(id, { expiresAt: Date.now() + USER_RESOLVE_CACHE_TTL_MS });
                 } catch (err) {
                     console.warn('[rank] Consulta do Discord falhou para ' + id + ':', err?.message || err);
