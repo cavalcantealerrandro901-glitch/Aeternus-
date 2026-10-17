@@ -14,7 +14,7 @@ function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 async function avatarData(url, sharp) {
   if (!url) return '';
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) return '';
     const input = Buffer.from(await response.arrayBuffer());
     if (input.length > 2_000_000) return '';
