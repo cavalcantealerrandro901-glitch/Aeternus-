@@ -261,8 +261,19 @@ function startWeb(client) {
     });
 
     app.post('/api/guild/:id/settings', requireGuildManager, (req, res) => {
-        setSettings(req.params.id, req.body || {});
-        res.json({ ok: true });
+        const body = req.body || {};
+        const patch = {};
+        if (body.languages && typeof body.languages === 'object') {
+            const allowed = new Set(['pt-BR', 'en', 'es', 'fr', 'de']);
+            const commands = String(body.languages.commands || 'pt-BR');
+            const server = String(body.languages.server || 'pt-BR');
+            if (!allowed.has(commands) || !allowed.has(server)) {
+                return res.status(400).json({ ok: false, error: 'Idioma não suportado.' });
+            }
+            patch.languages = { commands, server };
+        }
+        const saved = setSettings(req.params.id, patch);
+        return res.json({ ok: true, languages: saved.languages || { commands: 'pt-BR', server: 'pt-BR' } });
     });
 
     // Limite simples de requisições por sessão/IP para APIs de jogo.
