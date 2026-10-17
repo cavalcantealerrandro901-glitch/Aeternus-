@@ -207,7 +207,9 @@ module.exports = {
         if (['progresso', 'progress', 'andamento'].includes(sub)) {
             const st = workUtil.status(message.author.id);
             return message.reply({ embeds: [progressEmbed(message.author, st)] });
-        }\n\n        if (['status', 'perfil', 'carreira', 'info', 'stats'].includes(sub)) {
+        }
+
+        if (['status', 'perfil', 'carreira', 'info', 'stats'].includes(sub)) {
             const st = workUtil.status(message.author.id);
             return message.reply({
                 embeds: [statusEmbed(message.author, st)]
@@ -230,7 +232,8 @@ module.exports = {
         if (acao === 'progresso') {
             const st = workUtil.status(interaction.user.id);
             return interaction.reply({ embeds: [progressEmbed(interaction.user, st)] });
-        }\n        if (acao === 'status' || acao === 'ranks') {
+        }
+        if (acao === 'status' || acao === 'ranks') {
             const st = workUtil.status(interaction.user.id);
             return interaction.reply({
                 embeds: [statusEmbed(interaction.user, st)]
