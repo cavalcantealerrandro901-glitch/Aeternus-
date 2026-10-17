@@ -10,7 +10,11 @@ const xp = require('../utils/xp');
 const rankCard = require('../utils/rankCard');
 
 const PAGE_SIZE = 5;
-const USER_FETCH_CONCURRENCY = 8;
+const USER_FETCH_CONCURRENCY = 5;
+const USER_FETCH_TIMEOUT_MS = 4500;
+const USER_RESOLVE_CACHE_TTL_MS = 5 * 60 * 1000;
+const resolvedUsers = new Map();
+const pendingUserFetches = new Map();
 
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
 
@@ -36,16 +40,35 @@ function isKnownBot(client, id) {
 }
 
 async function resolveUsers(client, entries) {
-    // Resolve IDs provenientes dos arquivos de economia/XP para nome e avatar do Discord.
-    // IDs vêm do banco; não dependemos de o usuário estar no cache local.
-    const uniqueIds = [...new Set(entries.map(e => String(e.id)).filter(id => /^\d{17,20}$/.test(id)))];
+    // Consulta somente os IDs necessários para a página atual; cacheia resultados por 5 min.
+    const now = Date.now();
+    const ids = [...new Set(entries.map(e => String(e.id)).filter(id => /^\\d{17,20}$/.test(id)))];
     let cursor = 0;
-    const workers = Array.from({ length: Math.min(USER_FETCH_CONCURRENCY, uniqueIds.length) }, async () => {
-        while (cursor < uniqueIds.length) {
-            const id = uniqueIds[cursor++];
-            if (client.users.cache.has(id)) continue;
-            try { await client.users.fetch(id); }
-            catch (err) { console.warn('[rank] Não foi possível buscar usuário ' + id + ':', err?.message || err); }
+    const workers = Array.from({ length: Math.min(USER_FETCH_CONCURRENCY, ids.length) }, async () => {
+        while (cursor < ids.length) {
+            const id = ids[cursor++];
+            const cached = resolvedUsers.get(id);
+            if (cached && cached.expiresAt > now && client.users.cache.has(id)) continue;
+            if (pendingUserFetches.has(id)) {
+                await pendingUserFetches.get(id);
+                continue;
+            }
+            const request = (async () => {
+                try {
+                    const user = client.users.cache.get(id) || await client.users.fetch(id, {
+                        cache: true,
+                        force: false,
+                        time: USER_FETCH_TIMEOUT_MS
+                    });
+                    if (user) resolvedUsers.set(id, { expiresAt: Date.now() + USER_RESOLVE_CACHE_TTL_MS });
+                } catch (err) {
+                    console.warn('[rank] Consulta do Discord falhou para ' + id + ':', err?.message || err);
+                } finally {
+                    pendingUserFetches.delete(id);
+                }
+            })();
+            pendingUserFetches.set(id, request);
+            await request;
         }
     });
     await Promise.all(workers);
@@ -126,6 +149,8 @@ async function sendRank(ctx, mode, page = 0) {
     const meta = modeMeta(mode);
     const start = p * PAGE_SIZE;
     const slice = list.slice(start, start + PAGE_SIZE);
+
+    await resolveUsers(ctx.client, slice);
 
     const rows = slice.map((e, i) => {
         const user = ctx.client.users.cache.get(e.id);
