@@ -115,7 +115,7 @@ function createSession(token) {
     sessions.set(id, {
         accessToken: token.access_token,
         refreshToken: token.refresh_token || null,
-        expiresAt: Date.now() + Math.max(60, Number(token.expires_in || 604800) - 60) * 1000,
+        expiresAt: Date.now() + Math.max(1, Number(token.expires_in) - 60) * 1000,
         createdAt: Date.now(),
         identity: null,
         identityAt: 0,
