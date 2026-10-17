@@ -80,7 +80,7 @@ function profileEmbed(user, p, rankInfo) {
     ].filter(Boolean);
 
     return new EmbedBuilder()
-        .setColor(0xa78bfa)
+        .setColor(0x8B5CF6)
         .setAuthor({
             name: `${user.globalName || user.username} · Experiência`,
             iconURL: user.displayAvatarURL({ size: 64 })
@@ -103,7 +103,7 @@ function leaderboardEmbed(client, list) {
     });
 
     return new EmbedBuilder()
-        .setColor(0xa78bfa)
+        .setColor(0x8B5CF6)
         .setTitle('AETERNUS RANK XP · GLOBAL')
         .setDescription(
             lines.length
@@ -116,7 +116,7 @@ function leaderboardEmbed(client, list) {
 
 function helpEmbed() {
     return new EmbedBuilder()
-        .setColor(0xa78bfa)
+        .setColor(0x8B5CF6)
         .setTitle('📖 Como funciona o XP')
         .setDescription(
             [

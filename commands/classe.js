@@ -5,7 +5,8 @@ const {
     ButtonBuilder,
     ButtonStyle,
     StringSelectMenuBuilder,
-    SlashCommandBuilder
+    SlashCommandBuilder,
+    MessageFlags
 } = require('discord.js');
 const classes = require('../utils/classes');
 const player = require('../utils/player');
@@ -277,22 +278,22 @@ module.exports = {
         if (id.startsWith('classe:pick:')) {
             const classId = id.slice('classe:pick:'.length);
             if (!classes.getClass(classId)) {
-                return interaction.reply({ content: 'Classe inválida.', ephemeral: true });
+                return interaction.reply({ content: 'Classe inválida.', flags: MessageFlags.Ephemeral });
             }
             if (!player.has(interaction.user.id)) {
                 return interaction.reply({
                     content: 'Você ainda não tem perfil. Use `O.j criar` primeiro.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
             const resolved = classes.resolveClassId(classId);
             const current = player.get(interaction.user.id);
             if (current?.classId) {
-                return interaction.reply({ content: `🔒 Sua classe já foi escolhida: **${player.getClass(current.classId)?.name || current.classId}**. Ela é permanente e não pode ser trocada.`, ephemeral: true });
+                return interaction.reply({ content: `🔒 Sua classe já foi escolhida: **${player.getClass(current.classId)?.name || current.classId}**. Ela é permanente e não pode ser trocada.`, flags: MessageFlags.Ephemeral });
             }
             const claim = classes.canClaim(resolved, interaction.user.id, player.all());
             if (!claim.ok) {
-                return interaction.reply({ content: '🔒 ' + claim.reason, ephemeral: true });
+                return interaction.reply({ content: '🔒 ' + claim.reason, flags: MessageFlags.Ephemeral });
             }
             player.update(interaction.user.id, { classId: resolved });
             const c = classes.getClass(resolved);
@@ -306,22 +307,22 @@ module.exports = {
                     c.exclusive || c.maxHolders === 1 ? '🔒 **Classe exclusiva — só você pode usá-la.**' : '✨ Sua classe está pronta para ser usada.'
                 ].join('\n'),
                 embeds: [classEmbed(c)],
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
         if (id.startsWith('classe:sel:')) {
             const classId = interaction.values[0];
             if (!player.has(interaction.user.id)) {
-                return interaction.reply({ content: 'Crie o perfil com `O.j criar`.', ephemeral: true });
+                return interaction.reply({ content: 'Crie o perfil com `O.j criar`.', flags: MessageFlags.Ephemeral });
             }
             const resolved = classes.resolveClassId(classId);
             const current = player.get(interaction.user.id);
             if (current?.classId) {
-                return interaction.reply({ content: `🔒 Sua classe já foi escolhida: **${player.getClass(current.classId)?.name || current.classId}**. Ela é permanente e não pode ser trocada.`, ephemeral: true });
+                return interaction.reply({ content: `🔒 Sua classe já foi escolhida: **${player.getClass(current.classId)?.name || current.classId}**. Ela é permanente e não pode ser trocada.`, flags: MessageFlags.Ephemeral });
             }
             const claim = classes.canClaim(resolved, interaction.user.id, player.all());
             if (!claim.ok) {
-                return interaction.reply({ content: '🔒 ' + claim.reason, ephemeral: true });
+                return interaction.reply({ content: '🔒 ' + claim.reason, flags: MessageFlags.Ephemeral });
             }
             player.update(interaction.user.id, { classId: resolved });
             const c = classes.getClass(resolved);
@@ -391,7 +392,7 @@ function classListPayload(rarity = 'comum', page = 0, source = 'component') {
     return { embeds: [emb], components: [
         new ActionRowBuilder().addComponents(prev, next),
         new ActionRowBuilder().addComponents(rarityButton)
-    ], ephemeral: source !== 'prefix' };
+    ], flags: source !== 'prefix' ? MessageFlags.Ephemeral : undefined };
 }
 
 function parseQuotedArgs(input) {
@@ -427,7 +428,7 @@ function chooseStartPayload() {
                     .setEmoji('⚔️')
             )
         ],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
     };
 }
 
@@ -462,7 +463,7 @@ async function showChooseMenu(interaction, isUpdate = false) {
             '🔒 Depois de escolhida, a classe será permanente.'
         ].join('\n'),
         components: rows,
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
     };
 
     if (!rows.length) {

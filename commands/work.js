@@ -119,6 +119,43 @@ function statusEmbed(user, st) {
         .setThumbnail(user.displayAvatarURL({ size: 128 }));
 }
 
+function progressEmbed(user, st) {
+    const next = st.next;
+    const previousMin = next ? (workUtil.RANKS[next.id - 1]?.minJobs ?? 0) : st.rank.minJobs;
+    const target = next ? next.minJobs : st.rank.minJobs;
+    const span = Math.max(1, target - previousMin);
+    const done = next ? Math.min(span, Math.max(0, st.jobs - previousMin)) : span;
+    const percent = next ? Math.floor((done / span) * 100) : 100;
+    const remaining = next ? Math.max(0, target - st.jobs) : 0;
+
+    const lines = [
+        `> ${st.rank.emoji} **Cargo atual:** ${st.rank.name}`,
+        `📦 Turnos concluídos: **${fmt(st.jobs)}**`,
+        `📈 Ganhos acumulados: ✨ **${fmt(st.totalEarned)} éter**`,
+        '',
+        next
+            ? `🎯 **Próxima meta:** ${next.emoji} **${next.name}**`
+            : '🌌 **Carreira concluída:** você alcançou o cargo máximo.',
+        progressBar(st.jobs, next),
+        next
+            ? `🧭 Progresso: **${fmt(done)} / ${fmt(span)} turnos** · faltam **${fmt(remaining)}**`
+            : '🏆 Todas as metas de cargo foram concluídas.',
+        '',
+        `⏰ Próximo trabalho: **${st.cooldownText}**`
+    ];
+
+    return new EmbedBuilder()
+        .setColor(0xa78bfa)
+        .setAuthor({
+            name: `${user.username} · Progresso do trabalho`,
+            iconURL: user.displayAvatarURL({ size: 64 })
+        })
+        .setTitle(`📊 Progresso da carreira · ${percent}%`)
+        .setDescription(lines.join('\n'))
+        .setThumbnail(user.displayAvatarURL({ size: 128 }))
+        .setFooter({ text: 'Aeternus Economy • Progresso profissional' });
+}
+
 async function doWork(user, member) {
     const r = workUtil.work(user.id);
     if (!r.ok) {
@@ -151,11 +188,12 @@ module.exports = {
         .addStringOption((o) =>
             o
                 .setName('acao')
-                .setDescription('trabalhar | status | cargos')
+                .setDescription('trabalhar | status | progresso | cargos')
                 .setRequired(false)
                 .addChoices(
                     { name: 'Trabalhar', value: 'go' },
                     { name: 'Status / carreira', value: 'status' },
+                    { name: 'Progresso do trabalho', value: 'progresso' },
                     { name: 'Ver cargos', value: 'ranks' }
                 )
         ),
@@ -165,6 +203,11 @@ module.exports = {
             .toLowerCase()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '');
+
+        if (['progresso', 'progress', 'andamento'].includes(sub)) {
+            const st = workUtil.status(message.author.id);
+            return message.reply({ embeds: [progressEmbed(message.author, st)] });
+        }
 
         if (['status', 'perfil', 'carreira', 'info', 'stats'].includes(sub)) {
             const st = workUtil.status(message.author.id);
@@ -186,6 +229,10 @@ module.exports = {
 
     async executeSlash(interaction) {
         const acao = interaction.options.getString('acao') || 'go';
+        if (acao === 'progresso') {
+            const st = workUtil.status(interaction.user.id);
+            return interaction.reply({ embeds: [progressEmbed(interaction.user, st)] });
+        }
         if (acao === 'status' || acao === 'ranks') {
             const st = workUtil.status(interaction.user.id);
             return interaction.reply({
