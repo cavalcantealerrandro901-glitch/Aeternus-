@@ -2,7 +2,7 @@ const store = require('./store');
 
 const DEFAULT = {
     prefix: 'O.',
-    languages: { commands: 'pt-BR', server: 'pt-BR' },
+    languages: { commands: 'pt-BR' },
     logs: { enabled: false, channelId: null, events: {} },
     welcome: { enabled: false, channelId: null, message: 'Bem-vindo {user} ao **{server}**!', embed: true },
     leave: { enabled: false, channelId: null, message: '{user} saiu de **{server}**.' },
@@ -224,10 +224,10 @@ function setSettings(guildId, patch) {
     return getSettings(guildId);
 }
 
-function getLanguage(guildId, target = 'server') {
+function getLanguage(guildId) {
     const languages = getSettings(guildId).languages || {};
     const allowed = new Set(['pt-BR', 'en', 'es', 'fr', 'de']);
-    const value = languages[target];
+    const value = languages.commands;
     return allowed.has(value) ? value : 'pt-BR';
 }
 
