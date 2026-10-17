@@ -33,7 +33,35 @@ const BASE_ATTR = {
 };
 
 function all() {
-    return store.load('xp.json', {});
+    const data = store.load('xp.json', {});
+    let changed = false;
+
+    // Repara registros antigos em que o XP restante ultrapassou o necessário
+    // para o próximo nível, sem descartar XP nem reduzir o nível já registrado.
+    for (const record of Object.values(data)) {
+        if (!record || typeof record !== 'object') continue;
+        let level = Math.max(0, Math.floor(Number(record.level) || 0));
+        let remainingXp = Math.max(0, Math.floor(Number(record.xp) || 0));
+        let gainedLevels = 0;
+
+        while (level < 500 && remainingXp >= xpForLevel(level + 1)) {
+            remainingXp -= xpForLevel(level + 1);
+            level++;
+            gainedLevels++;
+        }
+
+        if (gainedLevels > 0 || remainingXp !== Number(record.xp || 0)) {
+            record.level = level;
+            record.xp = remainingXp;
+            if (gainedLevels > 0) {
+                record.attrPoints = Math.max(0, Math.floor(Number(record.attrPoints) || 0)) + gainedLevels * 3;
+            }
+            changed = true;
+        }
+    }
+
+    if (changed) store.save('xp.json', data);
+    return data;
 }
 
 function ensureAttrs(d) {
