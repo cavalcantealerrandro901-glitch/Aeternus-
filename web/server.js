@@ -26,6 +26,10 @@ function startWeb(client) {
         res.setHeader('X-Frame-Options', 'DENY');
         res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
         res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        // HSTS somente em produção; o Render termina TLS na borda e envia HTTPS ao visitante.
+        if (process.env.NODE_ENV === 'production' || process.env.RENDER_EXTERNAL_URL) {
+            res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+        }
         if (req.path.startsWith('/api/')) {
             res.setHeader('Cache-Control', 'no-store, max-age=0');
             res.setHeader('Pragma', 'no-cache');
