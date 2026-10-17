@@ -156,11 +156,51 @@
 }
 
 
-/* Seletor de servidor no menu lateral */
-.menu-server-picker{display:flex;align-items:center;gap:10px;padding:10px 12px 12px;min-width:0}
-.menu-server-icon{width:38px;height:38px;flex:0 0 38px;object-fit:cover;border-radius:12px;background:rgba(139,92,246,.14);border:1px solid rgba(139,92,246,.35)}
-#menu-server-select{display:block;min-width:0;width:100%;padding:10px 32px 10px 12px;border-radius:10px;border:1px solid rgba(139,92,246,.35);background:var(--admin-card,#171421);color:inherit;font:inherit;cursor:pointer}
+/* Foto centralizada e seletor fino logo abaixo no menu lateral */
+.menu-server-picker{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  padding:14px 12px 16px;
+  min-width:0;
+  width:100%;
+  box-sizing:border-box;
+}
+.menu-server-icon{
+  display:block;
+  width:76px;
+  height:76px;
+  flex:0 0 76px;
+  object-fit:cover;
+  border-radius:20px;
+  background:rgba(139,92,246,.14);
+  border:2px solid rgba(167,139,250,.62);
+  box-shadow:0 0 20px rgba(139,61,255,.20);
+}
+#menu-server-select{
+  display:block;
+  min-width:0;
+  width:100%;
+  max-width:230px;
+  box-sizing:border-box;
+  padding:4px 26px 4px 9px;
+  min-height:28px;
+  border-radius:7px;
+  border:1px solid rgba(139,92,246,.38);
+  background:var(--admin-card,#171421);
+  color:inherit;
+  font:inherit;
+  font-size:.78rem;
+  line-height:1.2;
+  cursor:pointer;
+}
 #menu-server-select:disabled{opacity:.65;cursor:wait}
+@media(max-width:420px){
+  .menu-server-icon{width:68px;height:68px;flex-basis:68px;border-radius:17px}
+  #menu-server-select{max-width:100%}
+}
 
 
 /* Cartões de Prefixo e idioma */
