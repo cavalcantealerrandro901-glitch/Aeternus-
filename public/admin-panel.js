@@ -50,14 +50,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       const selectedServer = (serverList.guilds || []).find((server) => server.id === id);
       const iconHash = (selectedServer && selectedServer.icon) || guild.icon;
-      if (iconHash) {
-        menuServerIcon.src = iconHash.startsWith('http')
-          ? iconHash
-          : 'https://cdn.discordapp.com/icons/' + encodeURIComponent(id) + '/' + encodeURIComponent(iconHash) + '.png?size=128';
-        menuServerIcon.classList.remove('hidden');
-      } else {
-        menuServerIcon.classList.add('hidden');
+      function setServerImage(img, hash, guildId) {
+        if (!img) return;
+        img.onerror = () => {
+          img.onerror = null;
+          img.classList.add('hidden');
+        };
+        if (!hash) {
+          img.removeAttribute('src');
+          img.classList.add('hidden');
+          return;
+        }
+        const imageUrl = /^https?:\\/\\//i.test(hash)
+          ? hash
+          : 'https://cdn.discordapp.com/icons/' + encodeURIComponent(guildId) + '/' + encodeURIComponent(hash) + '.png?size=128';
+        img.src = imageUrl;
+        img.classList.remove('hidden');
       }
+      setServerImage(menuServerIcon, iconHash, id);
 
       $('selected-server-name').textContent = guild.name;
       $('selected-server-description').textContent = guild.description || 'Painel de administração do servidor selecionado.';
@@ -73,8 +83,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       $('detail-locale').textContent = guild.preferredLocale || '—';
 
       if (guild.icon) {
-        $('server-icon').src = guild.icon;
-        $('server-icon').classList.remove('hidden');
+        setServerImage($('server-icon'), guild.icon, id);
+      } else {
+        $('server-icon').classList.add('hidden');
       }
 
       const daily = await api('/api/dashboard/guild/' + encodeURIComponent(id) + '/daily');
