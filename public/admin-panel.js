@@ -83,9 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       $('prefix-input').value = guild.prefix || 'O.';
       const savedLanguages = guild.settings?.languages || {};
       $('command-language').value = savedLanguages.commands || 'pt-BR';
-      $('server-language').value = savedLanguages.server || guild.preferredLocale || 'pt-BR';
       $('command-language-current').textContent = languageName($('command-language').value);
-      $('server-language-current').textContent = languageName($('server-language').value);
 
       if (guild.icon) {
         setServerImage($('server-icon'), guild.icon, id);
@@ -186,16 +184,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const button = $('save-languages');
     const feedback = $('language-feedback');
     button.disabled = true;
-    feedback.textContent = 'Salvando preferências de idioma...';
+    feedback.textContent = 'Salvando idioma dos comandos...';
     try {
       const result = await api('/api/guild/' + encodeURIComponent(id) + '/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ languages: { commands: $('command-language').value, server: $('server-language').value } })
+        body: JSON.stringify({ languages: { commands: $('command-language').value } })
       });
       $('command-language-current').textContent = languageName(result.languages?.commands || $('command-language').value);
-      $('server-language-current').textContent = languageName(result.languages?.server || $('server-language').value);
-      feedback.textContent = 'Preferências salvas.';
+      feedback.textContent = 'Idioma dos comandos salvo.';
     } catch (e) {
       feedback.textContent = 'Não foi possível salvar: ' + e.message;
     } finally {
