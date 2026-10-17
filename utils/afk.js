@@ -27,7 +27,7 @@ function persist() {
 
 function validId(id) {
     const key = String(id || '').trim();
-    return key.length > 0 && key.length <= 32 ? key : null;
+    return /^\d{15,22}$/.test(key) ? key : null;
 }
 
 module.exports = {
