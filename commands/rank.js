@@ -198,7 +198,23 @@ module.exports = {
         else if (action === 'next') page += 1;
         else return;
 
-        const payload = await sendRank(interaction, mode, page);
+        // Aviso fora do card com animação enquanto o PNG é preparado.
+        const frames = ['⏳', '⌛', '✨', '🔄'];
+        let frame = 0;
+        const makeLoading = () => new EmbedBuilder()
+            .setColor(0xa78bfa)
+            .setDescription(`${frames[frame % frames.length]} **Estou editando o rank, aguarde...**`);
+        await interaction.editReply({ embeds: [makeLoading()], components: [] }).catch(() => {});
+        const animation = setInterval(() => {
+            frame++;
+            interaction.editReply({ embeds: [makeLoading()], components: [] }).catch(() => {});
+        }, 850);
+        let payload;
+        try {
+            payload = await sendRank(interaction, mode, page);
+        } finally {
+            clearInterval(animation);
+        }
         return editRankMessage(interaction, payload, 'atualizar ranking');
     }
 };
