@@ -10,6 +10,19 @@ function esc(value) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 function fmt(n) { return Number(n || 0).toLocaleString('pt-BR'); }
+
+async function avatarData(url, sharp) {
+  if (!url) return '';
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
+    if (!response.ok) return '';
+    const input = Buffer.from(await response.arrayBuffer());
+    if (input.length > 2_000_000) return '';
+    const tiny = await sharp(input, { limitInputPixels: 4000000 })
+      .resize(88, 88, { fit: 'cover' }).png().toBuffer();
+    return 'data:image/png;base64,' + tiny.toString('base64');
+  } catch { return ''; }
+}
 const MAX_ROWS = 5;
 const TEMPLATE_PATH = path.join(__dirname, '..', 'assets', 'rank', 'rank-template.svg');
 const OUTPUT_DIR = path.join(__dirname, '..', 'assets', 'rank');
@@ -23,6 +36,7 @@ function rowMarkup(r, i, y, opts, maxValue) {
   const fill = Math.max(0, Math.min(barWidth, Math.round((Math.max(0, Number(r.value) || 0) / Math.max(1, maxValue)) * barWidth)));
   const name = esc(String(r.name || 'Aventureiro').slice(0, 28));
   const id = esc(String(r.id || '—').slice(0, 22));
+  const avatar = r.avatarData || '';
   const value = esc(fmt(r.value));
   const rank = Math.max(1, Number(r.rank) || i + 1);
   const level = Math.max(0, Number(r.level) || 0);
@@ -34,7 +48,7 @@ function rowMarkup(r, i, y, opts, maxValue) {
   return `<g>
     <text x="99" y="${circleY + 9}" text-anchor="middle" font-family="DejaVu Sans,Arial,sans-serif" font-size="30" font-weight="800" fill="#fff">${rank}</text>
     <circle cx="190" cy="${circleY}" r="${avatarR-3}" fill="#130a20" stroke="${color}" stroke-opacity=".75" stroke-width="1.5"/>
-    <path d="M190 ${circleY-18} l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5 Z" fill="none" stroke="#e7a3ff" stroke-opacity=".9"/>
+    ${avatar ? `<clipPath id="avatarClip${i}"><circle cx="190" cy="${circleY}" r="${avatarR-4}"/></clipPath><image href="${avatar}" x="${190-(avatarR-4)}" y="${circleY-(avatarR-4)}" width="${(avatarR-4)*2}" height="${(avatarR-4)*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatarClip${i})"/>` : `<path d="M190 ${circleY-18} l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5 Z" fill="none" stroke="#e7a3ff" stroke-opacity=".9"/>`}
     <text x="262" y="${y+65}" font-family="DejaVu Sans,Arial,sans-serif" font-size="30" font-weight="800" fill="#f8f3ff">${name}</text>
     <text x="262" y="${y+103}" font-family="DejaVu Sans,Arial,sans-serif" font-size="19" letter-spacing=".6" fill="#dca9ef">ID · ${id}</text>
     <text x="1355" y="${y+64}" text-anchor="end" font-family="DejaVu Sans,Arial,sans-serif" font-size="37" font-weight="900" fill="${color}">${value} ${economy ? 'ÉTER' : 'XP'}</text>
@@ -69,7 +83,6 @@ async function render(opts = {}) {
     console.warn('[rankCard] Modelo SVG não encontrado; usando modelo mínimo:', err.message);
     template = '<svg xmlns="http://www.w3.org/2000/svg" width="1383" height="1100" viewBox="0 0 1383 1100"><rect width="1383" height="1100" fill="#030207"/><text x="40" y="80" fill="#e9a8ff" font-size="42">RANK AETERNUS</text></svg>';
   }
-  const svgBuf = Buffer.from(buildSvg(opts, rows, template), 'utf8');
   let sharp;
   try {
     const mod = require('sharp');
@@ -79,6 +92,10 @@ async function render(opts = {}) {
     // PNG é obrigatório para este card: não devolve SVG como anexo silenciosamente.
     throw new Error('Não foi possível carregar sharp para gerar o PNG do ranking: ' + (err?.message || err));
   }
+
+  // Busca somente até cinco avatares pequenos para compor o card.
+  for (const row of rows) row.avatarData = await avatarData(row.avatarURL, sharp);
+  const svgBuf = Buffer.from(buildSvg(opts, rows, template), 'utf8');
 
   // Salva o último card renderizado em arquivo e envia o mesmo buffer ao Discord.
   // O SVG-base continua preservado; o arquivo PNG é atualizado a cada chamada.
