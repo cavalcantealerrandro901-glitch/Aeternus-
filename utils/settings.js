@@ -2,6 +2,7 @@ const store = require('./store');
 
 const DEFAULT = {
     prefix: 'O.',
+    languages: { commands: 'pt-BR', server: 'pt-BR' },
     logs: { enabled: false, channelId: null, events: {} },
     welcome: { enabled: false, channelId: null, message: 'Bem-vindo {user} ao **{server}**!', embed: true },
     leave: { enabled: false, channelId: null, message: '{user} saiu de **{server}**.' },
@@ -223,6 +224,13 @@ function setSettings(guildId, patch) {
     return getSettings(guildId);
 }
 
+function getLanguage(guildId, target = 'server') {
+    const languages = getSettings(guildId).languages || {};
+    const allowed = new Set(['pt-BR', 'en', 'es', 'fr', 'de']);
+    const value = languages[target];
+    return allowed.has(value) ? value : 'pt-BR';
+}
+
 function getPrefix(guildId) {
     return normalizePrefix(getSettings(guildId).prefix);
 }
@@ -231,4 +239,4 @@ function setPrefix(guildId, prefix) {
     return setSettings(guildId, { prefix: normalizePrefix(prefix) });
 }
 
-module.exports = { getSettings, setSettings, getPrefix, setPrefix, normalizePrefix, DEFAULT };
+module.exports = { getSettings, setSettings, getPrefix, setPrefix, getLanguage, normalizePrefix, DEFAULT };
