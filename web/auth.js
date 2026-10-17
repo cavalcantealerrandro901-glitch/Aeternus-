@@ -245,14 +245,20 @@ function setupAuth(app, client) {
             const state = String(req.query.state || '');
             const savedState = String(req.cookies?.aeternus_oauth_state || '');
 
-            res.clearCookie('aeternus_oauth_state', { path: '/' });
+            // O estado é de uso único: removê-lo antes de processar impede replay do callback.
+            res.clearCookie('aeternus_oauth_state', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL,
+                sameSite: 'lax',
+                path: '/'
+            });
 
             if (!cfg.clientId || !cfg.clientSecret || !cfg.redirect) {
                 return res.status(500).send('OAuth Discord não configurado');
             }
             const stateMatches = state && savedState && state.length === savedState.length &&
                 crypto.timingSafeEqual(Buffer.from(state), Buffer.from(savedState));
-            if (!code || !stateMatches) {
+            if (!code || code.length > 2048 || !stateMatches || state.length > 256) {
                 return res.status(400).send('OAuth state inválido');
             }
 
@@ -275,10 +281,31 @@ function setupAuth(app, client) {
                 return res.status(401).send('Não foi possível autenticar com o Discord');
             }
 
+            // Não aceitar tokens malformados nem criar uma sessão antes de confirmar a identidade
+            // diretamente com o Discord. Isso evita entregar uma sessão baseada só na resposta do token.
+            if (typeof token.access_token !== 'string' || token.access_token.length < 10 ||
+                !Number.isFinite(Number(token.expires_in)) || Number(token.expires_in) <= 0) {
+                return res.status(401).send('Resposta de autenticação inválida');
+            }
+
             const sessionId = createSession(token);
+            const created = sessions.get(sessionId);
+            try {
+                await fetchIdentity(created);
+            } catch (_) {
+                deleteSession(sessionId);
+                return res.status(401).send('Não foi possível confirmar sua conta Discord');
+            }
+
+            // Só emitir o cookie depois da validação completa da conta.
             res.cookie('aeternus_session', sessionId, cookieOptions());
             const returnTo = String(req.cookies?.aeternus_return_to || '').trim();
-            res.clearCookie('aeternus_return_to', { path: '/' });
+            res.clearCookie('aeternus_return_to', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL,
+                sameSite: 'lax',
+                path: '/'
+            });
             res.redirect(returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/dashboard');
         } catch (e) {
             console.error('[auth] callback:', e.message);
