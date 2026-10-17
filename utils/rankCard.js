@@ -34,11 +34,13 @@ function rowMarkup(r, i, y, opts, maxValue) {
   const economy = opts.economy !== false;
   const barWidth = 1088;
   const fill = Math.max(0, Math.min(barWidth, Math.round((Math.max(0, Number(r.value) || 0) / Math.max(1, maxValue)) * barWidth)));
-  // Normaliza alfabetos Unicode estilizados (ex.: letras matemáticas) e remove símbolos
-  // que frequentemente não existem na fonte usada pelo renderizador SVG.
-  const rawName = String(r.name || 'Aventureiro').normalize('NFKC')
+  // Preserva símbolos decorativos do nome (♡ ☆ € 《 ¤ ◇ ♧ 》 £ ₩ ♤ etc.).
+  // NFKC converte letras Unicode estilizadas quando há equivalente comum;
+  // a fonte DejaVu Sans cobre boa parte dos símbolos e o SVG mantém os caracteres.
+  const rawName = String(r.name || 'Aventureiro')
+    .normalize('NFKC')
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/[^\p{L}\p{N}\p{M}\p{P}\p{Zs}]/gu, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
     .trim();
   const name = esc((rawName || 'Aventureiro').slice(0, 28));
   const id = esc(String(r.id || '—').slice(0, 22));
