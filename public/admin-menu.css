@@ -326,3 +326,20 @@
 .logs-editor-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .logs-editor-actions .setting-status{color:rgba(203,199,218,.72);font-size:.82rem}
 @media(max-width:560px){.logs-config-card{padding:14px}.logs-form-grid{grid-template-columns:1fr}.logs-editor-actions .btn{width:100%}}
+
+
+/* Tela exclusiva de edição de cada categoria de logs */
+.logs-editor-screen{position:fixed;inset:0;z-index:9999;overflow-y:auto;padding:clamp(14px,3vw,30px);background:radial-gradient(ellipse at top right,rgba(124,58,237,.18),transparent 42%),#090811;color:#f5f3ff}
+.logs-editor-screen.hidden{display:none!important}
+.logs-editor-screen-head{display:flex;align-items:center;gap:18px;max-width:980px;margin:0 auto 22px;padding:4px 0 18px;border-bottom:1px solid rgba(167,139,250,.2)}
+.logs-editor-screen-head h2{margin:5px 0 0;font-size:clamp(1.25rem,3vw,1.8rem)}
+.logs-editor-screen-head .btn{flex-shrink:0}
+#logs-editor-screen-body{max-width:980px;margin:0 auto 40px}
+#logs-editor-screen-body>.logs-editor{display:block!important;max-width:none;margin:0;padding:0;border:0;background:transparent}
+#logs-editor-screen-body .logs-editor-fields{gap:18px}
+#logs-editor-screen-body .logs-config-card{padding:clamp(15px,3vw,24px);border-color:rgba(139,92,246,.27);background:linear-gradient(145deg,rgba(22,18,39,.98),rgba(12,12,22,.98));box-shadow:0 12px 36px rgba(0,0,0,.18)}
+#logs-editor-screen-body .logs-live-preview{border-left-width:4px;border-color:rgba(167,139,250,.3);border-left-color:#8b5cf6;background:linear-gradient(135deg,#151321,#0d0c15);padding:20px;min-height:100px}
+#logs-editor-screen-body .logs-preview-title{font-size:1.12rem;color:#f4edff}
+#logs-editor-screen-body .logs-preview-description{color:#d5d0e2}
+#logs-editor-screen-body .logs-editor-actions{position:sticky;bottom:0;padding:12px 0;background:linear-gradient(0deg,#090811 75%,transparent)}
+@media(max-width:560px){.logs-editor-screen-head{align-items:flex-start;flex-direction:column;gap:12px}.logs-editor-screen-head .btn{width:100%}}
