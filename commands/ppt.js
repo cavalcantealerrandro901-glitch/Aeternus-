@@ -22,8 +22,8 @@ function outcome(a, b) {
 function gameEmbed(game, result = false) {
     const desc = result
         ? [
-            `👤 **${game.challengerName}**: ${CHOICES[game.choices[game.challenger]].emoji} **${CHOICES[game.choices[game.challenger]].label}**`,
-            `🎯 **${game.opponentName}**: ${CHOICES[game.choices[game.opponent]].emoji} **${CHOICES[game.choices[game.opponent]].label}**`,
+            `👤 <@${game.challenger}>: ${CHOICES[game.choices[game.challenger]].emoji} **${CHOICES[game.choices[game.challenger]].label}**`,
+            `🎯 <@${game.opponent}>: ${CHOICES[game.choices[game.opponent]].emoji} **${CHOICES[game.choices[game.opponent]].label}**`,
             '',
             game.result === 'empate'
                 ? '🤝 **Empate!** As escolhas foram iguais.'
@@ -33,11 +33,11 @@ function gameEmbed(game, result = false) {
                 : `💰 O vencedor recebeu **${fmt(game.bet * 2)} éter**.`) : '🎮 Partida por diversão.'
         ].join('\\n')
         : [
-            `👤 **${game.challengerName}** contra **${game.opponentName}**`,
+            `👤 <@${game.challenger}> contra <@${game.opponent}>`,
             game.bet ? `💰 Aposta: **${fmt(game.bet)} éter por jogador**` : '🎮 Modo diversão • sem aposta',
             '',
-            `**${game.challengerName}**, escolha sua jogada nos botões.`,
-            `**${game.opponentName}**, escolha também. As escolhas ficam ocultas até ambos decidirem.`,
+            `<@${game.challenger}>, escolha sua jogada nos botões.`,
+            `<@${game.opponent}>, escolha também. As escolhas ficam ocultas até ambos decidirem.`,
             '',
             `Status: ${game.choices[game.challenger] ? '✅' : '⏳'} ${game.challengerName} • ${game.choices[game.opponent] ? '✅' : '⏳'} ${game.opponentName}`
         ].join('\\n');
@@ -90,7 +90,7 @@ async function startGame({ challenger, opponent, channel, bet = 0 }) {
     }, GAME_TIMEOUT);
 
     try {
-        game.message = await channel.send({ embeds: [gameEmbed(game)], components: [gameButtons(game)] });
+        game.message = await channel.send({ content: `🎮 Desafio: <@${game.challenger}> contra <@${game.opponent}>`, allowedMentions: { users: [game.challenger, game.opponent] }, embeds: [gameEmbed(game)], components: [gameButtons(game)] });
     } catch (e) {
         clearTimeout(game.timeout);
         games.delete(id);
