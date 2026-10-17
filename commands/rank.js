@@ -41,7 +41,7 @@ function isKnownBot(client, id) {
 async function resolveUsers(client, entries) {
     // Consulta somente os IDs necessários para a página atual; cacheia resultados por 5 min.
     const now = Date.now();
-    const ids = [...new Set(entries.map(e => String(e.id)).filter(id => /^\\d{17,20}$/.test(id)))];
+    const ids = [...new Set(entries.map(e => String(e.id)).filter(id => /^\d{17,20}$/.test(id)))];
     let cursor = 0;
     const workers = Array.from({ length: Math.min(USER_FETCH_CONCURRENCY, ids.length) }, async () => {
         while (cursor < ids.length) {
