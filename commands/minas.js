@@ -172,7 +172,7 @@ async function sendResult(game, client, type = null) {
         }
 
         const result = await channel.send({
-            
+
             reply: game.messageId
                 ? { messageReference: game.messageId, failIfNotExists: false }
                 : undefined,
@@ -433,7 +433,7 @@ function endPayload(game) {
 
 module.exports = {
     name: 'minas',
-    aliases: ['mines', 'mine', 'campo'],
+    aliases: ['mines', 'campo'],
     description: 'Explore a caverna do Éter no Mines do Aeternus.',
 
     async execute(message, args, client, options = {}) {
