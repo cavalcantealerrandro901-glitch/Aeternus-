@@ -262,11 +262,12 @@ function startWeb(client) {
 
     app.post('/api/guild/:id/settings', requireGuildManager, (req, res) => {
         const body = req.body || {};
+        const allowed = new Set(['pt-BR', 'en', 'es', 'fr', 'de']);
         const patch = {};
         if (body.languages && typeof body.languages === 'object') {
-            const allowed = new Set(['pt-BR', 'en', 'es', 'fr', 'de']);
-            const commands = String(body.languages.commands || 'pt-BR');
-            const server = String(body.languages.server || 'pt-BR');
+            const current = getSettings(req.params.id).languages || {};
+            const commands = body.languages.commands === undefined ? (current.commands || 'pt-BR') : String(body.languages.commands);
+            const server = body.languages.server === undefined ? (current.server || 'pt-BR') : String(body.languages.server);
             if (!allowed.has(commands) || !allowed.has(server)) {
                 return res.status(400).json({ ok: false, error: 'Idioma não suportado.' });
             }
