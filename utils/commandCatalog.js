@@ -15,7 +15,7 @@ const CATEGORIES = {
             { name: 'cambio', desc: 'Câmbio Éter ⇄ Sonhos (Loritta)', usage: 'cambio [comprar|vender|saldo] <valor>', example: 'O.cambio comprar 100', about: 'Troca éter do Aeternus por sonhos da Loritta e vice-versa.' },
             { name: 'pay', desc: 'Transferir éter', usage: 'pay @user <valor>', example: 'O.pay @user 2k', about: 'Envia éter da sua carteira para outro membro.' },
             { name: 'transacoes', desc: 'Extrato', usage: 'transacoes', example: 'O.transacoes', about: 'Lista as últimas movimentações de éter.' },
-            { name: 'work', desc: 'Trabalhar por éter', usage: 'work', example: 'O.work', about: 'Ganha éter trabalhando (com ranking de cargos).' },
+            { name: 'work', desc: 'Trabalhar por éter', usage: 'work [status|progresso|cargos]', example: 'O.work progresso', about: 'Trabalha por éter e acompanha o progresso até o próximo cargo.' },
             { name: 'beg', desc: 'Pedir éter', usage: 'beg', example: 'O.beg', about: 'Pede uma quantia aleatória de éter (cooldown).' },
             { name: 'crime', desc: 'Crime por éter', usage: 'crime', example: 'O.crime', about: 'Tenta um crime: ganha ou perde éter.' },
             { name: 'rob', desc: 'Roubar éter', usage: 'rob @user', example: 'O.rob @user', about: 'Tenta roubar éter de outro membro.' },
