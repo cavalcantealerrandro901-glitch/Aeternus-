@@ -30,6 +30,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       $('admin-user').textContent = '👤 ' + (me.user.global_name || me.user.username);
       const guild = await api('/api/guild/' + encodeURIComponent(id));
 
+      // Seletor de servidores disponíveis para esta conta.
+      const serverSelect = $('menu-server-select');
+      const menuServerIcon = $('menu-server-icon');
+      const serverList = await api('/api/dashboard/guilds');
+      serverSelect.innerHTML = '';
+      (serverList.guilds || []).forEach((server) => {
+        const option = document.createElement('option');
+        option.value = server.id;
+        option.textContent = server.name;
+        serverSelect.appendChild(option);
+      });
+      serverSelect.value = id;
+      serverSelect.disabled = !(serverList.guilds || []).length;
+      serverSelect.addEventListener('change', () => {
+        if (serverSelect.value && serverSelect.value !== id) {
+          location.href = '/admin/' + encodeURIComponent(serverSelect.value);
+        }
+      });
+      const selectedServer = (serverList.guilds || []).find((server) => server.id === id);
+      const iconHash = (selectedServer && selectedServer.icon) || guild.icon;
+      if (iconHash) {
+        menuServerIcon.src = iconHash.startsWith('http')
+          ? iconHash
+          : 'https://cdn.discordapp.com/icons/' + encodeURIComponent(id) + '/' + encodeURIComponent(iconHash) + '.png?size=128';
+        menuServerIcon.classList.remove('hidden');
+      } else {
+        menuServerIcon.classList.add('hidden');
+      }
+
       $('selected-server-name').textContent = guild.name;
       $('selected-server-description').textContent = guild.description || 'Painel de administração do servidor selecionado.';
       $('server-members').textContent = guild.memberCount ?? '—';
