@@ -36,9 +36,9 @@ function isKnownBot(client, id) {
 }
 
 async function resolveUsers(client, entries) {
-    // Busca usuários fora do cache em pequenos lotes; não existe garantia de que
-    // o Discord retorne contas removidas/indisponíveis, mas tentamos resolver todas.
-    const uniqueIds = [...new Set(entries.map(e => String(e.id)))];
+    // Resolve IDs provenientes dos arquivos de economia/XP para nome e avatar do Discord.
+    // IDs vêm do banco; não dependemos de o usuário estar no cache local.
+    const uniqueIds = [...new Set(entries.map(e => String(e.id)).filter(id => /^\d{17,20}$/.test(id)))];
     let cursor = 0;
     const workers = Array.from({ length: Math.min(USER_FETCH_CONCURRENCY, uniqueIds.length) }, async () => {
         while (cursor < uniqueIds.length) {
@@ -129,7 +129,12 @@ async function sendRank(ctx, mode, page = 0) {
 
     const rows = slice.map((e, i) => {
         const user = ctx.client.users.cache.get(e.id);
-        return { id: e.id, name: user ? (user.globalName || user.username) : ('Aventureiro ' + e.id.slice(-4)), avatarURL: user ? user.displayAvatarURL({ extension: 'png', size: 64 }) : null, rank: start + i + 1, value: e.value, level: e.level || 0 };
+        return {
+            id: e.id,
+            name: user ? (user.globalName || user.username) : ('Aventureiro ' + e.id.slice(-4)),
+            avatarURL: user ? user.displayAvatarURL({ extension: 'png', size: 128 }) : null,
+            rank: start + i + 1, value: e.value, level: e.level || 0
+        };
     });
 
     // O modelo Aeternus é rasterizado para PNG e exibido dentro do embed do Discord.
