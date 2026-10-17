@@ -1,7 +1,11 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
+
+// Identificador novo a cada inicialização para renovar a URL dos scripts do painel.
+const PANEL_BOOT_ID = crypto.randomBytes(12).toString('hex');
 const { getSettings, setSettings, getPrefix } = require('../utils/settings');
 const player = require('../utils/player');
 const xp = require('../utils/xp');
@@ -11,9 +15,35 @@ const { setupAuth, requireAuth, requireGuildManager, fetchGuildsForSession } = r
 
 function startWeb(client) {
     const app = express();
+    app.disable('x-powered-by');
     app.use(express.json({ limit: '6mb' }));
-    app.use(express.urlencoded({ extended: true }));
+    app.use(express.urlencoded({ extended: true, limit: '1mb' }));
     app.use(cookieParser());
+
+    // Cabeçalhos defensivos e proteção básica contra requisições cross-origin.
+    app.use((req, res, next) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('X-Frame-Options', 'DENY');
+        res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+        res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        if (req.path.startsWith('/api/')) {
+            res.setHeader('Cache-Control', 'no-store, max-age=0');
+            res.setHeader('Pragma', 'no-cache');
+        }
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+            const origin = String(req.get('origin') || '').trim();
+            const referer = String(req.get('referer') || '').trim();
+            let supplied = origin;
+            if (!supplied && referer) {
+                try { supplied = new URL(referer).origin; } catch (_) { supplied = 'invalid'; }
+            }
+            const host = String(req.get('host') || '');
+            if (supplied && supplied !== 'http://' + host && supplied !== 'https://' + host) {
+                return res.status(403).json({ ok: false, error: 'origem_nao_permitida' });
+            }
+        }
+        next();
+    });
 
     const publicDir = path.join(__dirname, '..', 'public');
 
@@ -28,7 +58,7 @@ function startWeb(client) {
                     content = content.replace('</head>', '    <link rel="stylesheet" href="dashboard.css">\n</head>');
                 }
                 if (!content.includes('dashboard-app.js')) {
-                    content = content.replace('</body>', '    <script src="dashboard-app.js"></script>\n</body>');
+                    content = content.replace('</body>', '    <script src="dashboard-app.js?v=' + PANEL_BOOT_ID + '"></script>\n</body>');
                 }
                 res.setHeader('Content-Type', 'text/html');
                 return res.send(content);
