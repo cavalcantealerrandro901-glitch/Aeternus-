@@ -6,13 +6,16 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
-# Fontconfig + DejaVu are required by librsvg/sharp to render SVG text correctly.
-# Without installed fonts, the ranking cards can show tofu/square glyphs.
+# Install fonts used by librsvg/sharp when converting ranking SVGs to PNG.
+# DejaVu covers general text; Noto and Symbola expand Unicode symbol/emoji coverage.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     fontconfig \
     fonts-dejavu-core \
+    fonts-noto-core \
+    fonts-noto-color-emoji \
+    fonts-symbola \
   && fc-cache -f \
   && rm -rf /var/lib/apt/lists/*
 
