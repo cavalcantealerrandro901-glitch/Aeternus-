@@ -292,8 +292,8 @@ module.exports = {
             if (mentionedAfk.length > 0) {
                 const shown = mentionedAfk.slice(0, AFK_NOTICE_MAX_USERS);
                 const lines = shown.map((entry) =>
-                    '💤 <@' + entry.id + '> está ausente.\n> **Motivo:** ' + entry.reason +
-                    '\n> **Ausente há:** ' + entry.duration
+                    '💤 <@' + entry.id + '> está ausente.\n**Motivo:** ' + entry.reason +
+                    '\n**Ausente há:** ' + entry.duration
                 );
                 if (mentionedAfk.length > shown.length) {
                     lines.push('… e mais ' + (mentionedAfk.length - shown.length) + ' pessoa(s) ausente(s).');
