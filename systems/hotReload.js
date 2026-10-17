@@ -13,10 +13,6 @@ const {
 } = require('../bot/loaders');
 
 const ROOT_DIR = path.join(__dirname, '..');
-// O hot-reload só observa comandos e sistemas que já existiam na inicialização.
-// Não executa automaticamente novos arquivos nem limpa o cache de módulos arbitrários.
-const TRUSTED_COMMAND_FILES = new Set(fs.existsSync(COMMANDS_DIR) ? fs.readdirSync(COMMANDS_DIR).filter(f => /^[a-zA-Z0-9_-]+\.js$/.test(f)) : []);
-const TRUSTED_SYSTEM_FILES = new Set(fs.existsSync(SYSTEMS_DIR) ? fs.readdirSync(SYSTEMS_DIR).filter(f => /^[a-zA-Z0-9_-]+\.js$/.test(f)) : []);
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'data', 'public', '.cache', '.npm']);
 
 const DEBOUNCE_MS = 400;
@@ -40,39 +36,35 @@ function debounce(key, fn) {
 }
 
 function handleFileChange(client, dir, filename) {
-    if (!filename || !/^[a-zA-Z0-9_-]+\.js$/.test(filename) || filename === 'hotReload.js') return;
+    if (!filename || !filename.endsWith('.js')) return;
+    if (filename === 'hotReload.js') return;
 
-    const fullPath = path.resolve(dir, filename);
-    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) return;
+    const fullPath = path.join(dir, filename);
+    if (!fs.existsSync(fullPath)) return;
 
-    // Novos arquivos são bloqueados até uma implantação/reinicialização controlada.
-    if (path.resolve(dir) === path.resolve(COMMANDS_DIR)) {
-        if (!TRUSTED_COMMAND_FILES.has(filename)) {
-            console.warn('[hotReload] bloqueado comando novo não autorizado: ' + filename);
-            return;
-        }
-    } else if (path.resolve(dir) === path.resolve(SYSTEMS_DIR)) {
-        if (!TRUSTED_SYSTEM_FILES.has(filename)) {
-            console.warn('[hotReload] bloqueado sistema novo não autorizado: ' + filename);
-            return;
-        }
-    } else {
-        // Nunca tenta carregar ou limpar cache de JS fora das pastas autorizadas.
-        return;
-    }
+    const relativePath = path.relative(ROOT_DIR, fullPath);
 
     debounce('file:' + fullPath, () => {
-        if (path.resolve(dir) === path.resolve(COMMANDS_DIR)) {
-            const r = loadCommandFile(client, filename, { quiet: true });
-            if (r.ok) console.log(`🔄 [hotReload] comando recarregado: ${r.name}`);
-            else console.warn(`🔄 [hotReload] comando bloqueado/falhou ${filename}: ${r.error}`);
+        if (fullPath.startsWith(COMMANDS_DIR)) {
+            const relativeCmd = path.relative(COMMANDS_DIR, fullPath);
+            const r = loadCommandFile(client, relativeCmd, { quiet: true });
+            if (r.ok) console.log(`🔄 [hotReload] comando recarregado: ${r.name}${r.slash ? ' (/' + r.slash + ')' : ''}`);
+            else console.warn(`🔄 [hotReload] falha no comando ${relativeCmd}: ${r.error}`);
             return;
         }
-
-        if (path.resolve(dir) === path.resolve(SYSTEMS_DIR)) {
-            const r = loadSystemFile(client, filename, { quiet: true });
+        if (fullPath.startsWith(SYSTEMS_DIR)) {
+            const relativeSys = path.relative(SYSTEMS_DIR, fullPath);
+            const r = loadSystemFile(client, relativeSys, { quiet: true });
             if (r.ok) console.log(`🔄 [hotReload] sistema recarregado: ${r.name}`);
-            else console.warn(`🔄 [hotReload] sistema bloqueado/falhou ${filename}: ${r.error}`);
+            else console.warn(`🔄 [hotReload] falha no sistema ${relativeSys}: ${r.error}`);
+            return;
+        }
+        try {
+            const resolved = require.resolve(fullPath);
+            delete require.cache[resolved];
+            console.log(`🔄 [hotReload] arquivo recarregado: ${relativePath}`);
+        } catch (err) {
+            console.warn(`🔄 [hotReload] falha ao limpar cache de ${relativePath}: ${err.message}`);
         }
     });
 }
@@ -127,9 +119,8 @@ function setup(client) {
         }
     };
 
-    watchRecursive(client, COMMANDS_DIR);
-    watchRecursive(client, SYSTEMS_DIR);
-    console.log('[hotReload] protegido · observa apenas comandos/sistemas existentes; bloqueia arquivos novos e módulos fora da lista.');
+    watchRecursive(client, ROOT_DIR);
+    console.log('[hotReload] ativo · observando TODOS os arquivos .js do projeto!');
 }
 
 function destroy() {
