@@ -53,7 +53,7 @@ module.exports = {
     aliases: ['coinflip', 'cf', 'caracoroa'],
     description: 'Cara ou coroa (aposta 1k–35m)',
     data: new SlashCommandBuilder()
-        .setName('cara coroa')
+        .setName('cara-coroa')
         .setDescription('Cara ou coroa')
         .addStringOption((o) =>
             o
