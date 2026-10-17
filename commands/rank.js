@@ -115,12 +115,18 @@ async function sendRank(ctx, mode, page = 0) {
         return { id: e.id, name: user ? (user.globalName || user.username) : ('Aventureiro ' + e.id.slice(-4)), rank: start + i + 1, value: e.value, level: e.level || 0 };
     });
 
-    // O comando sempre tem uma saída legível. SVG não é exibido como imagem pelo Discord;
-    // só anexamos cards PNG. Se o sharp falhar, usamos o embed do ranking no próprio comando.
+    // O modelo Aeternus é rasterizado para PNG e exibido dentro do embed do Discord.
+    // SVG puro não é anexado como imagem, pois o Discord não o pré-visualiza consistentemente.
     try {
         const card = await rankCard.render({ title: meta.title, subtitle: meta.economy ? 'Ranking de éter' : 'Ranking de XP', rows, economy: meta.economy, page: p + 1, totalPages, tip: meta.tip });
-        if (card?.buffer && /\.png$/i.test(card.name || '')) {
-            return { files: [new AttachmentBuilder(card.buffer, { name: 'aeternus-rank.png' })], embeds: [], components: [navRow(mode, p, totalPages)], attachments: [] };
+        if (card?.buffer && /\\.png$/i.test(card.name || '')) {
+            const filename = 'aeternus-rank.png';
+            const imageEmbed = new EmbedBuilder().setColor(meta.color).setImage(`attachment://${filename}`);
+            return {
+                files: [new AttachmentBuilder(card.buffer, { name: filename })],
+                embeds: [imageEmbed],
+                components: [navRow(mode, p, totalPages)]
+            };
         }
     } catch (err) {
         console.warn('[rank] Falha ao gerar imagem; usando embed:', err?.message || err);
