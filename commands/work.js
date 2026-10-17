@@ -151,7 +151,7 @@ function progressEmbed(user, st) {
             iconURL: user.displayAvatarURL({ size: 64 })
         })
         .setTitle(`📊 Progresso da carreira · ${percent}%`)
-        .setDescription(lines.join('\\n'))
+        .setDescription(lines.join('\n'))
         .setThumbnail(user.displayAvatarURL({ size: 128 }))
         .setFooter({ text: 'Aeternus Economy • Progresso profissional' });
 }
@@ -193,6 +193,7 @@ module.exports = {
                 .addChoices(
                     { name: 'Trabalhar', value: 'go' },
                     { name: 'Status / carreira', value: 'status' },
+                    { name: 'Progresso do trabalho', value: 'progresso' },
                     { name: 'Ver cargos', value: 'ranks' }
                 )
         ),
@@ -203,7 +204,10 @@ module.exports = {
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '');
 
-        if (['progresso', 'progress', 'andamento'].includes(sub)) {\n            const st = workUtil.status(message.author.id);\n            return message.reply({ embeds: [progressEmbed(message.author, st)] });\n        }\n\n        if (['status', 'perfil', 'carreira', 'info', 'stats'].includes(sub)) {
+        if (['progresso', 'progress', 'andamento'].includes(sub)) {
+            const st = workUtil.status(message.author.id);
+            return message.reply({ embeds: [progressEmbed(message.author, st)] });
+        }\n\n        if (['status', 'perfil', 'carreira', 'info', 'stats'].includes(sub)) {
             const st = workUtil.status(message.author.id);
             return message.reply({
                 embeds: [statusEmbed(message.author, st)]
@@ -223,7 +227,10 @@ module.exports = {
 
     async executeSlash(interaction) {
         const acao = interaction.options.getString('acao') || 'go';
-        if (acao === 'progresso') {\n            const st = workUtil.status(interaction.user.id);\n            return interaction.reply({ embeds: [progressEmbed(interaction.user, st)] });\n        }\n        if (acao === 'status' || acao === 'ranks') {
+        if (acao === 'progresso') {
+            const st = workUtil.status(interaction.user.id);
+            return interaction.reply({ embeds: [progressEmbed(interaction.user, st)] });
+        }\n        if (acao === 'status' || acao === 'ranks') {
             const st = workUtil.status(interaction.user.id);
             return interaction.reply({
                 embeds: [statusEmbed(interaction.user, st)]
