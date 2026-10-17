@@ -5,6 +5,32 @@ const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 const IDENTITY_CACHE_TTL = 5 * 60 * 1000;
 const DISCORD_API = 'https://discord.com/api/v10';
 
+// Protege as rotas de autenticação do painel contra excesso de tentativas por IP.
+const authRateBuckets = new Map();
+function authRateLimit(max = 20, windowMs = 60_000) {
+    return (req, res, next) => {
+        const key = String(req.ip || req.socket?.remoteAddress || 'unknown');
+        const now = Date.now();
+        let bucket = authRateBuckets.get(key);
+        if (!bucket || now - bucket.start >= windowMs) {
+            bucket = { start: now, count: 0 };
+            authRateBuckets.set(key, bucket);
+        }
+        bucket.count++;
+        if (authRateBuckets.size > 5000) {
+            for (const [ip, item] of authRateBuckets) {
+                if (now - item.start >= windowMs) authRateBuckets.delete(ip);
+            }
+        }
+        if (bucket.count > max) {
+            res.setHeader('Retry-After', '60');
+            return res.status(429).send('Muitas tentativas. Aguarde um minuto e tente novamente.');
+        }
+        next();
+    };
+}
+
+
 function env(...keys) {
     for (const key of keys) {
         const value = String(process.env[key] || '').trim();
@@ -176,7 +202,7 @@ async function requireGuildManager(req, res, next) {
 }
 
 function setupAuth(app, client) {
-    app.get('/login', (req, res) => {
+    app.get('/login', authRateLimit(15), (req, res) => {
         const cfg = getConfig();
         const returnTo = String(req.query.returnTo || '').trim();
         if (returnTo.startsWith('/') && !returnTo.startsWith('//')) {
@@ -212,7 +238,7 @@ function setupAuth(app, client) {
         res.redirect('https://discord.com/oauth2/authorize?' + params.toString());
     });
 
-    app.get('/auth/discord/callback', async (req, res) => {
+    app.get('/auth/discord/callback', authRateLimit(20), async (req, res) => {
         try {
             const cfg = getConfig();
             const code = String(req.query.code || '');
