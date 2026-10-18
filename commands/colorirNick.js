@@ -47,7 +47,11 @@ module.exports = {
             .setDescription('Quantidade de cores/cargos para criar (de 5 a 20)')
             .setMinValue(5)
             .setMaxValue(20)
-            .setRequired(true))
+            .setRequired(false))
+        .addBooleanOption((option) => option
+            .setName('desativar')
+            .setDescription('Desativa os painéis de cores deste servidor')
+            .setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
 
     async executeSlash(interaction) {
@@ -66,7 +70,51 @@ module.exports = {
             return interaction.editReply('❌ Preciso da permissão **Gerenciar cargos** para criar as cores.');
         }
 
-        const count = interaction.options.getInteger('quantidade', true);
+        const shouldDisable = interaction.options.getBoolean('desativar') || false;
+        const state = getState();
+        const guildState = state[guild.id] || { panels: [], selections: {} };
+
+        if (shouldDisable) {
+            const panels = guildState.panels || [];
+            if (!panels.length && !Object.keys(guildState.selections || {}).length) {
+                return interaction.editReply('ℹ️ O sistema **Colorir Nick** já está desativado neste servidor.');
+            }
+
+            let deletedMessages = 0;
+            for (const panel of panels) {
+                const channel = await guild.channels.fetch(panel.channelId).catch(() => null);
+                const message = channel?.isTextBased()
+                    ? await channel.messages.fetch(panel.messageId).catch(() => null)
+                    : null;
+                if (message && await message.delete().then(() => true).catch(() => false)) deletedMessages++;
+            }
+
+            for (const [userId, selection] of Object.entries(guildState.selections || {})) {
+                if (!selection?.roleId) continue;
+                const member = await guild.members.fetch(userId).catch(() => null);
+                if (member?.roles?.cache?.has(selection.roleId)) {
+                    await member.roles.remove(selection.roleId, 'Aeternus • desativação do Colorir Nick').catch(() => {});
+                }
+            }
+
+            guildState.panels = [];
+            guildState.selections = {};
+            state[guild.id] = guildState;
+            store.save(STATE_KEY, state);
+
+            const disabled = new EmbedBuilder()
+                .setColor(0xA78BFA)
+                .setTitle('⏹️ Colorir Nick desativado')
+                .setDescription('Os painéis de escolha foram desativados e as cores escolhidas pelo sistema foram removidas dos membros. Os cargos coloridos foram mantidos no servidor, mas não estão mais ativos neste sistema.')
+                .addFields({ name: 'Painéis removidos', value: String(deletedMessages), inline: true })
+                .setFooter({ text: 'Aeternus • Colorir Nick' });
+            return interaction.editReply({ embeds: [disabled] });
+        }
+
+        const count = interaction.options.getInteger('quantidade');
+        if (count === null) {
+            return interaction.editReply('❌ Informe **quantidade** (de 5 a 20) para criar o painel, ou use **desativar: Sim** para desligar o sistema.');
+        }
         if (count < 5 || count > 20) return interaction.editReply('❌ Escolha entre 5 e 20 cores.');
 
         const palette = COLORS.slice(0, count);
@@ -142,12 +190,12 @@ module.exports = {
             return interaction.editReply('❌ Os cargos foram criados, mas não consegui enviar os embeds. Verifique se tenho permissão para enviar mensagens e adicionar reações.');
         }
 
-        const state = getState();
-        const guildState = state[guild.id] || { panels: [], selections: {} };
-        guildState.panels = [...(guildState.panels || []), ...panels];
-        guildState.selections = guildState.selections || {};
-        state[guild.id] = guildState;
-        store.save(STATE_KEY, state);
+        const latestState = getState();
+        const latestGuildState = latestState[guild.id] || { panels: [], selections: {} };
+        latestGuildState.panels = [...(latestGuildState.panels || []), ...panels];
+        latestGuildState.selections = latestGuildState.selections || {};
+        latestState[guild.id] = latestGuildState;
+        store.save(STATE_KEY, latestState);
 
         const result = new EmbedBuilder()
             .setColor(0xA78BFA)
