@@ -354,11 +354,13 @@ const CLASS_RARITIES = [
 
 function listCatalogClasses(rarity) {
     const all = typeof classes.allClasses === 'function' ? classes.allClasses() : {};
-    return Object.values(all).filter((c) => c && c.id &&
-        String(c.selectionPool || '').toLowerCase() === String(rarity).toLowerCase() &&
-        !(c.exclusive || c.maxHolders === 1));
+    return Object.values(all).filter((c) => {
+        if (!c || !c.id) return false;
+        const classRarity = String(c.rarity || c.selectionPool || '').toLowerCase();
+        const isUnique = classRarity === 'unica' || c.exclusive === true || c.maxHolders === 1;
+        return isUnique && classRarity === String(rarity).toLowerCase();
+    });
 }
-
 function classListPayload(rarity = 'comum', page = 0, source = 'component') {
     const rarityInfo = CLASS_RARITIES.find((r) => r.id === rarity) || CLASS_RARITIES[0];
     const list = listCatalogClasses(rarityInfo.id);
