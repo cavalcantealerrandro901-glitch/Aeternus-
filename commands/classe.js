@@ -389,9 +389,14 @@ function classListPayload(rarity = 'comum', page = 0, source = 'component') {
     const rarityButton = new ButtonBuilder()
         .setCustomId('classe:list:' + nextRarity.id + ':0')
         .setLabel('Mudar raridade · ' + nextRarity.name).setStyle(ButtonStyle.Primary).setEmoji('🔄');
+    const chooseButton = new ButtonBuilder()
+        .setCustomId('classe:abrir')
+        .setLabel('Escolher uma classe')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('⚔️');
     return { embeds: [emb], components: [
         new ActionRowBuilder().addComponents(prev, next),
-        new ActionRowBuilder().addComponents(rarityButton)
+        new ActionRowBuilder().addComponents(rarityButton, chooseButton)
     ], flags: source !== 'prefix' ? MessageFlags.Ephemeral : undefined };
 }
 
