@@ -130,7 +130,7 @@ module.exports = {
                 try {
                     role = await guild.roles.create({
                         name: roleName,
-                        color: color.value,
+                        colors: { primaryColor: color.value },
                         hoist: false,
                         mentionable: false,
                         reason: 'Aeternus • criação de cargos para colorir nick'
