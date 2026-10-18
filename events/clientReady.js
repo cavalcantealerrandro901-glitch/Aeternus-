@@ -16,6 +16,16 @@ module.exports = {
             console.error('❌ Falha no registro de slash:', e);
         }
 
+        // Recria os cargos registrados do sistema Colorir Nick a cada inicialização.
+        try {
+            const colorNick = require('../systems/colorirNick');
+            if (typeof colorNick.rebuildRolesOnStartup === 'function') {
+                await colorNick.rebuildRolesOnStartup(client);
+            }
+        } catch (e) {
+            console.error('❌ Falha ao recriar cargos do Colorir Nick:', e);
+        }
+
         // status
         try {
             client.user.setPresence({
