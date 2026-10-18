@@ -1,4 +1,4 @@
-const { PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const store = require('../utils/store');
 
 const STATE_KEY = 'nickColors.json';
@@ -102,6 +102,115 @@ async function handleRemove(reaction, user) {
     store.save(STATE_KEY, state);
 }
 
+async function rebuildRolesOnStartup(client) {
+    const state = getState();
+    let rebuiltGuilds = 0;
+
+    for (const [guildId, guildState] of Object.entries(state)) {
+        const panels = Array.isArray(guildState?.panels) ? guildState.panels : [];
+        if (!panels.length) continue;
+
+        const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+        if (!guild) continue;
+
+        const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+        if (!me?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
+            console.warn(`[colorirNick] Sem Gerenciar cargos no servidor ${guildId}; mantendo cargos existentes.`);
+            continue;
+        }
+
+        // Reúne apenas cargos cujos IDs estão registrados nos painéis deste sistema.
+        const oldRoleIds = new Set();
+        const colorsByOldId = new Map();
+        for (const panel of panels) {
+            for (const color of panel.colors || []) {
+                if (!color?.roleId || !Number.isInteger(Number(color.value))) continue;
+                oldRoleIds.add(color.roleId);
+                colorsByOldId.set(color.roleId, color);
+            }
+        }
+        if (!oldRoleIds.size) continue;
+
+        const replacements = new Map();
+        let failed = false;
+        for (const [oldId, color] of colorsByOldId) {
+            try {
+                const role = await guild.roles.create({
+                    name: 'Nick • ' + String(color.name || 'Cor').slice(0, 85),
+                    colors: { primaryColor: Number(color.value) },
+                    hoist: false,
+                    mentionable: false,
+                    reason: 'Aeternus • recriação automática dos cargos Colorir Nick ao iniciar'
+                });
+                const position = Math.max(1, me.roles.highest.position - 1);
+                await role.setPosition(position);
+                replacements.set(oldId, role);
+            } catch (error) {
+                failed = true;
+                console.error(`[colorirNick] Não foi possível recriar cargo no servidor ${guildId}:`, error.message);
+                break;
+            }
+        }
+
+        // Se alguma criação falhar, não apaga os cargos antigos; remove apenas os novos
+        // criados nesta tentativa para evitar deixar o painel sem cargos válidos.
+        if (failed) {
+            for (const role of replacements.values()) {
+                await role.delete('Aeternus • cancelando recriação incompleta dos cargos Colorir Nick').catch(() => {});
+            }
+            continue;
+        }
+
+        for (const panel of panels) {
+            panel.colors = (panel.colors || []).map((color) => {
+                const replacement = replacements.get(color.roleId);
+                return replacement ? { ...color, roleId: replacement.id } : color;
+            });
+
+            const channel = await guild.channels.fetch(panel.channelId).catch(() => null);
+            const message = channel?.isTextBased()
+                ? await channel.messages.fetch(panel.messageId).catch(() => null)
+                : null;
+            if (!message) continue;
+
+            const embed = new EmbedBuilder()
+                .setColor(0xA78BFA)
+                .setAuthor({ name: 'AETERNUS • CENTRAL DE CORES' })
+                .setTitle('🎨 COLORIR NICK')
+                .setDescription('Reaja com o símbolo correspondente para escolher a cor do seu nick.\\n\\n**Você pode ter apenas uma cor por vez.** Se escolher outra, a cor anterior será removida.')
+                .addFields((panel.colors || []).map((color) => ({
+                    name: color.emoji + '  ' + (color.name || 'Cor'),
+                    value: '**' + (color.hex || '#A78BFA') + '** · <@&' + color.roleId + '>',
+                    inline: true
+                })))
+                .setFooter({ text: 'Aeternus • Reaja para aplicar · uma cor por membro' })
+                .setTimestamp();
+            await message.edit({ embeds: [embed] }).catch((error) => {
+                console.warn('[colorirNick] Não foi possível atualizar o painel:', error.message);
+            });
+        }
+
+        // As seleções antigas apontam para cargos que serão excluídos.
+        guildState.selections = {};
+        state[guildId] = guildState;
+        store.save(STATE_KEY, state);
+
+        for (const oldId of oldRoleIds) {
+            const oldRole = guild.roles.cache.get(oldId) || await guild.roles.fetch(oldId).catch(() => null);
+            if (oldRole && oldRole.id !== replacements.get(oldId)?.id) {
+                await oldRole.delete('Aeternus • substituição dos cargos Colorir Nick ao iniciar').catch((error) => {
+                    console.warn('[colorirNick] Não foi possível excluir cargo antigo:', error.message);
+                });
+            }
+        }
+
+        rebuiltGuilds++;
+        console.log(`[colorirNick] Cargos de cor recriados no servidor ${guildId} (${replacements.size}).`);
+    }
+
+    if (rebuiltGuilds) console.log(`[colorirNick] Inicialização concluída em ${rebuiltGuilds} servidor(es).`);
+}
+
 function setup(client) {
     const previous = global.__aeternusColorNickHandlers;
     if (previous?.client) {
@@ -129,4 +238,4 @@ function destroy(client) {
     global.__aeternusColorNickHandlers = null;
 }
 
-module.exports = { setup, destroy };
+module.exports = { setup, destroy, rebuildRolesOnStartup };
