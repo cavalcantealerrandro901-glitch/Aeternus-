@@ -28,7 +28,7 @@ const COLORS = [
     { name: 'Violeta', hex: '#7F00FF', value: 0x7F00FF, emoji: '💟' },
     { name: 'Turquesa', hex: '#40E0D0', value: 0x40E0D0, emoji: '🩵' }
 ];
-const REACTIONS = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟','🇦','🇧','🇨','🇩','🇪','🇫','🇬','🇭','🇮','🇯'];
+const REACTIONS = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟','🅰️','🅱️','©️','®️','™️','🔠','🔡','🔢','#️⃣','*️⃣'];
 
 function getState() {
     const value = store.load(STATE_KEY, {});
