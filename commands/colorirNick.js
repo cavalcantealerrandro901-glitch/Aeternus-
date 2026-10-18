@@ -125,9 +125,9 @@ module.exports = {
         for (let i = 0; i < palette.length; i++) {
             const color = palette[i];
             const roleName = 'Nick • ' + color.name;
-            let role = guild.roles.cache.find((item) => item.name === roleName && item.color === color.value);
-            if (!role) {
-                try {
+            let role = guild.roles.cache.find((item) => item.name === roleName);
+            try {
+                if (!role) {
                     role = await guild.roles.create({
                         name: roleName,
                         colors: { primaryColor: color.value },
@@ -135,14 +135,22 @@ module.exports = {
                         mentionable: false,
                         reason: 'Aeternus • criação de cargos para colorir nick'
                     });
-                    try {
-                        const position = Math.max(1, me.roles.highest.position - 1);
-                        await role.setPosition(position);
-                    } catch (_) {}
-                } catch (error) {
-                    failed.push(color.name + ': ' + (error.code === 50013 ? 'hierarquia/permissão insuficiente' : 'falha ao criar cargo'));
-                    continue;
+                } else if (role.colors?.primaryColor !== color.value) {
+                    await role.edit({
+                        colors: { primaryColor: color.value },
+                        reason: 'Aeternus • atualização da cor do cargo'
+                    });
                 }
+
+                // Cargos de cor precisam ficar acima dos cargos comuns dos membros
+                // para que o Discord exiba a cor no nome. O cargo do bot continua acima deles.
+                const position = Math.max(1, me.roles.highest.position - 1);
+                await role.setPosition(position);
+            } catch (error) {
+                failed.push(color.name + ': ' + (error.code === 50013
+                    ? 'hierarquia/permissão insuficiente — mova o cargo do Aeternus para cima dos cargos de membros'
+                    : 'falha ao criar/posicionar cargo'));
+                continue;
             }
             created.push({ index: i, name: color.name, hex: color.hex, value: color.value, emoji: color.emoji, reaction: REACTIONS[i], roleId: role.id });
         }
