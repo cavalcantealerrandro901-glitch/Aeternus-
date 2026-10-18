@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 
@@ -161,24 +161,24 @@ module.exports = {
         let bet = 0;
         if (raw.trim()) {
             const resolved = resolveBet(raw, eter.get(i.user.id), { label: '✨' });
-            if (!resolved.ok) return i.reply({ content: `❌ ${resolved.error}`, ephemeral: true });
+            if (!resolved.ok) return i.reply({ content: `❌ ${resolved.error}`, flags: MessageFlags.Ephemeral });
             bet = resolved.amount;
-            if (bet <= 0) return i.reply({ content: 'A aposta precisa ser maior que zero.', ephemeral: true });
+            if (bet <= 0) return i.reply({ content: 'A aposta precisa ser maior que zero.', flags: MessageFlags.Ephemeral });
         }
         const result = await startGame({ challenger: i.user, opponent, channel: i.channel, bet });
-        if (result.error) return i.reply({ content: `❌ ${result.error}`, ephemeral: true });
-        return i.reply({ content: '🎮 Desafio criado!', ephemeral: true });
+        if (result.error) return i.reply({ content: `❌ ${result.error}`, flags: MessageFlags.Ephemeral });
+        return i.reply({ content: '🎮 Desafio criado!', flags: MessageFlags.Ephemeral });
     },
 
     async handleComponent(i) {
         const [, id, choice] = String(i.customId || '').split(':');
         const game = games.get(id);
-        if (!game || game.done) return i.reply({ content: 'Esta partida expirou ou já terminou.', ephemeral: true });
-        if (!CHOICES[choice]) return i.reply({ content: 'Jogada inválida.', ephemeral: true });
+        if (!game || game.done) return i.reply({ content: 'Esta partida expirou ou já terminou.', flags: MessageFlags.Ephemeral });
+        if (!CHOICES[choice]) return i.reply({ content: 'Jogada inválida.', flags: MessageFlags.Ephemeral });
         if (i.user.id !== game.challenger && i.user.id !== game.opponent) {
-            return i.reply({ content: 'Só os dois jogadores desta partida podem escolher.', ephemeral: true });
+            return i.reply({ content: 'Só os dois jogadores desta partida podem escolher.', flags: MessageFlags.Ephemeral });
         }
-        if (game.choices[i.user.id]) return i.reply({ content: 'Você já escolheu sua jogada.', ephemeral: true });
+        if (game.choices[i.user.id]) return i.reply({ content: 'Você já escolheu sua jogada.', flags: MessageFlags.Ephemeral });
         game.choices[i.user.id] = choice;
         await i.deferUpdate();
         if (game.choices[game.challenger] && game.choices[game.opponent]) {
