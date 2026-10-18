@@ -182,7 +182,8 @@ module.exports = {
                 channelId: sent.channelId,
                 messageId: sent.id,
                 colors: group.map((color) => ({
-                    emoji: color.reaction,
+                    emoji: color.emoji,
+                    reaction: color.reaction,
                     roleId: color.roleId,
                     name: color.name,
                     hex: color.hex,
