@@ -36,27 +36,40 @@ async function handleAdd(reaction, user) {
     const member = await guild.members.fetch(user.id).catch(() => null);
     if (!member || member.user.bot) return;
     const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
-    if (!me?.permissions?.has(PermissionFlagsBits.ManageRoles)) return;
+    if (!me?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
+        console.warn('[colorirNick] Não posso atribuir cores: falta a permissão Gerenciar cargos.');
+        return;
+    }
 
     const current = guildState.selections?.[user.id];
-    if (current?.roleId === choice.roleId) return;
+    if (current?.roleId === choice.roleId && member.roles.cache.has(choice.roleId)) return;
 
     try {
-        if (current?.roleId && member.roles.cache.has(current.roleId)) {
-            await member.roles.remove(current.roleId, 'Aeternus • troca da cor do nick');
+        // Busca o cargo atualizado no Discord, pois ele pode ter sido recriado no boot.
+        const role = guild.roles.cache.get(choice.roleId) || await guild.roles.fetch(choice.roleId).catch(() => null);
+        if (!role) throw new Error('cargo não encontrado; recrie o painel com /colorir-nick');
+        if (role.managed || role.position >= me.roles.highest.position) {
+            throw new Error('cargo fora da hierarquia gerenciável; mova o cargo do Aeternus acima dos cargos de cor');
         }
 
-        await member.roles.add(choice.roleId, 'Aeternus • escolha da cor do nick');
+        // Primeiro atribui a nova cor. Só remove a antiga depois que a atribuição funciona.
+        await member.roles.add(role, 'Aeternus • escolha da cor do nick');
 
         guildState.selections = guildState.selections || {};
         guildState.selections[user.id] = {
-            roleId: choice.roleId,
+            roleId: role.id,
             messageId: resolved.message.id,
             channelId: resolved.message.channelId,
             emoji: resolved.emoji.name
         };
         state[guild.id] = guildState;
         store.save(STATE_KEY, state);
+
+        if (current?.roleId && current.roleId !== role.id && member.roles.cache.has(current.roleId)) {
+            await member.roles.remove(current.roleId, 'Aeternus • troca da cor do nick').catch((error) => {
+                console.warn('[colorirNick] A nova cor foi atribuída, mas não consegui remover a anterior:', error.message);
+            });
+        }
 
         // Retira a reação anterior depois de salvar a nova seleção. Assim,
         // o evento de remoção antigo não apaga a cor recém-escolhida.
@@ -69,7 +82,7 @@ async function handleAdd(reaction, user) {
             if (oldReaction) await oldReaction.users.remove(user.id).catch(() => {});
         }
     } catch (error) {
-        console.warn('[colorirNick] Falha ao aplicar cor:', error.message);
+        console.warn('[colorirNick] Falha ao aplicar cor:', error.code || '', error.message);
         await resolved.users.remove(user.id).catch(() => {});
     }
 }
