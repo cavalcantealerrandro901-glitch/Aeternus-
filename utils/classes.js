@@ -472,7 +472,12 @@ function updateCustomClass(id, patch) {
 }
 
 function listSelectableClasses() {
-    return Object.values(allClasses()).filter((c) => c && c.id && c.selectionPool === 'common' && !(c.exclusive || c.maxHolders === 1));
+    const selectableRarities = new Set(['comum', 'incomum', 'rara', 'epica', 'lendaria', 'unica', 'mitica', 'common']);
+    return Object.values(allClasses()).filter((c) => {
+        if (!c || !c.id || !c.selectionPool) return false;
+        const pool = String(c.selectionPool).toLowerCase();
+        return selectableRarities.has(pool) && !(c.exclusive || c.maxHolders === 1);
+    });
 }
 function listClassesForUser(userId) {
     const uid = String(userId || '');
