@@ -3,6 +3,23 @@ const store = require('../utils/store');
 
 const STATE_KEY = 'nickColors.json';
 
+// Compatibilidade com painéis antigos: eles salvaram o número exibido no embed
+// como emoji, embora a reação real adicionada à mensagem seja o emoji colorido.
+const LEGACY_COLOR_EMOJI = {
+    'Vermelho': '🔴', 'Laranja': '🟠', 'Amarelo': '🟡', 'Verde': '🟢',
+    'Azul': '🔵', 'Roxo': '🟣', 'Rosa': '🩷', 'Ciano': '🩵',
+    'Marrom': '🟤', 'Cinza': '⚪', 'Vermelho escuro': '🔻', 'Dourado': '⭐',
+    'Verde-água': '🔹', 'Azul-marinho': '🔷', 'Lavanda': '💜',
+    'Coral': '🧡', 'Menta': '💚', 'Prata': '🔘', 'Violeta': '💟',
+    'Turquesa': '🩵'
+};
+
+function reactionMatchesColor(color, reactionName) {
+    return color.emoji === reactionName ||
+        color.colorEmoji === reactionName ||
+        LEGACY_COLOR_EMOJI[color.name] === reactionName;
+}
+
 function getState() {
     const value = store.load(STATE_KEY, {});
     return value && typeof value === 'object' ? value : {};
@@ -30,8 +47,11 @@ async function handleAdd(reaction, user) {
 
     const panel = (guildState.panels || []).find((item) => item.messageId === resolved.message.id);
     if (!panel) return;
-    const choice = (panel.colors || []).find((item) => item.emoji === resolved.emoji.name);
-    if (!choice) return;
+    const choice = (panel.colors || []).find((item) => reactionMatchesColor(item, resolved.emoji.name));
+    if (!choice) {
+        console.info(`[colorirNick] Reação ignorada: emoji ${resolved.emoji.name} não corresponde a uma cor do painel ${resolved.message.id}.`);
+        return;
+    }
 
     const member = await guild.members.fetch(user.id).catch(() => null);
     if (!member || member.user.bot) return;
@@ -192,7 +212,7 @@ async function rebuildRolesOnStartup(client) {
                 .setTitle('🎨 COLORIR NICK')
                 .setDescription('Reaja com o símbolo correspondente para escolher a cor do seu nick.\\n\\n**Você pode ter apenas uma cor por vez.** Se escolher outra, a cor anterior será removida.')
                 .addFields((panel.colors || []).map((color) => ({
-                    name: color.emoji + '  ' + (color.name || 'Cor'),
+                    name: (LEGACY_COLOR_EMOJI[color.name] || color.emoji || '🎨') + '  ' + (color.name || 'Cor'),
                     value: '**' + (color.hex || '#A78BFA') + '** · <@&' + color.roleId + '>',
                     inline: true
                 })))
