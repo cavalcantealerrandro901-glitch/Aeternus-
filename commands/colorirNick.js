@@ -1,7 +1,8 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits
+    PermissionFlagsBits,
+    MessageFlags
 } = require('discord.js');
 const store = require('../utils/store');
 
@@ -56,14 +57,14 @@ module.exports = {
 
     async executeSlash(interaction) {
         if (!interaction.inGuild()) {
-            return interaction.reply({ content: '❌ Use este comando dentro de um servidor.', ephemeral: true });
+            return interaction.reply({ content: '❌ Use este comando dentro de um servidor.', flags: MessageFlags.Ephemeral });
         }
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-            return interaction.reply({ content: '❌ Você precisa da permissão Gerenciar cargos.', ephemeral: true });
+            return interaction.reply({ content: '❌ Você precisa da permissão Gerenciar cargos.', flags: MessageFlags.Ephemeral });
         }
 
         const guild = interaction.guild;
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
         if (!me?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
