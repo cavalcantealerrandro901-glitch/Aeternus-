@@ -42,11 +42,6 @@ async function handleAdd(reaction, user) {
     if (current?.roleId === choice.roleId) return;
 
     try {
-        if (!member.manageable) {
-            await resolved.users.remove(user.id).catch(() => {});
-            return;
-        }
-
         if (current?.roleId && member.roles.cache.has(current.roleId)) {
             await member.roles.remove(current.roleId, 'Aeternus • troca da cor do nick');
         }
