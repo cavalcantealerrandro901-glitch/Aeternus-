@@ -377,7 +377,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('add-drop-template').addEventListener('click', () => {
     const templates = collectTemplates();
     const idNew = 'template-' + Date.now();
-    templates.push({ id: idNew, name: 'Novo modelo', title: '🎁 DROP EM ANDAMENTO', description: '**Prêmio:** {prize}\\n**Vencedores:** {winners_count}\\n**Termina:** {ends}\\n\\nClique em **Participar** para entrar.', footer: 'Aeternus · {participants} participante(s)', color: $('drop-color').value });
+    templates.push({ id: idNew, name: 'Novo modelo', title: '🎁 DROP EM ANDAMENTO', description: '**Prêmio:** {prize}\n**Vencedores:** {winners_count}\n**Termina:** {ends}\n\nClique em **Participar** para entrar.', footer: 'Aeternus · {participants} participante(s)', color: $('drop-color').value });
     renderTemplates(templates);
     $('drop-template').value = idNew;
   });
