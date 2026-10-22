@@ -8,6 +8,7 @@ const CHOICES = {
     tesoura: { label: 'Tesoura', emoji: '✌️', beats: 'papel' }
 };
 const games = new Map();
+const finishedGames = new Map();
 const GAME_TIMEOUT = 5 * 60 * 1000;
 
 function fmt(n) {
@@ -57,7 +58,15 @@ function gameButtons(game, disabled = false) {
     );
 }
 
-async function startGame({ challenger, opponent, channel, bet = 0 }) {
+function againButton(game, disabled = false) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`ppt:again:${game.id}`)
+            .setLabel('Jogar novamente').setEmoji('🔁')
+            .setStyle(ButtonStyle.Success).setDisabled(disabled)
+    );
+}
+
+async function startGame({ challenger, opponent, channel, bet = 0, replyTo = null }) {
     if (!opponent) return { error: 'Mencione uma pessoa válida para desafiar.' };
     if (challenger.id === opponent.id) return { error: 'Você não pode jogar contra si mesmo.' };
     if (bet > 0) {
@@ -90,7 +99,7 @@ async function startGame({ challenger, opponent, channel, bet = 0 }) {
     }, GAME_TIMEOUT);
 
     try {
-        game.message = await channel.send({ content: `🎮 Desafio: <@${game.challenger}> contra <@${game.opponent}>`, allowedMentions: { users: [game.challenger, game.opponent] }, embeds: [gameEmbed(game)], components: [gameButtons(game)] });
+        game.message = await channel.send({ content: `🎮 Desafio: <@${game.challenger}> contra <@${game.opponent}>`, allowedMentions: { users: [game.challenger, game.opponent] }, ...(replyTo ? { reply: { messageReference: replyTo.id, failIfNotExists: false } } : {}), embeds: [gameEmbed(game)], components: [gameButtons(game)] });
     } catch (e) {
         clearTimeout(game.timeout);
         games.delete(id);
@@ -127,7 +136,10 @@ async function settle(game) {
         }
     }
     games.delete(game.id);
-    await game.message.edit({ embeds: [gameEmbed(game, true)], components: [gameButtons(game, true)] });
+    finishedGames.set(game.id, game);
+    const cleanup = setTimeout(() => finishedGames.delete(game.id), 15 * 60 * 1000);
+    cleanup.unref?.();
+    await game.message.edit({ embeds: [gameEmbed(game, true)], components: [gameButtons(game, true), againButton(game)] });
 }
 
 module.exports = {
@@ -171,7 +183,23 @@ module.exports = {
     },
 
     async handleComponent(i) {
-        const [, id, choice] = String(i.customId || '').split(':');
+        const customId = String(i.customId || '');
+        if (customId.startsWith('ppt:again:')) {
+            const id = customId.split(':')[2];
+            const previous = finishedGames.get(id);
+            if (!previous || previous.rematchStarted) return i.reply({ content: 'Este botão de revanche expirou ou já foi usado.', flags: MessageFlags.Ephemeral });
+            if (i.user.id !== previous.challenger && i.user.id !== previous.opponent) return i.reply({ content: 'Só os dois jogadores da partida podem jogar novamente.', flags: MessageFlags.Ephemeral });
+            previous.rematchStarted = true;
+            await i.deferUpdate();
+            await i.message.edit({ components: [gameButtons(previous, true), againButton(previous, true)] }).catch(() => {});
+            const challenger = await i.client.users.fetch(previous.challenger).catch(() => null);
+            const opponent = await i.client.users.fetch(previous.opponent).catch(() => null);
+            if (!challenger || !opponent) return i.followUp({ content: 'Não consegui localizar os dois jogadores para iniciar outra partida.', flags: MessageFlags.Ephemeral });
+            const result = await startGame({ challenger, opponent, channel: i.channel, bet: previous.bet, replyTo: i.message });
+            if (result.error) { previous.rematchStarted = false; return i.followUp({ content: '❌ ' + result.error, flags: MessageFlags.Ephemeral }); }
+            return;
+        }
+        const [, id, choice] = customId.split(':');
         const game = games.get(id);
         if (!game || game.done) return i.reply({ content: 'Esta partida expirou ou já terminou.', flags: MessageFlags.Ephemeral });
         if (!CHOICES[choice]) return i.reply({ content: 'Jogada inválida.', flags: MessageFlags.Ephemeral });
