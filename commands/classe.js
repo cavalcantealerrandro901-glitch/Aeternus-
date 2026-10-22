@@ -178,11 +178,11 @@ module.exports = {
         const sub = String(args[0] || 'listar').toLowerCase();
 
         if (sub === 'listar' || sub === 'lista' || sub === 'list') {
-            return message.reply(classListPayload('comum', 0, 'prefix'));
+            return message.reply('📜 O catálogo de classes está vazio no momento. As classes serão adicionadas novamente por **O.classe criar**.');
         }
 
         if (sub === 'escolher' || sub === 'escolha') {
-            return message.reply(chooseStartPayload());
+            return message.reply('⚔️ Não há classes disponíveis para escolher no momento. Aguarde as novas classes serem criadas.');
         }
 
         if (sub === 'criar') {
@@ -384,45 +384,8 @@ function listCatalogClasses(rarity) {
         return isUnique && classRarity === String(rarity).toLowerCase();
     });
 }
-function classListPayload(rarity = 'comum', page = 0, source = 'component') {
-    const rarityInfo = CLASS_RARITIES.find((r) => r.id === rarity) || CLASS_RARITIES[0];
-    const list = listCatalogClasses(rarityInfo.id);
-    const pageSize = 5;
-    const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
-    const safePage = Math.min(Math.max(0, Number(page) || 0), totalPages - 1);
-    const visible = list.slice(safePage * pageSize, safePage * pageSize + pageSize);
-    const lines = [];
-    lines.push('**✦ Raridade: ' + rarityInfo.name + '**');
-    lines.push('*Escolha uma classe para conhecer seu caminho.*', '');
-    for (const c of visible) {
-        lines.push((c.emoji || '✨') + ' **' + c.name + '**');
-        lines.push(c.desc || 'Sem descrição disponível.', '');
-    }
-    const emb = new EmbedBuilder()
-        .setColor(0xc9a227)
-        .setTitle('📜 CLASSES • AETERNUS')
-        .setDescription(lines.join('\n').trim() || '_Nenhuma classe disponível nesta raridade._')
-        .setFooter({ text: 'Página ' + (safePage + 1) + '/' + totalPages + ' • ' + list.length + ' classes • ' + rarityInfo.name });
-    const prev = new ButtonBuilder()
-        .setCustomId('classe:list:' + rarityInfo.id + ':prev:' + Math.max(0, safePage - 1))
-        .setLabel('Anterior').setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(safePage === 0);
-    const next = new ButtonBuilder()
-        .setCustomId('classe:list:' + rarityInfo.id + ':next:' + Math.min(totalPages - 1, safePage + 1))
-        .setLabel('Próxima').setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(safePage >= totalPages - 1);
-    const rarityIndex = CLASS_RARITIES.findIndex((r) => r.id === rarityInfo.id);
-    const nextRarity = CLASS_RARITIES[(rarityIndex + 1) % CLASS_RARITIES.length];
-    const rarityButton = new ButtonBuilder()
-        .setCustomId('classe:list:' + nextRarity.id + ':0')
-        .setLabel('Mudar raridade · ' + nextRarity.name).setStyle(ButtonStyle.Primary).setEmoji('🔄');
-    const chooseButton = new ButtonBuilder()
-        .setCustomId('classe:abrir')
-        .setLabel('Escolher uma classe')
-        .setStyle(ButtonStyle.Success)
-        .setEmoji('⚔️');
-    return { embeds: [emb], components: [
-        new ActionRowBuilder().addComponents(prev, next),
-        new ActionRowBuilder().addComponents(rarityButton, chooseButton)
-    ], flags: source !== 'prefix' ? MessageFlags.Ephemeral : undefined };
+function classListPayload() {
+    return { content: '📜 O catálogo de classes está vazio no momento.', components: [] };
 }
 
 function parseQuotedArgs(input) {
@@ -436,70 +399,11 @@ function parseQuotedArgs(input) {
 }
 
 function chooseStartPayload() {
-    return {
-        content: [
-            '# ✦ ESCOLHA SUA CLASSE',
-            '',
-            '## 🜂 O SEU CAMINHO COMEÇA AQUI',
-            '',
-            'Sua escolha define a classe que acompanhará seu personagem.',
-            '',
-            '⭐ **Raridade disponível:** Comum',
-            '🔒 **A escolha é permanente.**',
-            '',
-            'Pressione o botão abaixo para abrir o menu de classes.'
-        ].join('\n'),
-        components: [
-            new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('classe:abrir')
-                    .setLabel('Selecionar uma classe')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('⚔️')
-            )
-        ],
-        flags: MessageFlags.Ephemeral
-    };
+    return { content: '⚔️ Não há classes disponíveis para escolher no momento.', components: [], flags: MessageFlags.Ephemeral };
 }
 
 async function showChooseMenu(interaction, isUpdate = false) {
-    const list = classes.listSelectableClasses();
-    const options = list.slice(0, 30).map((c) => ({
-        label: String(c.name).slice(0, 100),
-        value: c.id,
-        emoji: c.emoji || '✨',
-        description: String(c.desc || 'Classe Comum').slice(0, 100)
-    }));
-
-    const rows = [];
-    for (let i = 0; i < options.length; i += 15) {
-        const chunk = options.slice(i, i + 15);
-        if (!chunk.length) continue;
-        rows.push(
-            new ActionRowBuilder().addComponents(
-                new StringSelectMenuBuilder()
-                    .setCustomId(`classe:sel:common:${Math.floor(i / 15)}`)
-                    .setPlaceholder(i === 0 ? 'Selecione uma classe Comum' : 'Mais classes Comuns')
-                    .addOptions(chunk)
-            )
-        );
-    }
-
-    const payload = {
-        content: [
-            '# ✦ SELECIONE SUA CLASSE',
-            '',
-            'Escolha uma das classes disponíveis para a sua raridade.',
-            '🔒 Depois de escolhida, a classe será permanente.'
-        ].join('\n'),
-        components: rows,
-        flags: MessageFlags.Ephemeral
-    };
-
-    if (!rows.length) {
-        payload.content = '# ✦ SELECIONE SUA CLASSE\n\nNenhuma classe Comum está disponível no momento.';
-    }
-
+    const payload = { content: '⚔️ Não há classes disponíveis para escolher no momento.', components: [], flags: MessageFlags.Ephemeral };
     if (isUpdate && interaction.isMessageComponent()) return interaction.update(payload);
     if (interaction.replied || interaction.deferred) return interaction.followUp(payload);
     return interaction.reply(payload);
