@@ -59,7 +59,7 @@ async function finishDrop(client, dropId, { isReroll = false } = {}) {
             : (isReroll ? '#FBBF24' : '#34D399');
         const winnerMentions = winners.map((w) => `<@${w.id}>`).join(' ');
         const winnerNames = winners.map((w) => `<@${w.id}>`).join(', ');
-        const replace = (text) => String(text || '').replace(/\\{(\\w+)\\}/g, (_, key) => ({
+        const replace = (text) => String(text || '').replace(/\{(\w+)\}/g, (_, key) => ({
             winners: winnerNames,
             winners_count: winners.length,
             prize: drop.prize?.label || '—',
@@ -89,7 +89,7 @@ async function finishDrop(client, dropId, { isReroll = false } = {}) {
                 ...lines,
                 '',
                 `🔁 Reroll: \`${rerollId}\``
-            ].join('\\n'))
+            ].join('\n'))
             .setFooter({ text: 'Aeternus • Resultado do drop' })
             .setTimestamp();
 
