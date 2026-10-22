@@ -492,13 +492,13 @@ module.exports = {
 
         if (!game) {
             return interaction
-                .reply({ content: 'Esta expedição expirou. Inicie outra com `O.minas <bombas> [valor]`.', ephemeral: true })
+                .reply({ content: 'Esta expedição expirou. Inicie outra com `O.minas <bombas> [valor]`.', flags: MessageFlags.Ephemeral })
                 .catch(() => {});
         }
 
         if (interaction.user.id !== game.userId) {
             return interaction
-                .reply({ content: 'Esta partida pertence a outra pessoa. Use `O.minas <bombas> [valor]` para jogar.', ephemeral: true })
+                .reply({ content: 'Esta partida pertence a outra pessoa. Use `O.minas <bombas> [valor]` para jogar.', flags: MessageFlags.Ephemeral })
                 .catch(() => {});
         }
 
@@ -511,7 +511,7 @@ module.exports = {
         try {
             if ((game.dead || game.cashed) && action !== 'refresh' && action !== 'again') {
                 return interaction
-                    .reply({ content: 'Esta partida terminou. Clique em **Nova expedição** para jogar novamente.', ephemeral: true })
+                    .reply({ content: 'Esta partida terminou. Clique em **Nova expedição** para jogar novamente.', flags: MessageFlags.Ephemeral })
                     .catch(() => {});
             }
 
@@ -520,7 +520,7 @@ module.exports = {
             if (action === 'again') {
                 if (!game.dead && !game.cashed) {
                     return interaction
-                        .reply({ content: 'Sua partida ainda está ativa. Termine-a antes de iniciar outra.', ephemeral: true })
+                        .reply({ content: 'Sua partida ainda está ativa. Termine-a antes de iniciar outra.', flags: MessageFlags.Ephemeral })
                         .catch(() => {});
                 }
 
@@ -544,7 +544,7 @@ module.exports = {
                         return interaction
                             .reply({
                                 content: '❌ Éter insuficiente: você precisa de ' + fmt(game.amount) + ' ✨ para repetir a aposta.',
-                                ephemeral: true
+                                flags: MessageFlags.Ephemeral
                             })
                             .catch(() => {});
                     }
@@ -611,7 +611,7 @@ module.exports = {
                 const idx = pickRandom(game);
                 if (idx == null) {
                     return interaction
-                        .reply({ content: 'Não há casas livres nesta partida.', ephemeral: true })
+                        .reply({ content: 'Não há casas livres nesta partida.', flags: MessageFlags.Ephemeral })
                         .catch(() => {});
                 }
                 const res = openCell(game, idx);
@@ -629,7 +629,7 @@ module.exports = {
                 const opened = game.opened.size;
                 if (opened <= 0) {
                     return interaction
-                        .reply({ content: '🔒 Abra pelo menos um cristal antes de sacar.', ephemeral: true })
+                        .reply({ content: '🔒 Abra pelo menos um cristal antes de sacar.', flags: MessageFlags.Ephemeral })
                         .catch(() => {});
                 }
                 if (game.cashed) {
@@ -643,7 +643,7 @@ module.exports = {
                 if (win <= 0 && !game.fun && !game.testMode) {
                     game.cashed = false;
                     return interaction
-                        .reply({ content: '❌ Valor de saque inválido. Atualize o painel e tente novamente.', ephemeral: true })
+                        .reply({ content: '❌ Valor de saque inválido. Atualize o painel e tente novamente.', flags: MessageFlags.Ephemeral })
                         .catch(() => {});
                 }
 
@@ -657,7 +657,7 @@ module.exports = {
                         game.cashed = false;
                         game._lastWin = 0;
                         return interaction
-                            .reply({ content: '❌ Não foi possível concluir o saque. Tente novamente; se persistir, avise a equipe.', ephemeral: true })
+                            .reply({ content: '❌ Não foi possível concluir o saque. Tente novamente; se persistir, avise a equipe.', flags: MessageFlags.Ephemeral })
                             .catch(() => {});
                     }
                 }
@@ -671,7 +671,7 @@ module.exports = {
                 const idx = parseInt(parts[3], 10);
                 if (Number.isNaN(idx) || idx < 0 || idx >= TOTAL) {
                     return interaction
-                        .reply({ content: 'Casa inválida. Escolha uma das 16 casas do tabuleiro.', ephemeral: true })
+                        .reply({ content: 'Casa inválida. Escolha uma das 16 casas do tabuleiro.', flags: MessageFlags.Ephemeral })
                         .catch(() => {});
                 }
                 const res = openCell(game, idx);
