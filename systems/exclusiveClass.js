@@ -2,6 +2,8 @@ const classes = require('../utils/classes');
 const player = require('../utils/player');
 
 const EXCLUSIVES = [
+  { classId:'cavaleiro_negro', owner:'1510077259518710061', gear:[] },
+
   { classId:'ceifador_negro', owner:'1483097258944630897', gear:[
     {id:'foice_grande',name:'Foice Grande',emoji:'🪓',category:'arma',rarity:'mitica',classId:'ceifador_negro',effects:{forca:900,agilidade:650,dano:850}},
     {id:'manto_negro_armadura',name:'Manto Negro',emoji:'🧥',category:'armadura',rarity:'lendaria',classId:'ceifador_negro',effects:{defesa:800,agilidade:500,vida:750}},
@@ -41,7 +43,17 @@ function setup() {
     for (const ex of EXCLUSIVES) {
       const owner=String(ex.owner);
       if (!player.has(owner)) continue;
-      player.update(owner,{classId:ex.classId,class:ex.classId});
+      if (ex.classId === 'cavaleiro_negro') {
+        const profile = player.get(owner);
+        profile.classId = ex.classId;
+        profile.class = ex.classId;
+        profile.updatedAt = Date.now();
+        const profiles = player.all();
+        profiles[owner] = profile;
+        player.save(profiles);
+      } else {
+        player.update(owner,{classId:ex.classId,class:ex.classId});
+      }
       grantGear(owner,ex.gear);
       console.log('[exclusiveClass] itens conferidos → '+ex.classId+' / '+owner);
     }
