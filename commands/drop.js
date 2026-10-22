@@ -93,8 +93,12 @@ function buildListPayload(drop, page) {
 }
 
 function replaceTemplate(text, values) {
-    return String(text || '').replace(/\\{(\\w+)\\}/g, (_, key) =>
-        values[key] == null ? '' : String(values[key])
+    // Substitui {variaveis} no título, descrição e rodapé do modelo.
+    // A regex precisa de uma única barra invertida para reconhecer chaves literais.
+    return String(text || '').replace(/\{(\w+)\}/g, (match, key) =>
+        Object.prototype.hasOwnProperty.call(values, key) && values[key] != null
+            ? String(values[key])
+            : match
     );
 }
 
