@@ -186,7 +186,14 @@ module.exports = {
         }
 
         if (sub === 'criar') {
-            const rawDescription = args.slice(1).join(' ').trim();
+            const originalDescription = args.slice(1).join(' ').trim();
+            const targetMatch = originalDescription.match(/<@!?(\d{17,20})>|\b(?:para|pro|pra)\s+(\d{17,20})\b/i);
+            const targetUserId = targetMatch ? (targetMatch[1] || targetMatch[2]) : null;
+            const rawDescription = originalDescription
+                .replace(/<@!?\d{17,20}>/g, ' ')
+                .replace(/\b(?:dar|entregar|atribuir)\s+(?:a\s+)?classe\s+(?:para|pro|pra)\s+/ig, ' ')
+                .replace(/\b(?:para|pro|pra)\s+\d{17,20}\b/ig, ' ')
+                .trim();
             if (!rawDescription) return message.reply('❌ Informe a descrição completa da classe. Use: O.classe criar "descrição completa da classe"');
 
             let isOwner = false;
@@ -221,14 +228,27 @@ module.exports = {
                 });
                 const createdItems = items.createCustomItems(generated.items, cls.id);
                 if (createdItems.length !== 3) return message.reply('❌ A classe foi gerada, mas os 3 itens exclusivos não puderam ser registrados.');
-                const updated = classes.updateCustomClass(cls.id, {
+                let updated = classes.updateCustomClass(cls.id, {
                     exclusiveItems: createdItems.map((item) => item.id),
-                    classGear: { armor: createdItems.find((x) => x.category === 'armadura')?.id || null, accessory: createdItems.find((x) => x.category === 'acessorio')?.id || null }
+                    classGear: { armor: createdItems.find((x) => x.category === 'armadura')?.id || null, accessory: createdItems.find((x) => x.category === 'acessorio')?.id || null },
+                    ...(targetUserId ? { exclusive: true, maxHolders: 1, boundUserId: targetUserId, selectionPool: null } : {})
                 }) || cls;
+                let assignmentNote = '';
+                if (targetUserId) {
+                    const targetProfile = player.get(targetUserId);
+                    if (!targetProfile) {
+                        assignmentNote = '\n\n⚠️ A classe foi criada, mas <@' + targetUserId + '> ainda não tem perfil no RPG.';
+                    } else {
+                        const profiles = player.all();
+                        profiles[targetUserId] = { ...targetProfile, classId: updated.id, class: updated.id, updatedAt: Date.now() };
+                        player.save(profiles);
+                        assignmentNote = '\n\n✅ Classe atribuída diretamente para <@' + targetUserId + '>.';
+                    }
+                }
                 const itemLines = createdItems.map((item) => item.emoji + ' **' + item.name + '** · ' + item.category).join('\n');
                 const attrLines = Object.entries(generated.attributes).map(([key, value]) => key + ': **' + value + '**').join(' · ');
                 return message.reply({
-                    content: ['# ✦ NOVA CLASSE GERADA', '', updated.emoji + ' **' + updated.name + '**', '⭐ Raridade: **' + updated.rarityName + '**', '⚔️ Tipo: **' + updated.type + '**', '', '📊 **Atributos:** ' + attrLines, '', '🎒 **Itens exclusivos:**', itemLines].join('\n'),
+                    content: ['# ✦ NOVA CLASSE GERADA', '', updated.emoji + ' **' + updated.name + '**', '⭐ Raridade: **' + updated.rarityName + '**', '⚔️ Tipo: **' + updated.type + '**', '', '📊 **Atributos:** ' + attrLines, '', '🎒 **Itens exclusivos:**', itemLines].join('\\n') + assignmentNote,
                     embeds: [classEmbed(updated)]
                 });
             } catch (e) {
