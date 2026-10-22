@@ -8,7 +8,7 @@ const CHOICES = {
     tesoura: { label: 'Tesoura', emoji: '✌️', beats: 'papel' }
 };
 const games = new Map();
-const GAME_TIMEOUT = 2 * 60 * 1000;
+const GAME_TIMEOUT = 5 * 60 * 1000;
 
 function fmt(n) {
     return Number(n || 0).toLocaleString('pt-BR');
@@ -31,7 +31,7 @@ function gameEmbed(game, result = false) {
             game.bet ? (game.result === 'empate'
                 ? `✨ A aposta de **${fmt(game.bet)} éter** foi devolvida para cada jogador.`
                 : `💰 O vencedor recebeu **${fmt(game.bet * 2)} éter**.`) : '🎮 Partida por diversão.'
-        ].join('\\n')
+        ].join('\n')
         : [
             `👤 <@${game.challenger}> contra <@${game.opponent}>`,
             game.bet ? `💰 Aposta: **${fmt(game.bet)} éter por jogador**` : '🎮 Modo diversão • sem aposta',
@@ -40,7 +40,7 @@ function gameEmbed(game, result = false) {
             `<@${game.opponent}>, escolha também. As escolhas ficam ocultas até ambos decidirem.`,
             '',
             `Status: ${game.choices[game.challenger] ? '✅' : '⏳'} ${game.challengerName} • ${game.choices[game.opponent] ? '✅' : '⏳'} ${game.opponentName}`
-        ].join('\\n');
+        ].join('\n');
 
     return new EmbedBuilder()
         .setColor(result ? (game.result === 'empate' ? 0xf59e0b : 0x8b5cf6) : 0x8b5cf6)
