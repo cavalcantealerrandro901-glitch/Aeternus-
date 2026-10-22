@@ -74,6 +74,18 @@ const BASE_CLASSES = {
         basicAttack: { id: 'golpe_bengala', name: 'Golpe de Bengala', emoji: '🪄', type: 'magic', power: 1.15, mana: 0 },
         classGear: { weapon: 'olho_infinito_absoluto', armor: 'escudo_deducao_cosmica_suprema', accessory: 'reliquia_verdade_absoluta' }
     },
+    cavaleiro_negro: {
+        id: 'cavaleiro_negro', name: 'Cavaleiro Negro', emoji: '🖤', type: 'melee', rarity: 'unica', rarityName: 'Única',
+        maxHolders: 1, exclusive: true, boundUserId: '1510077259518710061',
+        desc: 'Um cavaleiro lendário envolto em trevas. Classe Única vinculada.',
+        uniqueAbilities: [], activeAbilities: ['Corte Sombrio', 'Investida Negra', 'Muralha Obsidiana', 'Lâmina do Eclipse'],
+        uniquePassives: [], passives: ['Aura Sombria', 'Vontade Inabalável', 'Armadura das Trevas'],
+        powers: ['Corte Sombrio', 'Investida Negra', 'Muralha Obsidiana', 'Lâmina do Eclipse'],
+        disadvantages: ['Classe exclusiva vinculada'],
+        bonus: { forca: 4, defesa: 4, agilidade: 2, vida: 3 }, manaMult: 1, color: 0x111827,
+        basicAttack: { id: 'golpe_cavaleiro_negro', name: 'Golpe Sombrio', emoji: '⚔️', type: 'physical', power: 1.2, mana: 0 },
+        classGear: null
+    },
     ceifador_negro: {
         id: 'ceifador_negro', name: 'Ceifador Negro', emoji: '💀', type: 'melee', rarity: 'unica', rarityName: 'Única',
         maxHolders: 1, exclusive: true, boundUserId: '1483097258944630897',
