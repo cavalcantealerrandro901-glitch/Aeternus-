@@ -256,6 +256,9 @@ module.exports = {
 
     async handleComponent(interaction) {
         const id = interaction.customId || '';
+        if (id.startsWith('classe:list:') || id === 'classe:abrir' || id === 'classe:lista' || id.startsWith('classe:pick:') || id.startsWith('classe:sel:')) {
+            return interaction.reply({ content: '⚔️ O catálogo antigo foi desativado. As classes serão recriadas pelo comando **O.classe criar**.', flags: MessageFlags.Ephemeral });
+        }
         if (id.startsWith('classe:list:')) {
             const parts = id.split(':');
             const rarity = parts[2] || 'comum';
