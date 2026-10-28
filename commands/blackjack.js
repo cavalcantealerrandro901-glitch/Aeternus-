@@ -95,10 +95,12 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
     const playerTotal = handTotal(session.player);
     const status = phase === 'dealer' ? '✦ VEZ DA AETERNUS' : result ? (result === 'bj' ? '✦ BLACKJACK NATURAL' : result === 'win' ? '✦ VITÓRIA' : result === 'push' ? '✦ EMPATE' : result === 'bust' ? '✦ ESTOURO' : '✦ FIM DA PARTIDA') : '✦ SUA VEZ';
     const lines = [
-        '# ✧ A E T E R N U S',
-        '## BLACKJACK · MESA DE ÉTER',
-        '━━━━━━━━━━━━━━━━━━━━',
         `**✧ SUA APOSTA**\n✨ ${fmt(session.amount)} Éter${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
+        phase === 'play'
+            ? (session.hits > 0
+                ? '🌌 *Cada nova carta altera o destino. A Aeternus observa sua próxima escolha…*'
+                : '✧ *O destino está nas cartas. Que o Éter guie sua decisão.*')
+            : '',
         session.insured ? `🛡️ **Seguro contratado:** ${fmt(INSURANCE_COST)} Éter · cobertura de ${fmt(session.insuranceCoverage)} Éter` : '',
         `**♜ DEALER**\n${handLabel(session.dealer, hide)}`,
         `**♠ SUA MÃO**\n${handLabel(session.player)}`,
@@ -115,7 +117,16 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
         lines.push(`> 📊 **Sua pontuação:** ${playerTotal}`, hide ? '> 🔒 A segunda carta do dealer está oculta.' : '', '_Blackjack natural paga 3:2 · Dealer para em 17 · Ás vale 1 ou 11._');
     }
     if (note) lines.push(note);
-    const panel = new ContainerBuilder().setAccentColor(color).addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.filter(Boolean).join('\n')));
+    const panel = new ContainerBuilder().setAccentColor(color);
+    const heading = new SectionBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# ✧ A E T E R N U S\n## BLACKJACK · MESA DE ÉTER\n━━━━━━━━━━━━━━━━━━━━'));
+    if (session.artUrl) {
+        heading.setThumbnailAccessory(new ThumbnailBuilder()
+            .setURL(session.artUrl)
+            .setDescription('A Aeternus observa a mesa de Éter.'));
+    }
+    panel.addSectionComponents(heading)
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.filter(Boolean).join('\n')));
     if (phase === 'play') {
         panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
             .addActionRowComponents(playButtons(session.userId, session.firstAction && session.player.length === 2 && eter.get(session.userId) >= session.amount, session));
