@@ -82,12 +82,15 @@ function handLabel(cards, hideHole = false) {
     const bj = isBlackjack(cards) ? ' · BJ' : '';
     return `${showHand(cards)}   (**${t}**${soft}${bj})`;
 }
-function mood(result) {
-    if (result === 'bj') return '✦ 🌟 **BLACKJACK NATURAL**\n> 21 logo na abertura. A mesa não poderia pedir um começo melhor.';
-    if (result === 'win') return '✦ 🏆 **VITÓRIA**\n> A sua mão terminou acima da banca. O Éter da rodada agora é seu.';
-    if (result === 'push') return '✦ ⚖️ **EMPATE**\n> As mãos terminaram iguais. Sua aposta retorna sem alteração.';
-    if (result === 'bust') return '✦ 💥 **PASSOU DE 21**\n> A última carta ultrapassou o limite. Esta rodada fica com a banca.';
-    return '✦ 🌑 **DERROTA**\n> Desta vez, a banca levou a melhor. Sua próxima decisão começa uma nova mão.';
+function mood(result, session, payout = 0) {
+    const playerScore = handTotal(session.player);
+    const dealerScore = handTotal(session.dealer);
+    const profit = Math.max(0, payout - session.amount);
+    if (result === 'bj') return `✦ 🌟 **BLACKJACK NATURAL**\n> Sua mão fechou em **21 pontos** logo nas duas primeiras cartas. Você recebeu **${fmt(payout)} Éter** e saiu com **${fmt(profit)} Éter de lucro**.`;
+    if (result === 'win') return `✦ 🏆 **VITÓRIA**\n> Sua mão fez **${playerScore} pontos**, contra **${dealerScore} da banca**. Você recebeu **${fmt(payout)} Éter** e terminou com **${fmt(profit)} Éter de lucro**.`;
+    if (result === 'push') return `✦ ⚖️ **EMPATE**\n> Sua mão e a banca fecharam em **${playerScore} pontos**. Os **${fmt(session.amount)} Éter** da aposta foram devolvidos; sem lucro ou prejuízo nesta rodada.`;
+    if (result === 'bust') return `✦ 💥 **PASSOU DE 21**\n> Sua mão chegou a **${playerScore} pontos** e ultrapassou o limite. A aposta de **${fmt(session.amount)} Éter** foi perdida${session.insured ? `; o seguro devolveu **${fmt(session.insuranceCoverage)} Éter**` : ''}.`;
+    return `✦ 🌑 **DERROTA**\n> Sua mão terminou com **${playerScore} pontos**, enquanto a banca fez **${dealerScore}**. A aposta de **${fmt(session.amount)} Éter** foi perdida${session.insured ? `, mas o seguro recuperou **${fmt(session.insuranceCoverage)} Éter**` : ''}.`;
 }
 function tableEmbed(session, { phase = 'play', result = null, payout = 0, note = null } = {}) {
     const hide = phase === 'play';
@@ -109,7 +112,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
         `**✧ SUA APOSTA**`,
         `✨ **${fmt(session.amount)} Éter**${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
         result
-            ? mood(result)
+            ? mood(result, session, payout)
             : phase === 'play'
                 ? (session.hits > 0
                     ? '*🌌 Cada nova carta altera o destino. A Aeternus observa sua próxima escolha…*'
