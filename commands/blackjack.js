@@ -105,39 +105,62 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
         : art.table;
     const playerTotal = handTotal(session.player);
     const status = phase === 'dealer' ? '✦ VEZ DA AETERNUS' : result ? (result === 'bj' ? '✦ BLACKJACK NATURAL' : result === 'win' ? '✦ VITÓRIA' : result === 'push' ? '✦ EMPATE' : result === 'bust' ? '✦ ESTOURO' : '✦ FIM DA PARTIDA') : '✦ SUA VEZ';
-    const lines = [
-        `**✧ SUA APOSTA**\n✨ ${fmt(session.amount)} Éter${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
+    const betBlock = [
+        `**✧ SUA APOSTA**`,
+        `✨ **${fmt(session.amount)} Éter**${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
         phase === 'play'
             ? (session.hits > 0
-                ? '🌌 *Cada nova carta altera o destino. A Aeternus observa sua próxima escolha…*'
-                : '✧ *O destino está nas cartas. Que o Éter guie sua decisão.*')
-            : '',
-        session.insured ? `🛡️ **Seguro contratado:** ${fmt(INSURANCE_COST)} Éter · cobertura de ${fmt(session.insuranceCoverage)} Éter` : '',
-        `**♜ DEALER**\n${handLabel(session.dealer, hide)}`,
-        `**♠ SUA MÃO**\n${handLabel(session.player)}`,
-        `> ${status}`
-    ];
+                ? '*🌌 Cada nova carta altera o destino. A Aeternus observa sua próxima escolha…*'
+                : '*✧ O destino está nas cartas. Que o Éter guie sua decisão.*')
+            : null,
+        session.insured ? `🛡️ Seguro: **${fmt(INSURANCE_COST)} Éter** · cobertura: **${fmt(session.insuranceCoverage)} Éter**` : null
+    ].filter(Boolean).join('\n');
+
+    const dealerBlock = [
+        '**♜ DEALER**',
+        handLabel(session.dealer, hide)
+    ].join('\n');
+
+    const playerBlock = [
+        '**♠ SUA MÃO**',
+        handLabel(session.player),
+        `📊 Pontuação: **${playerTotal}**`
+    ].join('\n');
+
+    const details = [];
     if (result) {
-        lines.push(mood(result));
-        if (payout > 0) lines.push(`> ✨ **Recebido:** +${fmt(payout)} Éter`);
-        if (result === 'lose' || result === 'bust') lines.push(`> 💫 **Perdido:** −${fmt(session.amount)} Éter`);
-        if (result === 'push') lines.push('> ↩️ Sua aposta foi devolvida.');
-        if (session.insured && (result === 'lose' || result === 'bust')) lines.push(`> 🛡️ **Seguro acionado:** +${fmt(session.insuranceCoverage)} Éter recuperados.`);
-        lines.push(`> 🪙 **Saldo atual:** ${fmt(eter.get(session.userId))} Éter`);
+        details.push(mood(result));
+        if (payout > 0) details.push(`✨ **Recebido:** +${fmt(payout)} Éter`);
+        if (result === 'lose' || result === 'bust') details.push(`💫 **Perdido:** −${fmt(session.amount)} Éter`);
+        if (result === 'push') details.push('↩️ Sua aposta foi devolvida.');
+        if (session.insured && (result === 'lose' || result === 'bust')) details.push(`🛡️ **Seguro acionado:** +${fmt(session.insuranceCoverage)} Éter recuperados.`);
+        details.push(`🪙 **Saldo atual:** ${fmt(eter.get(session.userId))} Éter`);
     } else {
-        lines.push(`> 📊 **Sua pontuação:** ${playerTotal}`, hide ? '> 🔒 A segunda carta do dealer está oculta.' : '', '_Blackjack natural paga 3:2 · Dealer para em 17 · Ás vale 1 ou 11._');
+        if (hide) details.push('🔒 A segunda carta do dealer está oculta.');
+        details.push('_Blackjack natural paga 3:2 · Dealer para em 17 · Ás vale 1 ou 11._');
     }
-    if (note) lines.push(note);
+    if (note) details.push(note);
+
     const panel = new ContainerBuilder().setAccentColor(color);
     const heading = new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# ✧ A E T E R N U S\n## BLACKJACK · MESA DE ÉTER\n━━━━━━━━━━━━━━━━━━━━'));
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# ✧ A E T E R N U S\n## BLACKJACK · MESA DE ÉTER'));
     if (imageUrl) {
         heading.setThumbnailAccessory(new ThumbnailBuilder()
             .setURL(imageUrl)
             .setDescription('Ilustração da Aeternus para esta fase da mesa.'));
     }
     panel.addSectionComponents(heading)
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.filter(Boolean).join('\n')));
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(betBlock))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(dealerBlock))
+        .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(playerBlock));
+
+    if (details.length) {
+        panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(details.join('\n')));
+    }
     if (phase === 'play') {
         panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
             .addActionRowComponents(playButtons(session.userId, session.firstAction && session.player.length === 2 && eter.get(session.userId) >= session.amount, session));
