@@ -93,7 +93,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
 
     const playerTotal = handTotal(session.player);
     const dealerTotal = hide ? null : handTotal(session.dealer);
-    const status = result
+    const status = phase === 'dealer' ? '✦ VEZ DA AETERNUS' : result
         ? (result === 'bj' ? '✦ BLACKJACK NATURAL' :
            result === 'win' ? '✦ VITÓRIA' :
            result === 'push' ? '✦ EMPATE' :
@@ -344,11 +344,42 @@ module.exports = {
         }
 
         if (action === 'stand') {
-            dealerPlay(session);
+            // Mostra a Aeternus jogando, uma carta por vez.
+            await interaction.update({
+                embeds: [tableEmbed(session, {
+                    phase: 'dealer',
+                    note: '🌌 **A Aeternus está comprando cartas...**'
+                })],
+                components: []
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 900));
+
+            while (handTotal(session.dealer) < 17) {
+                session.dealer.push(draw(session.deck));
+                await interaction.editReply({
+                    embeds: [tableEmbed(session, {
+                        phase: 'dealer',
+                        note: `🃏 **A Aeternus comprou uma carta:** ${showCard(session.dealer[session.dealer.length - 1])}`
+                    })],
+                    components: []
+                });
+                await new Promise(resolve => setTimeout(resolve, 1100));
+            }
+
+            await interaction.editReply({
+                embeds: [tableEmbed(session, {
+                    phase: 'dealer',
+                    note: '✧ A Aeternus encerrou a compra e está revelando o resultado...'
+                })],
+                components: []
+            });
+            await new Promise(resolve => setTimeout(resolve, 800));
+
             const { result, payout } = settle(session);
             const original = session.doubled ? Math.floor(session.amount / 2) : session.amount;
             sessions.delete(userId);
-            return interaction.update({
+            return interaction.editReply({
                 embeds: [tableEmbed(session, { phase: 'end', result, payout })],
                 components: [againRow(userId, original)]
             });
