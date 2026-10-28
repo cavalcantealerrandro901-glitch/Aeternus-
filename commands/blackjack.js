@@ -21,6 +21,8 @@ const savedBlackjack = store.load('blackjack_sessions.json', { nextGameId: 1, ac
 const sessions = new Map(Object.entries(savedBlackjack?.active || {}));
 let nextGameId = Math.max(Number(savedBlackjack?.nextGameId) || 1, ...[...sessions.values()].map(s => (Number(s.gameId) || 0) + 1), 1);
 const INSURANCE_COST = 100000;
+const MIN_BET = 100;
+const MAX_BET = 50000000;
 async function persistSessions() {
     store.save('blackjack_sessions.json', { nextGameId, active: Object.fromEntries(sessions) });
     try { await store.flush(); } catch (error) { console.error('[blackjack] Falha ao salvar partidas:', error.message); }
@@ -203,7 +205,7 @@ function playButtons(userId, canDouble, session) {
         new ButtonBuilder().setCustomId(`blackjack:hit:${userId}`).setLabel('Carta').setEmoji('🃏').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`blackjack:stand:${userId}`).setLabel('Parar').setEmoji('🛑').setStyle(ButtonStyle.Secondary)
     );
-    if (canDouble) {
+    if (canDouble && session.amount * 2 <= MAX_BET) {
         row.addComponents(
             new ButtonBuilder().setCustomId(`blackjack:double:${userId}`).setLabel('Dobrar').setEmoji('✖️').setStyle(ButtonStyle.Success)
         );
@@ -332,6 +334,8 @@ module.exports = {
     description: 'Blackjack · éter',
     async execute(message, args) {
         const bet = resolveBet(args[0], eter.get(message.author.id), { label: '✨' });
+        if (bet.ok && bet.amount < MIN_BET) return message.reply('❌ A aposta mínima no Blackjack é **100 Éter**.');
+        if (bet.ok && bet.amount > MAX_BET) return message.reply('❌ A aposta máxima no Blackjack é **50.000.000 Éter**.');
         if (!bet.ok)
             return message.reply(`❌ ${bet.error}\nUso: \`O.bj <valor|all|half>\``);
         if (sessions.has(message.author.id))
@@ -382,6 +386,8 @@ module.exports = {
         if (action === 'again') {
             const amount = parseInt(parts[3], 10);
             const bet = resolveBet(String(amount), eter.get(userId), { label: '✨' });
+            if (bet.ok && bet.amount < MIN_BET) return interaction.reply({ content: '❌ A aposta mínima no Blackjack é **100 Éter**.', flags: MessageFlags.Ephemeral });
+            if (bet.ok && bet.amount > MAX_BET) return interaction.reply({ content: '❌ A aposta máxima no Blackjack é **50.000.000 Éter**.', flags: MessageFlags.Ephemeral });
             if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
             if (sessions.has(userId)) {
                 return interaction.reply({
@@ -469,6 +475,8 @@ module.exports = {
         if (action === 'double') {
             if (!session.firstAction || session.player.length !== 2)
                 return interaction.reply({ content: 'Só na primeira ação.', flags: MessageFlags.Ephemeral });
+            if (session.amount * 2 > MAX_BET)
+                return interaction.reply({ content: '❌ Ao dobrar, a aposta ultrapassaria o limite de **50.000.000 Éter**.', flags: MessageFlags.Ephemeral });
             if (eter.get(userId) < session.amount)
                 return interaction.reply({
                     content: `❌ ✨ insuficiente. Precisa de **${fmt(session.amount)}**.`,
