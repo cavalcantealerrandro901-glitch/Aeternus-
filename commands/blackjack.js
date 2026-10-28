@@ -1,5 +1,8 @@
 const {
-    EmbedBuilder,
+    ContainerBuilder,
+    TextDisplayBuilder,
+    SeparatorBuilder,
+    SeparatorSpacingSize,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
@@ -85,67 +88,34 @@ function mood(result) {
 }
 function tableEmbed(session, { phase = 'play', result = null, payout = 0, note = null } = {}) {
     const hide = phase === 'play';
-    const color =
-        result === 'bj' || result === 'win' ? 0xA78BFA :
-        result === 'push' ? 0x818CF8 :
-        result === 'lose' || result === 'bust' ? 0xF43F5E :
-        0x7C3AED;
-
+    const color = result === 'bj' || result === 'win' ? 0xA78BFA : result === 'push' ? 0x818CF8 : result === 'lose' || result === 'bust' ? 0xF43F5E : 0x7C3AED;
     const playerTotal = handTotal(session.player);
-    const dealerTotal = hide ? null : handTotal(session.dealer);
-    const status = phase === 'dealer' ? '✦ VEZ DA AETERNUS' : result
-        ? (result === 'bj' ? '✦ BLACKJACK NATURAL' :
-           result === 'win' ? '✦ VITÓRIA' :
-           result === 'push' ? '✦ EMPATE' :
-           result === 'bust' ? '✦ ESTOURO' : '✦ FIM DA PARTIDA')
-        : '✦ SUA VEZ';
-
+    const status = phase === 'dealer' ? '✦ VEZ DA AETERNUS' : result ? (result === 'bj' ? '✦ BLACKJACK NATURAL' : result === 'win' ? '✦ VITÓRIA' : result === 'push' ? '✦ EMPATE' : result === 'bust' ? '✦ ESTOURO' : '✦ FIM DA PARTIDA') : '✦ SUA VEZ';
     const lines = [
-        '╭────────── ✧ ──────────╮',
-        '　　 **A E T E R N U S**',
-        '　　　 **BLACKJACK**',
-        '╰────────── ✧ ──────────╯',
-        '',
-        '┌ ✧ **SUA APOSTA**',
-        `└ ✨ ${fmt(session.amount)} Éter${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
-        '',
-        '┌ ♜ **DEALER**',
-        `└ ${handLabel(session.dealer, hide)}`,
-        '',
-        '┌ ♠ **SUA MÃO**',
-        `└ ${handLabel(session.player)}`,
-        '',
+        '# ✧ A E T E R N U S',
+        '## BLACKJACK · MESA DE ÉTER',
+        '━━━━━━━━━━━━━━━━━━━━',
+        `**✧ SUA APOSTA**\n✨ ${fmt(session.amount)} Éter${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
+        `**♜ DEALER**\n${handLabel(session.dealer, hide)}`,
+        `**♠ SUA MÃO**\n${handLabel(session.player)}`,
         `> ${status}`
     ];
-
     if (result) {
-        lines.push('', mood(result));
+        lines.push(mood(result));
         if (payout > 0) lines.push(`> ✨ **Recebido:** +${fmt(payout)} Éter`);
         if (result === 'lose' || result === 'bust') lines.push(`> 💫 **Perdido:** −${fmt(session.amount)} Éter`);
         if (result === 'push') lines.push('> ↩️ Sua aposta foi devolvida.');
         lines.push(`> 🪙 **Saldo atual:** ${fmt(eter.get(session.userId))} Éter`);
     } else {
-        lines.push(
-            '',
-            `> 📊 **Sua pontuação:** ${playerTotal}`,
-            hide ? '> 🔒 A segunda carta do dealer está oculta.' : '',
-            '',
-            '_Compre uma carta, pare ou dobre sua aposta na primeira jogada._'
-        );
+        lines.push(`> 📊 **Sua pontuação:** ${playerTotal}`, hide ? '> 🔒 A segunda carta do dealer está oculta.' : '', '_Blackjack natural paga 3:2 · Dealer para em 17 · Ás vale 1 ou 11._');
     }
-
-    if (note) lines.push('', note);
-
-    return new EmbedBuilder()
-        .setColor(color)
-        .setTitle('✧  AETERNUS  /  MESA DE ÉTER')
-        .setDescription(lines.filter(Boolean).join('\n'))
-        .addFields(
-            { name: '🃏 Regras', value: 'Blackjack natural paga 3:2\nDealer para em 17', inline: true },
-            { name: '🎯 Objetivo', value: 'Chegue a 21 sem ultrapassar', inline: true }
-        )
-        .setFooter({ text: 'Aeternus • Economia Astral  ✦  Ás vale 1 ou 11' })
-        .setTimestamp();
+    if (note) lines.push(note);
+    const panel = new ContainerBuilder().setAccentColor(color).addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.filter(Boolean).join('\n')));
+    if (phase === 'play') {
+        panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+            .addActionRowComponents(playButtons(session.userId, session.firstAction && session.player.length === 2 && eter.get(session.userId) >= session.amount));
+    }
+    return panel;
 }
 function playButtons(userId, canDouble) {
     const row = new ActionRowBuilder().addComponents(
@@ -221,28 +191,25 @@ module.exports = {
                 eter.add(session.userId, session.amount, { reason: 'bj push' });
                 sessions.delete(session.userId);
                 return message.reply({
-                    embeds: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount })],
-                    components: [againRow(session.userId, session.amount)]
+                    components: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount }), againRow(session.userId, session.amount)],
+                    flags: MessageFlags.IsComponentsV2
                 });
             }
             const pay = Math.floor(session.amount * 2.5);
             eter.add(session.userId, pay, { reason: 'bj natural' });
             sessions.delete(session.userId);
             return message.reply({
-                embeds: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay })],
-                components: [againRow(session.userId, session.amount)]
+                components: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay }), againRow(session.userId, session.amount)], flags: MessageFlags.IsComponentsV2
             });
         }
         if (isBlackjack(session.dealer)) {
             sessions.delete(session.userId);
             return message.reply({
-                embeds: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.' })],
-                components: [againRow(session.userId, session.amount)]
+                components: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.' }), againRow(session.userId, session.amount)], flags: MessageFlags.IsComponentsV2
             });
         }
         await message.reply({
-            embeds: [tableEmbed(session, { phase: 'play' })],
-            components: [playButtons(session.userId, true)]
+            components: [tableEmbed(session, { phase: 'play' })], flags: MessageFlags.IsComponentsV2
         });
     },
     async handleComponent(interaction) {
@@ -269,28 +236,24 @@ module.exports = {
                     eter.add(userId, session.amount, { reason: 'bj push' });
                     sessions.delete(userId);
                     return interaction.update({
-                        embeds: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount })],
-                        components: [againRow(userId, session.amount)]
+                        components: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                     });
                 }
                 const pay = Math.floor(session.amount * 2.5);
                 eter.add(userId, pay, { reason: 'bj natural' });
                 sessions.delete(userId);
                 return interaction.update({
-                    embeds: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay })],
-                    components: [againRow(userId, session.amount)]
+                    components: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                 });
             }
             if (isBlackjack(session.dealer)) {
                 sessions.delete(userId);
                 return interaction.update({
-                    embeds: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.' })],
-                    components: [againRow(userId, session.amount)]
+                    components: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.' }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                 });
             }
             return interaction.update({
-                embeds: [tableEmbed(session, { phase: 'play' })],
-                components: [playButtons(userId, true)]
+                components: [tableEmbed(session, { phase: 'play' })], flags: MessageFlags.IsComponentsV2
             });
         }
 
@@ -304,13 +267,11 @@ module.exports = {
             if (handTotal(session.player) > 21) {
                 sessions.delete(userId);
                 return interaction.update({
-                    embeds: [tableEmbed(session, { phase: 'end', result: 'bust' })],
-                    components: [againRow(userId, session.amount)]
+                    components: [tableEmbed(session, { phase: 'end', result: 'bust' }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                 });
             }
             return interaction.update({
-                embeds: [tableEmbed(session, { phase: 'play' })],
-                components: [playButtons(userId, false)]
+                components: [tableEmbed(session, { phase: 'play' })], flags: MessageFlags.IsComponentsV2
             });
         }
 
@@ -330,27 +291,24 @@ module.exports = {
             if (handTotal(session.player) > 21) {
                 sessions.delete(userId);
                 return interaction.update({
-                    embeds: [tableEmbed(session, { phase: 'end', result: 'bust' })],
-                    components: [againRow(userId, Math.floor(session.amount / 2))]
+                    components: [tableEmbed(session, { phase: 'end', result: 'bust' }), againRow(userId, Math.floor(session.amount / 2))], flags: MessageFlags.IsComponentsV2
                 });
             }
             dealerPlay(session);
             const { result, payout } = settle(session);
             sessions.delete(userId);
             return interaction.update({
-                embeds: [tableEmbed(session, { phase: 'end', result, payout })],
-                components: [againRow(userId, Math.floor(session.amount / 2))]
+                components: [tableEmbed(session, { phase: 'end', result, payout }), againRow(userId, Math.floor(session.amount / 2))], flags: MessageFlags.IsComponentsV2
             });
         }
 
         if (action === 'stand') {
             // Mostra a Aeternus jogando, uma carta por vez.
             await interaction.update({
-                embeds: [tableEmbed(session, {
+                components: [tableEmbed(session, {
                     phase: 'dealer',
                     note: '🌌 **A Aeternus está comprando cartas...**'
-                })],
-                components: []
+                })], flags: MessageFlags.IsComponentsV2
             });
 
             await new Promise(resolve => setTimeout(resolve, 900));
@@ -358,21 +316,19 @@ module.exports = {
             while (handTotal(session.dealer) < 17) {
                 session.dealer.push(draw(session.deck));
                 await interaction.editReply({
-                    embeds: [tableEmbed(session, {
+                    components: [tableEmbed(session, {
                         phase: 'dealer',
                         note: `🃏 **A Aeternus comprou uma carta:** ${showCard(session.dealer[session.dealer.length - 1])}`
-                    })],
-                    components: []
+                    })], flags: MessageFlags.IsComponentsV2
                 });
                 await new Promise(resolve => setTimeout(resolve, 1100));
             }
 
             await interaction.editReply({
-                embeds: [tableEmbed(session, {
+                components: [tableEmbed(session, {
                     phase: 'dealer',
                     note: '✧ A Aeternus encerrou a compra e está revelando o resultado...'
-                })],
-                components: []
+                })], flags: MessageFlags.IsComponentsV2
             });
             await new Promise(resolve => setTimeout(resolve, 800));
 
@@ -380,8 +336,8 @@ module.exports = {
             const original = session.doubled ? Math.floor(session.amount / 2) : session.amount;
             sessions.delete(userId);
             return interaction.editReply({
-                embeds: [tableEmbed(session, { phase: 'end', result, payout })],
-                components: [againRow(userId, original)]
+                components: [tableEmbed(session, { phase: 'end', result, payout }), againRow(userId, original)],
+                flags: MessageFlags.IsComponentsV2
             });
         }
     }
