@@ -399,6 +399,9 @@ function startWeb(client) {
         return res.json(result);
     });
 
+    // Sistema de masmorra temporariamente desativado: bloqueia leitura e ações da API.
+    app.use('/api/dungeon', (req, res) => res.status(503).json({ error: 'O sistema de masmorra está temporariamente desativado.' }));
+
     app.get('/api/dungeon/:id', requireAuth, rateLimit(), (req, res) => {
         const match = dungeon.getDungeonMatch(req.params.id);
         if (!match) return res.status(404).json({ error: 'Masmorra não encontrada' });
