@@ -11,13 +11,24 @@ const {
     MessageFlags
 } = require('discord.js');
 const eter = require('../utils/eter');
+const store = require('../utils/store');
 const { resolveBet } = require('../utils/parseAmount');
 const { fmt, betFooter, C } = require('../utils/gameStyle');
 
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-const sessions = new Map();
+const savedBlackjack = store.load('blackjack_sessions.json', { nextGameId: 1, active: {} });
+const sessions = new Map(Object.entries(savedBlackjack?.active || {}));
+let nextGameId = Math.max(Number(savedBlackjack?.nextGameId) || 1, ...[...sessions.values()].map(s => (Number(s.gameId) || 0) + 1), 1);
 const INSURANCE_COST = 100000;
+async function persistSessions() {
+    store.save('blackjack_sessions.json', { nextGameId, active: Object.fromEntries(sessions) });
+    try { await store.flush(); } catch (error) { console.error('[blackjack] Falha ao salvar partidas:', error.message); }
+}
+function trackMessage(session, sent, channelId) {
+    session.channelId = session.channelId || channelId || null;
+    session.messageId = sent?.id || sent?.resource?.message?.id || session.messageId || null;
+}
 
 function freshDeck() {
     const d = [];
@@ -160,7 +171,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
 
     const panel = new ContainerBuilder().setAccentColor(color);
     const heading = new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# ✧ A E T E R N U S\n## BLACKJACK · MESA DE ÉTER'));
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ✧ A E T E R N U S\n## BLACKJACK · PARTIDA #${String(session.gameId).padStart(6, '0')}`));
     if (imageUrl) {
         heading.setThumbnailAccessory(new ThumbnailBuilder()
             .setURL(imageUrl)
@@ -232,11 +243,15 @@ function settle(session) {
 function dealerPlay(session) {
     while (handTotal(session.dealer) < 17) session.dealer.push(draw(session.deck));
 }
-function startHand(userId, amount, artUrl = null) {
+function startHand(userId, amount, artUrl = null, channelId = null) {
     const deck = freshDeck();
     const session = {
+        gameId: nextGameId++,
         userId,
         amount,
+        channelId,
+        messageId: null,
+        phase: 'play',
         artUrl,
         hits: 0,
         deck,
@@ -251,7 +266,64 @@ function startHand(userId, amount, artUrl = null) {
     return session;
 }
 
+async function restoreActiveGames(client) {
+    for (const [userId, session] of [...sessions.entries()]) {
+        let message = null;
+        if (session.channelId && session.messageId) {
+            try {
+                const channel = await client.channels.fetch(session.channelId);
+                message = await channel?.messages?.fetch(session.messageId);
+            } catch (error) {
+                console.warn('[blackjack] Não foi possível localizar a mensagem da partida #' + session.gameId + ':', error.message);
+            }
+        }
+
+        // Se o bot caiu enquanto a banca comprava cartas, conclui a jogada pendente.
+        if (session.phase === 'dealer') {
+            dealerPlay(session);
+            const { result, payout } = settle(session);
+            if (session.insured && (result === 'lose' || result === 'bust')) {
+                eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
+            }
+            const original = session.doubled ? Math.floor(session.amount / 2) : session.amount;
+            sessions.delete(userId);
+            await persistSessions();
+            if (message) {
+                try {
+                    await message.edit({
+                        components: [tableEmbed(session, {
+                            phase: 'end',
+                            result,
+                            payout,
+                            note: '🔄 Resultado recuperado após a reinicialização da Aeternus.'
+                        }), againRow(userId, original)],
+                        flags: MessageFlags.IsComponentsV2
+                    });
+                } catch (error) {
+                    console.warn('[blackjack] Não foi possível atualizar o resultado recuperado:', error.message);
+                }
+            }
+            continue;
+        }
+
+        if (message) {
+            try {
+                await message.edit({
+                    components: [tableEmbed(session, {
+                        phase: 'play',
+                        note: '🔄 **Partida restaurada:** o estado foi recuperado após a reinicialização da Aeternus.'
+                    })],
+                    flags: MessageFlags.IsComponentsV2
+                });
+            } catch (error) {
+                console.warn('[blackjack] Não foi possível restaurar a mensagem da partida #' + session.gameId + ':', error.message);
+            }
+        }
+    }
+}
+
 module.exports = {
+    restoreActiveGames,
     name: 'blackjack',
     aliases: ['bj', '21'],
     description: 'Blackjack · éter',
@@ -263,12 +335,14 @@ module.exports = {
             return message.reply('Termine a mão atual primeiro.');
 
         eter.remove(message.author.id, bet.amount, { reason: 'bj bet' });
-        const session = startHand(message.author.id, bet.amount, message.client.user.displayAvatarURL({ extension: 'png', size: 256 }));
+        const session = startHand(message.author.id, bet.amount, message.client.user.displayAvatarURL({ extension: 'png', size: 256 }), message.channel?.id);
+        await persistSessions();
 
         if (isBlackjack(session.player)) {
             if (isBlackjack(session.dealer)) {
                 eter.add(session.userId, session.amount, { reason: 'bj push' });
                 sessions.delete(session.userId);
+                await persistSessions();
                 return message.reply({
                     components: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount }), againRow(session.userId, session.amount)],
                     flags: MessageFlags.IsComponentsV2
@@ -277,19 +351,23 @@ module.exports = {
             const pay = Math.floor(session.amount * 2.5);
             eter.add(session.userId, pay, { reason: 'bj natural' });
             sessions.delete(session.userId);
+            await persistSessions();
             return message.reply({
                 components: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay }), againRow(session.userId, session.amount)], flags: MessageFlags.IsComponentsV2
             });
         }
         if (isBlackjack(session.dealer)) {
             sessions.delete(session.userId);
+            await persistSessions();
             return message.reply({
                 components: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.' }), againRow(session.userId, session.amount)], flags: MessageFlags.IsComponentsV2
             });
         }
-        await message.reply({
+        const sent = await message.reply({
             components: [tableEmbed(session, { phase: 'play' })], flags: MessageFlags.IsComponentsV2
         });
+        trackMessage(session, sent, message.channel?.id);
+        await persistSessions();
     },
     async handleComponent(interaction) {
         const parts = interaction.customId.split(':');
@@ -315,11 +393,13 @@ module.exports = {
                 allowedMentions: { users: [userId] },
                 reply: { messageReference: interaction.message.id, failIfNotExists: false }
             });
-            const session = startHand(userId, bet.amount, interaction.client.user.displayAvatarURL({ extension: 'png', size: 256 }));
+            const session = startHand(userId, bet.amount, interaction.client.user.displayAvatarURL({ extension: 'png', size: 256 }), interaction.channelId);
+            await persistSessions();
             if (isBlackjack(session.player)) {
                 if (isBlackjack(session.dealer)) {
                     eter.add(userId, session.amount, { reason: 'bj push' });
                     sessions.delete(userId);
+                    await persistSessions();
                     return interaction.channel.send({
                         reply: { messageReference: interaction.message.id, failIfNotExists: false },
                         components: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
@@ -328,6 +408,7 @@ module.exports = {
                 const pay = Math.floor(session.amount * 2.5);
                 eter.add(userId, pay, { reason: 'bj natural' });
                 sessions.delete(userId);
+                await persistSessions();
                 return interaction.channel.send({
                     reply: { messageReference: mentionMessage.id, failIfNotExists: false },
                     components: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
@@ -335,19 +416,24 @@ module.exports = {
             }
             if (isBlackjack(session.dealer)) {
                 sessions.delete(userId);
+                await persistSessions();
                 return interaction.update({
                     components: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.' }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                 });
             }
-            return interaction.channel.send({
+            const sent = await interaction.channel.send({
                 reply: { messageReference: mentionMessage.id, failIfNotExists: false },
                 components: [tableEmbed(session, { phase: 'play' })], flags: MessageFlags.IsComponentsV2
             });
+            trackMessage(session, sent, interaction.channelId);
+            await persistSessions();
+            return sent;
         }
 
         const session = sessions.get(userId);
         if (!session)
             return interaction.reply({ content: '⏳ Mão expirada.', flags: MessageFlags.Ephemeral });
+        trackMessage(session, interaction.message, interaction.channelId);
 
         if (action === 'insurance') {
             if (session.insured) return interaction.reply({ content: '🛡️ Você já contratou o seguro desta mão.', flags: MessageFlags.Ephemeral });
@@ -355,6 +441,7 @@ module.exports = {
             eter.remove(userId, INSURANCE_COST, { reason: 'bj insurance' });
             session.insured = true;
             session.insuranceCoverage = session.amount;
+            await persistSessions();
             return interaction.update({ components: [tableEmbed(session, { phase: 'play', note: `🛡️ **Seguro contratado!** Custa ${fmt(INSURANCE_COST)} Éter. Se perder esta mão, a cobertura devolverá ${fmt(session.insuranceCoverage)} Éter.` })], flags: MessageFlags.IsComponentsV2 });
         }
 
@@ -365,10 +452,12 @@ module.exports = {
             if (handTotal(session.player) > 21) {
                 sessions.delete(userId);
                 if (session.insured) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
+                await persistSessions();
                 return interaction.update({
                     components: [tableEmbed(session, { phase: 'end', result: 'bust' }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                 });
             }
+            await persistSessions();
             return interaction.update({
                 components: [tableEmbed(session, { phase: 'play' })], flags: MessageFlags.IsComponentsV2
             });
@@ -391,6 +480,7 @@ module.exports = {
             if (handTotal(session.player) > 21) {
                 sessions.delete(userId);
                 if (session.insured) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
+                await persistSessions();
                 return interaction.update({
                     components: [tableEmbed(session, { phase: 'end', result: 'bust' }), againRow(userId, Math.floor(session.amount / 2))], flags: MessageFlags.IsComponentsV2
                 });
@@ -399,6 +489,7 @@ module.exports = {
             const { result, payout } = settle(session);
             if (session.insured && (result === 'lose' || result === 'bust')) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
             sessions.delete(userId);
+            await persistSessions();
             return interaction.update({
                 components: [tableEmbed(session, { phase: 'end', result, payout }), againRow(userId, Math.floor(session.amount / 2))], flags: MessageFlags.IsComponentsV2
             });
@@ -406,6 +497,8 @@ module.exports = {
 
         if (action === 'stand') {
             // Mostra a Aeternus jogando, uma carta por vez.
+            session.phase = 'dealer';
+            await persistSessions();
             await interaction.update({
                 components: [tableEmbed(session, {
                     phase: 'dealer',
@@ -417,6 +510,7 @@ module.exports = {
 
             while (handTotal(session.dealer) < 17) {
                 session.dealer.push(draw(session.deck));
+                await persistSessions();
                 await interaction.editReply({
                     components: [tableEmbed(session, {
                         phase: 'dealer',
@@ -438,6 +532,7 @@ module.exports = {
             if (session.insured && (result === 'lose' || result === 'bust')) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
             const original = session.doubled ? Math.floor(session.amount / 2) : session.amount;
             sessions.delete(userId);
+            await persistSessions();
             return interaction.editReply({
                 components: [tableEmbed(session, { phase: 'end', result, payout }), againRow(userId, original)],
                 flags: MessageFlags.IsComponentsV2
