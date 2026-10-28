@@ -1,6 +1,7 @@
 const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
+const { nextGameNumber } = require('../utils/gameNumbers');
 
 const CHOICES = {
     pedra: { label: 'Pedra', emoji: '✊', beats: 'tesoura' },
@@ -47,7 +48,7 @@ function gameEmbed(game, result = false) {
         .setColor(result ? (game.result === 'empate' ? 0xf59e0b : 0x8b5cf6) : 0x8b5cf6)
         .setTitle(result ? '✦ AETERNUS • PEDRA, PAPEL E TESOURA' : '✦ AETERNUS • DESAFIO PPT')
         .setDescription(desc)
-        .setFooter({ text: result ? 'Partida encerrada' : 'Cada jogador pode escolher apenas uma vez.' });
+        .setFooter({ text: `Aeternus • PPT · Partida #${String(game.partida).padStart(6, '0')} · ${result ? 'Partida encerrada' : 'Cada jogador pode escolher apenas uma vez.'}` });
 }
 
 function gameButtons(game, disabled = false) {
@@ -75,8 +76,9 @@ async function startGame({ challenger, opponent, channel, bet = 0, replyTo = nul
     }
 
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    const partida = await nextGameNumber('ppt');
     const game = {
-        id, challenger: challenger.id, opponent: opponent.id,
+        id, partida, challenger: challenger.id, opponent: opponent.id,
         challengerName: challenger.globalName || challenger.username,
         opponentName: opponent.globalName || opponent.username,
         choices: {}, bet, channel, done: false
@@ -93,7 +95,8 @@ async function startGame({ challenger, opponent, channel, bet = 0, replyTo = nul
         games.delete(id);
         await game.message.edit({
             embeds: [new EmbedBuilder().setColor(0x64748b).setTitle('⌛ Desafio PPT expirado')
-                .setDescription('A partida foi cancelada porque os dois jogadores não escolheram a tempo.')],
+                .setDescription('A partida foi cancelada porque os dois jogadores não escolheram a tempo.')
+                .setFooter({ text: `Aeternus • PPT · Partida #${String(game.partida).padStart(6, '0')}` })],
             components: [gameButtons(game, true)]
         }).catch(() => {});
     }, GAME_TIMEOUT);
@@ -122,7 +125,8 @@ async function settle(game) {
             games.delete(game.id);
             await game.message.edit({
                 embeds: [new EmbedBuilder().setColor(0xef4444).setTitle('Partida cancelada')
-                    .setDescription('Um dos jogadores não tem mais éter suficiente. Nenhuma aposta foi cobrada.')],
+                    .setDescription('Um dos jogadores não tem mais éter suficiente. Nenhuma aposta foi cobrada.')
+                    .setFooter({ text: `Aeternus • PPT · Partida #${String(game.partida).padStart(6, '0')}` })],
                 components: [gameButtons(game, true)]
             });
             return;
