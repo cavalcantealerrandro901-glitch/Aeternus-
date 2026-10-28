@@ -116,7 +116,7 @@ function mood(result, session, payout = 0) {
     else details = `> **${playerScore} pontos** contra ${dealerScore} da banca. Perdeu **${fmt(session.amount)} Éter**${session.insured ? ` · seguro: +${fmt(session.insuranceCoverage)}` : ''}.`;
     return `${lead}\n${tail}\n${details}`;
 }
-function tableEmbed(session, { phase = 'play', result = null, payout = 0, note = null } = {}) {
+function tableEmbed(session, { phase = 'play', result = null, payout = 0, note = null, mention = false } = {}) {
     const hide = phase === 'play';
     const color = result === 'bj' || result === 'win' ? 0x22C55E : result === 'push' ? 0xEAB308 : result === 'lose' || result === 'bust' ? 0xEF4444 : 0x7C3AED;
     const art = {
@@ -177,6 +177,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
             .setURL(imageUrl)
             .setDescription('Ilustração da Aeternus para esta fase da mesa.'));
     }
+    if (mention) panel.addTextDisplayComponents(new TextDisplayBuilder().setContent(`<@${session.userId}>`));
     panel.addSectionComponents(heading)
         .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Large))
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(betBlock))
@@ -379,57 +380,57 @@ module.exports = {
             return interaction.reply({ content: 'Não é a sua mesa.', flags: MessageFlags.Ephemeral });
 
         if (action === 'again') {
-            await interaction.deferUpdate();
             const amount = parseInt(parts[3], 10);
             const bet = resolveBet(String(amount), eter.get(userId), { label: '✨' });
-            if (!bet.ok) return interaction.followUp({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
+            if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
             if (sessions.has(userId)) {
-                return interaction.followUp({
+                return interaction.reply({
                     content: '⚠️ Você já tem uma mão ativa. Termine essa partida antes de iniciar outra.',
                     flags: MessageFlags.Ephemeral
                 });
             }
+
             eter.remove(userId, bet.amount, { reason: 'bj again' });
-            const mentionMessage = await interaction.channel.send({
-                content: `<@${userId}>`,
-                allowedMentions: { users: [userId] },
-                reply: { messageReference: interaction.message.id, failIfNotExists: false }
-            });
             const session = startHand(userId, bet.amount, interaction.client.user.displayAvatarURL({ extension: 'png', size: 256 }), interaction.channelId);
+            trackMessage(session, interaction.message, interaction.channelId);
             await persistSessions();
+
             if (isBlackjack(session.player)) {
                 if (isBlackjack(session.dealer)) {
                     eter.add(userId, session.amount, { reason: 'bj push' });
                     sessions.delete(userId);
                     await persistSessions();
-                    return interaction.channel.send({
-                        reply: { messageReference: interaction.message.id, failIfNotExists: false },
-                        components: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
+                    return interaction.update({
+                        components: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount, mention: true }), againRow(userId, session.amount)],
+                        flags: MessageFlags.IsComponentsV2,
+                        allowedMentions: { users: [userId] }
                     });
                 }
                 const pay = Math.floor(session.amount * 2.5);
                 eter.add(userId, pay, { reason: 'bj natural' });
                 sessions.delete(userId);
                 await persistSessions();
-                return interaction.channel.send({
-                    reply: { messageReference: mentionMessage.id, failIfNotExists: false },
-                    components: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
+                return interaction.update({
+                    components: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay, mention: true }), againRow(userId, session.amount)],
+                    flags: MessageFlags.IsComponentsV2,
+                    allowedMentions: { users: [userId] }
                 });
             }
             if (isBlackjack(session.dealer)) {
                 sessions.delete(userId);
                 await persistSessions();
                 return interaction.update({
-                    components: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.' }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
+                    components: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.', mention: true }), againRow(userId, session.amount)],
+                    flags: MessageFlags.IsComponentsV2,
+                    allowedMentions: { users: [userId] }
                 });
             }
-            const sent = await interaction.channel.send({
-                reply: { messageReference: mentionMessage.id, failIfNotExists: false },
-                components: [tableEmbed(session, { phase: 'play' })], flags: MessageFlags.IsComponentsV2
+
+            return interaction.update({
+                components: [tableEmbed(session, { phase: 'play', mention: true })],
+                flags: MessageFlags.IsComponentsV2,
+                allowedMentions: { users: [userId] }
             });
-            trackMessage(session, sent, interaction.channelId);
-            await persistSessions();
-            return sent;
         }
 
         const session = sessions.get(userId);
