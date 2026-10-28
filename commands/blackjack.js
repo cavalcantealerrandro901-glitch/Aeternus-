@@ -15,6 +15,7 @@ const { fmt, betFooter, C } = require('../utils/gameStyle');
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const sessions = new Map();
+const INSURANCE_COST = 100000;
 
 function freshDeck() {
     const d = [];
@@ -96,6 +97,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
         '## BLACKJACK · MESA DE ÉTER',
         '━━━━━━━━━━━━━━━━━━━━',
         `**✧ SUA APOSTA**\n✨ ${fmt(session.amount)} Éter${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
+        session.insured ? `🛡️ **Seguro contratado:** ${fmt(INSURANCE_COST)} Éter · cobertura de ${fmt(session.insuranceCoverage)} Éter` : '',
         `**♜ DEALER**\n${handLabel(session.dealer, hide)}`,
         `**♠ SUA MÃO**\n${handLabel(session.player)}`,
         `> ${status}`
@@ -105,6 +107,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
         if (payout > 0) lines.push(`> ✨ **Recebido:** +${fmt(payout)} Éter`);
         if (result === 'lose' || result === 'bust') lines.push(`> 💫 **Perdido:** −${fmt(session.amount)} Éter`);
         if (result === 'push') lines.push('> ↩️ Sua aposta foi devolvida.');
+        if (session.insured && (result === 'lose' || result === 'bust')) lines.push(`> 🛡️ **Seguro acionado:** +${fmt(session.insuranceCoverage)} Éter recuperados.`);
         lines.push(`> 🪙 **Saldo atual:** ${fmt(eter.get(session.userId))} Éter`);
     } else {
         lines.push(`> 📊 **Sua pontuação:** ${playerTotal}`, hide ? '> 🔒 A segunda carta do dealer está oculta.' : '', '_Blackjack natural paga 3:2 · Dealer para em 17 · Ás vale 1 ou 11._');
@@ -113,11 +116,11 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
     const panel = new ContainerBuilder().setAccentColor(color).addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.filter(Boolean).join('\n')));
     if (phase === 'play') {
         panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
-            .addActionRowComponents(playButtons(session.userId, session.firstAction && session.player.length === 2 && eter.get(session.userId) >= session.amount));
+            .addActionRowComponents(playButtons(session.userId, session.firstAction && session.player.length === 2 && eter.get(session.userId) >= session.amount, session));
     }
     return panel;
 }
-function playButtons(userId, canDouble) {
+function playButtons(userId, canDouble, session) {
     const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`blackjack:hit:${userId}`).setLabel('Carta').setEmoji('🃏').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`blackjack:stand:${userId}`).setLabel('Parar').setEmoji('🛑').setStyle(ButtonStyle.Secondary)
@@ -126,6 +129,14 @@ function playButtons(userId, canDouble) {
         row.addComponents(
             new ButtonBuilder().setCustomId(`blackjack:double:${userId}`).setLabel('Dobrar').setEmoji('✖️').setStyle(ButtonStyle.Success)
         );
+    }
+    if (session && !session.insured) {
+        row.addComponents(new ButtonBuilder()
+            .setCustomId(`blackjack:insurance:${userId}`)
+            .setLabel(`Seguro (${fmt(INSURANCE_COST)})`)
+            .setEmoji('🛡️')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(eter.get(userId) < INSURANCE_COST));
     }
     return row;
 }
@@ -166,7 +177,9 @@ function startHand(userId, amount) {
         player: [draw(deck), draw(deck)],
         dealer: [draw(deck), draw(deck)],
         doubled: false,
-        firstAction: true
+        firstAction: true,
+        insured: false,
+        insuranceCoverage: 0
     };
     sessions.set(userId, session);
     return session;
@@ -261,11 +274,21 @@ module.exports = {
         if (!session)
             return interaction.reply({ content: '⏳ Mão expirada.', flags: MessageFlags.Ephemeral });
 
+        if (action === 'insurance') {
+            if (session.insured) return interaction.reply({ content: '🛡️ Você já contratou o seguro desta mão.', flags: MessageFlags.Ephemeral });
+            if (eter.get(userId) < INSURANCE_COST) return interaction.reply({ content: `Você precisa de **${fmt(INSURANCE_COST)} Éter** para contratar o seguro.`, flags: MessageFlags.Ephemeral });
+            eter.remove(userId, INSURANCE_COST, { reason: 'bj insurance' });
+            session.insured = true;
+            session.insuranceCoverage = session.amount;
+            return interaction.update({ components: [tableEmbed(session, { phase: 'play', note: `🛡️ **Seguro contratado!** Custa ${fmt(INSURANCE_COST)} Éter. Se perder esta mão, a cobertura devolverá ${fmt(session.insuranceCoverage)} Éter.` })], flags: MessageFlags.IsComponentsV2 });
+        }
+
         if (action === 'hit') {
             session.player.push(draw(session.deck));
             session.firstAction = false;
             if (handTotal(session.player) > 21) {
                 sessions.delete(userId);
+                if (session.insured) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
                 return interaction.update({
                     components: [tableEmbed(session, { phase: 'end', result: 'bust' }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                 });
@@ -333,6 +356,7 @@ module.exports = {
             await new Promise(resolve => setTimeout(resolve, 800));
 
             const { result, payout } = settle(session);
+            if (session.insured && (result === 'lose' || result === 'bust')) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
             const original = session.doubled ? Math.floor(session.amount / 2) : session.amount;
             sessions.delete(userId);
             return interaction.editReply({
