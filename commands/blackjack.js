@@ -259,9 +259,9 @@ module.exports = {
             await interaction.deferUpdate();
             const amount = parseInt(parts[3], 10);
             const bet = resolveBet(String(amount), eter.get(userId), { label: '✨' });
-            if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
+            if (!bet.ok) return interaction.followUp({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
             if (sessions.has(userId)) {
-                return interaction.reply({
+                return interaction.followUp({
                     content: '⚠️ Você já tem uma mão ativa. Termine essa partida antes de iniciar outra.',
                     flags: MessageFlags.Ephemeral
                 });
@@ -278,7 +278,7 @@ module.exports = {
                     eter.add(userId, session.amount, { reason: 'bj push' });
                     sessions.delete(userId);
                     return interaction.channel.send({
-                        reply: { messageReference: mentionMessage.id, failIfNotExists: false },
+                        reply: { messageReference: interaction.message.id, failIfNotExists: false },
                         components: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                     });
                 }
