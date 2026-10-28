@@ -85,9 +85,8 @@ function handLabel(cards, hideHole = false) {
 function mood(result, session, payout = 0) {
     const playerScore = handTotal(session.player);
     const dealerScore = handTotal(session.dealer);
-    const profit = Math.max(0, payout - session.amount);
-    if (result === 'bj') return `✦ 🌟 **BLACKJACK NATURAL**\n> 21 na abertura! **${fmt(payout)} Éter recebidos** · lucro: **${fmt(profit)}**.`;
-    if (result === 'win') return `✦ 🏆 **VITÓRIA**\n> **${playerScore} pontos** contra ${dealerScore} da banca. Recebeu **${fmt(payout)} Éter** · lucro: **${fmt(profit)}**.`;
+    if (result === 'bj') return `✦ 🌟 **BLACKJACK NATURAL**\n> 21 na abertura! Você recebeu **${fmt(payout)} Éter**.`;
+    if (result === 'win') return `✦ 🏆 **VITÓRIA**\n> **${playerScore} pontos** contra ${dealerScore} da banca. Recebeu **${fmt(payout)} Éter**.`;
     if (result === 'push') return `✦ ⚖️ **EMPATE**\n> Ambos fizeram **${playerScore} pontos**. Aposta devolvida: **${fmt(session.amount)} Éter**.`;
     if (result === 'bust') return `✦ 💥 **PASSOU DE 21**\n> **${playerScore} pontos**. Perdeu **${fmt(session.amount)} Éter**${session.insured ? ` · seguro: +${fmt(session.insuranceCoverage)}` : ''}.`;
     return `✦ 🌑 **DERROTA**\n> **${playerScore} pontos** contra ${dealerScore} da banca. Perdeu **${fmt(session.amount)} Éter**${session.insured ? ` · seguro: +${fmt(session.insuranceCoverage)}` : ''}.`;
