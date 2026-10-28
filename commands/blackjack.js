@@ -97,7 +97,10 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
         loss: 'https://cdn.discordapp.com/attachments/1506622463965007904/1565122973222961162/lv_0_20260905194445.jpg',
         win: 'https://cdn.discordapp.com/attachments/1506622463965007904/1565122973663232050/lv_0_20260905194951.jpg'
     };
-    const imageUrl = result === 'win' || result === 'bj' ? art.win
+    // Durante a animação da Aeternus comprando cartas, mantenha a arte da mesa.
+    // A arte de vitória/derrota só aparece depois que a animação termina.
+    const imageUrl = phase !== 'end' ? art.table
+        : result === 'win' || result === 'bj' ? art.win
         : result === 'lose' || result === 'bust' ? art.loss
         : art.table;
     const playerTotal = handTotal(session.player);
