@@ -12,6 +12,7 @@ const {
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
 const { fmt, betFooter } = require('../utils/gameStyle');
+const { nextGameNumber } = require('../utils/gameNumbers');
 
 const COLS = 4;
 const ROWS = 4;
@@ -27,7 +28,6 @@ const BOMB_CHANCE = 0.26;
 const games = new Map();
 const processing = new Set();
 
-let matchCounter = 0;
 
 // Multiplicador clássico de Mines: risco justo × house edge
 function multAt(opened, bombs) {
@@ -352,7 +352,7 @@ function fullComponents(game, reveal = false) {
     return [...boardRows(game, ended), ...controlsRows(game)];
 }
 
-function makeGame(userId, amount, bombCount, fun, meta = {}) {
+async function makeGame(userId, amount, bombCount, fun, meta = {}) {
     const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const bombs = new Set();
     const maxBombs = Math.min(Math.max(1, bombCount), MAX_BOMBS, TOTAL - 1);
@@ -360,7 +360,7 @@ function makeGame(userId, amount, bombCount, fun, meta = {}) {
 
     const g = {
         id,
-        partida: ++matchCounter,
+        partida: await nextGameNumber('minas'),
         userId,
         amount: fun && !meta.testMode ? 0 : amount,
         fun: !!fun,
@@ -454,7 +454,7 @@ module.exports = {
 
         let game;
         if (args[1] == null || args[1] === '') {
-            game = makeGame(message.author.id, 0, bombsRaw, true, { testMode });
+            game = await makeGame(message.author.id, 0, bombsRaw, true, { testMode });
         } else {
             const bet = resolveBet(args[1], testMode ? Number.MAX_SAFE_INTEGER : eter.get(message.author.id), { label: '✨' });
             if (!bet.ok) return message.reply('❌ Aposta inválida: ' + bet.error + '\nUse `O.minas <bombas> <valor>` (100–10.000.000 ✨).');
@@ -464,7 +464,7 @@ module.exports = {
                 );
             }
             if (!testMode) eter.remove(message.author.id, bet.amount, { reason: 'mines bet' });
-            game = makeGame(message.author.id, bet.amount, bombsRaw, false, { testMode });
+            game = await makeGame(message.author.id, bet.amount, bombsRaw, false, { testMode });
         }
 
         const msg = await message.reply({
@@ -567,7 +567,7 @@ module.exports = {
 
                 if (!channel) return;
 
-                const newGame = makeGame(
+                const newGame = await makeGame(
                     game.userId,
                     game.amount,
                     game.bombCount,
