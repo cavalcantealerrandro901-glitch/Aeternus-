@@ -107,7 +107,7 @@ function mood(result, session, payout = 0) {
 }
 function tableEmbed(session, { phase = 'play', result = null, payout = 0, note = null } = {}) {
     const hide = phase === 'play';
-    const color = result === 'bj' || result === 'win' ? 0xA78BFA : result === 'push' ? 0x818CF8 : result === 'lose' || result === 'bust' ? 0xF43F5E : 0x7C3AED;
+    const color = result === 'bj' || result === 'win' ? 0x22C55E : result === 'push' ? 0xEAB308 : result === 'lose' || result === 'bust' ? 0xEF4444 : 0x7C3AED;
     const art = {
         table: 'https://cdn.discordapp.com/attachments/1506622463965007904/1565122972677578852/grok-image-5aa59eff-57fb-4ed5-86dd-78c7a9371b77.jpg',
         loss: 'https://cdn.discordapp.com/attachments/1506622463965007904/1565122973222961162/lv_0_20260905194445.jpg',
