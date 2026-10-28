@@ -7,7 +7,7 @@ module.exports = {
     aliases: ['dungeon', 'dg', 'torre'],
     description: 'Entra na masmorra (exploração por clique, pisos 1–26)',
     async execute(message, args) {
-        return message.reply('🏰 O sistema de masmorra está temporariamente desativado.');
+        return message.reply('🏰 O sistema de masmorra está desativado por tempo indeterminado.');
 
         if (!player.has(message.author.id)) {
             return message.reply('Crie seu perfil com `O.j criar`.');
