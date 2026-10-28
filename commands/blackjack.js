@@ -92,6 +92,14 @@ function mood(result) {
 function tableEmbed(session, { phase = 'play', result = null, payout = 0, note = null } = {}) {
     const hide = phase === 'play';
     const color = result === 'bj' || result === 'win' ? 0xA78BFA : result === 'push' ? 0x818CF8 : result === 'lose' || result === 'bust' ? 0xF43F5E : 0x7C3AED;
+    const art = {
+        table: 'https://cdn.discordapp.com/attachments/1506622463965007904/1565122972677578852/grok-image-5aa59eff-57fb-4ed5-86dd-78c7a9371b77.jpg',
+        loss: 'https://cdn.discordapp.com/attachments/1506622463965007904/1565122973222961162/lv_0_20260905194445.jpg',
+        win: 'https://cdn.discordapp.com/attachments/1506622463965007904/1565122973663232050/lv_0_20260905194951.jpg'
+    };
+    const imageUrl = result === 'win' || result === 'bj' ? art.win
+        : result === 'lose' || result === 'bust' ? art.loss
+        : art.table;
     const playerTotal = handTotal(session.player);
     const status = phase === 'dealer' ? '✦ VEZ DA AETERNUS' : result ? (result === 'bj' ? '✦ BLACKJACK NATURAL' : result === 'win' ? '✦ VITÓRIA' : result === 'push' ? '✦ EMPATE' : result === 'bust' ? '✦ ESTOURO' : '✦ FIM DA PARTIDA') : '✦ SUA VEZ';
     const lines = [
@@ -120,10 +128,10 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
     const panel = new ContainerBuilder().setAccentColor(color);
     const heading = new SectionBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent('# ✧ A E T E R N U S\n## BLACKJACK · MESA DE ÉTER\n━━━━━━━━━━━━━━━━━━━━'));
-    if (session.artUrl) {
+    if (imageUrl) {
         heading.setThumbnailAccessory(new ThumbnailBuilder()
-            .setURL(session.artUrl)
-            .setDescription('A Aeternus observa a mesa de Éter.'));
+            .setURL(imageUrl)
+            .setDescription('Ilustração da Aeternus para esta fase da mesa.'));
     }
     panel.addSectionComponents(heading)
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.filter(Boolean).join('\n')));
