@@ -3,6 +3,8 @@ const {
     TextDisplayBuilder,
     SeparatorBuilder,
     SeparatorSpacingSize,
+    SectionBuilder,
+    ThumbnailBuilder,
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
@@ -168,11 +170,13 @@ function settle(session) {
 function dealerPlay(session) {
     while (handTotal(session.dealer) < 17) session.dealer.push(draw(session.deck));
 }
-function startHand(userId, amount) {
+function startHand(userId, amount, artUrl = null) {
     const deck = freshDeck();
     const session = {
         userId,
         amount,
+        artUrl,
+        hits: 0,
         deck,
         player: [draw(deck), draw(deck)],
         dealer: [draw(deck), draw(deck)],
@@ -197,7 +201,7 @@ module.exports = {
             return message.reply('Termine a mão atual primeiro.');
 
         eter.remove(message.author.id, bet.amount, { reason: 'bj bet' });
-        const session = startHand(message.author.id, bet.amount);
+        const session = startHand(message.author.id, bet.amount, message.client.user.displayAvatarURL({ extension: 'png', size: 256 }));
 
         if (isBlackjack(session.player)) {
             if (isBlackjack(session.dealer)) {
@@ -243,7 +247,7 @@ module.exports = {
                 });
             }
             eter.remove(userId, bet.amount, { reason: 'bj again' });
-            const session = startHand(userId, bet.amount);
+            const session = startHand(userId, bet.amount, interaction.client.user.displayAvatarURL({ extension: 'png', size: 256 }));
             if (isBlackjack(session.player)) {
                 if (isBlackjack(session.dealer)) {
                     eter.add(userId, session.amount, { reason: 'bj push' });
@@ -285,6 +289,7 @@ module.exports = {
 
         if (action === 'hit') {
             session.player.push(draw(session.deck));
+            session.hits++;
             session.firstAction = false;
             if (handTotal(session.player) > 21) {
                 sessions.delete(userId);
@@ -311,6 +316,7 @@ module.exports = {
             session.doubled = true;
             session.firstAction = false;
             session.player.push(draw(session.deck));
+            session.hits++;
             if (handTotal(session.player) > 21) {
                 sessions.delete(userId);
                 if (session.insured) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
