@@ -2,7 +2,8 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags
 } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
@@ -85,55 +86,65 @@ function mood(result) {
 function tableEmbed(session, { phase = 'play', result = null, payout = 0, note = null } = {}) {
     const hide = phase === 'play';
     const color =
-        result === 'bj' || result === 'win'
-            ? C.win
-            : result === 'push'
-              ? C.draw
-              : result === 'lose' || result === 'bust'
-                ? C.lose
-                : 0x1a1a2e;
+        result === 'bj' || result === 'win' ? 0xA78BFA :
+        result === 'push' ? 0x818CF8 :
+        result === 'lose' || result === 'bust' ? 0xF43F5E :
+        0x7C3AED;
+
+    const playerTotal = handTotal(session.player);
+    const dealerTotal = hide ? null : handTotal(session.dealer);
+    const status = result
+        ? (result === 'bj' ? '✦ BLACKJACK NATURAL' :
+           result === 'win' ? '✦ VITÓRIA' :
+           result === 'push' ? '✦ EMPATE' :
+           result === 'bust' ? '✦ ESTOURO' : '✦ FIM DA PARTIDA')
+        : '✦ SUA VEZ';
+
     const lines = [
-        '```',
-        '   ╔════════════════════════════════╗',
-        '   ║     AETERNUS  ·  BLACKJACK   ║',
-        '   ╚════════════════════════════════╝',
-        '```',
-        `✨ Aposta **${fmt(session.amount)}**${session.doubled ? ' · *doubled*' : ''}`,
+        '╭────────── ✧ ──────────╮',
+        '　　 **A E T E R N U S**',
+        '　　　 **BLACKJACK**',
+        '╰────────── ✧ ──────────╯',
         '',
-        `🏠 **Dealer**`,
-        `> ${handLabel(session.dealer, hide)}`,
+        '┌ ✧ **SUA APOSTA**',
+        `└ ✨ ${fmt(session.amount)} Éter${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
         '',
-        `👤 **Você**`,
-        `> ${handLabel(session.player, false)}`
+        '┌ ♜ **DEALER**',
+        `└ ${handLabel(session.dealer, hide)}`,
+        '',
+        '┌ ♠ **SUA MÃO**',
+        `└ ${handLabel(session.player)}`,
+        '',
+        `> ${status}`
     ];
+
     if (result) {
         lines.push('', mood(result));
-        if (payout > 0) lines.push(`✨ + **${fmt(payout)}**`);
-        if (result === 'lose' || result === 'bust')
-            lines.push(`💫 Prejuízo − **${fmt(session.amount)}**`);
-        if (result === 'push') lines.push('Aposta devolvida na íntegra.');
-        lines.push(`💼 Saldo: ✨ **${fmt(eter.get(session.userId))}**`);
+        if (payout > 0) lines.push(`> ✨ **Recebido:** +${fmt(payout)} Éter`);
+        if (result === 'lose' || result === 'bust') lines.push(`> 💫 **Perdido:** −${fmt(session.amount)} Éter`);
+        if (result === 'push') lines.push('> ↩️ Sua aposta foi devolvida.');
+        lines.push(`> 🪙 **Saldo atual:** ${fmt(eter.get(session.userId))} Éter`);
     } else {
-        lines.push('', '_Use **Pedir carta** para comprar, **Parar** para encerrar ou **Dobrar** na primeira decisão._');
+        lines.push(
+            '',
+            `> 📊 **Sua pontuação:** ${playerTotal}`,
+            hide ? '> 🔒 A segunda carta do dealer está oculta.' : '',
+            '',
+            '_Compre uma carta, pare ou dobre sua aposta na primeira jogada._'
+        );
     }
+
     if (note) lines.push('', note);
+
     return new EmbedBuilder()
         .setColor(color)
-        .setTitle(
-            result === 'bj'
-                ? '🌟  Blackjack Natural'
-                : result === 'win'
-                  ? '🃏  Você venceu'
-                  : result === 'push'
-                    ? '🤝  Push'
-                    : result === 'bust'
-                      ? '💥  Bust'
-                      : result
-                        ? '🃏  Dealer venceu'
-                        : '🃏  Blackjack'
+        .setTitle('✧  AETERNUS  /  MESA DE ÉTER')
+        .setDescription(lines.filter(Boolean).join('\n'))
+        .addFields(
+            { name: '🃏 Regras', value: 'Blackjack natural paga 3:2\nDealer para em 17', inline: true },
+            { name: '🎯 Objetivo', value: 'Chegue a 21 sem ultrapassar', inline: true }
         )
-        .setDescription(lines.join('\n'))
-        .setFooter({ text: 'Aeternus Economy • Blackjack 3:2 · Dealer para em 17 · Ás vale 1 ou 11 · ' + betFooter() })
+        .setFooter({ text: 'Aeternus • Economia Astral  ✦  Ás vale 1 ou 11' })
         .setTimestamp();
 }
 function playButtons(userId, canDouble) {
@@ -239,13 +250,18 @@ module.exports = {
         const action = parts[1];
         const userId = parts[2];
         if (interaction.user.id !== userId)
-            return interaction.reply({ content: 'Não é a sua mesa.', ephemeral: true });
+            return interaction.reply({ content: 'Não é a sua mesa.', flags: MessageFlags.Ephemeral });
 
         if (action === 'again') {
             const amount = parseInt(parts[3], 10);
             const bet = resolveBet(String(amount), eter.get(userId), { label: '✨' });
-            if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, ephemeral: true });
-            if (sessions.has(userId)) sessions.delete(userId);
+            if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
+            if (sessions.has(userId)) {
+                return interaction.reply({
+                    content: '⚠️ Você já tem uma mão ativa. Termine essa partida antes de iniciar outra.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
             eter.remove(userId, bet.amount, { reason: 'bj again' });
             const session = startHand(userId, bet.amount);
             if (isBlackjack(session.player)) {
@@ -280,7 +296,7 @@ module.exports = {
 
         const session = sessions.get(userId);
         if (!session)
-            return interaction.reply({ content: '⏳ Mão expirada.', ephemeral: true });
+            return interaction.reply({ content: '⏳ Mão expirada.', flags: MessageFlags.Ephemeral });
 
         if (action === 'hit') {
             session.player.push(draw(session.deck));
@@ -300,11 +316,11 @@ module.exports = {
 
         if (action === 'double') {
             if (!session.firstAction || session.player.length !== 2)
-                return interaction.reply({ content: 'Só na primeira ação.', ephemeral: true });
+                return interaction.reply({ content: 'Só na primeira ação.', flags: MessageFlags.Ephemeral });
             if (eter.get(userId) < session.amount)
                 return interaction.reply({
                     content: `❌ ✨ insuficiente. Precisa de **${fmt(session.amount)}**.`,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             eter.remove(userId, session.amount, { reason: 'bj double' });
             session.amount *= 2;
