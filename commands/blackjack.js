@@ -108,11 +108,13 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
     const betBlock = [
         `**✧ SUA APOSTA**`,
         `✨ **${fmt(session.amount)} Éter**${session.doubled ? ' · **APOSTA DOBRADA**' : ''}`,
-        phase === 'play'
-            ? (session.hits > 0
-                ? '*🌌 Cada nova carta altera o destino. A Aeternus observa sua próxima escolha…*'
-                : '*✧ O destino está nas cartas. Que o Éter guie sua decisão.*')
-            : null,
+        result
+            ? mood(result)
+            : phase === 'play'
+                ? (session.hits > 0
+                    ? '*🌌 Cada nova carta altera o destino. A Aeternus observa sua próxima escolha…*'
+                    : '*✧ O destino está nas cartas. Que o Éter guie sua decisão.*')
+                : null,
         session.insured ? `🛡️ Seguro: **${fmt(INSURANCE_COST)} Éter** · cobertura: **${fmt(session.insuranceCoverage)} Éter**` : null
     ].filter(Boolean).join('\n');
 
@@ -129,7 +131,6 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
 
     const details = [];
     if (result) {
-        details.push(mood(result));
         if (payout > 0) details.push(`✨ **Recebido:** +${fmt(payout)} Éter`);
         if (result === 'lose' || result === 'bust') details.push(`💫 **Perdido:** −${fmt(session.amount)} Éter`);
         if (result === 'push') details.push('↩️ Sua aposta foi devolvida.');
