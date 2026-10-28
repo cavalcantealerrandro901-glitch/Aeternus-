@@ -313,12 +313,14 @@ module.exports = {
             session.player.push(draw(session.deck));
             if (handTotal(session.player) > 21) {
                 sessions.delete(userId);
+                if (session.insured) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
                 return interaction.update({
                     components: [tableEmbed(session, { phase: 'end', result: 'bust' }), againRow(userId, Math.floor(session.amount / 2))], flags: MessageFlags.IsComponentsV2
                 });
             }
             dealerPlay(session);
             const { result, payout } = settle(session);
+            if (session.insured && (result === 'lose' || result === 'bust')) eter.add(userId, session.insuranceCoverage, { reason: 'bj insurance payout' });
             sessions.delete(userId);
             return interaction.update({
                 components: [tableEmbed(session, { phase: 'end', result, payout }), againRow(userId, Math.floor(session.amount / 2))], flags: MessageFlags.IsComponentsV2
