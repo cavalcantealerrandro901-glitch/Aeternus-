@@ -83,11 +83,11 @@ function handLabel(cards, hideHole = false) {
     return `${showHand(cards)}   (**${t}**${soft}${bj})`;
 }
 function mood(result) {
-    if (result === 'bj') return '🌟 **BLACKJACK NATURAL!** As cartas perfeitas.';
-    if (result === 'win') return '🎉 **Vitória!** Você leu a mesa melhor que a casa.';
-    if (result === 'push') return '🤝 **Empate (push).** Aposta devolvida.';
-    if (result === 'bust') return '💥 **Estourou.** Passou de 21… a casa leva.';
-    return '😢 **Derrota.** Prejuízo na mesa. Tente outra vez.';
+    if (result === 'bj') return '✦ 🌟 **BLACKJACK NATURAL**\n*O destino sorriu para você: 21 nas duas primeiras cartas. Uma vitória digna das estrelas.*';
+    if (result === 'win') return '✦ 🏆 **A MESA É SUA**\n*As cartas se alinharam ao seu favor. Você venceu esta rodada e conquistou mais Éter.*';
+    if (result === 'push') return '✦ ⚖️ **DESTINO EM EQUILÍBRIO**\n*Nem a sua mão, nem a da Aeternus prevaleceu. Sua aposta retorna intacta.*';
+    if (result === 'bust') return '✦ 💥 **ALÉM DOS 21**\n*O risco foi maior que a sorte desta vez. A mão ultrapassou o limite e a rodada ficou com a casa.*';
+    return '✦ 🌑 **A CASA PREVALECEU**\n*Desta vez, as cartas escolheram outro caminho. Reúna sua estratégia e tente novamente.*';
 }
 function tableEmbed(session, { phase = 'play', result = null, payout = 0, note = null } = {}) {
     const hide = phase === 'play';
