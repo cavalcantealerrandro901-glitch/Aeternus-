@@ -256,6 +256,7 @@ module.exports = {
             return interaction.reply({ content: 'Não é a sua mesa.', flags: MessageFlags.Ephemeral });
 
         if (action === 'again') {
+            await interaction.deferUpdate();
             const amount = parseInt(parts[3], 10);
             const bet = resolveBet(String(amount), eter.get(userId), { label: '✨' });
             if (!bet.ok) return interaction.reply({ content: `❌ ${bet.error}`, flags: MessageFlags.Ephemeral });
@@ -266,19 +267,26 @@ module.exports = {
                 });
             }
             eter.remove(userId, bet.amount, { reason: 'bj again' });
+            const mentionMessage = await interaction.channel.send({
+                content: `<@${userId}>`,
+                allowedMentions: { users: [userId] },
+                reply: { messageReference: interaction.message.id, failIfNotExists: false }
+            });
             const session = startHand(userId, bet.amount, interaction.client.user.displayAvatarURL({ extension: 'png', size: 256 }));
             if (isBlackjack(session.player)) {
                 if (isBlackjack(session.dealer)) {
                     eter.add(userId, session.amount, { reason: 'bj push' });
                     sessions.delete(userId);
-                    return interaction.update({
+                    return interaction.channel.send({
+                        reply: { messageReference: mentionMessage.id, failIfNotExists: false },
                         components: [tableEmbed(session, { phase: 'end', result: 'push', payout: session.amount }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                     });
                 }
                 const pay = Math.floor(session.amount * 2.5);
                 eter.add(userId, pay, { reason: 'bj natural' });
                 sessions.delete(userId);
-                return interaction.update({
+                return interaction.channel.send({
+                    reply: { messageReference: mentionMessage.id, failIfNotExists: false },
                     components: [tableEmbed(session, { phase: 'end', result: 'bj', payout: pay }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                 });
             }
@@ -288,7 +296,8 @@ module.exports = {
                     components: [tableEmbed(session, { phase: 'end', result: 'lose', note: 'Dealer abriu **Blackjack**.' }), againRow(userId, session.amount)], flags: MessageFlags.IsComponentsV2
                 });
             }
-            return interaction.update({
+            return interaction.channel.send({
+                reply: { messageReference: mentionMessage.id, failIfNotExists: false },
                 components: [tableEmbed(session, { phase: 'play' })], flags: MessageFlags.IsComponentsV2
             });
         }
