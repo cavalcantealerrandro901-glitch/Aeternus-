@@ -1,6 +1,7 @@
 const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const eter = require('../utils/eter');
 const { resolveBet } = require('../utils/parseAmount');
+const { nextGameNumber } = require('../utils/gameNumbers');
 
 const MIN_BET = 1_000;
 const MAX_BET = 35_000_000;
@@ -20,6 +21,7 @@ async function run(userId, side, amountRaw, reply) {
     const bet = resolveBet(amountRaw, bal, { min: MIN_BET, max: MAX_BET, label: '✨' });
     if (!bet.ok) return reply(`❌ ${bet.error}`);
     eter.remove(userId, bet.amount, { reason: 'cara' });
+    const partida = await nextGameNumber('cara');
     const result = Math.random() < 0.5 ? 'cara' : 'coroa';
     const win = result === s;
     if (win) eter.add(userId, bet.amount * 2, { reason: 'cara win' });
@@ -35,6 +37,7 @@ async function run(userId, side, amountRaw, reply) {
                             : '✨ **-' + fmt(bet.amount) + '**'
                     }\nSaldo: ✨ **${fmt(eter.get(userId))}**\n\n${win ? '🏆 A sorte sorriu para você nesta rodada!' : '💔 Desta vez não deu certo; fica para a próxima.'}`
                 )
+                .setFooter({ text: `Aeternus • Cara ou Coroa · Partida #${String(partida).padStart(6, '0')}` })
         ],
         components: [
             new ActionRowBuilder().addComponents(
