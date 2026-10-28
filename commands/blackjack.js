@@ -171,7 +171,7 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
 
     const panel = new ContainerBuilder().setAccentColor(color);
     const heading = new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ✧ A E T E R N U S\n## BLACKJACK · PARTIDA #${String(session.gameId).padStart(6, '0')}`));
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent('# ✧ A E T E R N U S\n## BLACKJACK · MESA DE ÉTER'));
     if (imageUrl) {
         heading.setThumbnailAccessory(new ThumbnailBuilder()
             .setURL(imageUrl)
@@ -193,6 +193,8 @@ function tableEmbed(session, { phase = 'play', result = null, payout = 0, note =
         panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
             .addActionRowComponents(playButtons(session.userId, session.firstAction && session.player.length === 2 && eter.get(session.userId) >= session.amount, session));
     }
+    panel.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(`-# PARTIDA #${String(session.gameId).padStart(6, '0')}`));
     return panel;
 }
 function playButtons(userId, canDouble, session) {
