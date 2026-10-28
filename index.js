@@ -66,6 +66,10 @@ async function main() {
     client.prefixDefault = 'O.';
 
     loadCommands(client);
+    client.once('ready', async () => {
+        try { await client.commands.get('blackjack')?.restoreActiveGames?.(client); }
+        catch (error) { console.error('[blackjack] Falha ao restaurar partidas salvas:', error); }
+    });
     loadEvents(client);
     loadSystems(client);
     startWeb(client);
