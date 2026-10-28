@@ -30,7 +30,7 @@ async function bridgeSlashToPrefix(interaction, cmd, client) {
             }
             if (!replied && !interaction.replied && !interaction.deferred) {
                 replied = true;
-                return interaction.reply(payload);
+                return interaction.reply({ ...payload, fetchReply: true });
             }
             return interaction.followUp(payload);
         }
